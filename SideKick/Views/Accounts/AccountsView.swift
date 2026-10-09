@@ -19,6 +19,9 @@ struct AccountsView: View {
                         Text("Initial Apple device registration may require the one-time computer pairing setup. LocalDevVPN is a separate app and must be installed and connected when SideStore’s device workflow requires it.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
+                        Text("Adding an Apple ID now saves its session first. Device registration and certificate setup are deferred so they can’t block account sign-in.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
                     .padding(.vertical, 6)
 
@@ -42,6 +45,14 @@ struct AccountsView: View {
                         ForEach(accountStore.accounts) { account in
                             accountRow(account)
                         }
+                    }
+                }
+
+                if let signInCheckpoint = accountStore.signInCheckpoint {
+                    Section("Sign-in status") {
+                        Label(signInCheckpoint, systemImage: signInCheckpoint == "Account saved successfully" ? "checkmark.circle" : "info.circle")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
                 }
 

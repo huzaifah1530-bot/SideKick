@@ -22,6 +22,7 @@ struct SigningAccountSummary: Identifiable, Equatable {
 final class SigningAccountStore {
     private(set) var accounts: [SigningAccountSummary] = []
     private(set) var isWorking = false
+    private(set) var signInCheckpoint = UserDefaults.standard.string(forKey: "sidekick.sign-in-checkpoint")
 
     private let vault = SigningSessionVault()
 
@@ -81,17 +82,56 @@ final class SigningAccountStore {
         isWorking = true
         defer { isWorking = false }
 
+        setSignInCheckpoint("Starting SideStore authentication")
+        let previousAccount = await activeAccountSummary()
+        if let previousAccount,
+           let previousCredentials = try? currentSessionCredentials(for: previousAccount) {
+            try? vault.save(
+                previousCredentials,
+                key: SigningSessionVault.key(
+                    accountIdentifier: previousAccount.accountIdentifier,
+                    teamIdentifier: previousAccount.teamIdentifier
+                )
+            )
+        }
+
         let handler = SideKickSignInFlowHandler(
             presentingViewController: presenter,
             appleID: appleID,
-            password: password
+            password: password,
+            onAuthenticationSuccess: { [weak self] in
+                self?.setSignInCheckpoint("Apple authentication succeeded; resolving developer team")
+            }
         )
-        let result = try await AuthManager.shared.signIn(
-            presentingViewController: presenter,
-            signInHandler: handler,
-            skipHowTos: true
-        )
+        let result: SignInResult
+        do {
+            result = try await AuthManager.shared.signIn(
+                presentingViewController: presenter,
+                signInHandler: handler,
+                skipDeviceRegistration: true,
+                skipCertificateProvisioning: true,
+                skipHowTos: true
+            )
+        } catch {
+            setSignInCheckpoint("Sign-in failed before SideStore returned an account")
+            throw error
+        }
+
+        setSignInCheckpoint("Apple ID authenticated; saving its signing session")
         let accountIdentifier = result.team.account?.identifier ?? result.team.identifier
+        let sessionKey = SigningSessionVault.key(
+            accountIdentifier: accountIdentifier,
+            teamIdentifier: result.team.identifier
+        )
+        let existingCredentials = try? vault.load(key: sessionKey)
+        let certificateData = existingCredentials?.certificateData
+        let certificatePassword = existingCredentials?.certificatePassword
+        if let certificateData {
+            let certificate = try CertificateManager.parse(certificateData, password: certificatePassword)
+            try CertificateManager.shared.setActiveCertificate(certificate)
+        } else {
+            CertificateManager.shared.clearActiveCertificate()
+        }
         guard let email = AuthManager.shared.currentAppleID,
               let password = AuthManager.shared.password,
               let adsid = AuthManager.shared.adsid,
@@ -107,14 +147,18 @@ final class SigningAccountStore {
             xcodeToken: xcodeToken,
             accountIdentifier: accountIdentifier,
             teamIdentifier: result.team.identifier,
-            certificateData: certificate?.p12Data,
-            certificatePassword: certificate?.password
+            certificateData: certificateData,
+            certificatePassword: certificatePassword
         )
-        try vault.save(credentials, key: SigningSessionVault.key(
-            accountIdentifier: accountIdentifier,
-            teamIdentifier: result.team.identifier
-        ))
+        try vault.save(credentials, key: sessionKey)
+        setSignInCheckpoint("Session saved; refreshing the account list")
         await reload()
+        setSignInCheckpoint("Account saved successfully")
+    }
+
+    private func setSignInCheckpoint(_ value: String) {
+        signInCheckpoint = value
+        UserDefaults.standard.set(value, forKey: "sidekick.sign-in-checkpoint")
     }
 
     func activate(_ account: SigningAccountSummary) async throws {
@@ -274,9 +318,16 @@ final class SigningAccountStore {
 private final class SideKickSignInFlowHandler: SignInFlowHandler {
     private var suppliedCredentials: (String, String)?
     private var authenticationError: Error?
+    private let onAuthenticationSuccess: () -> Void
 
-    init(presentingViewController: UIViewController, appleID: String, password: String) {
+    init(
+        presentingViewController: UIViewController,
+        appleID: String,
+        password: String,
+        onAuthenticationSuccess: @escaping () -> Void
+    ) {
         suppliedCredentials = (appleID, password)
+        self.onAuthenticationSuccess = onAuthenticationSuccess
         super.init(presentingViewController: presentingViewController)
     }
 
@@ -290,10 +341,17 @@ private final class SideKickSignInFlowHandler: SignInFlowHandler {
     }
 
     override func handleSignInResult(_ result: Result<(ALTAccount, ALTAppleAPISession), Error>) async {
-        if case .failure(let error) = result {
+        switch result {
+        case .success:
+            onAuthenticationSuccess()
+        case .failure(let error):
             authenticationError = error
         }
     }
+
+    override func showCertificateSkipAcknowledgment() async {}
+
+    override func showDeviceRegistrationSkipAcknowledgment() async {}
 }
 
 private struct SigningSessionCredentials: Codable {
