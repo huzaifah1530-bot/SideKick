@@ -21,7 +21,16 @@ struct SettingsView: View {
                     LabeledContent("Pairing file", value: PairingFileManager.shared.hasPairingFile() ? "Added" : "Not set up")
                     Button("Import pairing file…") { isChoosingPairingFile = true }
                     Link("How to get a pairing file", destination: AppConstants.URLs.pairingDocumentation)
-                    Text("Create the file using a computer you’ve paired with this iPhone, then import it here. You don’t need the SideStore app. Without pairing, SideKick can’t install or refresh apps.")
+                    Text("This file is a trust record for this iPhone, created once using a computer and iLoader. Import it here. SideStore itself is not required.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+
+                Section("Install and refresh") {
+                    Link(destination: URL(string: "https://apps.apple.com/app/id6755608044")!) {
+                        Label("Get LocalDevVPN", systemImage: "arrow.up.right")
+                    }
+                    Text("The current signing engine needs Wi-Fi and LocalDevVPN connected while installing or refreshing. Apple requires a Network Extension entitlement and tunnel extension; this SideKick build doesn’t have either, so it can’t switch the tunnel on itself. Open LocalDevVPN, tap Connect, then return here.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
@@ -60,9 +69,15 @@ struct SettingsView: View {
                 throw PairingSetupError.unreadableFile
             }
             try await AppBootManager.shared.startMinimuxer(pairingFile: pairingContent)
-            pairingStatus = "This iPhone is paired and SideKick can reach it. You can now try installing or refreshing an app."
+            do {
+                try await ensureMinimuxerReady()
+                _ = try await fetchUDID(forceLive: true)
+                pairingStatus = "Pairing is set up and SideKick can reach this iPhone. Install and refresh are ready."
+            } catch {
+                pairingStatus = "Pairing file imported. SideKick couldn’t reach the iPhone yet. Connect to Wi-Fi, open LocalDevVPN, tap Connect, then retry an install or refresh.\n\n\(error.localizedDescription)"
+            }
         } catch {
-            pairingStatus = "SideKick couldn’t use that pairing file. Make sure it was created for this iPhone and try again.\n\n\(error.localizedDescription)"
+            pairingStatus = "SideKick couldn’t import that pairing file. Make sure it was created for this iPhone and try again.\n\n\(error.localizedDescription)"
         }
         isShowingPairingStatus = true
     }

@@ -10,8 +10,9 @@ SideKick is a native SwiftUI iOS sideloading app. The existing SwiftUI screens a
 - Apple ID sign-in is connected to SideStore's native authentication flow. SideKick stores each account/team session and its signing certificate separately in the iOS Keychain and can switch the active SideStore identity.
 - IPA install and account-scoped refresh are routed through the integrated signing engine; these still need physical-device validation. SideKick now exposes pairing-file import and connection validation in Settings.
 - A pairing file must first be created on a computer paired with the iPhone. SideKick does not create that trust record on-device. SideStore's app is not required.
+- Install and refresh currently require Wi-Fi and the separate LocalDevVPN App Store app. This SideKick build has neither the Network Extension entitlement nor a tunnel extension, so it cannot enable that VPN itself. Settings links to LocalDevVPN and explains the setup.
 
-SideKick stores its database in private app storage and does not require SideStore's App Group or app. The unsigned CI build still does not verify signing or on-device functionality. Pairing-file creation requires a previously paired computer; LocalDevVPN may be needed for some remote/WireGuard workflows.
+SideKick stores its database in private app storage and does not require SideStore's App Group or app. The unsigned CI build still does not verify signing or on-device functionality. Pairing-file creation requires a previously paired computer. The current install/refresh transport requires LocalDevVPN; it is not bundled in SideKick.
 
 The upstream SideStore scheme also builds a widget extension. SideKick removes that extension from the packaged IPA because it is not part of the standalone app and an unsigned extension cannot be installed without its own valid provisioning profile.
 
