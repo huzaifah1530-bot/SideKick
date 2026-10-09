@@ -1,0 +1,70 @@
+name: SideKick iOS Build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "SideKick/**"
+      - "project.yml"
+      - ".github/workflows/ios-build.yml"
+  workflow_dispatch: {}
+
+jobs:
+  build-ipa:
+    name: Build unsigned SideKick IPA
+    runs-on: macos-15
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Select Xcode 26
+        run: |
+          set -euo pipefail
+          XCODE_PATH="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)"
+          if [ -z "$XCODE_PATH" ]; then
+            echo "No Xcode 26.x found on this runner. Available Xcodes:"
+            ls -d /Applications/Xcode*.app
+            exit 1
+          fi
+          sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
+
+      - name: Show toolchain
+        run: |
+          xcodebuild -version
+          xcodebuild -showsdks | grep -i "iphoneos" || true
+
+      - name: Install XcodeGen
+        run: brew install xcodegen
+
+      - name: Generate Xcode project
+        run: xcodegen generate
+
+      - name: Build SideKick for iOS
+        run: |
+          xcodebuild -project SideKick.xcodeproj \
+            -scheme SideKick \
+            -configuration Release \
+            -sdk iphoneos \
+            -destination "generic/platform=iOS" \
+            -derivedDataPath build \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            clean build
+
+      - name: Package IPA
+        run: |
+          set -euo pipefail
+          APP_PATH="build/Build/Products/Release-iphoneos/SideKick.app"
+          test -d "$APP_PATH"
+          mkdir -p Payload artifacts
+          cp -R "$APP_PATH" Payload/
+          zip -r -X artifacts/SideKick-unsigned.ipa Payload
+
+      - name: Upload IPA artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: SideKick-unsigned-ipa
+          path: artifacts/SideKick-unsigned.ipa
+          if-no-files-found: error
