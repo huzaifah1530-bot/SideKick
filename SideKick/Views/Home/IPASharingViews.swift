@@ -229,7 +229,7 @@ struct URLImportView: View {
             switch error {
             case .invalidArchive, .missingAppBundle, .missingBundleIdentifier, .notAnIPA:
                 errorMessage = "That link returned a web page or a file that isn’t a valid IPA. Use a direct IPA download link."
-            case .inaccessibleFile, .sourceFileMissing, .sourceBookmarkUnavailable:
+            case .inaccessibleFile, .sourceFileMissing, .sourceBookmarkUnavailable, .bundleIdentifierMismatch:
                 errorMessage = error.localizedDescription
             }
         } catch {
