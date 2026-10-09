@@ -299,6 +299,45 @@ final class SigningAccountStore {
         }
     }
 
+    /// Restore the certificate associated with LiveContainer before the SideStore
+    /// deep-link exporter reads its process-global active certificate.
+    func prepareCertificateForLiveContainerExport() async throws {
+        guard DatabaseManager.shared.isStarted else {
+            throw SigningAccountError.databaseUnavailable
+        }
+
+        let context = DatabaseManager.shared.viewContext
+        let target = try await context.perform {
+            let apps = try context.fetch(InstalledApp.fetchRequest())
+            let liveContainer = apps.first {
+                $0.name.localizedCaseInsensitiveContains("LiveContainer") ||
+                    $0.bundleIdentifier.localizedCaseInsensitiveContains("livecontainer") ||
+                    $0.resignedBundleIdentifier.localizedCaseInsensitiveContains("livecontainer")
+            }
+            if let team = liveContainer?.team, let account = team.account {
+                return (account.identifier, team.identifier)
+            }
+
+            let sideKickTeamIdentifier = ALTApplication(fileURL: Bundle.Info.activeBundleURL)?
+                .provisioningProfile?.teamIdentifier
+            guard let sideKickTeamIdentifier,
+                  let team = try context.fetch(Team.fetchRequest()).first(where: { $0.identifier == sideKickTeamIdentifier }) else {
+                throw SigningAccountError.savedAccountMissing
+            }
+            return (team.account.identifier, team.identifier)
+        }
+
+        let credentials = try vault.load(key: SigningSessionVault.key(
+            accountIdentifier: target.0,
+            teamIdentifier: target.1
+        ))
+        guard let certificateData = credentials.certificateData else {
+            throw SigningAccountError.certificateUnavailable
+        }
+        let certificate = try CertificateManager.parse(certificateData, password: credentials.certificatePassword)
+        try CertificateManager.shared.setActiveCertificate(certificate)
+    }
+
     /// Completes the device registration and certificate setup deferred by the
     /// account sign-in screen before a real signing operation begins.
     private func ensureSigningReady(for target: SigningAccountSummary) async throws {
@@ -574,6 +613,7 @@ private enum SigningAccountError: LocalizedError {
     case sessionNotAvailable
     case savedAccountMissing
     case credentialsUnavailable
+    case certificateUnavailable
     case databaseUnavailable
     case keychain(OSStatus)
 
@@ -589,6 +629,8 @@ private enum SigningAccountError: LocalizedError {
             return "This account or team is missing from SideKick’s local data. Sign in again to restore it."
         case .credentialsUnavailable:
             return "SideKick couldn’t retrieve the Apple ID details. Please try signing in again."
+        case .certificateUnavailable:
+            return "SideKick has no saved signing certificate for the account used by LiveContainer. Refresh LiveContainer in SideKick, then import the certificate again."
         case .databaseUnavailable:
             return "SideKick’s local database isn’t available. Restart the app and try again before signing in."
         case .keychain(let status):

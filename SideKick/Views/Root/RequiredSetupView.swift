@@ -16,6 +16,7 @@ final class SetupStatus {
     private(set) var vpnInstalled = false
     private(set) var vpnConnected = false
     private(set) var pairingVerified = false
+    private(set) var refreshAutomationsConfigured = UserDefaults.standard.bool(forKey: Self.refreshAutomationsConfiguredKey)
     private(set) var isCheckingPairing = false
     private(set) var isReady = false
     var message: String?
@@ -30,6 +31,11 @@ final class SetupStatus {
 
     var selfSigningAccount: SigningAccountSummary? {
         accounts.accounts.first { $0.hasSavedSession && $0.teamIdentifier == requiredTeamIdentifier }
+    }
+
+    var isDeviceReady: Bool {
+        notificationsEnabled && backgroundRefreshEnabled && vpnInstalled && pairingVerified &&
+            vpnConnected && selfSigningAccount != nil
     }
 
     func refresh(reportConnectionErrors: Bool = false) async {
@@ -95,10 +101,16 @@ final class SetupStatus {
     }
 
     private static let pairingVerifiedKey = "sidekick.setup.pairing-verified"
+    private static let refreshAutomationsConfiguredKey = "sidekick.setup.refresh-automations-configured"
+
+    func confirmRefreshAutomationsConfigured() {
+        refreshAutomationsConfigured = true
+        UserDefaults.standard.set(true, forKey: Self.refreshAutomationsConfiguredKey)
+        updateReadyState()
+    }
 
     func updateReadyState() {
-        isReady = notificationsEnabled && backgroundRefreshEnabled && vpnInstalled && pairingVerified &&
-            vpnConnected && selfSigningAccount != nil
+        isReady = isDeviceReady && refreshAutomationsConfigured
     }
 
     func requestNotifications() async {
@@ -140,7 +152,7 @@ struct RequiredSetupView: View {
 
     private let vpnURL = URL(string: "localdevvpn://enable?scheme=sidestore")!
     private let appStoreURL = URL(string: "https://apps.apple.com/app/id6755608044")!
-    private let lastStep = 5
+    private let lastStep = 6
 
     var body: some View {
         NavigationStack {
@@ -163,6 +175,7 @@ struct RequiredSetupView: View {
                     accountPage.tag(3)
                     pairingPage.tag(4)
                     vpnPage.tag(5)
+                    refreshAutomationPage.tag(6)
                 }
                 .tabViewStyle(.page(indexDisplayMode: .never))
 
@@ -229,7 +242,8 @@ struct RequiredSetupView: View {
         case 2: status.backgroundRefreshEnabled
         case 3: status.selfSigningAccount != nil
         case 4: status.hasPairingFile
-        case 5: status.isReady
+        case 5: status.isDeviceReady
+        case 6: status.refreshAutomationsConfigured
         default: false
         }
     }
@@ -318,7 +332,7 @@ struct RequiredSetupView: View {
         onboardingPage(
             symbol: "network",
             title: "Connect to this iPhone",
-            message: status.isReady
+            message: status.isDeviceReady
                 ? "Your iPhone is paired and ready."
                 : status.vpnConnected
                     ? "LocalDevVPN’s tunnel is connected. Verify that this pairing file belongs to this iPhone."
@@ -339,9 +353,37 @@ struct RequiredSetupView: View {
                 }
                 .disabled(status.isCheckingPairing)
             }
-            if status.isReady {
+            if status.isDeviceReady {
                 Label("Setup Complete", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
+            }
+        }
+    }
+
+    private var refreshAutomationPage: some View {
+        onboardingPage(
+            symbol: "clock.arrow.circlepath",
+            title: "Schedule app refreshes",
+            message: "Add two daily Personal Automations in Shortcuts: run SideKick’s “Refresh Apps” action at 2:00 AM and again at 8:00 PM. The evening run skips if the morning refresh succeeded. Missed attempts stay quiet; SideKick only notifies you when an app has about two days left.") {
+            VStack(spacing: 12) {
+                SwiftUI.Button("Open Shortcuts") {
+                    UIApplication.shared.open(URL(string: "shortcuts://")!)
+                }
+                .buttonStyle(.borderedProminent)
+
+                Text("In Shortcuts, create a Time of Day automation for each time, choose Daily, add the “Refresh SideKick Apps” action, and turn off Ask Before Running. iOS does not let apps create or verify personal automations for you.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+
+                SwiftUI.Button {
+                    status.confirmRefreshAutomationsConfigured()
+                } label: {
+                    Label(status.refreshAutomationsConfigured ? "Automations Added" : "I’ve Added Both Automations",
+                          systemImage: status.refreshAutomationsConfigured ? "checkmark.circle.fill" : "checkmark.circle")
+                }
+                .buttonStyle(.bordered)
+                .disabled(status.refreshAutomationsConfigured)
             }
         }
     }

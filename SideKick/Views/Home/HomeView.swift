@@ -36,8 +36,8 @@ struct HomeView: View {
                     .listRowBackground(Color.clear)
                 }
 
-                if !filteredInstalledApps.isEmpty {
-                    SwiftUI.Section("Installed") {
+                if !filteredInstalledApps.isEmpty || !filteredImportedApps.isEmpty {
+                    SwiftUI.Section("Ready to Install") {
                         ForEach(filteredInstalledApps) { app in
                             NavigationLink {
                                 AppManagementView(installedApp: app)
@@ -45,11 +45,6 @@ struct HomeView: View {
                                 installedAppRow(app)
                             }
                         }
-                    }
-                }
-
-                if !filteredImportedApps.isEmpty {
-                    SwiftUI.Section("Ready to Install") {
                         ForEach(filteredImportedApps) { app in
                             NavigationLink {
                                 AppManagementView(importedApp: app) {

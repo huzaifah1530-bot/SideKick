@@ -22,6 +22,7 @@ final class AppEnvironment {
         databaseState = .starting
         do {
             try await DatabaseManager.shared.start()
+            await ExpirationNotificationScheduler.update()
             databaseState = .ready
         } catch {
             databaseState = .failed(Self.readableDescription(for: error))

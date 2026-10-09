@@ -91,10 +91,16 @@ final class SideStoreOperationService {
                 observationBox.retain(observation)
             }
         }
+        await ExpirationNotificationScheduler.update()
     }
 
-    func refresh(bundleIdentifier: String) async throws {
-        guard let presenter = UIApplication.shared.topViewController() else {
+    func refresh(
+        bundleIdentifier: String,
+        requiresPresenter: Bool = true,
+        updatesExpiryNotifications: Bool = true
+    ) async throws {
+        let presenter = UIApplication.shared.topViewController()
+        guard !requiresPresenter || presenter != nil else {
             throw SideStoreOperationError.presentationUnavailable
         }
         let context = DatabaseManager.shared.viewContext
@@ -120,6 +126,9 @@ final class SideStoreOperationService {
                 AppManager.shared.refresh([installedApp], presentingViewController: presenter, group: group)
             }
         }
+        if updatesExpiryNotifications {
+            await ExpirationNotificationScheduler.update()
+        }
     }
 
     func enableJIT(bundleIdentifier: String) async throws {
@@ -136,6 +145,34 @@ final class SideStoreOperationService {
                 continuation.resume(with: result.map { _ in () })
             }
         }
+    }
+
+    func refreshAllManagedAppsQuietly(
+        progressHandler: @escaping @MainActor @Sendable (Int, Int) -> Void = { _, _ in }
+    ) async -> (succeeded: Int, attempted: Int) {
+        let apps = await installedApps()
+        guard !apps.isEmpty else {
+            await ExpirationNotificationScheduler.update()
+            return (0, 0)
+        }
+
+        var succeeded = 0
+        for (index, app) in apps.enumerated() {
+            do {
+                try await refresh(
+                    bundleIdentifier: app.bundleIdentifier,
+                    requiresPresenter: false,
+                    updatesExpiryNotifications: false
+                )
+                succeeded += 1
+            } catch {
+                // Scheduled attempts are intentionally quiet; the next automation retries failures.
+                debugLog("[SideKick] Scheduled refresh failed for \(app.bundleIdentifier): \(error.localizedDescription)")
+            }
+            progressHandler(index + 1, apps.count)
+        }
+        await ExpirationNotificationScheduler.update()
+        return (succeeded, apps.count)
     }
 }
 
