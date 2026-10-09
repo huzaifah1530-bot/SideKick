@@ -1,21 +1,21 @@
 # SideKick
 
-SideKick is a native SwiftUI iOS app for managing sideloaded IPA files.
+SideKick is a native SwiftUI iOS sideloading app. The existing SwiftUI screens and IPA library are being integrated with SideStore's on-device signing and installation engine.
 
-## Current functionality
+## Integration status
 
-- Import an IPA from Files.
-- Validate that it is an iOS app archive and read its bundle ID, name, and version from `Info.plist`.
-- Keep imported IPA files and the library index in the app's Application Support directory.
-- Search the library and remove imported files.
+- The SideStore source is pinned as a recursive Git submodule at `Vendor/SideStore`.
+- The build uses SideStore's Xcode project and runtime bootstrap, while the app scene presents SideKick's SwiftUI UI.
+- The IPA library imports IPA files from Files, validates their bundle metadata, stores them locally, supports search, and removes imported files.
+- Apple ID sign-in, account selection per app, IPA install, pairing setup, LocalDevVPN readiness, and refresh are not yet wired into SideKick's screens. Do not treat these as working until they pass on a physical device.
 
-Signing, installation, Apple ID authentication, pairing, and app refresh are not implemented yet. The app labels these capabilities as unavailable; it does not simulate installs or refreshes.
+Free-account builds require the shared App Group to be present in the installed app's provisioning/signing state. A successful unsigned CI build does not verify that requirement. Initial SideStore-style installation and pairing also require the external computer/iLoader setup; LocalDevVPN is a separate app that must be installed and connected by the user.
 
-## SideStore backend research
+## Build and source distribution
 
-SideStore's on-device install path is a full application engine. It includes Apple developer account authentication, certificate and provisioning profile management, IPA signing, a database and install pipeline, device pairing, Minimuxer, and EM Proxy. The in-device install flow also relies on the LocalDevVPN companion and its system-granted entitlement. SideKick's current `IPAImportStore` is only the file and metadata layer, not that signing/install engine.
+GitHub Actions recursively checks out the pinned SideStore source and builds the integrated target. Each build uploads an unsigned IPA and a matching `SideKick-corresponding-source.tar.gz` artifact. Distribute those together, and keep source access available to anyone who receives the IPA.
 
-SideStore is licensed under AGPL-3.0. Incorporating its engine into a distributed SideKick build has source-distribution obligations. Review that license before vendoring or adapting its code.
+SideStore and Minimuxer are AGPL-3.0; SideSign is identified upstream as GPL-3.0. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md). A license file is absent from the pinned SideSign checkout, and the transitive package license set still needs a final audit before distributing builds beyond this private project. The corresponding-source artifact is intended to accompany each IPA.
 
 ## Project layout
 
@@ -34,7 +34,7 @@ SideKick/
 
 ## Build
 
-The repository uses XcodeGen and GitHub Actions to build an unsigned iOS IPA. See `.github/workflows/ios-build.yml`. The IPA must be signed and provisioned before it can be installed on a device.
+The canonical build is the GitHub Actions workflow in `.github/workflows/ios-build.yml`. Check out with `git clone --recurse-submodules` for local work. The workflow currently produces an unsigned iOS IPA; it does not sign the app for your device or prove on-device functionality.
 
 ## Design references
 

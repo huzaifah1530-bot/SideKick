@@ -9,16 +9,27 @@ struct HomeView: View {
         NavigationStack {
             ScrollView {
                 VStack(alignment: .leading, spacing: 24) {
-                    header
                     capabilityCard
                     librarySection
                 }
                 .padding(.horizontal, 20)
-                .padding(.top, 16)
+                .padding(.top, 8)
                 .padding(.bottom, 110)
             }
             .background(Color.sideKickCanvas)
-            .navigationBarHidden(true)
+            .navigationTitle("SideKick")
+            .navigationBarTitleDisplayMode(.large)
+            .toolbar {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showingImporter = true } label: {
+                        Image(systemName: "plus")
+                            .font(.body.weight(.semibold))
+                    }
+                    .buttonStyle(.glassProminent)
+                    .tint(.sideKickBlue)
+                    .accessibilityLabel("Import IPA")
+                }
+            }
             .fileImporter(isPresented: $showingImporter, allowedContentTypes: [.data], allowsMultipleSelection: false) { result in
                 switch result {
                 case .success(let urls):
@@ -38,34 +49,13 @@ struct HomeView: View {
         }
     }
 
-    private var header: some View {
-        HStack(alignment: .bottom) {
-            VStack(alignment: .leading, spacing: 4) {
-                Text("Your sideloading library")
-                    .font(.subheadline.weight(.medium)).foregroundStyle(.secondary)
-                Text("SideKick")
-                    .font(.system(size: 34, weight: .bold, design: .rounded))
-                    .tracking(-1)
-            }
-            Spacer()
-            Button { showingImporter = true } label: {
-                Image(systemName: "plus")
-                    .font(.title3.weight(.bold))
-                    .frame(width: 46, height: 46)
-            }
-            .buttonStyle(.glassProminent)
-            .tint(.sideKickBlue)
-            .accessibilityLabel("Import IPA")
-        }
-    }
-
     private var capabilityCard: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Label("IMPORT WORKS · SIGNING IN PROGRESS", systemImage: "shippingbox.fill")
+            Label("IPA LIBRARY READY · ENGINE INTEGRATION IN PROGRESS", systemImage: "shippingbox.fill")
                 .font(.caption.weight(.bold)).foregroundStyle(.secondary)
             Text("Bring your IPA files into SideKick")
                 .font(.title3.weight(.bold))
-            Text("SideKick can now inspect IPA metadata and keep the files in your library. Signing, installing, and refreshing still need the SideStore engine and device pairing.")
+            Text("Your IPA files are stored in your library. Apple ID sign-in, installation, and refresh are not connected yet. Device pairing and LocalDevVPN setup will also be required before the engine can be used.")
                 .font(.subheadline).foregroundStyle(.secondary)
             Button { showingImporter = true } label: {
                 Label(viewModel.isImporting ? "Importing…" : "Choose an IPA", systemImage: "square.and.arrow.down")

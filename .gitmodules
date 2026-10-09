@@ -1,0 +1,4 @@
+[submodule "Vendor/SideStore"]
+	path = Vendor/SideStore
+	url = https://github.com/SideStore/SideStore.git
+	branch = develop

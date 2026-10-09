@@ -1,0 +1,140 @@
+diff --git a/AltStore.xcodeproj/project.pbxproj b/AltStore.xcodeproj/project.pbxproj
+index a511c447..0c64db14 100644
+--- a/AltStore.xcodeproj/project.pbxproj
++++ b/AltStore.xcodeproj/project.pbxproj
+@@ -112,6 +112,7 @@
+ 			membershipExceptions = (
+ 				Info.plist,
+ 				Resources/ReleaseEntitlements.plist,
++				Resources/Icons.xcassets/AppIcon.appiconset,
+ 			);
+ 			platformFiltersByRelativePath = {
+ 				Authentication/Authentication.storyboard = (
+@@ -217,6 +218,14 @@
+ 			);
+ 			target = BF989166250AABF3002ACF50 /* AltWidgetExtension */;
+ 		};
++		F1A0A0000000000000000002 /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
++			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
++			membershipExceptions = (
++				App/SideKickApp.swift,
++				Info.plist,
++			);
++			target = BFD247692284B9A500981D42 /* SideStore */;
++		};
+ /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+ 
+ /* Begin PBXFileSystemSynchronizedRootGroup section */
+@@ -226,6 +235,7 @@
+ 		A8EEC71D2F4B10D900F2436D /* xcconfigs */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = xcconfigs; sourceTree = "<group>"; };
+ 		A8EEC8412F4B146A00F2436D /* AltStore */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (A8EEC8CB2F4B146B00F2436D /* PBXFileSystemSynchronizedBuildFileExceptionSet */, A8EEC8CD2F4B146B00F2436D /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = AltStore; sourceTree = "<group>"; };
+ 		A8EECF2A2F4B195000F2436D /* SideStore */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (A8EECF492F4B195000F2436D /* PBXFileSystemSynchronizedBuildFileExceptionSet */, A8EECF4A2F4B195000F2436D /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = SideStore; sourceTree = "<group>"; };
++		F1A0A0000000000000000001 /* SideKick */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (F1A0A0000000000000000002 /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = ../../SideKick; sourceTree = "<group>"; };
+ /* End PBXFileSystemSynchronizedRootGroup section */
+ 
+ /* Begin PBXFrameworksBuildPhase section */
+@@ -272,6 +282,7 @@
+ 		BFD247612284B9A500981D42 = {
+ 			isa = PBXGroup;
+ 			children = (
++				F1A0A0000000000000000001 /* SideKick */,
+ 				A8EEC8412F4B146A00F2436D /* AltStore */,
+ 				A8EEC3B92F4B0EFC00F2436D /* AltWidget */,
+ 				A8EEC3482F4B0D8600F2436D /* Shared */,
+@@ -366,6 +377,7 @@
+ 			fileSystemSynchronizedGroups = (
+ 				A8EEC3482F4B0D8600F2436D /* Shared */,
+ 				A8EEC8412F4B146A00F2436D /* AltStore */,
+ 				A8EECF2A2F4B195000F2436D /* SideStore */,
++				F1A0A0000000000000000001 /* SideKick */,
+ 			);
+ 			name = SideStore;
+@@ -828,7 +840,7 @@
+ 				ENABLE_DEBUG_DYLIB = NO;
+ 				GCC_UNROLL_LOOPS = YES;
+ 				INFOPLIST_FILE = AltStore/Info.plist;
+-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
++				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+ 				LD_EXPORT_SYMBOLS = NO;
+ 				LD_RUNPATH_SEARCH_PATHS = (
+ 					"$(inherited)",
+@@ -877,7 +889,7 @@
+ 				GCC_OPTIMIZATION_LEVEL = fast;
+ 				GCC_UNROLL_LOOPS = YES;
+ 				INFOPLIST_FILE = AltStore/Info.plist;
+-				IPHONEOS_DEPLOYMENT_TARGET = 15.0;
++				IPHONEOS_DEPLOYMENT_TARGET = 26.0;
+ 				LD_EXPORT_SYMBOLS = NO;
+ 				LD_RUNPATH_SEARCH_PATHS = (
+ 					"$(inherited)",
+diff --git a/AltStore/Info.plist b/AltStore/Info.plist
+index 868efe81..a5a9a77c 100644
+--- a/AltStore/Info.plist
++++ b/AltStore/Info.plist
+@@ -41,7 +41,9 @@
+ 	<key>CFBundleInfoDictionaryVersion</key>
+ 	<string>6.0</string>
+ 	<key>CFBundleName</key>
+-	<string>$(PRODUCT_NAME)</string>
++	<string>SideKick</string>
++	<key>CFBundleDisplayName</key>
++	<string>SideKick</string>
+ 	<key>CFBundlePackageType</key>
+ 	<string>APPL</string>
+ 	<key>CFBundleShortVersionString</key>
+diff --git a/AltStore/SceneDelegate.swift b/AltStore/SceneDelegate.swift
+index b3b01cfd..c937fe85 100644
+--- a/AltStore/SceneDelegate.swift
++++ b/AltStore/SceneDelegate.swift
+@@ -7,6 +7,7 @@
+ //
+ 
+ @preconcurrency import UIKit
++import SwiftUI
+ 
+ 
+ final class SceneDelegate: UIResponder, UIWindowSceneDelegate
+@@ -19,7 +20,21 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate
+         // Use this method to optionally configure and attach the UIWindow `window` to the provided UIWindowScene `scene`.
+         // If using a storyboard, the `window` property will automatically be initialized and attached to the scene.
+         // This delegate does not imply the connecting scene or session are new (see `application:configurationForConnectingSceneSession` instead).
+-        guard let _ = (scene as? UIWindowScene) else { return }
++        guard let windowScene = scene as? UIWindowScene else { return }
++
++        let rootView = ContentView()
++            .environment(AppEnvironment())
++            .tint(.sideKickBlue)
++        let hostingController = UIHostingController(rootView: rootView)
++
++        if let window {
++            window.rootViewController = hostingController
++        } else {
++            let window = UIWindow(windowScene: windowScene)
++            window.rootViewController = hostingController
++            self.window = window
++        }
++        window?.makeKeyAndVisible()
+         
+         if let context = connectionOptions.urlContexts.first
+         {
+diff --git a/Build.xcconfig b/Build.xcconfig
+index 3fd3b5c9..c8cb3f03 100644
+--- a/Build.xcconfig
++++ b/Build.xcconfig
+@@ -6,7 +6,7 @@
+ 
+ // Vars to be overwritten by `CodeSigning.xcconfig` if exists
+ DEVELOPMENT_TEAM = S32Z3HMYVQ
+-ORG_IDENTIFIER = com.SideStore
++ORG_IDENTIFIER = com.sidekick
+ 
+ // Default is free for CI builds, override it using CodeSigning.xcconfig if required
+ CODE_SIGN_ENTITLEMENTS = ./AltStore/AltStoreFree.entitlements
+@@ -16,6 +16,6 @@
+ PRODUCT_NAME = SideStore
+ 
+-BASE_BUNDLE_ID                                  = $(ORG_IDENTIFIER).SideStore
++BASE_BUNDLE_ID                                  = $(ORG_IDENTIFIER).app
+ MAIN_BUNDLE_IDENTIFIER[config=Debug]            = $(BASE_BUNDLE_ID).$(DEVELOPMENT_TEAM)
+ MAIN_BUNDLE_IDENTIFIER[config=Release]          = $(BASE_BUNDLE_ID)
+ APP_GROUP_IDENTIFIER                            = $(MAIN_BUNDLE_IDENTIFIER)
