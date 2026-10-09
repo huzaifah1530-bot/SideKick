@@ -2,7 +2,7 @@ import Foundation
 import ZIPFoundation
 
 actor IPAImportStore {
-    private let fileManager = FileManager.default
+    private let fileManager: FileManager
     private let directory: URL
     private let indexURL: URL
 

@@ -8,3 +8,5 @@ artifacts/
 action-logs-*/
 action-logs-*.zip
 /sidestore-reference/
+/failed-run/
+/failed-run.zip
