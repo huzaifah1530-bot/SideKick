@@ -49,7 +49,7 @@ struct BuzzheavierClient {
                 ?? ((payload["data"] as? [String: Any])?["id"] as? String),
             !fileID.isEmpty,
             fileID.range(of: #"^[A-Za-z0-9_-]+$"#, options: .regularExpression) != nil,
-            let shareURL = URL(string: "https://buzzheavier.com/d/\(fileID)")
+            let shareURL = URL(string: "https://buzzheavier.com/\(fileID)")
         else {
             throw AppSharingError.invalidUploadResponse
         }
