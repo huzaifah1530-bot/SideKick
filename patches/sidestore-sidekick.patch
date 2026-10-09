@@ -82,6 +82,12 @@ index 868efe81..a5a9a77c 100644
  	<key>CFBundlePackageType</key>
  	<string>APPL</string>
  	<key>CFBundleShortVersionString</key>
+@@ -55,4 +55,5 @@
+ 			<string>SideStore General</string>
+ 			<key>CFBundleURLSchemes</key>
+ 			<array>
++				<string>sidekick</string>
+ 				<string>sidestore</string>
 diff --git a/AltStore/SceneDelegate.swift b/AltStore/SceneDelegate.swift
 index b3b01cfd..c937fe85 100644
 --- a/AltStore/SceneDelegate.swift
@@ -274,6 +280,14 @@ diff --git a/AltStore/Intents/App Intents/AppShortcuts.swift b/AltStore/Intents/
 diff --git a/SideStore/DeepLinks/URLHandler.swift b/SideStore/DeepLinks/URLHandler.swift
 --- a/SideStore/DeepLinks/URLHandler.swift
 +++ b/SideStore/DeepLinks/URLHandler.swift
+@@ -16,6 +16,7 @@ class URLHandler {
+     @discardableResult
+     func handle(_ url: URL) -> Bool {
+         debugLog("[URLHandler] handle(_:) called with URL: \(url.absoluteString)")
++        if SideKickShareLink.handle(url) { return true }
+         if url.isFileURL {
+             return FileImportHandler.shared.handle(fileURL: url)
+         }
 @@ -87,6 +87,6 @@ class URLHandler {
              guard let callbackTemplate = queryItems["callback_template"]?.removingPercentEncoding else { return false }
              

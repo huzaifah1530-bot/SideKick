@@ -6,6 +6,8 @@ struct AppManagementView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var accountStore = SigningAccountStore()
     @State private var isWorking = false
+    @State private var isFindingShareIPA = false
+    @State private var shareIPA: ImportedIPA?
     @State private var errorMessage: String?
 
     private let importedApp: ImportedIPA?
@@ -86,6 +88,13 @@ struct AppManagementView: View {
                             .foregroundStyle(.secondary)
                     }
 
+                    NavigationLink {
+                        ShareIPAView(app: importedApp)
+                    } label: {
+                        Label("Share IPA", systemImage: "square.and.arrow.up")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+
                     if onDelete != nil {
                         SwiftUI.Button("Remove Imported IPA", role: .destructive) {
                             Task {
@@ -95,6 +104,17 @@ struct AppManagementView: View {
                         }
                     }
                 } else if let installedApp {
+                    SwiftUI.Button {
+                        Task { await findIPAForSharing(installedApp) }
+                    } label: {
+                        HStack {
+                            if isFindingShareIPA { ProgressView() }
+                            Label("Share IPA", systemImage: "square.and.arrow.up")
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .disabled(isFindingShareIPA)
+
                     SwiftUI.Button {
                         UIApplication.shared.open(InstalledApp.openAppURL(targetBundleIdentifier: installedApp.resignedBundleIdentifier))
                     } label: {
@@ -134,6 +154,9 @@ struct AppManagementView: View {
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle(appName)
         .navigationBarTitleDisplayMode(.inline)
+        .navigationDestination(item: $shareIPA) { ipa in
+            ShareIPAView(app: ipa)
+        }
         .task { await accountStore.reload() }
         .alert("App action failed", isPresented: Binding(
             get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
@@ -163,6 +186,22 @@ struct AppManagementView: View {
                 accountStore: accountStore,
                 ipaStore: environment.ipaImportStore
             ).refresh(bundleIdentifier: app.bundleIdentifier)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func findIPAForSharing(_ app: InstalledAppSummary) async {
+        isFindingShareIPA = true
+        defer { isFindingShareIPA = false }
+        do {
+            let imported = try await environment.ipaImportStore.importedApps()
+            guard let sourceIPA = imported.first(where: { $0.bundleIdentifier == app.bundleIdentifier }) else {
+                errorMessage = "SideKick can’t extract an IPA from an installed app. Import its original IPA into SideKick first, then share it here."
+                return
+            }
+            shareIPA = sourceIPA
         } catch {
             errorMessage = error.localizedDescription
         }

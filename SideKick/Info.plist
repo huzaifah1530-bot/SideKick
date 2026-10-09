@@ -27,6 +27,7 @@
 			<string>SideKick</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
+				<string>sidekick</string>
 				<string>sidestore</string>
 				<string>sidestore-$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 			</array>

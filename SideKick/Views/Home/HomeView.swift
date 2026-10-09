@@ -5,6 +5,8 @@ import UIKit
 struct HomeView: View {
     @State var viewModel: HomeViewModel
     @State private var showingImporter = false
+    @State private var showingURLImport = false
+    @State private var incomingShareURL: URL?
     @State private var installedApps: [InstalledAppSummary] = []
     @Environment(AppEnvironment.self) private var environment
 
@@ -63,12 +65,27 @@ struct HomeView: View {
             .searchable(text: $viewModel.searchText, prompt: "Search apps")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    SwiftUI.Button {
-                        showingImporter = true
+                    Menu {
+                        SwiftUI.Button {
+                            showingImporter = true
+                        } label: {
+                            Label("From Files", systemImage: "folder")
+                        }
+                        SwiftUI.Button {
+                            incomingShareURL = nil
+                            showingURLImport = true
+                        } label: {
+                            Label("From URL", systemImage: "link")
+                        }
                     } label: {
                         Image(systemName: "plus")
                     }
-                    .accessibilityLabel("Import IPA")
+                    .accessibilityLabel("Add App")
+                }
+            }
+            .navigationDestination(isPresented: $showingURLImport) {
+                URLImportView(initialURL: incomingShareURL) { _ in
+                    await load()
                 }
             }
             .fileImporter(isPresented: $showingImporter, allowedContentTypes: [.data], allowsMultipleSelection: false) { result in
@@ -81,6 +98,17 @@ struct HomeView: View {
                 }
             }
             .task { await load() }
+            .task {
+                if let url = SideKickShareLink.consumePendingURL() {
+                    incomingShareURL = url
+                    showingURLImport = true
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: SideKickShareLink.importNotification)) { notification in
+                guard let url = notification.userInfo?[SideKickShareLink.urlKey] as? URL else { return }
+                incomingShareURL = url
+                showingURLImport = true
+            }
             .refreshable { await load() }
             .alert(viewModel.errorMessage == nil ? "IPA imported" : "Couldn’t import IPA", isPresented: Binding(
                 get: { viewModel.errorMessage != nil || viewModel.noticeMessage != nil },
