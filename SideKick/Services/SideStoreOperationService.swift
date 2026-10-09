@@ -121,6 +121,22 @@ final class SideStoreOperationService {
             }
         }
     }
+
+    func enableJIT(bundleIdentifier: String) async throws {
+        let context = DatabaseManager.shared.viewContext
+        guard let installedApp = try await context.perform({
+            (try? context.fetch(InstalledApp.fetchRequest()))?.first { $0.bundleIdentifier == bundleIdentifier }
+                ?? InstalledApp.fetchAltStore(in: context).flatMap { $0.bundleIdentifier == bundleIdentifier ? $0 : nil }
+        }) else {
+            throw SideStoreOperationError.installedAppUnavailable
+        }
+
+        try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+            AppManager.shared.enableJIT(for: installedApp) { result in
+                continuation.resume(with: result.map { _ in () })
+            }
+        }
+    }
 }
 
 private final class ProgressObservationBox: @unchecked Sendable {

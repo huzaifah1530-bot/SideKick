@@ -117,6 +117,16 @@ struct AppManagementView: View {
                         .buttonStyle(.borderedProminent)
                         .buttonBorderShape(.capsule)
                         .disabled(isWorking)
+
+                    NavigationLink {
+                        JITEnableView(app: installedApp)
+                    } label: {
+                        Label("Enable JIT", systemImage: "bolt.fill")
+                            .fontWeight(.semibold)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.capsule)
                 }
             }
         }
@@ -153,6 +163,90 @@ struct AppManagementView: View {
                 accountStore: accountStore,
                 ipaStore: environment.ipaImportStore
             ).refresh(bundleIdentifier: app.bundleIdentifier)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct JITEnableView: View {
+    let app: InstalledAppSummary
+
+    @Environment(AppEnvironment.self) private var environment
+    @State private var accountStore = SigningAccountStore()
+    @State private var isWorking = false
+    @State private var statusMessage: String?
+    @State private var errorMessage: String?
+
+    var body: some View {
+        List {
+            Section {
+                Label("Open \(app.name) first, then return here and enable JIT. Keep the app open in the background while SideKick connects.", systemImage: "info.circle")
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .padding(.vertical, 4)
+
+                if #available(iOS 17, *) {
+                    NavigationLink {
+                        SideJITServerConfigView()
+                    } label: {
+                        Label("JIT Server Setup", systemImage: "desktopcomputer")
+                    }
+                    Text("On iOS 17 and later, JIT may need SideJITServer running on a paired computer on the same network. SideKick can connect to it, but cannot run that computer-side service itself.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } else {
+                    Text("JIT uses the device pairing connection. Keep the pairing file valid and the local device connection available.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Before You Enable JIT")
+            }
+
+            Section {
+                SwiftUI.Button {
+                    Task { await enableJIT() }
+                } label: {
+                    HStack {
+                        if isWorking { ProgressView() }
+                        Text(isWorking ? "Connecting…" : "Enable JIT for \(app.name)")
+                            .fontWeight(.semibold)
+                    }
+                    .frame(maxWidth: .infinity)
+                }
+                .buttonStyle(.borderedProminent)
+                .buttonBorderShape(.capsule)
+                .disabled(isWorking)
+
+                if let statusMessage {
+                    Label(statusMessage, systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.green)
+                }
+                if let errorMessage {
+                    Label(errorMessage, systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+            } header: {
+                Text("JIT Connection")
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Enable JIT")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    @MainActor
+    private func enableJIT() async {
+        isWorking = true
+        statusMessage = nil
+        errorMessage = nil
+        defer { isWorking = false }
+        do {
+            try await SideStoreOperationService(accountStore: accountStore, ipaStore: environment.ipaImportStore)
+                .enableJIT(bundleIdentifier: app.bundleIdentifier)
+            statusMessage = "JIT was enabled for \(app.name)."
         } catch {
             errorMessage = error.localizedDescription
         }
