@@ -1,8 +1,0 @@
-2026-10-09T11:42:07.5760000Z Evaluating build-ipa.if
-2026-10-09T11:42:07.5760000Z Evaluating: success()
-2026-10-09T11:42:07.5760000Z Result: true
-2026-10-09T11:42:07.7740000Z Job is waiting for a hosted runner to come online.
-2026-10-09T11:42:07.7480000Z Requested labels: macos-15
-2026-10-09T11:42:07.7480000Z Job defined at: huzaifah1530-bot/SideKick/.github/workflows/ios-build.yml@refs/heads/main
-2026-10-09T11:42:07.7480000Z Waiting for a runner to pick up this job...
-2026-10-09T11:42:07.7710000Z Job is about to start running on the hosted runner: GitHub Actions 1000000144
