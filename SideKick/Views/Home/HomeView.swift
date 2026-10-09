@@ -247,14 +247,15 @@ struct HomeView: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             Spacer(minLength: 8)
-            VStack(alignment: .trailing, spacing: 4) {
+            VStack(alignment: .center, spacing: 4) {
                 Text("Expires in")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
+                    .frame(width: 82, alignment: .center)
                 Text("\(daysRemaining(for: app.expirationDate)) DAYS")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white)
-                    .frame(minWidth: 82, minHeight: 34)
+                    .frame(width: 82, height: 34)
                     .background(expirationColor(for: app.expirationDate).opacity(0.84), in: .capsule)
             }
         }

@@ -28,7 +28,6 @@ struct GitHubUpdateRow: View {
                 Text(downloadJob?.isDownloading == true ? "DOWNLOADING" : "UPDATE")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(downloadJob?.isDownloading == true ? Color.sideKickAccent : .blue)
-                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
             }
             if let progress = downloadJob?.progress, downloadJob?.isDownloading == true {
                 DownloadProgressBar(progress: progress).frame(height: 3)
