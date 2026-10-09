@@ -4,6 +4,7 @@ import SideSign
 import UserNotifications
 import UniformTypeIdentifiers
 import UIKit
+import Minimuxer
 
 @MainActor
 @Observable
@@ -13,6 +14,7 @@ final class SetupStatus {
     private(set) var backgroundRefreshEnabled = false
     private(set) var backgroundRefreshRestricted = false
     private(set) var vpnInstalled = false
+    private(set) var vpnConnected = false
     private(set) var pairingVerified = false
     private(set) var isCheckingPairing = false
     private(set) var isReady = false
@@ -30,18 +32,31 @@ final class SetupStatus {
         accounts.accounts.first { $0.hasSavedSession && $0.teamIdentifier == requiredTeamIdentifier }
     }
 
-    func refresh() async {
+    func refresh(reportConnectionErrors: Bool = false) async {
+        message = nil
         let notificationSettings = await UNUserNotificationCenter.current().notificationSettings()
         notificationsEnabled = notificationSettings.authorizationStatus == .authorized
         let refreshStatus = UIApplication.shared.backgroundRefreshStatus
         backgroundRefreshEnabled = refreshStatus == .available
         backgroundRefreshRestricted = refreshStatus == .restricted
         vpnInstalled = UIApplication.shared.canOpenURL(URL(string: "localdevvpn://")!)
+        vpnConnected = Minimuxer.shared.network.activeInterfaces.contains { interface in
+            interface.name.lowercased().hasPrefix("utun") && interface.ip.hasPrefix("10.7.")
+        }
         await accounts.reload()
 
         guard notificationsEnabled, backgroundRefreshEnabled, vpnInstalled, selfSigningAccount != nil else {
             pairingVerified = false
             updateReadyState()
+            return
+        }
+
+        guard vpnConnected else {
+            pairingVerified = false
+            updateReadyState()
+            if reportConnectionErrors {
+                message = "LocalDevVPN is installed, but SideKick can’t detect its connected tunnel. Open LocalDevVPN, connect it, then try again."
+            }
             return
         }
 
@@ -72,7 +87,9 @@ final class SetupStatus {
             UserDefaults.standard.set(true, forKey: Self.pairingVerifiedKey)
         } catch {
             pairingVerified = false
-            message = "SideKick can’t reach this iPhone yet. Connect LocalDevVPN, then check again."
+            if reportConnectionErrors {
+                message = "SideKick couldn’t verify the iPhone connection: \(error.localizedDescription)"
+            }
         }
         updateReadyState()
     }
@@ -81,7 +98,7 @@ final class SetupStatus {
 
     func updateReadyState() {
         isReady = notificationsEnabled && backgroundRefreshEnabled && vpnInstalled && pairingVerified &&
-            selfSigningAccount != nil
+            vpnConnected && selfSigningAccount != nil
     }
 
     func requestNotifications() async {
@@ -97,9 +114,9 @@ final class SetupStatus {
         do {
             UserDefaults.standard.set(false, forKey: Self.pairingVerifiedKey)
             try PairingSetupImporter.importFile(from: url)
-            await refresh()
-            if notificationsEnabled && backgroundRefreshEnabled && vpnInstalled && selfSigningAccount != nil && !pairingVerified {
-                message = "Pairing file was imported, but verification failed. Make sure LocalDevVPN is connected and that the file belongs to this iPhone."
+            await refresh(reportConnectionErrors: true)
+            if notificationsEnabled && backgroundRefreshEnabled && vpnInstalled && selfSigningAccount != nil && vpnConnected && !pairingVerified && message == nil {
+                message = "The pairing file was imported, but SideKick couldn’t verify it. Check that it was made for this iPhone."
             }
         } catch {
             message = "Couldn’t import that pairing file: \(error.localizedDescription)"
@@ -107,7 +124,7 @@ final class SetupStatus {
     }
 
     func verifyPairing() async {
-        await refresh()
+        await refresh(reportConnectionErrors: true)
         if !pairingVerified, message == nil {
             message = "Pairing is not ready. Connect LocalDevVPN and try again."
         }
@@ -133,11 +150,6 @@ struct RequiredSetupView: View {
                         Text("STEP \(step + 1) OF \(lastStep + 1)")
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
-                        Spacer()
-                        if step > 0 {
-                            SwiftUI.Button("Back") { step -= 1 }
-                                .buttonStyle(.plain)
-                        }
                     }
                     ProgressView(value: Double(step + 1), total: Double(lastStep + 1))
                 }
@@ -171,6 +183,18 @@ struct RequiredSetupView: View {
             .background(Color(uiColor: .systemBackground))
             .navigationTitle("SideKick Setup")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                if step > 0 {
+                    ToolbarItem(placement: .topBarLeading) {
+                        SwiftUI.Button {
+                            withAnimation(.easeInOut(duration: 0.2)) { step -= 1 }
+                        } label: {
+                            Image(systemName: "chevron.left")
+                        }
+                        .accessibilityLabel("Back")
+                    }
+                }
+            }
             .fileImporter(
                 isPresented: $isChoosingPairingFile,
                 allowedContentTypes: PairingFileManager.supportedContentTypes,
@@ -296,12 +320,18 @@ struct RequiredSetupView: View {
             title: "Connect to this iPhone",
             message: status.isReady
                 ? "Your iPhone is paired and ready."
-                : "LocalDevVPN provides the local connection SideKick needs to install and refresh apps. Install it, open it, and connect before verifying."
+                : status.vpnConnected
+                    ? "LocalDevVPN’s tunnel is connected. Verify that this pairing file belongs to this iPhone."
+                    : "SideKick doesn’t currently detect LocalDevVPN’s connected tunnel. Open LocalDevVPN, connect it, return here, then verify."
         ) {
             SwiftUI.Button(status.vpnInstalled ? "Open LocalDevVPN" : "Get LocalDevVPN") {
                 UIApplication.shared.open(status.vpnInstalled ? vpnURL : appStoreURL)
             }
             .buttonStyle(.borderedProminent)
+
+            Label(status.vpnConnected ? "VPN Connected" : "VPN Not Detected", systemImage: status.vpnConnected ? "checkmark.circle.fill" : "network.slash")
+                .font(.subheadline)
+                .foregroundStyle(status.vpnConnected ? .green : .secondary)
 
             if status.vpnInstalled && status.hasPairingFile && !status.isReady {
                 SwiftUI.Button(status.isCheckingPairing ? "Checking…" : "Verify Connection") {

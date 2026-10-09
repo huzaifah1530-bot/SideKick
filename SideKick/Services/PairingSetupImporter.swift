@@ -17,13 +17,28 @@ enum PairingSetupImporter {
         }
 
         let manager = PairingFileManager.shared
-        let protocolToUse: PairingProtocol
-        do {
-            _ = try manager.parse(content: contents, preferred: .lockdown)
-            protocolToUse = .lockdown
-        } catch {
-            _ = try manager.parse(content: contents, preferred: .rppairing)
-            protocolToUse = .rppairing
+        let preferenceOrder: [PairingProtocol]
+        if #available(iOS 26.4, *) {
+            // On newer iOS, LocalDevVPN's loopback tunnel is compatible with
+            // Remote Pairing; Lockdown additionally requires IKEv2/IPSec.
+            preferenceOrder = [.rppairing, .lockdown]
+        } else {
+            preferenceOrder = [.lockdown, .rppairing]
+        }
+
+        var protocolToUse: PairingProtocol?
+        var lastParseError: Error?
+        for candidate in preferenceOrder {
+            do {
+                _ = try manager.parse(content: contents, preferred: candidate)
+                protocolToUse = candidate
+                break
+            } catch {
+                lastParseError = error
+            }
+        }
+        guard let protocolToUse else {
+            throw lastParseError ?? CocoaError(.fileReadCorruptFile)
         }
 
         _ = try manager.savePairingFile(contents: contents, preferred: protocolToUse)
