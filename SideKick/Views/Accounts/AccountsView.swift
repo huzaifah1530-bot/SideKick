@@ -121,7 +121,7 @@ private struct SigningAccountDetailView: View {
                 }
             }
 
-            Section("Apple Developer") {
+            SwiftUI.Section("Apple Developer") {
                 if !currentAccount.hasSavedSession {
                     Text("Sign in again to check App IDs and profiles.")
                         .font(.footnote)
@@ -226,11 +226,6 @@ private struct AccountAppIDListView: View {
                         Text(appID.bundleIdentifier)
                             .font(.footnote)
                             .foregroundStyle(.secondary)
-                        if let expirationDate = appID.expirationDate {
-                            Text("App ID expires \(expirationDate.formatted(date: .abbreviated, time: .omitted))")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
                     }
                     .padding(.vertical, 3)
                 }
@@ -259,7 +254,7 @@ private struct AccountProfileListView: View {
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
-                        Text("Expires \(profile.dateExpire.formatted(.relative(presentation: .numeric))) · \(profile.dateExpire.formatted(date: .abbreviated, time: .omitted))")
+                        Text("\(profile.dateExpire <= .now ? "Expired" : "Expires \(profile.dateExpire.formatted(.relative(presentation: .numeric)))") · \(profile.dateExpire.formatted(date: .abbreviated, time: .omitted))")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
