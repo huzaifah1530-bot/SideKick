@@ -159,3 +159,61 @@ index c426783d..983e8fca 100644
              steps: .signIn,
              dbBackgroundContext: dbBackgroundContext
          )
+diff --git a/Shared/Extensions/FileManager+SharedDirectories.swift b/Shared/Extensions/FileManager+SharedDirectories.swift
+index 0000000..0000000 100644
+--- a/Shared/Extensions/FileManager+SharedDirectories.swift
++++ b/Shared/Extensions/FileManager+SharedDirectories.swift
+@@ -13,11 +13,20 @@ public extension FileManager
+         #if os(tvOS)
+         return self.cachesDirectory
+         #else
+-        guard let appGroup = Bundle.main.altstoreAppGroup else {
+-            return nil
+-        }
+-        
+-        let sharedDirectoryURL = self.containerURL(forSecurityApplicationGroupIdentifier: appGroup)
+-        return sharedDirectoryURL
++        if let appGroup = Bundle.main.altstoreAppGroup,
++           let sharedDirectoryURL = self.containerURL(forSecurityApplicationGroupIdentifier: appGroup) {
++            return sharedDirectoryURL
++        }
++
++        // SideKick is independently installed and cannot assume an App Group entitlement.
++        let sideKickDirectoryURL = self.applicationSupportDirectory
++            .appendingPathComponent("SideKick", isDirectory: true)
++        do {
++            try self.createDirectory(at: sideKickDirectoryURL, withIntermediateDirectories: true)
++            return sideKickDirectoryURL
++        } catch {
++            debugLog("[FileManager] Could not create SideKick private data directory.")
++            return nil
++        }
+         #endif
+     }
+diff --git a/SideStore/AppConstants.swift b/SideStore/AppConstants.swift
+index 0000000..0000000 100644
+--- a/SideStore/AppConstants.swift
++++ b/SideStore/AppConstants.swift
+@@ -12,6 +12,4 @@ public enum AppConstants {
+     // features required for functioning
+-    public static let mandatoryFeatures: Set<ALTFeature> = [
+-        .appGroups
+-    ]
++    public static let mandatoryFeatures: Set<ALTFeature> = []
+
+     public enum Database {
+diff --git a/AltStore/AltStoreFree.entitlements b/AltStore/AltStoreFree.entitlements
+index 0000000..0000000 100644
+--- a/AltStore/AltStoreFree.entitlements
++++ b/AltStore/AltStoreFree.entitlements
+@@ -1,9 +1,5 @@
+ <?xml version="1.0" encoding="UTF-8"?>
+ <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+ <plist version="1.0">
+ <dict>
+-    <key>com.apple.security.application-groups</key>
+-    <array>
+-        <string>group.$(APP_GROUP_IDENTIFIER)</string>
+-    </array>
+ </dict>
+ </plist>
