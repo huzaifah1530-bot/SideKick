@@ -70,11 +70,6 @@ struct AccountsView: View {
                     .foregroundStyle(.secondary)
             }
             Spacer()
-            if account.isActive {
-                Text("Active")
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-            }
         }
         .padding(.vertical, 3)
     }
@@ -98,7 +93,9 @@ struct AccountsView: View {
 private struct SigningAccountDetailView: View {
     let account: SigningAccountSummary
     let accountStore: SigningAccountStore
+    @Environment(\.dismiss) private var dismiss
     @State private var errorMessage: String?
+    @State private var isConfirmingRemoval = false
 
     private var currentAccount: SigningAccountSummary {
         accountStore.accounts.first(where: { $0.id == account.id }) ?? account
@@ -113,33 +110,42 @@ private struct SigningAccountDetailView: View {
             }
 
             Section {
-                if currentAccount.isActive {
-                    LabeledContent("Signing account", value: "Active")
-                } else {
-                    SwiftUI.Button("Use for signing") {
-                        Task {
-                            do {
-                                try await accountStore.activate(account)
-                            } catch {
-                                errorMessage = error.localizedDescription
-                            }
-                        }
-                    }
-                    .disabled(accountStore.isWorking || !currentAccount.hasSavedSession)
-                }
-
                 if !currentAccount.hasSavedSession {
                     Text("Sign in again to use this account on this device.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
             }
+
+            Section {
+                SwiftUI.Button("Remove Apple ID", role: .destructive) {
+                    isConfirmingRemoval = true
+                }
+                .disabled(accountStore.isWorking)
+            } footer: {
+                Text("This removes the saved account from SideKick. Apps already installed on your iPhone are not deleted.")
+            }
         }
         .listStyle(.insetGrouped)
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Apple ID")
         .navigationBarTitleDisplayMode(.inline)
-        .alert("Couldn’t switch account", isPresented: Binding(
+        .confirmationDialog("Remove this Apple ID?", isPresented: $isConfirmingRemoval, titleVisibility: .visible) {
+            SwiftUI.Button("Remove Apple ID", role: .destructive) {
+                Task {
+                    do {
+                        try await accountStore.remove(account)
+                        dismiss()
+                    } catch {
+                        errorMessage = error.localizedDescription
+                    }
+                }
+            }
+            SwiftUI.Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Its saved signing session will also be removed from this device.")
+        }
+        .alert("Couldn’t remove Apple ID", isPresented: Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
         )) {

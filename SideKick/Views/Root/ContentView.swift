@@ -8,8 +8,10 @@ struct ContentView: View {
         Group {
             if case .ready = environment.databaseState {
                 TabView(selection: $selectedTab) {
-                    HomeView(viewModel: HomeViewModel(store: environment.ipaImportStore))
-                        .tabItem { Label("Today", systemImage: "square.grid.2x2.fill") }
+                    HomeView(viewModel: HomeViewModel(store: environment.ipaImportStore)) {
+                        selectedTab = 1
+                    }
+                        .tabItem { Label("SideKick", systemImage: "bolt.fill") }
                         .tag(0)
                     LibraryView(viewModel: HomeViewModel(store: environment.ipaImportStore))
                         .tabItem { Label("Library", systemImage: "square.stack.3d.up.fill") }

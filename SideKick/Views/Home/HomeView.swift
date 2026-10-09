@@ -3,35 +3,35 @@ import UniformTypeIdentifiers
 
 struct HomeView: View {
     @State var viewModel: HomeViewModel
+    var onOpenLibrary: () -> Void = {}
     @State private var showingImporter = false
 
     var body: some View {
         NavigationStack {
             List {
                 Section {
+                    Text("Sideload apps with your Apple ID.")
+                        .font(.title3)
+                        .foregroundStyle(.secondary)
+                        .listRowBackground(Color.clear)
+
                     SwiftUI.Button {
                         showingImporter = true
                     } label: {
                         Label(viewModel.isImporting ? "Importing…" : "Import IPA", systemImage: "square.and.arrow.down")
                     }
                     .disabled(viewModel.isImporting)
+                    .listRowBackground(Color.clear)
                 }
 
-                if !viewModel.importedApps.isEmpty {
-                    Section("Recently Added") {
-                        ForEach(viewModel.importedApps.prefix(5)) { app in
-                            NavigationLink {
-                                AppManagementView(importedApp: app)
-                            } label: {
-                                ImportedIPARow(app: app)
-                            }
-                        }
-                    }
+                SwiftUI.Button(action: onOpenLibrary) {
+                    Label("Browse Library", systemImage: "square.stack.3d.up")
                 }
+                .listRowBackground(Color.clear)
             }
             .listStyle(.insetGrouped)
             .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("Today")
+            .navigationTitle("SideKick")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     SwiftUI.Button {

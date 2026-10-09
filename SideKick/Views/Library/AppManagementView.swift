@@ -6,6 +6,7 @@ struct AppManagementView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var accountStore = SigningAccountStore()
     @State private var isWorking = false
+    @State private var isChoosingAccount = false
     @State private var errorMessage: String?
 
     private let importedApp: ImportedIPA?
@@ -60,9 +61,9 @@ struct AppManagementView: View {
 
             Section {
                 if let importedApp {
-                    if let account = accountStore.accounts.first(where: { $0.isActive && $0.hasSavedSession }) {
+                    if accountStore.accounts.contains(where: \.hasSavedSession) {
                         SwiftUI.Button {
-                            Task { await install(importedApp, using: account) }
+                            isChoosingAccount = true
                         } label: {
                             HStack {
                                 if isWorking { ProgressView() }
@@ -74,7 +75,7 @@ struct AppManagementView: View {
                         .buttonBorderShape(.capsule)
                         .disabled(isWorking || accountStore.isWorking)
                     } else {
-                        Text("Add or select a signing account in Accounts to install this app.")
+                        Text("Add an Apple ID in Accounts to install this app.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
@@ -108,6 +109,18 @@ struct AppManagementView: View {
         .navigationTitle(appName)
         .navigationBarTitleDisplayMode(.inline)
         .task { await accountStore.reload() }
+        .confirmationDialog("Choose Apple ID", isPresented: $isChoosingAccount, titleVisibility: .visible) {
+            ForEach(accountStore.accounts.filter(\.hasSavedSession)) { account in
+                SwiftUI.Button("\(account.email) · \(account.teamType)") {
+                    if let importedApp {
+                        Task { await install(importedApp, using: account) }
+                    }
+                }
+            }
+            SwiftUI.Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Choose which account to use for this install.")
+        }
         .alert("App action failed", isPresented: Binding(
             get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
         )) {

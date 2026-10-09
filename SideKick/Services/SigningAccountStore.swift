@@ -11,7 +11,6 @@ struct SigningAccountSummary: Identifiable, Equatable {
     let email: String
     let teamName: String
     let teamType: String
-    let isActive: Bool
     let hasSavedSession: Bool
 
     var id: String { "\(accountIdentifier)|\(teamIdentifier)" }
@@ -42,8 +41,7 @@ final class SigningAccountStore {
                          team.identifier,
                          account.appleID,
                          team.name,
-                         team.type.localizedDescription,
-                         team.isActiveTeam)
+                         team.type.localizedDescription)
                     }
                 }
             }
@@ -56,12 +54,10 @@ final class SigningAccountStore {
                     email: record.2,
                     teamName: record.3,
                     teamType: record.4,
-                    isActive: record.5,
                     hasSavedSession: (try? vault.load(key: key)) != nil
                 )
             }
             .sorted { lhs, rhs in
-                if lhs.isActive != rhs.isActive { return lhs.isActive }
                 return lhs.email.localizedCaseInsensitiveCompare(rhs.email) == .orderedAscending
             }
         } catch {
@@ -164,14 +160,41 @@ final class SigningAccountStore {
         UserDefaults.standard.set(value, forKey: "sidekick.sign-in-checkpoint")
     }
 
-    func activate(_ account: SigningAccountSummary) async throws {
-        guard !isWorking else { return }
+    func remove(_ account: SigningAccountSummary) async throws {
+        guard !isWorking else { throw SigningAccountError.engineBusy }
         guard !AppManager.shared.isActivelyManagingAnyApp else {
             throw SigningAccountError.engineBusy
         }
+        guard DatabaseManager.shared.isStarted else {
+            throw SigningAccountError.databaseUnavailable
+        }
+
         isWorking = true
         defer { isWorking = false }
-        try await restoreAccountSession(account)
+
+        let wasActive = await activeAccountSummary()?.accountIdentifier == account.accountIdentifier
+        let context = DatabaseManager.shared.persistentContainer.newBackgroundContext()
+        let teamIdentifiers = try await context.perform {
+            let request = Account.fetchRequest()
+            request.predicate = NSPredicate(format: "%K == %@", #keyPath(Account.identifier), account.accountIdentifier)
+            guard let savedAccount = try context.fetch(request).first else {
+                throw SigningAccountError.savedAccountMissing
+            }
+            let teamIdentifiers = savedAccount.teams.map(\.identifier)
+            context.delete(savedAccount)
+            try context.save()
+            return teamIdentifiers
+        }
+
+        if wasActive {
+            await AuthManager.shared.signOut(keepCertificate: false, keepAnisetteData: true)
+        }
+        for teamIdentifier in teamIdentifiers {
+            try vault.delete(key: SigningSessionVault.key(
+                accountIdentifier: account.accountIdentifier,
+                teamIdentifier: teamIdentifier
+            ))
+        }
         await reload()
     }
 
@@ -191,7 +214,6 @@ final class SigningAccountStore {
             email: "",
             teamName: "",
             teamType: "",
-            isActive: false,
             hasSavedSession: true
         )
         isWorking = true
@@ -352,7 +374,6 @@ final class SigningAccountStore {
                 email: account.appleID,
                 teamName: team.name,
                 teamType: team.type.localizedDescription,
-                isActive: true,
                 hasSavedSession: true
             )
         }
@@ -463,6 +484,13 @@ private struct SigningSessionVault {
             throw SigningAccountError.keychain(status)
         }
         return try JSONDecoder().decode(SigningSessionCredentials.self, from: data)
+    }
+
+    func delete(key: String) throws {
+        let status = SecItemDelete(baseQuery(key: key) as CFDictionary)
+        guard status == errSecSuccess || status == errSecItemNotFound else {
+            throw SigningAccountError.keychain(status)
+        }
     }
 
     private func baseQuery(key: String) -> [String: Any] {
