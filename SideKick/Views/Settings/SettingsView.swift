@@ -6,7 +6,8 @@ struct SettingsView: View {
             List {
                 Section("Sideloading setup") {
                     LabeledContent("IPA import", value: "Available")
-                    LabeledContent("Signing and install", value: "Not connected")
+                    LabeledContent("Apple ID accounts", value: "Available")
+                    LabeledContent("IPA signing and install", value: "Not connected")
                     LabeledContent("App refresh", value: "Not connected")
                 }
                 Section("About") {
