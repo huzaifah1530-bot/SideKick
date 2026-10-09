@@ -65,6 +65,21 @@ jobs:
           set -euo pipefail
           APP_PATH="build/Build/Products/Release-iphoneos/SideStore.app"
           test -d "$APP_PATH"
+
+          # SideKick is a standalone app and does not ship SideStore's widget.
+          # The upstream scheme embeds AltWidgetExtension.appex, but the
+          # unsigned CI build cannot carry a valid provisioning profile for it.
+          # Leaving it in the IPA makes iOS reject the whole install with
+          # "The app extension is missing a valid provisioning profile".
+          if [ -d "$APP_PATH/PlugIns" ]; then
+            find "$APP_PATH/PlugIns" -maxdepth 1 -type d -name '*.appex' -print -exec rm -rf {} +
+            rmdir "$APP_PATH/PlugIns" 2>/dev/null || true
+          fi
+          if [ -d "$APP_PATH/PlugIns" ]; then
+            echo "Unexpected app extensions remain in the SideKick bundle"
+            exit 1
+          fi
+
           mkdir -p Payload artifacts
           cp -R "$APP_PATH" Payload/
           zip -r -X artifacts/SideKick-unsigned.ipa Payload

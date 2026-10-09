@@ -11,7 +11,9 @@ SideKick is a native SwiftUI iOS sideloading app. The existing SwiftUI screens a
 - IPA install, app-specific account selection, account-scoped refresh, pairing setup, and LocalDevVPN readiness are not yet wired into SideKick's screens. Do not treat these as working until they pass on a physical device.
 - SideStore persists each installed app's signing team, but SideKick does not yet route installs or refreshes through that ownership. Its account UI explicitly warns that install and refresh remain disabled.
 
-Free-account builds require the shared App Group to be present in the installed app's provisioning/signing state. A successful unsigned CI build does not verify that requirement. Initial SideStore-style installation and pairing also require the external computer/iLoader setup; LocalDevVPN is a separate app that must be installed and connected by the user.
+SideKick stores its database in private app storage and does not require SideStore's App Group. The unsigned CI build still does not verify signing or on-device functionality. Initial SideStore-style installation and pairing also require the external computer/iLoader setup; LocalDevVPN is a separate app that must be installed and connected by the user.
+
+The upstream SideStore scheme also builds a widget extension. SideKick removes that extension from the packaged IPA because it is not part of the standalone app and an unsigned extension cannot be installed without its own valid provisioning profile.
 
 ## Build and source distribution
 
