@@ -68,7 +68,7 @@ final class SigningAccountStore {
         }
     }
 
-    func addAccount() async throws {
+    func addAccount(appleID: String, password: String) async throws {
         guard !isWorking else { return }
         guard !AppManager.shared.isActivelyManagingAnyApp else {
             throw SigningAccountError.engineBusy
@@ -80,7 +80,16 @@ final class SigningAccountStore {
         isWorking = true
         defer { isWorking = false }
 
-        let result = try await AuthManager.shared.signIn(presentingViewController: presenter)
+        let handler = SideKickSignInFlowHandler(
+            presentingViewController: presenter,
+            appleID: appleID,
+            password: password
+        )
+        let result = try await AuthManager.shared.signIn(
+            presentingViewController: presenter,
+            signInHandler: handler,
+            skipHowTos: true
+        )
         let accountIdentifier = result.team.account?.identifier ?? result.team.identifier
         guard let email = AuthManager.shared.currentAppleID,
               let password = AuthManager.shared.password,
@@ -260,6 +269,32 @@ final class SigningAccountStore {
     }
 }
 
+@MainActor
+private final class SideKickSignInFlowHandler: SignInFlowHandler {
+    private var suppliedCredentials: (String, String)?
+    private var authenticationError: Error?
+
+    init(presentingViewController: UIViewController, appleID: String, password: String) {
+        suppliedCredentials = (appleID, password)
+        super.init(presentingViewController: presentingViewController)
+    }
+
+    override func credentials() async throws -> (String, String) {
+        if let authenticationError { throw authenticationError }
+        guard let credentials = suppliedCredentials else {
+            throw SigningAccountError.credentialsUnavailable
+        }
+        suppliedCredentials = nil
+        return credentials
+    }
+
+    override func handleSignInResult(_ result: Result<(ALTAccount, ALTAppleAPISession), Error>) async {
+        if case .failure(let error) = result {
+            authenticationError = error
+        }
+    }
+}
+
 private struct SigningSessionCredentials: Codable {
     let appleID: String
     let password: String
@@ -319,6 +354,7 @@ private enum SigningAccountError: LocalizedError {
     case engineBusy
     case sessionNotAvailable
     case savedAccountMissing
+    case credentialsUnavailable
     case keychain(OSStatus)
 
     var errorDescription: String? {
@@ -331,6 +367,8 @@ private enum SigningAccountError: LocalizedError {
             return "SideStore completed sign-in but did not return a complete Apple ID session. This account was not saved."
         case .savedAccountMissing:
             return "This account or team is missing from SideStore’s database. Sign in again to restore it."
+        case .credentialsUnavailable:
+            return "SideKick couldn’t retrieve the Apple ID details. Please try signing in again."
         case .keychain(let status):
             return "SideKick couldn’t securely save or load this Apple ID session (Keychain status \(status))."
         }

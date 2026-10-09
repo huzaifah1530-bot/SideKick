@@ -138,3 +138,24 @@ index 3fd3b5c9..c8cb3f03 100644
  MAIN_BUNDLE_IDENTIFIER[config=Debug]            = $(BASE_BUNDLE_ID).$(DEVELOPMENT_TEAM)
  MAIN_BUNDLE_IDENTIFIER[config=Release]          = $(BASE_BUNDLE_ID)
  APP_GROUP_IDENTIFIER                            = $(MAIN_BUNDLE_IDENTIFIER)
+diff --git a/SideStore/Core/Auth/AuthManager.swift b/SideStore/Core/Auth/AuthManager.swift
+index c426783d..983e8fca 100644
+--- a/SideStore/Core/Auth/AuthManager.swift
++++ b/SideStore/Core/Auth/AuthManager.swift
+@@ -140,13 +140,14 @@ public final class AuthManager: @unchecked Sendable {
+     @discardableResult
+     func signIn(
+         presentingViewController: UIViewController? = nil,
++        signInHandler: SignInFlowHandler? = nil,
+         skipDeviceRegistration: Bool = false,
+         skipCertificateProvisioning: Bool = false,
+         skipResign: Bool = false,
+         skipHowTos: Bool = false
+     ) async throws -> SignInResult {
+         let dbBackgroundContext = DatabaseManager.shared.persistentContainer.newBackgroundContext()
+-        let signInFlowHandler = SignInFlowHandler(presentingViewController: presentingViewController)
++        let signInFlowHandler = signInHandler ?? SignInFlowHandler(presentingViewController: presentingViewController)
+         let context = StandaloneOperationContext(
+             steps: .signIn,
+             dbBackgroundContext: dbBackgroundContext
+         )

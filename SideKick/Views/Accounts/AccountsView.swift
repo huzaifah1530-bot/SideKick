@@ -3,6 +3,8 @@ import SwiftUI
 struct AccountsView: View {
     @State private var accountStore = SigningAccountStore()
     @State private var errorMessage: String?
+    @State private var isShowingSignIn = false
+    @State private var submittedCredentials: (appleID: String, password: String)?
 
     var body: some View {
         NavigationStack {
@@ -21,13 +23,7 @@ struct AccountsView: View {
                     .padding(.vertical, 6)
 
                     SwiftUI.Button {
-                        Task {
-                            do {
-                                try await accountStore.addAccount()
-                            } catch {
-                                errorMessage = error.localizedDescription
-                            }
-                        }
+                        isShowingSignIn = true
                     } label: {
                         Label(accountStore.isWorking ? "Connecting…" : "Add Apple ID", systemImage: "plus.circle.fill")
                     }
@@ -74,6 +70,11 @@ struct AccountsView: View {
             }
             .task { await accountStore.reload() }
             .refreshable { await accountStore.reload() }
+            .sheet(isPresented: $isShowingSignIn, onDismiss: beginSignIn) {
+                AppleIDSignInSheet { appleID, password in
+                    submittedCredentials = (appleID, password)
+                }
+            }
             .alert("Couldn’t update Apple IDs", isPresented: Binding(
                 get: { errorMessage != nil },
                 set: { if !$0 { errorMessage = nil } }
@@ -81,6 +82,21 @@ struct AccountsView: View {
                     SwiftUI.Button("OK", role: .cancel) { errorMessage = nil }
             } message: {
                 Text(errorMessage ?? "")
+            }
+        }
+    }
+
+    private func beginSignIn() {
+        guard let submittedCredentials else { return }
+        self.submittedCredentials = nil
+        Task {
+            do {
+                try await accountStore.addAccount(
+                    appleID: submittedCredentials.appleID,
+                    password: submittedCredentials.password
+                )
+            } catch {
+                errorMessage = error.localizedDescription
             }
         }
     }
