@@ -51,7 +51,7 @@ actor IPAImportStore {
         }
     }
 
-    func importIPA(from sourceURL: URL, remoteSourceURL: URL? = nil) throws -> ImportedIPA {
+    func prepareIPA(from sourceURL: URL, remoteSourceURL: URL? = nil) throws -> ImportedIPA {
         guard remoteSourceURL != nil || sourceURL.pathExtension.lowercased() == "ipa" else {
             throw IPAImportError.notAnIPA
         }
@@ -84,17 +84,10 @@ actor IPAImportStore {
             importedAt: .now,
             iconData: metadata.iconData
         )
-        var entries = try importedApps()
-        if let previous = entries.first(where: { $0.bundleIdentifier == metadata.bundleIdentifier }) {
-            removeLegacyStoredIPA(previous)
-            entries.removeAll { $0.bundleIdentifier == metadata.bundleIdentifier }
-        }
-        entries.insert(app, at: 0)
-        try save(entries)
         return app
     }
 
-    func importIPA(bookmarkData: Data) throws -> ImportedIPA {
+    func prepareIPA(bookmarkData: Data) throws -> ImportedIPA {
         var isStale = false
         let sourceURL: URL
         do {
@@ -127,14 +120,29 @@ actor IPAImportStore {
             importedAt: .now,
             iconData: metadata.iconData
         )
+        return app
+    }
+
+    func importIPA(from sourceURL: URL, remoteSourceURL: URL? = nil) throws -> ImportedIPA {
+        let app = try prepareIPA(from: sourceURL, remoteSourceURL: remoteSourceURL)
+        try saveImportedIPA(app)
+        return app
+    }
+
+    func importIPA(bookmarkData: Data) throws -> ImportedIPA {
+        let app = try prepareIPA(bookmarkData: bookmarkData)
+        try saveImportedIPA(app)
+        return app
+    }
+
+    func saveImportedIPA(_ app: ImportedIPA) throws {
         var entries = try importedApps()
-        if let previous = entries.first(where: { $0.bundleIdentifier == metadata.bundleIdentifier }) {
+        if let previous = entries.first(where: { $0.bundleIdentifier == app.bundleIdentifier }) {
             removeLegacyStoredIPA(previous)
-            entries.removeAll { $0.bundleIdentifier == metadata.bundleIdentifier }
+            entries.removeAll { $0.bundleIdentifier == app.bundleIdentifier }
         }
         entries.insert(app, at: 0)
         try save(entries)
-        return app
     }
 
     func fileURL(for app: ImportedIPA) async throws -> URL {

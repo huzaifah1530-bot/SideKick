@@ -99,6 +99,8 @@ struct URLImportView: View {
     @State private var isDownloading = false
     @State private var errorMessage: String?
     @State private var importedApp: ImportedIPA?
+    @State private var importedAsUpdate = false
+    @State private var ipaAwaitingUpdateChoice: ImportedIPA?
     @State private var didStartIncomingImport = false
 
     var body: some View {
@@ -124,12 +126,15 @@ struct URLImportView: View {
                         Text("Downloading and checking IPA…")
                     }
                 } else if let importedApp {
-                    Label("\(importedApp.name) is ready to install", systemImage: "checkmark.circle.fill")
+                    Label(
+                        importedAsUpdate ? "Update queued for \(importedApp.name)" : "\(importedApp.name) is ready to install",
+                        systemImage: "checkmark.circle.fill"
+                    )
                         .foregroundStyle(.green)
                     NavigationLink {
                         AppManagementView(importedApp: importedApp)
                     } label: {
-                        Label("Review \(importedApp.name)", systemImage: "app")
+                        Label(importedAsUpdate ? "Review update" : "Review \(importedApp.name)", systemImage: "app")
                     }
                 } else {
                     SwiftUI.Button {
@@ -159,6 +164,19 @@ struct URLImportView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Import from URL")
         .navigationBarTitleDisplayMode(.inline)
+        .confirmationDialog(
+            "\(ipaAwaitingUpdateChoice?.name ?? "This app") is already installed",
+            isPresented: Binding(
+                get: { ipaAwaitingUpdateChoice != nil },
+                set: { if !$0 { ipaAwaitingUpdateChoice = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            SwiftUI.Button("Queue for Update") { Task { await queuePendingUpdate() } }
+            SwiftUI.Button("Cancel", role: .cancel) { ipaAwaitingUpdateChoice = nil }
+        } message: {
+            Text("Queue this IPA as the update for the installed app?")
+        }
         .onAppear {
             guard let initialURL else { return }
             if linkText.isEmpty { linkText = initialURL.absoluteString }
@@ -196,9 +214,17 @@ struct URLImportView: View {
                 throw AppSharingError.downloadFailed(response.statusCode)
             }
 
-            let app = try await environment.ipaImportStore.importIPA(from: downloadedURL, remoteSourceURL: sourceURL)
-            importedApp = app
-            await onImported(app)
+            let app = try await environment.ipaImportStore.prepareIPA(from: downloadedURL, remoteSourceURL: sourceURL)
+            let installedApps = await SideStoreOperationService(
+                accountStore: SigningAccountStore(),
+                ipaStore: environment.ipaImportStore
+            ).installedApps()
+            let installedIDs = Set(installedApps.flatMap { [$0.bundleIdentifier, $0.resignedBundleIdentifier] }.map { $0.lowercased() })
+            if installedIDs.contains(app.bundleIdentifier.lowercased()) {
+                ipaAwaitingUpdateChoice = app
+            } else {
+                try await savePreparedIPA(app, asUpdate: false)
+            }
         } catch let error as IPAImportError {
             switch error {
             case .invalidArchive, .missingAppBundle, .missingBundleIdentifier, .notAnIPA:
@@ -209,6 +235,22 @@ struct URLImportView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    @MainActor
+    private func queuePendingUpdate() async {
+        guard let app = ipaAwaitingUpdateChoice else { return }
+        ipaAwaitingUpdateChoice = nil
+        do { try await savePreparedIPA(app, asUpdate: true) }
+        catch { errorMessage = error.localizedDescription }
+    }
+
+    @MainActor
+    private func savePreparedIPA(_ app: ImportedIPA, asUpdate: Bool) async throws {
+        try await environment.ipaImportStore.saveImportedIPA(app)
+        importedApp = app
+        importedAsUpdate = asUpdate
+        await onImported(app)
     }
 
 }

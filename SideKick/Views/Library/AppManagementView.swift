@@ -8,6 +8,7 @@ struct AppManagementView: View {
     @State private var isWorking = false
     @State private var isFindingShareIPA = false
     @State private var shareIPA: ImportedIPA?
+    @State private var pendingUpdateIPA: ImportedIPA?
     @State private var errorMessage: String?
 
     private let importedApp: ImportedIPA?
@@ -62,6 +63,9 @@ struct AppManagementView: View {
                         value: "\(installedApp.expirationDate.formatted(.relative(presentation: .numeric))) · \(installedApp.expirationDate.formatted(date: .abbreviated, time: .omitted))"
                     )
                 }
+                if let pendingUpdateIPA {
+                    LabeledContent("Queued update", value: "Version \(pendingUpdateIPA.version)")
+                }
             }
 
             Section {
@@ -72,7 +76,9 @@ struct AppManagementView: View {
                                 app: importedApp,
                                 accounts: accountStore.accounts.filter(\.hasSavedSession),
                                 accountStore: accountStore,
-                                ipaStore: environment.ipaImportStore
+                                ipaStore: environment.ipaImportStore,
+                                isUpdate: false,
+                                onInstalled: nil
                             )
                         } label: {
                             Label("Install", systemImage: "arrow.down.circle")
@@ -112,15 +118,47 @@ struct AppManagementView: View {
                     }
                     .disabled(isFindingShareIPA)
 
-                    SwiftUI.Button {
-                        UIApplication.shared.open(InstalledApp.openAppURL(targetBundleIdentifier: installedApp.resignedBundleIdentifier))
-                    } label: {
-                        Text("Open")
-                            .fontWeight(.semibold)
-                            .frame(maxWidth: .infinity)
+                    if let pendingUpdateIPA {
+                        if accountStore.accounts.contains(where: \.hasSavedSession) {
+                            NavigationLink {
+                                InstallAccountSelectionView(
+                                    app: pendingUpdateIPA,
+                                    accounts: accountStore.accounts.filter(\.hasSavedSession),
+                                    accountStore: accountStore,
+                                    ipaStore: environment.ipaImportStore,
+                                    isUpdate: true,
+                                    onInstalled: {
+                                        do {
+                                            try await environment.ipaImportStore.delete(pendingUpdateIPA)
+                                            self.pendingUpdateIPA = nil
+                                        } catch {
+                                            self.errorMessage = error.localizedDescription
+                                        }
+                                    }
+                                )
+                            } label: {
+                                Text("Update")
+                                    .fontWeight(.semibold)
+                                    .frame(maxWidth: .infinity)
+                            }
+                            .buttonStyle(.borderedProminent)
+                            .buttonBorderShape(.capsule)
+                        } else {
+                            Text("Add an Apple ID in Accounts to update this app.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                    } else {
+                        SwiftUI.Button {
+                            UIApplication.shared.open(InstalledApp.openAppURL(targetBundleIdentifier: installedApp.resignedBundleIdentifier))
+                        } label: {
+                            Text("Open")
+                                .fontWeight(.semibold)
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .buttonBorderShape(.capsule)
                     }
-                    .buttonStyle(.bordered)
-                    .buttonBorderShape(.capsule)
 
                     SwiftUI.Button {
                         Task { await refresh(installedApp) }
@@ -154,7 +192,7 @@ struct AppManagementView: View {
         .navigationDestination(item: $shareIPA) { ipa in
             ShareIPAView(app: ipa)
         }
-        .task { await accountStore.reload() }
+        .onAppear { Task { await reloadManagementState() } }
         .alert("App action failed", isPresented: Binding(
             get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
         )) {
@@ -186,6 +224,15 @@ struct AppManagementView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    @MainActor
+    private func reloadManagementState() async {
+        await accountStore.reload()
+        guard let installedApp else { return }
+        let matchingBundleIDs = Set([installedApp.bundleIdentifier, installedApp.resignedBundleIdentifier].map { $0.lowercased() })
+        pendingUpdateIPA = (try? await environment.ipaImportStore.importedApps())?
+            .first { matchingBundleIDs.contains($0.bundleIdentifier.lowercased()) }
     }
 
     @MainActor
@@ -294,13 +341,15 @@ private struct InstallAccountSelectionView: View {
     let accounts: [SigningAccountSummary]
     let accountStore: SigningAccountStore
     let ipaStore: IPAImportStore
+    let isUpdate: Bool
+    let onInstalled: (() async -> Void)?
 
     var body: some View {
         List {
             Section {
                 ForEach(accounts) { account in
                     NavigationLink {
-                        InstallConsoleView(app: app, account: account, accountStore: accountStore, ipaStore: ipaStore)
+                        InstallConsoleView(app: app, account: account, accountStore: accountStore, ipaStore: ipaStore, isUpdate: isUpdate, onInstalled: onInstalled)
                     } label: {
                         VStack(alignment: .leading, spacing: 5) {
                             Text(account.email).font(.body.weight(.medium))
@@ -314,7 +363,7 @@ private struct InstallAccountSelectionView: View {
             } header: {
                 Text("Apple Account")
             } footer: {
-                Text("Choose the account that will sign and install \(app.name).")
+                Text("Choose the account that will sign and \(isUpdate ? "update" : "install") \(app.name).")
             }
         }
         .listStyle(.insetGrouped)
@@ -328,6 +377,8 @@ private struct InstallConsoleView: View {
     let account: SigningAccountSummary
     let accountStore: SigningAccountStore
     let ipaStore: IPAImportStore
+    let isUpdate: Bool
+    let onInstalled: (() async -> Void)?
 
     @Environment(\.dismiss) private var dismiss
     @State private var lines: [String] = []
@@ -340,7 +391,7 @@ private struct InstallConsoleView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 8) {
-                Text(isRunning ? "Installing" : (failure == nil ? "Installed" : "Install Failed"))
+                Text(isRunning ? (isUpdate ? "Updating" : "Installing") : (failure == nil ? (isUpdate ? "Updated" : "Installed") : (isUpdate ? "Update Failed" : "Install Failed")))
                     .font(.largeTitle.bold())
                 Text(app.name)
                     .font(.title3)
@@ -401,7 +452,7 @@ private struct InstallConsoleView: View {
     private func runInstall() async {
         append("Starting install · \(Date.now.formatted(date: .omitted, time: .standard))")
         append("Account selected · \(account.email)")
-        append("Preparing imported IPA")
+        append(isUpdate ? "Preparing update IPA" : "Preparing imported IPA")
         do {
             try await SideStoreOperationService(accountStore: accountStore, ipaStore: ipaStore)
                 .install(app, using: account) { fraction in
@@ -416,7 +467,8 @@ private struct InstallConsoleView: View {
                     }
                 }
             progress = 1
-            append("Install completed successfully")
+            append(isUpdate ? "Update completed successfully" : "Install completed successfully")
+            await onInstalled?()
         } catch {
             failure = error.localizedDescription
             append("ERROR · \(error.localizedDescription)")

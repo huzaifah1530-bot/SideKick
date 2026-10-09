@@ -7,6 +7,7 @@ struct HomeView: View {
     @State private var showingImporter = false
     @State private var showingURLImport = false
     @State private var incomingShareURL: URL?
+    @State private var ipaAwaitingUpdateChoice: ImportedIPA?
     @State private var installedApps: [InstalledAppSummary] = []
     @Environment(AppEnvironment.self) private var environment
 
@@ -110,7 +111,7 @@ struct HomeView: View {
                 switch result {
                 case .success(let urls):
                     guard let url = urls.first else { return }
-                    Task { await viewModel.importIPA(from: url) }
+                    Task { await prepareImport(from: url) }
                 case .failure(let error):
                     viewModel.errorMessage = error.localizedDescription
                 }
@@ -136,6 +137,19 @@ struct HomeView: View {
                 Task { await importPendingIPA() }
             }
             .refreshable { await load() }
+            .confirmationDialog(
+                "\(ipaAwaitingUpdateChoice?.name ?? "This app") is already installed",
+                isPresented: Binding(
+                    get: { ipaAwaitingUpdateChoice != nil },
+                    set: { if !$0 { ipaAwaitingUpdateChoice = nil } }
+                ),
+                titleVisibility: .visible
+            ) {
+                SwiftUI.Button("Queue for Update") { Task { await queuePendingUpdate() } }
+                SwiftUI.Button("Cancel", role: .cancel) { ipaAwaitingUpdateChoice = nil }
+            } message: {
+                Text("Queue this IPA as the update for the installed app?")
+            }
             .alert(viewModel.errorMessage == nil ? "IPA imported" : "Couldn’t import IPA", isPresented: Binding(
                 get: { viewModel.errorMessage != nil || viewModel.noticeMessage != nil },
                 set: { if !$0 { viewModel.errorMessage = nil; viewModel.noticeMessage = nil } }
@@ -190,12 +204,51 @@ struct HomeView: View {
         }
         guard let bookmark = SideKickIncomingIPA.consumePendingBookmark() else { return }
         do {
-            let app = try await environment.ipaImportStore.importIPA(bookmarkData: bookmark)
-            viewModel.importedApps = try await environment.ipaImportStore.importedApps()
-            viewModel.noticeMessage = "\(app.name) is ready to install."
+            let app = try await environment.ipaImportStore.prepareIPA(bookmarkData: bookmark)
+            await handlePreparedIPA(app)
         } catch {
             viewModel.errorMessage = error.localizedDescription
         }
         await load()
+    }
+
+    private func prepareImport(from url: URL) async {
+        viewModel.isImporting = true
+        defer { viewModel.isImporting = false }
+        do {
+            let app = try await environment.ipaImportStore.prepareIPA(from: url)
+            await handlePreparedIPA(app)
+        } catch {
+            viewModel.errorMessage = error.localizedDescription
+        }
+    }
+
+    private func handlePreparedIPA(_ app: ImportedIPA) async {
+        installedApps = await SideStoreOperationService(
+            accountStore: SigningAccountStore(),
+            ipaStore: environment.ipaImportStore
+        ).installedApps()
+        let installedIDs = Set(installedApps.flatMap { [$0.bundleIdentifier, $0.resignedBundleIdentifier] }.map { $0.lowercased() })
+        guard installedIDs.contains(app.bundleIdentifier.lowercased()) else {
+            await savePreparedIPA(app, update: false)
+            return
+        }
+        ipaAwaitingUpdateChoice = app
+    }
+
+    private func queuePendingUpdate() async {
+        guard let app = ipaAwaitingUpdateChoice else { return }
+        ipaAwaitingUpdateChoice = nil
+        await savePreparedIPA(app, update: true)
+    }
+
+    private func savePreparedIPA(_ app: ImportedIPA, update: Bool) async {
+        do {
+            try await environment.ipaImportStore.saveImportedIPA(app)
+            viewModel.importedApps = try await environment.ipaImportStore.importedApps()
+            viewModel.noticeMessage = update ? "\(app.name) is queued as an update." : "\(app.name) is ready to install."
+        } catch {
+            viewModel.errorMessage = error.localizedDescription
+        }
     }
 }
