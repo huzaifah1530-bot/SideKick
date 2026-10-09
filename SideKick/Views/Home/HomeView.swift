@@ -10,10 +10,16 @@ struct HomeView: View {
     @State private var installedApps: [InstalledAppSummary] = []
     @Environment(AppEnvironment.self) private var environment
 
+    private var installedBundleIdentifiers: Set<String> {
+        Set(installedApps.flatMap { [$0.bundleIdentifier, $0.resignedBundleIdentifier] }
+            .map { $0.lowercased() })
+    }
+
     private var filteredImportedApps: [ImportedIPA] {
         viewModel.importedApps.filter {
-            viewModel.searchText.isEmpty || $0.name.localizedCaseInsensitiveContains(viewModel.searchText)
-                || $0.bundleIdentifier.localizedCaseInsensitiveContains(viewModel.searchText)
+            !installedBundleIdentifiers.contains($0.bundleIdentifier.lowercased())
+                && (viewModel.searchText.isEmpty || $0.name.localizedCaseInsensitiveContains(viewModel.searchText)
+                    || $0.bundleIdentifier.localizedCaseInsensitiveContains(viewModel.searchText))
         }
     }
 

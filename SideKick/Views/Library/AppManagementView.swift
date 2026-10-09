@@ -75,12 +75,9 @@ struct AppManagementView: View {
                                 ipaStore: environment.ipaImportStore
                             )
                         } label: {
-                            Text("Install")
+                            Label("Install", systemImage: "arrow.down.circle")
                                 .fontWeight(.semibold)
-                                .frame(maxWidth: .infinity)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .buttonBorderShape(.capsule)
                         .disabled(accountStore.isWorking)
                     } else {
                         Text("Add an Apple ID in Accounts to install this app.")
