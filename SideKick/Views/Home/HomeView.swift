@@ -8,18 +8,13 @@ struct HomeView: View {
     @State private var installedApps: [InstalledAppSummary] = []
     @Environment(AppEnvironment.self) private var environment
 
-    private var capacityRows: [InstalledAppSummary] {
-        var seen = Set<String>()
-        return installedApps.filter { seen.insert($0.teamIdentifier).inserted }
-    }
-
     var body: some View {
         NavigationStack {
             List {
-                SwiftUI.Section("Installed") {
+                SwiftUI.Section("Managed Apps") {
                     if installedApps.isEmpty {
                         ContentUnavailableView(
-                            "No installed apps yet",
+                            "No apps managed yet",
                             systemImage: "square.stack.3d.up",
                             description: Text("Import an IPA from Library to get started.")
                         )
@@ -33,21 +28,6 @@ struct HomeView: View {
                             }
                         }
                     }
-                }
-
-                SwiftUI.Section {
-                    if capacityRows.isEmpty {
-                        Text("Add an Apple Account to see capacity.")
-                            .foregroundStyle(.secondary)
-                    } else {
-                        ForEach(capacityRows, id: \.teamIdentifier) { account in
-                            LabeledContent(account.accountEmail, value: account.capacityDescription)
-                        }
-                    }
-                } header: {
-                    Text("Account capacity")
-                } footer: {
-                    Text("Capacity reflects apps and App IDs recorded by SideKick. iOS doesn’t provide a reliable list of apps installed by other sideloaders.")
                 }
             }
             .listStyle(.insetGrouped)
@@ -103,15 +83,12 @@ struct HomeView: View {
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text(app.name).font(.body.weight(.semibold))
-                Text("\(app.accountEmail) · Version \(app.version)")
+                Text("Version \(app.version) · \(app.expirationDate.formatted(.relative(presentation: .numeric)))")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
             Spacer(minLength: 4)
-            Image(systemName: "chevron.right")
-                .font(.footnote.weight(.semibold))
-                .foregroundStyle(.tertiary)
         }
         .padding(.vertical, 4)
     }

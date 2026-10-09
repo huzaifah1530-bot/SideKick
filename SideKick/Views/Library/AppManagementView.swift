@@ -56,6 +56,10 @@ struct AppManagementView: View {
                 if let installedApp {
                     LabeledContent("Signing account", value: installedApp.accountEmail)
                     LabeledContent("Team", value: installedApp.teamIdentifier)
+                    LabeledContent(
+                        "Signing expires",
+                        value: "\(installedApp.expirationDate.formatted(.relative(presentation: .numeric))) · \(installedApp.expirationDate.formatted(date: .abbreviated, time: .omitted))"
+                    )
                 }
             }
 

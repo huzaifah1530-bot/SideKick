@@ -11,6 +11,7 @@ struct SigningAccountSummary: Identifiable, Equatable {
     let email: String
     let teamName: String
     let teamType: String
+    let isFreeAccount: Bool
     let hasSavedSession: Bool
 
     var id: String { "\(accountIdentifier)|\(teamIdentifier)" }
@@ -41,7 +42,8 @@ final class SigningAccountStore {
                          team.identifier,
                          account.appleID,
                          team.name,
-                         team.type.localizedDescription)
+                         team.type.localizedDescription,
+                         team.type == .free)
                     }
                 }
             }
@@ -54,6 +56,7 @@ final class SigningAccountStore {
                     email: record.2,
                     teamName: record.3,
                     teamType: record.4,
+                    isFreeAccount: record.5,
                     hasSavedSession: (try? vault.load(key: key)) != nil
                 )
             }
@@ -201,6 +204,7 @@ final class SigningAccountStore {
     func withAccount<T>(
         accountIdentifier: String,
         teamIdentifier: String,
+        prepareForSigning: Bool = true,
         operation: () async throws -> T
     ) async throws -> T {
         guard !isWorking else { throw SigningAccountError.engineBusy }
@@ -208,38 +212,90 @@ final class SigningAccountStore {
             throw SigningAccountError.engineBusy
         }
 
-        let target = SigningAccountSummary(
+        let target = accounts.first {
+            $0.accountIdentifier == accountIdentifier && $0.teamIdentifier == teamIdentifier
+        } ?? SigningAccountSummary(
             accountIdentifier: accountIdentifier,
             teamIdentifier: teamIdentifier,
             email: "",
             teamName: "",
             teamType: "",
+            isFreeAccount: false,
             hasSavedSession: true
         )
         isWorking = true
         defer { isWorking = false }
 
         let previous = await activeAccountSummary()
-        let previousCredentials = try? currentSessionCredentials(for: previous)
+        let previousCredentials: SigningSessionCredentials?
+        if let previous {
+            let key = SigningSessionVault.key(
+                accountIdentifier: previous.accountIdentifier,
+                teamIdentifier: previous.teamIdentifier
+            )
+            previousCredentials = (try? currentSessionCredentials(for: previous)) ?? (try? vault.load(key: key))
+        } else {
+            previousCredentials = nil
+        }
 
-        if previous?.id != target.id {
-            try await restoreAccountSession(target)
+        let sessionMatchesTarget = AuthManager.shared.currentAppleID?.caseInsensitiveCompare(target.email) == .orderedSame
+        if previous?.id != target.id || !sessionMatchesTarget {
+            try await restoreAccountSession(target, activateTeam: prepareForSigning)
         }
 
         do {
-            try await ensureSigningReady(for: target)
+            if prepareForSigning {
+                try await ensureSigningReady(for: target)
+            }
             let result = try await operation()
-            if previous?.id != target.id, let previousCredentials {
+            if (previous?.id != target.id || !sessionMatchesTarget), let previousCredentials {
                 try await restoreSession(previousCredentials)
             }
             await reload()
             return result
         } catch {
-            if previous?.id != target.id, let previousCredentials {
+            if (previous?.id != target.id || !sessionMatchesTarget), let previousCredentials {
                 try? await restoreSession(previousCredentials)
             }
             await reload()
             throw error
+        }
+    }
+
+    func fetchDeveloperInventory(for account: SigningAccountSummary) async throws -> AppleDeveloperInventory {
+        guard DatabaseManager.shared.isStarted else {
+            throw SigningAccountError.databaseUnavailable
+        }
+
+        let accountIdentifier = account.accountIdentifier
+        let teamIdentifier = account.teamIdentifier
+        let context = DatabaseManager.shared.viewContext
+        let team = try await context.perform {
+            let request = Team.fetchRequest()
+            request.predicate = NSPredicate(
+                format: "%K == %@ AND %K == %@",
+                #keyPath(Team.identifier), teamIdentifier,
+                #keyPath(Team.account.identifier), accountIdentifier
+            )
+            guard let savedTeam = try context.fetch(request).first else {
+                throw SigningAccountError.savedAccountMissing
+            }
+            return ALTTeam(
+                identifier: savedTeam.identifier,
+                name: savedTeam.name,
+                type: savedTeam.type
+            )
+        }
+
+        return try await withAccount(
+            accountIdentifier: accountIdentifier,
+            teamIdentifier: teamIdentifier,
+            prepareForSigning: false
+        ) {
+            async let appIDs = DeveloperPortalProxy.shared.fetchAppIDs(team: team)
+            async let profiles = DeveloperPortalProxy.shared.listProvisioningProfiles(team: team)
+            let (fetchedAppIDs, fetchedProfiles) = try await (appIDs, profiles)
+            return AppleDeveloperInventory(appIDs: fetchedAppIDs, profiles: fetchedProfiles)
         }
     }
 
@@ -305,16 +361,16 @@ final class SigningAccountStore {
         await reload()
     }
 
-    private func restoreAccountSession(_ account: SigningAccountSummary) async throws {
+    private func restoreAccountSession(_ account: SigningAccountSummary, activateTeam: Bool = true) async throws {
         let key = SigningSessionVault.key(
             accountIdentifier: account.accountIdentifier,
             teamIdentifier: account.teamIdentifier
         )
         let credentials = try vault.load(key: key)
-        try await restoreSession(credentials)
+        try await restoreSession(credentials, activateTeam: activateTeam)
     }
 
-    private func restoreSession(_ credentials: SigningSessionCredentials) async throws {
+    private func restoreSession(_ credentials: SigningSessionCredentials, activateTeam: Bool = true) async throws {
         let signingCertificate = try credentials.certificateData.map {
             try CertificateManager.parse($0, password: credentials.certificatePassword)
         }
@@ -327,38 +383,42 @@ final class SigningAccountStore {
         AuthManager.shared.adsid = credentials.adsid
         AuthManager.shared.xcodeToken = credentials.xcodeToken
 
-        let context = DatabaseManager.shared.persistentContainer.newBackgroundContext()
-        try await context.perform {
-            let accounts = try context.fetch(Account.fetchRequest())
-            let teams = try context.fetch(Team.fetchRequest())
-            guard let selectedAccount = accounts.first(where: { $0.identifier == credentials.accountIdentifier }),
-                  let selectedTeam = teams.first(where: {
-                      $0.identifier == credentials.teamIdentifier &&
-                      $0.account.identifier == credentials.accountIdentifier
-                  }) else {
-                throw SigningAccountError.savedAccountMissing
-            }
-            for savedAccount in accounts {
-                savedAccount.isActiveAccount = savedAccount == selectedAccount
-            }
-            for savedTeam in teams {
-                savedTeam.isActiveTeam = savedTeam == selectedTeam
-            }
+        if activateTeam {
+            let context = DatabaseManager.shared.persistentContainer.newBackgroundContext()
+            try await context.perform {
+                let accounts = try context.fetch(Account.fetchRequest())
+                let teams = try context.fetch(Team.fetchRequest())
+                guard let selectedAccount = accounts.first(where: { $0.identifier == credentials.accountIdentifier }),
+                      let selectedTeam = teams.first(where: {
+                          $0.identifier == credentials.teamIdentifier &&
+                          $0.account.identifier == credentials.accountIdentifier
+                      }) else {
+                    throw SigningAccountError.savedAccountMissing
+                }
+                for savedAccount in accounts {
+                    savedAccount.isActiveAccount = savedAccount == selectedAccount
+                }
+                for savedTeam in teams {
+                    savedTeam.isActiveTeam = savedTeam == selectedTeam
+                }
 
-            let sparseRestorePatched = ProcessInfo().sparseRestorePatched
-            let appLimitDisabled = UserDefaults.standard.isAppLimitDisabled
-            UserDefaults.standard.activeAppsLimit = nil
-            if selectedTeam.type == .free,
-               (!appLimitDisabled && sparseRestorePatched || appLimitDisabled && !sparseRestorePatched) {
-                UserDefaults.standard.activeAppsLimit = InstalledApp.freeAccountActiveAppsLimit
+                let sparseRestorePatched = ProcessInfo().sparseRestorePatched
+                let appLimitDisabled = UserDefaults.standard.isAppLimitDisabled
+                UserDefaults.standard.activeAppsLimit = nil
+                if selectedTeam.type == .free,
+                   (!appLimitDisabled && sparseRestorePatched || appLimitDisabled && !sparseRestorePatched) {
+                    UserDefaults.standard.activeAppsLimit = InstalledApp.freeAccountActiveAppsLimit
+                }
+                try context.save()
             }
-            try context.save()
         }
 
-        if let signingCertificate {
-            try CertificateManager.shared.setActiveCertificate(signingCertificate)
-        } else {
-            CertificateManager.shared.clearActiveCertificate()
+        if activateTeam {
+            if let signingCertificate {
+                try CertificateManager.shared.setActiveCertificate(signingCertificate)
+            } else {
+                CertificateManager.shared.clearActiveCertificate()
+            }
         }
     }
 
@@ -374,6 +434,7 @@ final class SigningAccountStore {
                 email: account.appleID,
                 teamName: team.name,
                 teamType: team.type.localizedDescription,
+                isFreeAccount: team.type == .free,
                 hasSavedSession: true
             )
         }
@@ -399,6 +460,11 @@ final class SigningAccountStore {
             certificatePassword: certificate?.password
         )
     }
+}
+
+struct AppleDeveloperInventory {
+    let appIDs: [ALTAppID]
+    let profiles: [ALTListedProvisioningProfile]
 }
 
 @MainActor

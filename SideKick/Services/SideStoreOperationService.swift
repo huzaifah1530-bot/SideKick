@@ -31,19 +31,8 @@ final class SideStoreOperationService {
                 try? context.save()
             }
 
-            return candidates.compactMap { app -> (InstalledApp, String, String, String, String, String, String, String, String)? in
+            return candidates.compactMap { app -> (InstalledApp, String, String, String, String, String, String, String, Date)? in
                 guard let team = app.team, let account = team.account else { return nil }
-                let capacityDescription: String
-                if team.type == .free {
-                    let usedSlots = team.installedApps
-                        .filter(\.isActive)
-                        .reduce(0) { $0 + $1.requiredActiveSlots }
-                    let slotLimit = InstalledApp.freeAccountActiveAppsLimit
-                    let appIDsRemaining = max(Team.maximumFreeAppIDs - team.appIDs.count, 0)
-                    capacityDescription = "\(max(slotLimit - usedSlots, 0)) of \(slotLimit) free app slots left · \(appIDsRemaining) App IDs left"
-                } else {
-                    capacityDescription = "Developer account"
-                }
                 return (
                     app,
                     app.bundleIdentifier,
@@ -53,7 +42,7 @@ final class SideStoreOperationService {
                     account.appleID,
                     account.identifier,
                     team.identifier,
-                    capacityDescription
+                    app.expirationDate
                 )
             }
         }
@@ -70,7 +59,7 @@ final class SideStoreOperationService {
                 accountIdentifier: record.6,
                 teamIdentifier: record.7,
                 iconData: iconData,
-                capacityDescription: record.8
+                expirationDate: record.8
             ))
         }
         return summaries.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -132,7 +121,7 @@ struct InstalledAppSummary: Identifiable {
     let accountIdentifier: String
     let teamIdentifier: String
     let iconData: Data?
-    let capacityDescription: String
+    let expirationDate: Date
 
     var id: String { bundleIdentifier }
 }
