@@ -24,20 +24,12 @@ struct HomeView: View {
     }
 
     private var filteredImportedApps: [ImportedIPA] {
-        viewModel.importedApps.filter {
-            !installedBundleIdentifiers.contains($0.bundleIdentifier.lowercased())
-                && (viewModel.searchText.isEmpty || $0.name.localizedCaseInsensitiveContains(viewModel.searchText)
-                    || $0.bundleIdentifier.localizedCaseInsensitiveContains(viewModel.searchText))
-        }
+        viewModel.importedApps.filter { !installedBundleIdentifiers.contains($0.bundleIdentifier.lowercased()) }
     }
 
     private var filteredInstalledApps: [InstalledAppSummary] {
-        let matches = installedApps.filter {
-            viewModel.searchText.isEmpty || $0.name.localizedCaseInsensitiveContains(viewModel.searchText)
-                || $0.bundleIdentifier.localizedCaseInsensitiveContains(viewModel.searchText)
-        }
         var seenBundleIDs = Set<String>()
-        return matches.filter { app in
+        return installedApps.filter { app in
             let identifiers = [app.bundleIdentifier, app.resignedBundleIdentifier].map { $0.lowercased() }
             guard !identifiers.contains(where: seenBundleIDs.contains) else { return false }
             identifiers.forEach { seenBundleIDs.insert($0) }
@@ -64,23 +56,30 @@ struct HomeView: View {
                     Section {
                         HStack(spacing: 9) {
                             if isCheckingGitHubUpdates { ProgressView() }
-                            else if githubUpdateCheckFailed { Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.orange) }
+                            else if githubUpdateCheckFailed {
+                                Image(systemName: "exclamationmark.circle").foregroundStyle(.orange)
+                            } else {
+                                Image(systemName: "arrow.down.circle").foregroundStyle(Color.sideKickAccentGradient)
+                            }
                             Text(isCheckingGitHubUpdates ? "Checking for Updates" : (githubUpdateCheckFailed ? "Couldn’t Check GitHub Updates" : "No Updates Available"))
                                 .font(.subheadline.weight(.medium))
                             Spacer()
                         }
-                        .padding(.vertical, 5)
-                        .listRowBackground(Color(uiColor: .secondarySystemGroupedBackground))
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 13)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color(uiColor: .secondarySystemGroupedBackground), in: .rect(cornerRadius: 18))
+                        .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
                     }
                 }
 
                 if filteredInstalledApps.isEmpty && filteredImportedApps.isEmpty {
                     ContentUnavailableView(
-                        viewModel.searchText.isEmpty ? "Your apps appear here" : "No matching apps",
+                        "Your apps appear here",
                         systemImage: "square.stack.3d.up",
-                        description: Text(viewModel.searchText.isEmpty
-                            ? "Import an IPA to install it, or manage apps already installed with SideKick."
-                            : "Try another app name or bundle identifier.")
+                        description: Text("Import an IPA to install it, or manage apps already installed with SideKick.")
                     )
                     .listRowBackground(Color.clear)
                 }
@@ -93,16 +92,7 @@ struct HomeView: View {
                             } label: {
                                 installedAppRow(app)
                             }
-                        }
-                        if let remainingAppIDs {
-                            HStack {
-                                Spacer()
-                                Text("\(remainingAppIDs) App IDs Remaining")
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
-                                Spacer()
-                            }
-                            .listRowBackground(Color.clear)
+                            .navigationLinkIndicatorVisibility(.hidden)
                         }
                     } header: {
                         HStack {
@@ -122,6 +112,12 @@ struct HomeView: View {
                             .font(.caption.weight(.medium))
                             .disabled(isRefreshingAll || filteredInstalledApps.isEmpty)
                         }
+                    } footer: {
+                        if let remainingAppIDs {
+                            Text("\(remainingAppIDs) App IDs Remaining")
+                                .frame(maxWidth: .infinity)
+                                .multilineTextAlignment(.center)
+                        }
                     }
                 }
 
@@ -135,6 +131,7 @@ struct HomeView: View {
                             } label: {
                                 ImportedIPARow(app: app)
                             }
+                            .navigationLinkIndicatorVisibility(.hidden)
                         }
                     }
                 }
@@ -142,7 +139,6 @@ struct HomeView: View {
             .listStyle(.insetGrouped)
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("My Apps")
-            .searchable(text: $viewModel.searchText, prompt: "Search apps")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
@@ -244,26 +240,26 @@ struct HomeView: View {
             }
             VStack(alignment: .leading, spacing: 4) {
                 Text(app.name).font(.body.weight(.semibold))
-                Text("Version \(app.version) · \(app.expirationDate.formatted(.relative(presentation: .numeric)))")
+                Text("Version \(app.version)")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
                     .lineLimit(1)
             }
-            Spacer(minLength: 4)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            Spacer(minLength: 8)
             VStack(alignment: .trailing, spacing: 4) {
                 Text("Expires in")
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                 Text("\(daysRemaining(for: app.expirationDate)) DAYS")
-                    .font(.caption2.weight(.bold))
+                    .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white)
-                    .padding(.horizontal, 9)
-                    .padding(.vertical, 5)
-                    .background(expirationColor(for: app.expirationDate), in: .capsule)
+                    .frame(minWidth: 82, minHeight: 34)
+                    .background(expirationColor(for: app.expirationDate).opacity(0.84), in: .capsule)
             }
         }
-        .padding(.vertical, 6)
-        .padding(.horizontal, 4)
+        .padding(.vertical, 8)
+        .padding(.horizontal, 6)
         .listRowBackground(Color(uiColor: .secondarySystemGroupedBackground))
     }
 
@@ -277,10 +273,7 @@ struct HomeView: View {
     }
 
     private var filteredGitHubUpdates: [GitHubUpdateCandidate] {
-        githubUpdates.filter {
-            viewModel.searchText.isEmpty || $0.appName.localizedCaseInsensitiveContains(viewModel.searchText)
-                || $0.bundleIdentifier.localizedCaseInsensitiveContains(viewModel.searchText)
-        }
+        githubUpdates
     }
 
     private func scanGitHubUpdates() async {

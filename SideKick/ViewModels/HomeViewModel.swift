@@ -5,7 +5,6 @@ import Observation
 @Observable
 final class HomeViewModel {
     var importedApps: [ImportedIPA] = []
-    var searchText = ""
     var isImporting = false
     var errorMessage: String?
     var noticeMessage: String?

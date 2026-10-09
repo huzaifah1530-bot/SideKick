@@ -123,7 +123,7 @@ private struct SigningAccountDetailView: View {
 
             SwiftUI.Section {
                 if !currentAccount.hasSavedSession {
-                    Text("Sign in again to check App IDs and profiles.")
+                    Text("Sign in again to check App IDs, profiles, and certificates.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 } else if let inventory {
@@ -143,6 +143,21 @@ private struct SigningAccountDetailView: View {
                     } label: {
                         LabeledContent("Provisioning Profiles", value: "\(inventory.profiles.count)")
                     }
+                    NavigationLink {
+                        AccountCertificateListView(
+                            account: currentAccount,
+                            accountStore: accountStore,
+                            certificates: inventory.certificates
+                        ) { updatedCertificates in
+                            self.inventory = AppleDeveloperInventory(
+                                appIDs: inventory.appIDs,
+                                profiles: inventory.profiles,
+                                certificates: updatedCertificates
+                            )
+                        }
+                    } label: {
+                        LabeledContent("Certificates", value: "\(inventory.certificates.count)")
+                    }
                 } else if isLoadingInventory {
                     ProgressView("Loading account details")
                 } else if let inventoryError {
@@ -157,7 +172,7 @@ private struct SigningAccountDetailView: View {
             } header: {
                 Text("Apple Developer")
             } footer: {
-                Text("This is the live Apple Developer account inventory. A profile can remain after its app is removed, so it doesn’t prove the app is installed.")
+                Text("Live Apple Developer records; profiles and certificates don’t prove an app is installed.")
             }
 
             Section {
@@ -267,5 +282,131 @@ private struct AccountProfileListView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Profiles")
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct AccountCertificateListView: View {
+    let account: SigningAccountSummary
+    let accountStore: SigningAccountStore
+    let onCertificatesChanged: ([ALTX509Certificate]) -> Void
+    @State private var certificates: [ALTX509Certificate]
+    @State private var certificateToRevoke: ALTX509Certificate?
+    @State private var errorMessage: String?
+    @State private var isWorking = false
+
+    init(
+        account: SigningAccountSummary,
+        accountStore: SigningAccountStore,
+        certificates: [ALTX509Certificate],
+        onCertificatesChanged: @escaping ([ALTX509Certificate]) -> Void
+    ) {
+        self.account = account
+        self.accountStore = accountStore
+        self.onCertificatesChanged = onCertificatesChanged
+        _certificates = State(initialValue: certificates)
+    }
+
+    private var sortedCertificates: [ALTX509Certificate] {
+        certificates.sorted { $0.expiryDate < $1.expiryDate }
+    }
+
+    var body: some View {
+        List {
+            if certificates.isEmpty {
+                ContentUnavailableView(
+                    "No Certificates",
+                    systemImage: "checkmark.seal",
+                    description: Text("This Apple Developer team has no certificates.")
+                )
+            } else {
+                Section {
+                    ForEach(sortedCertificates, id: \.serialNumber) { certificate in
+                        VStack(alignment: .leading, spacing: 5) {
+                            HStack(alignment: .firstTextBaseline) {
+                                Text(certificate.name)
+                                    .font(.body.weight(.medium))
+                                Spacer(minLength: 8)
+                                Text(certificate.expiryDate <= .now ? "Expired" : "Active")
+                                    .font(.caption.weight(.medium))
+                                    .foregroundStyle(certificate.expiryDate <= .now ? .red : .green)
+                            }
+                            if let machineName = certificate.machineName, !machineName.isEmpty {
+                                Text(machineName)
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Text("Expires \(certificate.expiryDate.formatted(date: .abbreviated, time: .omitted)) · Serial \(certificate.serialNumber)")
+                                .font(.caption)
+                                .foregroundStyle(.secondary)
+                                .textSelection(.enabled)
+                        }
+                        .padding(.vertical, 5)
+                        .swipeActions(edge: .trailing, allowsFullSwipe: false) {
+                            SwiftUI.Button(role: .destructive) {
+                                certificateToRevoke = certificate
+                            } label: {
+                                Label("Revoke", systemImage: "xmark.bin")
+                            }
+                            .disabled(isWorking)
+                        }
+                    }
+                } footer: {
+                    Text("Revoking a certificate is permanent and may affect apps signed with it.")
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Certificates")
+        .navigationBarTitleDisplayMode(.inline)
+        .refreshable { await reloadCertificates() }
+        .confirmationDialog(
+            "Revoke this certificate?",
+            isPresented: Binding(
+                get: { certificateToRevoke != nil },
+                set: { if !$0 { certificateToRevoke = nil } }
+            ),
+            titleVisibility: .visible
+        ) {
+            SwiftUI.Button("Revoke Certificate", role: .destructive) {
+                guard let certificate = certificateToRevoke else { return }
+                certificateToRevoke = nil
+                Task { await revoke(certificate) }
+            }
+            SwiftUI.Button("Cancel", role: .cancel) { certificateToRevoke = nil }
+        } message: {
+            Text("This removes it from Apple’s developer portal. Apps or profiles that depend on it may stop working.")
+        }
+        .alert("Couldn’t manage certificate", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            SwiftUI.Button("OK", role: .cancel) { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "")
+        }
+    }
+
+    private func reloadCertificates() async {
+        do {
+            certificates = try await accountStore.fetchDeveloperCertificates(for: account)
+            onCertificatesChanged(certificates)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    private func revoke(_ certificate: ALTX509Certificate) async {
+        isWorking = true
+        defer { isWorking = false }
+        do {
+            guard try await accountStore.revokeDeveloperCertificate(certificate, for: account) else {
+                errorMessage = "Apple didn’t revoke this certificate. Refresh the list and try again."
+                return
+            }
+            certificates.removeAll { $0.serialNumber == certificate.serialNumber }
+            onCertificatesChanged(certificates)
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 }

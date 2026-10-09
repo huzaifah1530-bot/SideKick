@@ -267,10 +267,59 @@ final class SigningAccountStore {
             throw SigningAccountError.databaseUnavailable
         }
 
+        let team = try await developerTeam(for: account)
+
+        return try await withAccount(
+            accountIdentifier: account.accountIdentifier,
+            teamIdentifier: account.teamIdentifier,
+            prepareForSigning: false
+        ) {
+            async let appIDs = DeveloperPortalProxy.shared.fetchAppIDs(team: team)
+            async let profiles = DeveloperPortalProxy.shared.listProvisioningProfiles(team: team)
+            async let certificates = DeveloperPortalProxy.shared.fetchCertificates(team: team)
+            let (fetchedAppIDs, fetchedProfiles, fetchedCertificates) = try await (appIDs, profiles, certificates)
+            return AppleDeveloperInventory(
+                appIDs: fetchedAppIDs,
+                profiles: fetchedProfiles,
+                certificates: fetchedCertificates
+            )
+        }
+    }
+
+    func revokeDeveloperCertificate(
+        _ certificate: ALTX509Certificate,
+        for account: SigningAccountSummary
+    ) async throws -> Bool {
+        let team = try await developerTeam(for: account)
+        return try await withAccount(
+            accountIdentifier: account.accountIdentifier,
+            teamIdentifier: account.teamIdentifier,
+            prepareForSigning: false
+        ) {
+            try await DeveloperPortalProxy.shared.revokeCertificate(certificate, team: team)
+        }
+    }
+
+    func fetchDeveloperCertificates(for account: SigningAccountSummary) async throws -> [ALTX509Certificate] {
+        let team = try await developerTeam(for: account)
+        return try await withAccount(
+            accountIdentifier: account.accountIdentifier,
+            teamIdentifier: account.teamIdentifier,
+            prepareForSigning: false
+        ) {
+            try await DeveloperPortalProxy.shared.fetchCertificates(team: team)
+        }
+    }
+
+    private func developerTeam(for account: SigningAccountSummary) async throws -> ALTTeam {
+        guard DatabaseManager.shared.isStarted else {
+            throw SigningAccountError.databaseUnavailable
+        }
+
         let accountIdentifier = account.accountIdentifier
         let teamIdentifier = account.teamIdentifier
         let context = DatabaseManager.shared.viewContext
-        let team = try await context.perform {
+        return try await context.perform {
             let request = Team.fetchRequest()
             request.predicate = NSPredicate(
                 format: "%K == %@ AND %K == %@",
@@ -285,17 +334,6 @@ final class SigningAccountStore {
                 name: savedTeam.name,
                 type: savedTeam.type
             )
-        }
-
-        return try await withAccount(
-            accountIdentifier: accountIdentifier,
-            teamIdentifier: teamIdentifier,
-            prepareForSigning: false
-        ) {
-            async let appIDs = DeveloperPortalProxy.shared.fetchAppIDs(team: team)
-            async let profiles = DeveloperPortalProxy.shared.listProvisioningProfiles(team: team)
-            let (fetchedAppIDs, fetchedProfiles) = try await (appIDs, profiles)
-            return AppleDeveloperInventory(appIDs: fetchedAppIDs, profiles: fetchedProfiles)
         }
     }
 
@@ -499,6 +537,7 @@ final class SigningAccountStore {
 struct AppleDeveloperInventory {
     let appIDs: [ALTAppID]
     let profiles: [ALTListedProvisioningProfile]
+    let certificates: [ALTX509Certificate]
 }
 
 @MainActor
