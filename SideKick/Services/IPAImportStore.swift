@@ -20,6 +20,37 @@ actor IPAImportStore {
             .sorted { $0.importedAt > $1.importedAt }
     }
 
+    func cleanupAbandonedTemporaryIPAImports() {
+        let temporaryRoot = fileManager.temporaryDirectory
+        guard let candidates = try? fileManager.contentsOfDirectory(
+            at: temporaryRoot,
+            includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey],
+            options: [.skipsHiddenFiles]
+        ) else { return }
+
+        let cutoff = Date.now.addingTimeInterval(-7 * 24 * 60 * 60)
+        for candidate in candidates {
+            guard let values = try? candidate.resourceValues(forKeys: [.isDirectoryKey, .contentModificationDateKey]),
+                  values.isDirectory == true,
+                  let modifiedAt = values.contentModificationDate,
+                  modifiedAt < cutoff,
+                  let contents = try? fileManager.contentsOfDirectory(
+                    at: candidate,
+                    includingPropertiesForKeys: [.isRegularFileKey],
+                    options: [.skipsHiddenFiles]
+                  ),
+                  contents.count == 1,
+                  contents[0].pathExtension.lowercased() == "ipa",
+                  (try? contents[0].resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else {
+                continue
+            }
+            // Older SideStore file-open handling left one copied IPA in a
+            // unique temporary folder and never removed it. Only prune that
+            // exact, stale shape; leave every other temporary file untouched.
+            try? fileManager.removeItem(at: candidate)
+        }
+    }
+
     func importIPA(from sourceURL: URL, remoteSourceURL: URL? = nil) throws -> ImportedIPA {
         guard remoteSourceURL != nil || sourceURL.pathExtension.lowercased() == "ipa" else {
             throw IPAImportError.notAnIPA

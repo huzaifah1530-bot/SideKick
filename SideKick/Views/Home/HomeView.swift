@@ -115,7 +115,10 @@ struct HomeView: View {
                     viewModel.errorMessage = error.localizedDescription
                 }
             }
-            .task { await load() }
+            .task {
+                await environment.ipaImportStore.cleanupAbandonedTemporaryIPAImports()
+                await load()
+            }
             .task {
                 if let url = SideKickShareLink.consumePendingURL() {
                     incomingShareURL = url
