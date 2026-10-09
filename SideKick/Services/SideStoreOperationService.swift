@@ -37,7 +37,7 @@ final class SideStoreOperationService {
             accountIdentifier: account.accountIdentifier,
             teamIdentifier: account.teamIdentifier
         ) {
-            try await withCheckedThrowingContinuation { continuation in
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 AppManager.shared.install(.url(url), presentingViewController: presenter) { result in
                     continuation.resume(with: result.map { _ in () })
                 }
@@ -59,7 +59,7 @@ final class SideStoreOperationService {
         let teamID = team.identifier
 
         try await accountStore.withAccount(accountIdentifier: accountID, teamIdentifier: teamID) {
-            try await withCheckedThrowingContinuation { continuation in
+            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                 let group = RefreshGroup(dbContext: DatabaseManager.shared.persistentContainer.newBackgroundContext())
                 group.completionHandler = { results in
                     guard let result = results[bundleIdentifier] else {
