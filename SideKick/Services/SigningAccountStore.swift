@@ -2,6 +2,7 @@ import CoreData
 import Foundation
 import Observation
 import Security
+import SideSign
 import UIKit
 
 struct SigningAccountSummary: Identifiable, Equatable {
