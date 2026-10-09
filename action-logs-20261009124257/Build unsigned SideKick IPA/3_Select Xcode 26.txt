@@ -1,0 +1,11 @@
+﻿2026-10-09T11:42:14.0106780Z ##[group]Run set -euo pipefail
+2026-10-09T11:42:14.0108060Z [36;1mset -euo pipefail[0m
+2026-10-09T11:42:14.0109210Z [36;1mXCODE_PATH="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)"[0m
+2026-10-09T11:42:14.0110540Z [36;1mif [ -z "$XCODE_PATH" ]; then[0m
+2026-10-09T11:42:14.0111490Z [36;1m  echo "No Xcode 26.x found on this runner. Available Xcodes:"[0m
+2026-10-09T11:42:14.0112520Z [36;1m  ls -d /Applications/Xcode*.app[0m
+2026-10-09T11:42:14.0113330Z [36;1m  exit 1[0m
+2026-10-09T11:42:14.0113950Z [36;1mfi[0m
+2026-10-09T11:42:14.0114800Z [36;1msudo xcode-select -s "$XCODE_PATH/Contents/Developer"[0m
+2026-10-09T11:42:14.0150440Z shell: /bin/bash -e {0}
+2026-10-09T11:42:14.0151150Z ##[endgroup]

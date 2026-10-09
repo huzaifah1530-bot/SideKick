@@ -1,0 +1,8 @@
+﻿2026-10-09T11:42:14.0731910Z ##[group]Run xcodebuild -version
+2026-10-09T11:42:14.0732710Z [36;1mxcodebuild -version[0m
+2026-10-09T11:42:14.0733490Z [36;1mxcodebuild -showsdks | grep -i "iphoneos" || true[0m
+2026-10-09T11:42:14.0762030Z shell: /bin/bash -e {0}
+2026-10-09T11:42:14.0762620Z ##[endgroup]
+2026-10-09T11:42:15.9234250Z Xcode 26.3
+2026-10-09T11:42:15.9235650Z Build version 17C529
+2026-10-09T11:42:16.4313120Z 	iOS 26.2                      	-sdk iphoneos26.2
