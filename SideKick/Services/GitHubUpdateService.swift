@@ -15,6 +15,7 @@ actor GitHubUpdateService {
     private struct WorkflowRuns: Decodable { let workflow_runs: [WorkflowRun] }
     private struct WorkflowRun: Decodable {
         let id: Int
+        let run_number: Int
         let name: String?
         let display_title: String?
         let head_branch: String
@@ -58,11 +59,12 @@ actor GitHubUpdateService {
             guard let artifact = artifacts.artifacts.first(where: {
                 !$0.expired && (configuration.assetName.isEmpty || $0.name.localizedCaseInsensitiveContains(configuration.assetName))
             }) else { return nil }
+            guard isNewer(String(run.run_number), than: app.buildVersion) else { return nil }
             let key = "actions:\(run.id):\(artifact.id)"
             guard configuration.lastInstalledUpdateKey != key else { return nil }
             return GitHubUpdateCandidate(
                 bundleIdentifier: app.bundleIdentifier, appName: app.name, currentVersion: app.version,
-                newVersion: run.display_title ?? "Build \(run.id)",
+                newVersion: "Build \(run.run_number)",
                 title: run.name ?? run.display_title ?? "Successful GitHub Actions build",
                 assetName: artifact.name, downloadURL: artifact.archive_download_url,
                 updateKey: key, source: .actionsArtifact
@@ -182,6 +184,8 @@ private final class GitHubDownloadProgressDelegate: NSObject, URLSessionDownload
             : nil
         onProgress(progress)
     }
+
+    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) { }
 }
 
 enum GitHubUpdateError: LocalizedError {

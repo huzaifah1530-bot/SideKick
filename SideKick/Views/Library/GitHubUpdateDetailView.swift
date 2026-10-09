@@ -120,7 +120,7 @@ struct GitHubUpdateDetailView: View {
                     }
                     .listRowInsets(EdgeInsets(top: 5, leading: 0, bottom: 5, trailing: 0))
                     .listRowBackground(Color.clear)
-                } else if let message = job?.errorMessage {
+                } else if let message = downloadJob?.errorMessage {
                     VStack(alignment: .leading, spacing: 11) {
                         Label(message, systemImage: "exclamationmark.triangle")
                             .font(.footnote).foregroundStyle(.red).textSelection(.enabled)
@@ -128,7 +128,7 @@ struct GitHubUpdateDetailView: View {
                     }
                     .listRowInsets(EdgeInsets(top: 5, leading: 0, bottom: 5, trailing: 0))
                     .listRowBackground(Color.clear)
-                } else if let queuedIPA = job?.queuedIPA {
+                } else if let queuedIPA = downloadJob?.queuedIPA {
                     if let account {
                         NavigationLink {
                             InstallConsoleView(

@@ -29,11 +29,12 @@ final class GitHubUpdateDownloadStore {
         )
 
         tasks[candidate.id] = Task { [weak self] in
+            guard let self else { return }
             var temporaryURL: URL?
             do {
                 let downloaded = try await GitHubUpdateService().downloadIPA(for: candidate, token: token) { progress in
-                    Task { @MainActor [weak self] in
-                        self?.setProgress(progress, for: candidate.id)
+                    Task { @MainActor in
+                        self.setProgress(progress, for: candidate.id)
                     }
                 }
                 temporaryURL = downloaded
@@ -41,14 +42,14 @@ final class GitHubUpdateDownloadStore {
                     from: downloaded,
                     expectedBundleIdentifiers: expectedBundleIdentifiers
                 )
-                self?.jobs[candidate.id] = GitHubUpdateDownloadJob(
+                self.jobs[candidate.id] = GitHubUpdateDownloadJob(
                     progress: 1,
                     isDownloading: false,
                     queuedIPA: queuedIPA,
                     errorMessage: nil
                 )
             } catch {
-                self?.jobs[candidate.id] = GitHubUpdateDownloadJob(
+                self.jobs[candidate.id] = GitHubUpdateDownloadJob(
                     progress: nil,
                     isDownloading: false,
                     queuedIPA: nil,
@@ -56,7 +57,7 @@ final class GitHubUpdateDownloadStore {
                 )
             }
             if let temporaryURL { try? FileManager.default.removeItem(at: temporaryURL) }
-            self?.tasks[candidate.id] = nil
+            self.tasks[candidate.id] = nil
         }
     }
 

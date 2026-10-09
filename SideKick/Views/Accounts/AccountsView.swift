@@ -339,6 +339,14 @@ private struct AccountCertificateListView: View {
                                 .font(.caption)
                                 .foregroundStyle(.secondary)
                                 .textSelection(.enabled)
+                            SwiftUI.Button(role: .destructive) {
+                                certificateToRevoke = certificate
+                            } label: {
+                                Label("Revoke Certificate", systemImage: "xmark.bin")
+                                    .font(.subheadline.weight(.medium))
+                            }
+                            .buttonStyle(.borderless)
+                            .disabled(isWorking)
                         }
                         .padding(.vertical, 5)
                         .swipeActions(edge: .trailing, allowsFullSwipe: false) {

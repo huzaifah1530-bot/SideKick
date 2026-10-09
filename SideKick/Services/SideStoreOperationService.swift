@@ -31,7 +31,7 @@ final class SideStoreOperationService {
                 try? context.save()
             }
 
-            return candidates.compactMap { app -> (InstalledApp, String, String, String, String, String, String, String, Date)? in
+            return candidates.compactMap { app -> (InstalledApp, String, String, String, String, String, String, String, String, Date)? in
                 guard let team = app.team, let account = team.account else { return nil }
                 return (
                     app,
@@ -39,6 +39,7 @@ final class SideStoreOperationService {
                     app.resignedBundleIdentifier,
                     app.name,
                     app.version,
+                    app.buildVersion,
                     account.appleID,
                     account.identifier,
                     team.identifier,
@@ -55,11 +56,12 @@ final class SideStoreOperationService {
                 resignedBundleIdentifier: record.2,
                 name: record.3,
                 version: record.4,
-                accountEmail: record.5,
-                accountIdentifier: record.6,
-                teamIdentifier: record.7,
+                buildVersion: record.5,
+                accountEmail: record.6,
+                accountIdentifier: record.7,
+                teamIdentifier: record.8,
                 iconData: iconData,
-                expirationDate: record.8
+                expirationDate: record.9
             ))
         }
         return summaries.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
@@ -205,6 +207,7 @@ struct InstalledAppSummary: Identifiable, Sendable {
     let resignedBundleIdentifier: String
     let name: String
     let version: String
+    let buildVersion: String
     let accountEmail: String
     let accountIdentifier: String
     let teamIdentifier: String
