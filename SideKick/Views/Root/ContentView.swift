@@ -14,15 +14,12 @@ struct ContentView: View {
                         HomeView(viewModel: HomeViewModel(store: environment.ipaImportStore))
                             .tabItem { Label("SideKick", systemImage: "bolt.fill") }
                             .tag(0)
-                        LibraryView(viewModel: HomeViewModel(store: environment.ipaImportStore))
-                            .tabItem { Label("Library", systemImage: "square.stack.3d.up.fill") }
-                            .tag(1)
                         AccountsView()
                             .tabItem { Label("Accounts", systemImage: "person.2.fill") }
-                            .tag(2)
+                            .tag(1)
                         SettingsView()
                             .tabItem { Label("Settings", systemImage: "gearshape.fill") }
-                            .tag(3)
+                            .tag(2)
                     }
                 } else {
                     RequiredSetupView(status: setupStatus)

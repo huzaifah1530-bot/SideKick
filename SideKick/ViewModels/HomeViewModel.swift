@@ -5,6 +5,7 @@ import Observation
 @Observable
 final class HomeViewModel {
     var importedApps: [ImportedIPA] = []
+    var searchText = ""
     var isImporting = false
     var errorMessage: String?
     var noticeMessage: String?
@@ -24,7 +25,7 @@ final class HomeViewModel {
         do {
             let app = try await store.importIPA(from: url)
             importedApps = try await store.importedApps()
-            noticeMessage = "\(app.name) was added to your library."
+            noticeMessage = "\(app.name) is ready to install."
         } catch {
             errorMessage = error.localizedDescription
         }

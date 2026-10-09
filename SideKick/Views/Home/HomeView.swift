@@ -8,19 +8,37 @@ struct HomeView: View {
     @State private var installedApps: [InstalledAppSummary] = []
     @Environment(AppEnvironment.self) private var environment
 
+    private var filteredImportedApps: [ImportedIPA] {
+        viewModel.importedApps.filter {
+            viewModel.searchText.isEmpty || $0.name.localizedCaseInsensitiveContains(viewModel.searchText)
+                || $0.bundleIdentifier.localizedCaseInsensitiveContains(viewModel.searchText)
+        }
+    }
+
+    private var filteredInstalledApps: [InstalledAppSummary] {
+        installedApps.filter {
+            viewModel.searchText.isEmpty || $0.name.localizedCaseInsensitiveContains(viewModel.searchText)
+                || $0.bundleIdentifier.localizedCaseInsensitiveContains(viewModel.searchText)
+        }
+    }
+
     var body: some View {
         NavigationStack {
             List {
-                SwiftUI.Section("Managed Apps") {
-                    if installedApps.isEmpty {
-                        ContentUnavailableView(
-                            "No apps managed yet",
-                            systemImage: "square.stack.3d.up",
-                            description: Text("Import an IPA from Library to get started.")
-                        )
-                        .listRowBackground(Color.clear)
-                    } else {
-                        ForEach(installedApps) { app in
+                if filteredInstalledApps.isEmpty && filteredImportedApps.isEmpty {
+                    ContentUnavailableView(
+                        viewModel.searchText.isEmpty ? "Your apps appear here" : "No matching apps",
+                        systemImage: "square.stack.3d.up",
+                        description: Text(viewModel.searchText.isEmpty
+                            ? "Import an IPA to install it, or manage apps already installed with SideKick."
+                            : "Try another app name or bundle identifier.")
+                    )
+                    .listRowBackground(Color.clear)
+                }
+
+                if !filteredInstalledApps.isEmpty {
+                    SwiftUI.Section("Installed") {
+                        ForEach(filteredInstalledApps) { app in
                             NavigationLink {
                                 AppManagementView(installedApp: app)
                             } label: {
@@ -29,10 +47,25 @@ struct HomeView: View {
                         }
                     }
                 }
+
+                if !filteredImportedApps.isEmpty {
+                    SwiftUI.Section("Ready to Install") {
+                        ForEach(filteredImportedApps) { app in
+                            NavigationLink {
+                                AppManagementView(importedApp: app) {
+                                    await viewModel.delete(app)
+                                }
+                            } label: {
+                                ImportedIPARow(app: app)
+                            }
+                        }
+                    }
+                }
             }
             .listStyle(.insetGrouped)
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("SideKick")
+            .searchable(text: $viewModel.searchText, prompt: "Search apps")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     SwiftUI.Button {
@@ -54,7 +87,7 @@ struct HomeView: View {
             }
             .task { await load() }
             .refreshable { await load() }
-            .alert(viewModel.errorMessage == nil ? "Added to library" : "Couldn’t import IPA", isPresented: Binding(
+            .alert(viewModel.errorMessage == nil ? "IPA imported" : "Couldn’t import IPA", isPresented: Binding(
                 get: { viewModel.errorMessage != nil || viewModel.noticeMessage != nil },
                 set: { if !$0 { viewModel.errorMessage = nil; viewModel.noticeMessage = nil } }
             )) {

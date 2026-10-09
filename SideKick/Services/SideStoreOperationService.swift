@@ -65,7 +65,11 @@ final class SideStoreOperationService {
         return summaries.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
-    func install(_ ipa: ImportedIPA, using account: SigningAccountSummary) async throws {
+    func install(
+        _ ipa: ImportedIPA,
+        using account: SigningAccountSummary,
+        progressHandler: @escaping @MainActor @Sendable (Double) -> Void = { _ in }
+    ) async throws {
         guard let presenter = UIApplication.shared.topViewController() else {
             throw SideStoreOperationError.presentationUnavailable
         }
@@ -75,9 +79,16 @@ final class SideStoreOperationService {
             teamIdentifier: account.teamIdentifier
         ) {
             try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                AppManager.shared.install(.url(url), presentingViewController: presenter) { result in
+                let observationBox = ProgressObservationBox()
+                let group = AppManager.shared.install(.url(url), presentingViewController: presenter) { result in
+                    observationBox.finish()
                     continuation.resume(with: result.map { _ in () })
                 }
+                let observation = group.progress.observe(\.fractionCompleted, options: [.initial, .new]) { progress, _ in
+                    let fraction = progress.fractionCompleted
+                    Task { @MainActor in progressHandler(fraction) }
+                }
+                observationBox.retain(observation)
             }
         }
     }
@@ -109,6 +120,29 @@ final class SideStoreOperationService {
                 AppManager.shared.refresh([installedApp], presentingViewController: presenter, group: group)
             }
         }
+    }
+}
+
+private final class ProgressObservationBox: @unchecked Sendable {
+    private let lock = NSLock()
+    private var observation: NSKeyValueObservation?
+    private var isFinished = false
+
+    func retain(_ observation: NSKeyValueObservation) {
+        lock.lock()
+        let shouldInvalidate = isFinished
+        if !shouldInvalidate { self.observation = observation }
+        lock.unlock()
+        if shouldInvalidate { observation.invalidate() }
+    }
+
+    func finish() {
+        lock.lock()
+        isFinished = true
+        let observation = self.observation
+        self.observation = nil
+        lock.unlock()
+        observation?.invalidate()
     }
 }
 

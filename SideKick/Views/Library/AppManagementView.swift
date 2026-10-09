@@ -6,7 +6,6 @@ struct AppManagementView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var accountStore = SigningAccountStore()
     @State private var isWorking = false
-    @State private var isChoosingAccount = false
     @State private var errorMessage: String?
 
     private let importedApp: ImportedIPA?
@@ -66,18 +65,21 @@ struct AppManagementView: View {
             Section {
                 if let importedApp {
                     if accountStore.accounts.contains(where: \.hasSavedSession) {
-                        SwiftUI.Button {
-                            isChoosingAccount = true
+                        NavigationLink {
+                            InstallAccountSelectionView(
+                                app: importedApp,
+                                accounts: accountStore.accounts.filter(\.hasSavedSession),
+                                accountStore: accountStore,
+                                ipaStore: environment.ipaImportStore
+                            )
                         } label: {
-                            HStack {
-                                if isWorking { ProgressView() }
-                                else { Text("Install").fontWeight(.semibold) }
-                            }
-                            .frame(maxWidth: .infinity)
+                            Text("Install")
+                                .fontWeight(.semibold)
+                                .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.borderedProminent)
                         .buttonBorderShape(.capsule)
-                        .disabled(isWorking || accountStore.isWorking)
+                        .disabled(accountStore.isWorking)
                     } else {
                         Text("Add an Apple ID in Accounts to install this app.")
                             .font(.footnote)
@@ -85,7 +87,7 @@ struct AppManagementView: View {
                     }
 
                     if onDelete != nil {
-                        SwiftUI.Button("Remove from Library", role: .destructive) {
+                        SwiftUI.Button("Remove Imported IPA", role: .destructive) {
                             Task {
                                 await onDelete?()
                                 dismiss()
@@ -123,18 +125,6 @@ struct AppManagementView: View {
         .navigationTitle(appName)
         .navigationBarTitleDisplayMode(.inline)
         .task { await accountStore.reload() }
-        .confirmationDialog("Choose Apple ID", isPresented: $isChoosingAccount, titleVisibility: .visible) {
-            ForEach(accountStore.accounts.filter(\.hasSavedSession)) { account in
-                SwiftUI.Button("\(account.email) · \(account.teamType)") {
-                    if let importedApp {
-                        Task { await install(importedApp, using: account) }
-                    }
-                }
-            }
-            SwiftUI.Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("Choose which account to use for this install.")
-        }
         .alert("App action failed", isPresented: Binding(
             get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
         )) {
@@ -155,19 +145,6 @@ struct AppManagementView: View {
         }
     }
 
-    private func install(_ app: ImportedIPA, using account: SigningAccountSummary) async {
-        isWorking = true
-        defer { isWorking = false }
-        do {
-            try await SideStoreOperationService(
-                accountStore: accountStore,
-                ipaStore: environment.ipaImportStore
-            ).install(app, using: account)
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
     private func refresh(_ app: InstalledAppSummary) async {
         isWorking = true
         defer { isWorking = false }
@@ -179,5 +156,146 @@ struct AppManagementView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+}
+
+private struct InstallAccountSelectionView: View {
+    let app: ImportedIPA
+    let accounts: [SigningAccountSummary]
+    let accountStore: SigningAccountStore
+    let ipaStore: IPAImportStore
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(accounts) { account in
+                    NavigationLink {
+                        InstallConsoleView(app: app, account: account, accountStore: accountStore, ipaStore: ipaStore)
+                    } label: {
+                        VStack(alignment: .leading, spacing: 5) {
+                            Text(account.email).font(.body.weight(.medium))
+                            Text("\(account.teamName) · \(account.teamType)")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        .padding(.vertical, 5)
+                    }
+                }
+            } header: {
+                Text("Apple Account")
+            } footer: {
+                Text("Choose the account that will sign and install \(app.name).")
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Choose Account")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+private struct InstallConsoleView: View {
+    let app: ImportedIPA
+    let account: SigningAccountSummary
+    let accountStore: SigningAccountStore
+    let ipaStore: IPAImportStore
+
+    @Environment(\.dismiss) private var dismiss
+    @State private var lines: [String] = []
+    @State private var progress = 0.0
+    @State private var isRunning = true
+    @State private var didStart = false
+    @State private var failure: String?
+    @State private var lastLoggedPercent = -5
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(isRunning ? "Installing" : (failure == nil ? "Installed" : "Install Failed"))
+                    .font(.largeTitle.bold())
+                Text(app.name)
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                ProgressView(value: progress)
+                    .tint(failure == nil ? .accentColor : .red)
+                Text(isRunning ? "\(Int(progress * 100))%" : (failure == nil ? "Complete" : "Needs attention"))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 9) {
+                        ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
+                            Text(line)
+                                .font(.system(.footnote, design: .monospaced))
+                                .foregroundStyle(line.contains("ERROR") ? .red : .primary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .id(index)
+                        }
+                    }
+                    .padding(14)
+                }
+                .background(Color(uiColor: .secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
+                .onChange(of: lines.count) { _, count in
+                    if count > 0 { proxy.scrollTo(count - 1, anchor: .bottom) }
+                }
+            }
+
+            if let failure {
+                Text(failure)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            if !isRunning {
+                SwiftUI.Button(failure == nil ? "Done" : "Close") { dismiss() }
+                    .fontWeight(.semibold)
+                    .frame(maxWidth: .infinity)
+                    .buttonStyle(.borderedProminent)
+                    .buttonBorderShape(.capsule)
+            }
+        }
+        .padding()
+        .navigationTitle("Install Activity")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(isRunning ? .hidden : .visible, for: .navigationBar)
+        .interactiveDismissDisabled(isRunning)
+        .task {
+            guard !didStart else { return }
+            didStart = true
+            await runInstall()
+        }
+    }
+
+    @MainActor
+    private func runInstall() async {
+        append("Starting install · \(Date.now.formatted(date: .omitted, time: .standard))")
+        append("Account selected · \(account.email)")
+        append("Preparing imported IPA")
+        do {
+            try await SideStoreOperationService(accountStore: accountStore, ipaStore: ipaStore)
+                .install(app, using: account) { fraction in
+                    let clamped = min(max(fraction, 0), 1)
+                    progress = clamped
+                    if clamped > 0 {
+                        let percent = Int(clamped * 100)
+                        if percent >= lastLoggedPercent + 5 || percent == 100 {
+                            lastLoggedPercent = percent
+                            append("Install pipeline progress · \(percent)%")
+                        }
+                    }
+                }
+            progress = 1
+            append("Install completed successfully")
+        } catch {
+            failure = error.localizedDescription
+            append("ERROR · \(error.localizedDescription)")
+        }
+        isRunning = false
+    }
+
+    @MainActor
+    private func append(_ message: String) {
+        lines.append("[\(Date.now.formatted(date: .omitted, time: .standard))] \(message)")
     }
 }
