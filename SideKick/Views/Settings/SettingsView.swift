@@ -65,7 +65,7 @@ struct SettingsView: View {
         do {
             guard let url = try result.get().first else { return }
             UserDefaults.standard.set(false, forKey: "sidekick.setup.pairing-verified")
-            try PairingFileManager.shared.importPairingFile(from: url)
+            try PairingSetupImporter.importFile(from: url)
             guard let pairingContent = PairingFileManager.shared.fetchPairingFile() else {
                 throw PairingSetupError.unreadableFile
             }

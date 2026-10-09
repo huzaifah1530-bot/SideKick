@@ -18,6 +18,10 @@ final class SetupStatus {
     private(set) var isReady = false
     var message: String?
 
+    var hasPairingFile: Bool {
+        PairingFileManager.shared.hasPairingFile()
+    }
+
     private var requiredTeamIdentifier: String? {
         ALTApplication(fileURL: Bundle.Info.activeBundleURL)?.provisioningProfile?.teamIdentifier
     }
@@ -92,9 +96,9 @@ final class SetupStatus {
     func importPairingFile(from url: URL) async {
         do {
             UserDefaults.standard.set(false, forKey: Self.pairingVerifiedKey)
-            try PairingFileManager.shared.importPairingFile(from: url)
+            try PairingSetupImporter.importFile(from: url)
             await refresh()
-            if !pairingVerified {
+            if notificationsEnabled && backgroundRefreshEnabled && vpnInstalled && selfSigningAccount != nil && !pairingVerified {
                 message = "Pairing file was imported, but verification failed. Make sure LocalDevVPN is connected and that the file belongs to this iPhone."
             }
         } catch {
@@ -115,109 +119,57 @@ struct RequiredSetupView: View {
     @State private var isChoosingPairingFile = false
     @State private var isShowingSignIn = false
     @State private var credentials: (appleID: String, password: String)?
+    @State private var step = 0
 
     private let vpnURL = URL(string: "localdevvpn://enable?scheme=sidestore")!
     private let appStoreURL = URL(string: "https://apps.apple.com/app/id6755608044")!
+    private let lastStep = 5
 
     var body: some View {
         NavigationStack {
-            List {
-                Section {
-                    VStack(alignment: .leading, spacing: 8) {
-                        Text("Set up SideKick")
-                            .font(.largeTitle.bold())
-                        Text("Complete these steps once to install and refresh apps from this iPhone.")
+            VStack(spacing: 0) {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Text("STEP \(step + 1) OF \(lastStep + 1)")
+                            .font(.caption.weight(.semibold))
                             .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 10)
-                    .listRowBackground(Color.clear)
-                }
-
-                Section("Required") {
-                    setupRow(
-                        title: "Notifications",
-                        detail: status.notificationsEnabled ? "On" : "Allow signing and expiry alerts",
-                        symbol: "bell"
-                    ) {
-                        Task {
-                            await status.requestNotifications()
-                            if !status.notificationsEnabled {
-                                await UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
-                            }
-                        }
-                    } label: {
-                        status.notificationsEnabled ? "Allowed" : "Allow Notifications"
-                    }
-
-                    setupRow(
-                        title: "Background App Refresh",
-                        detail: status.backgroundRefreshEnabled
-                            ? "On"
-                            : status.backgroundRefreshRestricted
-                                ? "Unavailable because this device restricts background refresh"
-                                : "Turn it on in Settings → General → Background App Refresh; Low Power Mode also pauses it",
-                        symbol: "arrow.clockwise"
-                    ) {
-                        if !status.backgroundRefreshRestricted {
-                            UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
-                        }
-                    } label: {
-                        status.backgroundRefreshEnabled ? "On" : status.backgroundRefreshRestricted ? "Unavailable" : "Open Settings"
-                    }
-                    .disabled(status.backgroundRefreshRestricted || status.backgroundRefreshEnabled)
-
-                    setupRow(
-                        title: "LocalDevVPN",
-                        detail: status.vpnInstalled ? "Installed" : "Required to connect to this iPhone’s signing service",
-                        symbol: "network"
-                    ) {
-                        UIApplication.shared.open(status.vpnInstalled ? vpnURL : appStoreURL)
-                    } label: {
-                        status.vpnInstalled ? "Open LocalDevVPN" : "Get LocalDevVPN"
-                    }
-
-                    setupRow(
-                        title: "Pair this iPhone",
-                        detail: status.isCheckingPairing ? "Checking connection…" : (status.pairingVerified ? "Pairing verified" : "Import the trust file made for this iPhone with iLoader on a computer"),
-                        symbol: "iphone.gen3.radiowaves.left.and.right"
-                    ) {
-                        isChoosingPairingFile = true
-                    } label: {
-                        status.pairingVerified ? "Verified" : "Import Pairing File"
-                    }
-                    .disabled(status.isCheckingPairing)
-
-                    Link("How to create a pairing file", destination: AppConstants.URLs.pairingDocumentation)
-
-                    if !status.pairingVerified && status.vpnInstalled && PairingFileManager.shared.hasPairingFile() {
-                        SwiftUI.Button {
-                            UIApplication.shared.open(vpnURL)
-                            Task { try? await Task.sleep(for: .seconds(2)); await status.verifyPairing() }
-                        } label: {
-                            Label("Connect and Verify", systemImage: "arrow.triangle.2.circlepath")
+                        Spacer()
+                        if step > 0 {
+                            SwiftUI.Button("Back") { step -= 1 }
+                                .buttonStyle(.plain)
                         }
                     }
+                    ProgressView(value: Double(step + 1), total: Double(lastStep + 1))
+                }
+                .padding(.horizontal, 24)
+                .padding(.top, 16)
 
-                    setupRow(
-                        title: "Apple Account",
-                        detail: status.selfSigningAccount?.email ?? "Add the Apple Account used to sign SideKick",
-                        symbol: "person.crop.circle"
-                    ) {
-                        isShowingSignIn = true
-                    } label: {
-                        status.selfSigningAccount != nil ? "Account Added" : "Add Apple Account"
+                TabView(selection: $step) {
+                    welcomePage.tag(0)
+                    notificationsPage.tag(1)
+                    backgroundRefreshPage.tag(2)
+                    accountPage.tag(3)
+                    pairingPage.tag(4)
+                    vpnPage.tag(5)
+                }
+                .tabViewStyle(.page(indexDisplayMode: .never))
+
+                SwiftUI.Button(step == lastStep ? "Finish Setup" : "Continue") {
+                    if step == lastStep {
+                        Task { await status.refresh() }
+                    } else {
+                        withAnimation(.easeInOut(duration: 0.2)) { step += 1 }
                     }
                 }
-
-                Section {
-                    Text("iOS controls notifications and Background App Refresh. SideKick can check these settings and guide you to change them, but it can’t turn them on for you.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                    SwiftUI.Button("Check Setup Again") { Task { await status.refresh() } }
-                }
+                .buttonStyle(.borderedProminent)
+                .controlSize(.large)
+                .frame(maxWidth: .infinity)
+                .disabled(!canContinue)
+                .padding(.horizontal, 24)
+                .padding(.vertical, 16)
             }
-            .listStyle(.insetGrouped)
-            .navigationTitle("Welcome to SideKick")
+            .background(Color(uiColor: .systemBackground))
+            .navigationTitle("SideKick Setup")
             .navigationBarTitleDisplayMode(.inline)
             .fileImporter(
                 isPresented: $isChoosingPairingFile,
@@ -246,30 +198,150 @@ struct RequiredSetupView: View {
         }
     }
 
-    private func setupRow(
-        title: String,
-        detail: String,
-        symbol: String,
-        action: @escaping () -> Void,
-        label: () -> String
-    ) -> some View {
-        VStack(alignment: .leading, spacing: 5) {
-            HStack(spacing: 12) {
-                Image(systemName: symbol)
-                    .font(.body.weight(.medium))
-                    .foregroundStyle(.tint)
-                    .frame(width: 26)
-                Text(title).font(.body.weight(.medium))
-                Spacer()
-                SwiftUI.Button(action: action) { Text(label()).font(.subheadline.weight(.semibold)) }
-                    .buttonStyle(.borderless)
-            }
-            Text(detail)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .padding(.leading, 38)
+    private var canContinue: Bool {
+        switch step {
+        case 0: true
+        case 1: status.notificationsEnabled
+        case 2: status.backgroundRefreshEnabled
+        case 3: status.selfSigningAccount != nil
+        case 4: status.hasPairingFile
+        case 5: status.isReady
+        default: false
         }
-        .padding(.vertical, 4)
+    }
+
+    private var welcomePage: some View {
+        onboardingPage(
+            symbol: "square.stack.3d.up.fill",
+            title: "Welcome to SideKick",
+            message: "A few quick steps prepare this iPhone to install and refresh your apps. You can change these choices later in Settings."
+        )
+    }
+
+    private var notificationsPage: some View {
+        onboardingPage(
+            symbol: "bell.badge",
+            title: "Stay up to date",
+            message: "Notifications let SideKick tell you when an app needs attention or is nearing its refresh date."
+        ) {
+            SwiftUI.Button(status.notificationsEnabled ? "Notifications Allowed" : "Allow Notifications") {
+                Task {
+                    await status.requestNotifications()
+                    if !status.notificationsEnabled {
+                        await UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
+                    }
+                }
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(status.notificationsEnabled)
+        }
+    }
+
+    private var backgroundRefreshPage: some View {
+        onboardingPage(
+            symbol: "arrow.clockwise",
+            title: "Keep apps refreshed",
+            message: status.backgroundRefreshRestricted
+                ? "iOS currently restricts Background App Refresh on this device. SideKick can’t change this system setting."
+                : "Allow Background App Refresh so SideKick can check signing status and help keep your apps available."
+        ) {
+            if status.backgroundRefreshEnabled {
+                Label("Background App Refresh is On", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+            } else if !status.backgroundRefreshRestricted {
+                SwiftUI.Button("Open Settings") {
+                    UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
+                }
+                .buttonStyle(.borderedProminent)
+            }
+        }
+    }
+
+    private var accountPage: some View {
+        onboardingPage(
+            symbol: "person.crop.circle",
+            title: "Choose a signing account",
+            message: "SideKick uses the Apple Account that signed this copy of SideKick to refresh it. You’ll choose an account for each app you install."
+        ) {
+            if let account = status.selfSigningAccount {
+                Label(account.email, systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+            } else {
+                SwiftUI.Button("Add Apple Account") { isShowingSignIn = true }
+                    .buttonStyle(.borderedProminent)
+            }
+        }
+    }
+
+    private var pairingPage: some View {
+        onboardingPage(
+            symbol: "iphone.gen3.radiowaves.left.and.right",
+            title: "Pair this iPhone",
+            message: status.hasPairingFile
+                ? "Pairing file imported. Next, connect through LocalDevVPN to verify this iPhone."
+                : "iLoader can’t place the file because SideKick isn’t in its supported-app list yet. In iLoader choose Export, then AirDrop the file to this iPhone or save it in Files and import it here. Pairing files are sensitive; keep the transfer private."
+        ) {
+            SwiftUI.Button(status.hasPairingFile ? "Choose Pairing File Again" : "Import Pairing File") {
+                isChoosingPairingFile = true
+            }
+            .buttonStyle(.borderedProminent)
+            Link("How to create a pairing file", destination: AppConstants.URLs.pairingDocumentation)
+                .font(.subheadline)
+        }
+    }
+
+    private var vpnPage: some View {
+        onboardingPage(
+            symbol: "network",
+            title: "Connect to this iPhone",
+            message: status.isReady
+                ? "Your iPhone is paired and ready."
+                : "LocalDevVPN provides the local connection SideKick needs to install and refresh apps. Install it, open it, and connect before verifying."
+        ) {
+            SwiftUI.Button(status.vpnInstalled ? "Open LocalDevVPN" : "Get LocalDevVPN") {
+                UIApplication.shared.open(status.vpnInstalled ? vpnURL : appStoreURL)
+            }
+            .buttonStyle(.borderedProminent)
+
+            if status.vpnInstalled && status.hasPairingFile && !status.isReady {
+                SwiftUI.Button(status.isCheckingPairing ? "Checking…" : "Verify Connection") {
+                    Task { await status.verifyPairing() }
+                }
+                .disabled(status.isCheckingPairing)
+            }
+            if status.isReady {
+                Label("Setup Complete", systemImage: "checkmark.circle.fill")
+                    .foregroundStyle(.green)
+            }
+        }
+    }
+
+    private func onboardingPage<Actions: View>(
+        symbol: String,
+        title: String,
+        message: String,
+        @ViewBuilder actions: () -> Actions = { EmptyView() }
+    ) -> some View {
+        VStack(spacing: 22) {
+            Spacer(minLength: 12)
+            Image(systemName: symbol)
+                .font(.system(size: 48, weight: .regular))
+                .foregroundStyle(.tint)
+                .frame(height: 64)
+                .accessibilityHidden(true)
+            Text(title)
+                .font(.largeTitle.weight(.bold))
+                .multilineTextAlignment(.center)
+            Text(message)
+                .font(.body)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+            VStack(spacing: 16, content: actions)
+            Spacer(minLength: 12)
+        }
+        .padding(.horizontal, 32)
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
     }
 
     private func finishSignIn() {
