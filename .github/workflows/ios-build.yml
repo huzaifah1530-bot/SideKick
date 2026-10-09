@@ -41,6 +41,9 @@ jobs:
       - name: Apply SideKick integration patch to SideStore
         run: git -C Vendor/SideStore apply ../../patches/sidestore-sidekick.patch
 
+      - name: Classify the certificate being checked for install errors
+        run: git -C Vendor/SideStore apply --unidiff-zero ../../patches/sidestore-certificate-error-classification.patch
+
       - name: Apply Swift compiler workaround
         run: git -C Vendor/SideStore apply ../../patches/sidestore-compiler-workarounds.patch
 

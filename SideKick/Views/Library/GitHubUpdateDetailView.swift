@@ -59,6 +59,10 @@ struct GitHubUpdateDetailView: View {
 
     private let configurationStore = GitHubUpdateConfigurationStore()
 
+    private var expectedUpdateBundleIdentifiers: Set<String> {
+        app.updateMatchingBundleIdentifiers
+    }
+
     private var downloadJob: GitHubUpdateDownloadJob? { environment.githubUpdateDownloads.jobs[candidate.id] }
 
     var body: some View {
@@ -172,7 +176,7 @@ struct GitHubUpdateDetailView: View {
         let token = try? GitHubCredentialStore().load()
         environment.githubUpdateDownloads.start(
             candidate: candidate,
-            expectedBundleIdentifiers: [app.bundleIdentifier, app.resignedBundleIdentifier],
+            expectedBundleIdentifiers: expectedUpdateBundleIdentifiers,
             ipaImportStore: environment.ipaImportStore,
             token: token
         )

@@ -215,6 +215,19 @@ struct InstalledAppSummary: Identifiable, Sendable {
     let expirationDate: Date
 
     var id: String { bundleIdentifier }
+
+    /// SideStore adds the signing team's identifier to this app's installed bundle ID.
+    /// GitHub builds retain the stable, unsuffixed product identifier.
+    var updateMatchingBundleIdentifiers: Set<String> {
+        let identifiers = [bundleIdentifier, resignedBundleIdentifier].map { $0.lowercased() }
+        let sideKickBundleID = "com.sidekick.app"
+        var result = Set(identifiers)
+        let teamQualifiedSideKickBundleID = "\(sideKickBundleID).\(teamIdentifier)".lowercased()
+        if identifiers.contains(where: { $0 == sideKickBundleID || $0 == teamQualifiedSideKickBundleID }) {
+            result.insert(sideKickBundleID)
+        }
+        return result
+    }
 }
 
 private enum SideStoreOperationError: LocalizedError {

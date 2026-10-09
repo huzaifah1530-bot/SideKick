@@ -1,0 +1,52 @@
+diff --git a/SideStore/Core/Operations/PipelineOperations/VerifyCertificateOperation.swift b/SideStore/Core/Operations/PipelineOperations/VerifyCertificateOperation.swift
+index 01054d10..3924aae1 100644
+--- a/SideStore/Core/Operations/PipelineOperations/VerifyCertificateOperation.swift
++++ b/SideStore/Core/Operations/PipelineOperations/VerifyCertificateOperation.swift
+@@ -70 +70 @@ final class VerifyCertificateOperation: BasePipelineOperation<InstallAppOperatio
+-                try processValidationResult(result, description: "Target bundle binary certificate", appName: appName, team: team)
++                try processValidationResult(result, certificate: lastSigningCert, description: "Target bundle binary certificate", appName: appName, team: team)
+@@ -84 +84 @@ final class VerifyCertificateOperation: BasePipelineOperation<InstallAppOperatio
+-                try processValidationResult(result, description: "Target signing certificate", appName: appName, team: team)
++                try processValidationResult(result, certificate: target.x509, description: "Target signing certificate", appName: appName, team: team)
+@@ -167,18 +167,11 @@ final class VerifyCertificateOperation: BasePipelineOperation<InstallAppOperatio
+-    private func processValidationResult(_ result: CertificateStatus, description: String, appName: String, team: ALTTeam) throws {
+-        // Check if there is a team ID mismatch with the active certificate
+-        var activeTeamID: String? = nil
+-        var isCustomCertActive = false
+-        
+-        if let activeCert = CertificateManager.shared.activeCertificate?.certificate,
+-           let data = activeCert.data {
+-                let details = parseCertificate(derData: data)
+-                let belongsToAuthenticatedTeam = details.subject.contains(team.identifier) || details.issuer.contains(team.identifier)
+-                if !belongsToAuthenticatedTeam {
+-                    isCustomCertActive = true
+-                    // Try to extract the team ID of the active cert from its Subject
+-                    // (It is friendly labeled as "Organizational Unit" in the parsed DN string)
+-                    if let ouPart = details.subject.components(separatedBy: ", ").first(where: { $0.hasPrefix("Organizational Unit=") }) {
+-                        activeTeamID = ouPart.replacingOccurrences(of: "Organizational Unit=", with: "")
+-                    }
+-                }
+-            }
++    private func processValidationResult(_ result: CertificateStatus, certificate: ALTX509Certificate, description: String, appName: String, team: ALTTeam) throws {
++        // Classify the certificate being checked, not a separate globally active certificate.
++        let customTeamID: String? = {
++            guard let data = certificate.data else { return nil }
++            let details = parseCertificate(derData: data)
++            let belongsToAuthenticatedTeam = details.subject.contains(team.identifier) || details.issuer.contains(team.identifier)
++            guard !belongsToAuthenticatedTeam else { return nil }
++            return details.subject.components(separatedBy: ", ")
++                .first(where: { $0.hasPrefix("Organizational Unit=") })?
++                .replacingOccurrences(of: "Organizational Unit=", with: "") ?? "Unknown Custom Team"
++        }()
+@@ -195 +188 @@ final class VerifyCertificateOperation: BasePipelineOperation<InstallAppOperatio
+-            if isCustomCertActive {
++            if let customTeamID {
+@@ -198 +191 @@ final class VerifyCertificateOperation: BasePipelineOperation<InstallAppOperatio
+-                    activeTeam: activeTeamID ?? "Unknown Custom Team"
++                    activeTeam: customTeamID
+@@ -204 +197 @@ final class VerifyCertificateOperation: BasePipelineOperation<InstallAppOperatio
+-            if isCustomCertActive {
++            if let customTeamID {
+@@ -207 +200 @@ final class VerifyCertificateOperation: BasePipelineOperation<InstallAppOperatio
+-                    activeTeam: activeTeamID ?? "Unknown Custom Team"
++                    activeTeam: customTeamID

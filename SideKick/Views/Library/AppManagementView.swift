@@ -240,7 +240,7 @@ struct AppManagementView: View {
     private func reloadManagementState() async {
         await accountStore.reload()
         guard let installedApp else { return }
-        let matchingBundleIDs = Set([installedApp.bundleIdentifier, installedApp.resignedBundleIdentifier].map { $0.lowercased() })
+        let matchingBundleIDs = installedApp.updateMatchingBundleIdentifiers
         pendingUpdateIPA = (try? await environment.ipaImportStore.importedApps())?
             .first { matchingBundleIDs.contains($0.bundleIdentifier.lowercased()) }
     }

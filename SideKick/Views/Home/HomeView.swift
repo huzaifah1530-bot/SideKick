@@ -19,8 +19,7 @@ struct HomeView: View {
     @Environment(AppEnvironment.self) private var environment
 
     private var installedBundleIdentifiers: Set<String> {
-        Set(installedApps.flatMap { [$0.bundleIdentifier, $0.resignedBundleIdentifier] }
-            .map { $0.lowercased() })
+        Set(installedApps.flatMap(\.updateMatchingBundleIdentifiers))
     }
 
     private var filteredImportedApps: [ImportedIPA] {
@@ -383,7 +382,7 @@ struct HomeView: View {
             accountStore: SigningAccountStore(),
             ipaStore: environment.ipaImportStore
         ).installedApps()
-        let installedIDs = Set(installedApps.flatMap { [$0.bundleIdentifier, $0.resignedBundleIdentifier] }.map { $0.lowercased() })
+        let installedIDs = Set(installedApps.flatMap(\.updateMatchingBundleIdentifiers))
         guard installedIDs.contains(app.bundleIdentifier.lowercased()) else {
             await savePreparedIPA(app, update: false)
             return
