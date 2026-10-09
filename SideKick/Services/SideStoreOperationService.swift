@@ -70,6 +70,7 @@ final class SideStoreOperationService {
     func install(
         _ ipa: ImportedIPA,
         using account: SigningAccountSummary,
+        recoveryHandler: @escaping @MainActor @Sendable () -> Void = {},
         progressHandler: @escaping @MainActor @Sendable (Double) -> Void = { _ in }
     ) async throws {
         guard let presenter = UIApplication.shared.topViewController() else {
@@ -77,23 +78,29 @@ final class SideStoreOperationService {
         }
         let url = try await ipaStore.fileURL(for: ipa)
         defer { try? FileManager.default.removeItem(at: url) }
-        try await accountStore.withAccount(
-            accountIdentifier: account.accountIdentifier,
-            teamIdentifier: account.teamIdentifier
+        try await retryAfterClearingRevokedAssignedProfile(
+            for: ipa.bundleIdentifier,
+            recoveryHandler: recoveryHandler
         ) {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                let observationBox = ProgressObservationBox()
-                let group = AppManager.shared.install(.url(url), presentingViewController: presenter) { result in
-                    observationBox.finish()
-                    continuation.resume(with: result.map { _ in () })
+            try await accountStore.withAccount(
+                accountIdentifier: account.accountIdentifier,
+                teamIdentifier: account.teamIdentifier
+            ) {
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                    let observationBox = ProgressObservationBox()
+                    let group = AppManager.shared.install(.url(url), presentingViewController: presenter) { result in
+                        observationBox.finish()
+                        continuation.resume(with: result.map { _ in () })
+                    }
+                    let observation = group.progress.observe(\.fractionCompleted, options: [.initial, .new]) { progress, _ in
+                        let fraction = progress.fractionCompleted
+                        Task { @MainActor in progressHandler(fraction) }
+                    }
+                    observationBox.retain(observation)
                 }
-                let observation = group.progress.observe(\.fractionCompleted, options: [.initial, .new]) { progress, _ in
-                    let fraction = progress.fractionCompleted
-                    Task { @MainActor in progressHandler(fraction) }
-                }
-                observationBox.retain(observation)
             }
         }
+        await Self.pruneUnusedCaches()
         await ExpirationNotificationScheduler.update()
     }
 
@@ -116,21 +123,69 @@ final class SideStoreOperationService {
         let accountID = account.identifier
         let teamID = team.identifier
 
-        try await accountStore.withAccount(accountIdentifier: accountID, teamIdentifier: teamID) {
-            try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                let group = RefreshGroup(dbContext: DatabaseManager.shared.persistentContainer.newBackgroundContext())
-                group.completionHandler = { results in
-                    guard let result = results[bundleIdentifier] else {
-                        continuation.resume(throwing: SideStoreOperationError.noRefreshResult)
-                        return
+        try await retryAfterClearingRevokedAssignedProfile(for: bundleIdentifier) {
+            try await accountStore.withAccount(accountIdentifier: accountID, teamIdentifier: teamID) {
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                    let group = RefreshGroup(dbContext: DatabaseManager.shared.persistentContainer.newBackgroundContext())
+                    group.completionHandler = { results in
+                        guard let result = results[bundleIdentifier] else {
+                            continuation.resume(throwing: SideStoreOperationError.noRefreshResult)
+                            return
+                        }
+                        continuation.resume(with: result.map { _ in () })
                     }
-                    continuation.resume(with: result.map { _ in () })
+                    AppManager.shared.refresh([installedApp], presentingViewController: presenter, group: group)
                 }
-                AppManager.shared.refresh([installedApp], presentingViewController: presenter, group: group)
             }
         }
+        await Self.pruneUnusedCaches()
         if updatesExpiryNotifications {
             await ExpirationNotificationScheduler.update()
+        }
+    }
+
+    private func retryAfterClearingRevokedAssignedProfile<T>(
+        for bundleIdentifier: String,
+        recoveryHandler: @escaping @MainActor @Sendable () -> Void = {},
+        operation: () async throws -> T
+    ) async throws -> T {
+        do {
+            return try await operation()
+        } catch let error as OperationError {
+            guard case .customCertificateRevoked = error,
+                  ProfileManager.shared.getAssignedProfile(for: bundleIdentifier) != nil else {
+                throw error
+            }
+
+            ProfileManager.shared.setAssignedProfile(nil, for: bundleIdentifier)
+            debugLog("[SideKick] Cleared revoked assigned profile for \(bundleIdentifier); retrying with the selected Apple ID certificate.")
+            recoveryHandler()
+            return try await operation()
+        }
+    }
+
+    static func pruneUnusedCaches() async {
+        guard DatabaseManager.shared.isStarted else { return }
+
+        let context = DatabaseManager.shared.viewContext
+        let references = await context.perform { () -> (bundleIdentifiers: Set<String>, signatures: Set<String>)? in
+            guard let apps = try? context.fetch(InstalledApp.fetchRequest()) else { return nil }
+            let retainedApps = apps.filter { !$0.isDeleted }
+            return (
+                Set(retainedApps.map(\.resignedBundleIdentifier)),
+                Set(retainedApps.compactMap(\.appBundleFingerprint))
+            )
+        }
+        guard let references else {
+            debugLog("[SideKick] Skipped cache pruning because installed apps could not be read.")
+            return
+        }
+
+        CacheAppOperation.pruneUnusedCaches(
+            activeSignatures: references.signatures,
+            activeBundleIDs: references.bundleIdentifiers
+        ) { bundleIdentifier in
+            AppManager.shared.isActivelyManagingApp(withBundleID: bundleIdentifier)
         }
     }
 

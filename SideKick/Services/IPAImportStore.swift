@@ -38,15 +38,26 @@ actor IPAImportStore {
                     at: candidate,
                     includingPropertiesForKeys: [.isRegularFileKey],
                     options: [.skipsHiddenFiles]
-                  ),
-                  contents.count == 1,
-                  contents[0].pathExtension.lowercased() == "ipa",
-                  (try? contents[0].resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true else {
+                  ) else {
                 continue
             }
-            // Older SideStore file-open handling left one copied IPA in a
-            // unique temporary folder and never removed it. Only prune that
-            // exact, stale shape; leave every other temporary file untouched.
+
+            let isAbandonedIPAImport = contents.count == 1
+                && contents[0].pathExtension.lowercased() == "ipa"
+                && (try? contents[0].resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+            let containsStagedApp = contents.contains { item in
+                item.lastPathComponent == "App.app"
+                    && (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
+            }
+            let containsStagedIPA = contents.contains { item in
+                item.lastPathComponent == "App.ipa"
+                    && (try? item.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
+            }
+
+            // Failed SideStore pipelines skip CleanStagedAppOperation and can
+            // leave a full extracted app plus its generated IPA in this unique
+            // temporary directory. Prune only old folders with those markers.
+            guard isAbandonedIPAImport || containsStagedApp || containsStagedIPA else { continue }
             try? fileManager.removeItem(at: candidate)
         }
     }

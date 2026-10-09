@@ -465,7 +465,13 @@ struct InstallConsoleView: View {
         append(isUpdate ? "Preparing update IPA" : "Preparing imported IPA")
         do {
             try await SideStoreOperationService(accountStore: accountStore, ipaStore: ipaStore)
-                .install(app, using: account) { fraction in
+                .install(
+                    app,
+                    using: account,
+                    recoveryHandler: {
+                        append("Revoked custom certificate found · switching to the selected Apple ID certificate and retrying")
+                    }
+                ) { fraction in
                     let clamped = min(max(fraction, 0), 1)
                     progress = clamped
                     if clamped > 0 {

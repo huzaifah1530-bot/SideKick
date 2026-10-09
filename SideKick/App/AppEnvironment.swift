@@ -23,6 +23,8 @@ final class AppEnvironment {
         databaseState = .starting
         do {
             try await DatabaseManager.shared.start()
+            await ipaImportStore.cleanupAbandonedTemporaryIPAImports()
+            await SideStoreOperationService.pruneUnusedCaches()
             await ExpirationNotificationScheduler.update()
             databaseState = .ready
         } catch {
