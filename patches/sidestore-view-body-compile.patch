@@ -1,0 +1,203 @@
+diff --git a/SideStore/Views/Settings/Advanced/UserCustomizations/UserCustomizationsView.swift b/SideStore/Views/Settings/Advanced/UserCustomizations/UserCustomizationsView.swift
+index 6d6a7232..3f236708 100644
+--- a/SideStore/Views/Settings/Advanced/UserCustomizations/UserCustomizationsView.swift
++++ b/SideStore/Views/Settings/Advanced/UserCustomizations/UserCustomizationsView.swift
+@@ -78,7 +78,101 @@ struct UserCustomizationsView: View {
+     @State private var editingValueText: String = ""
+ 
+     var body: some View {
+-        ScrollView {
++        content
++        .background(Color(uiColor: .settingsBackground).ignoresSafeArea())
++        .navigationTitle("User Customizations")
++        #if !os(tvOS)
++        .navigationBarTitleDisplayMode(.large)
++        #endif
++        .alert("Restart Required", isPresented: $showAnisetteRestartConfirmation) {
++            SwiftUI.Button("Restart Now", role: .destructive) {
++                Task {
++                    await AuthManager.shared.signOut(keepCertificate: true, keepAnisetteData: false)
++                    UserDefaults.standard.useOnDeviceAnisette = useOnDeviceAnisette
++                    exit(0)
++                }
++            }
++            SwiftUI.Button("Cancel", role: .cancel) {
++                useOnDeviceAnisette = UserDefaults.standard.useOnDeviceAnisette
++            }
++        } message: {
++            Text("Changing Anisette config will invalidate your current provisioned Anisette data and you will be signed out.\n\nThis action will require a restart, do you want to proceed?")
++        }
++        .alert("Restart Required", isPresented: $showEMPRestartConfirmation) {
++            SwiftUI.Button("Restart Now", role: .destructive) {
++                enableEMPforWireguard = pendingEMPOption
++                UserDefaults.standard.enableEMPforWireguard = pendingEMPOption
++                exit(0)
++            }
++            SwiftUI.Button("Cancel", role: .cancel) {}
++        } message: {
++            Text("Changing the EMProxy setting requires restarting SideStore. If canceled, changes will not be saved.")
++        }
++        .alert("Restart Required", isPresented: $showBackendRestartConfirmation) {
++            SwiftUI.Button("Restart Now", role: .destructive) {
++                if let newBackend = pendingBackendOption {
++                    applyBackendChange(newBackend, restartRequired: true)
++                }
++            }
++            SwiftUI.Button("Cancel", role: .cancel) {
++                pendingBackendOption = nil
++            }
++        } message: {
++            Text("Changing the Minimuxer backend requires restarting SideStore. If canceled, changes will not be saved.")
++        }
++        .alert(pendingPreferIPAOngoing ? "Prefer Resigned IPA" : "Prefer App Bundle", isPresented: $showPreferIPAToggleAlert) {
++            SwiftUI.Button("Switch") {
++                preferResignedIPA = pendingPreferIPAOngoing
++                UserDefaults.standard.preferResignedIPA = pendingPreferIPAOngoing
++            }
++            SwiftUI.Button("Cancel", role: .cancel) {
++                pendingPreferIPAOngoing = preferResignedIPA
++            }
++        } message: {
++            if pendingPreferIPAOngoing {
++                Text("Switching to Resigned IPA prioritizes install speed (~40% faster) by packaging an uncompressed IPA for fast transfer, but temporarily uses additional disk space during packaging.")
++            } else {
++                Text("Switching to App Bundle prioritizes storage efficiency by transferring the app bundle directly without packaging a temporary IPA, but transfer speeds will be noticeably slower.")
++            }
++        }
++        .sheet(isPresented: Binding<Bool>(
++            get: { wireGuardExportURL != nil },
++            set: { if !$0 { wireGuardExportURL = nil } }
++        )) {
++            if let url = wireGuardExportURL {
++                ActivityViewController(activityItems: [url])
++            }
++        }
++        .alert(
++            editDialog?.title ?? "",
++            isPresented: Binding<Bool>(
++                get: { editDialog != nil },
++                set: { if !$0 { editDialog = nil } }
++            )
++        ) {
++            TextField(editDialog?.placeholder ?? "", text: $editingValueText)
++                #if !os(tvOS)
++                .keyboardType(editDialog?.keyboardType ?? .default)
++                #endif
++            SwiftUI.Button("OK") {
++                if let dialog = editDialog {
++                    dialog.onSave(editingValueText)
++                }
++                editDialog = nil
++            }
++            SwiftUI.Button("Cancel", role: .cancel) {
++                editDialog = nil
++            }
++        } message: {
++            Text(editDialog?.message ?? "")
++        }
++        .task {
++            isFreeAccount = (try? await AuthManager.shared.getAuthenticatedTeam())?.type == .free
++        }
++    }
++
++    private var content: AnyView {
++        AnyView(ScrollView {
+             VStack(alignment: .leading, spacing: 24) {
+                 // Section 0: APPEARANCE & THEMES
+                 VStack(alignment: .leading, spacing: 8) {
+@@ -439,94 +533,5 @@ struct UserCustomizationsView: View {
+             .padding(.top, 16)
+             .padding(.bottom, 32)
+         }
+-        .background(Color(uiColor: .settingsBackground).ignoresSafeArea())
+-        .navigationTitle("User Customizations")
+-        #if !os(tvOS)
+-        .navigationBarTitleDisplayMode(.large)
+-        #endif
+-        .alert("Restart Required", isPresented: $showAnisetteRestartConfirmation) {
+-            SwiftUI.Button("Restart Now", role: .destructive) {
+-                Task {
+-                    await AuthManager.shared.signOut(keepCertificate: true, keepAnisetteData: false)
+-                    UserDefaults.standard.useOnDeviceAnisette = useOnDeviceAnisette
+-                    exit(0)
+-                }
+-            }
+-            SwiftUI.Button("Cancel", role: .cancel) {
+-                useOnDeviceAnisette = UserDefaults.standard.useOnDeviceAnisette
+-            }
+-        } message: {
+-            Text("Changing Anisette config will invalidate your current provisioned Anisette data and you will be signed out.\n\nThis action will require a restart, do you want to proceed?")
+-        }
+-        .alert("Restart Required", isPresented: $showEMPRestartConfirmation) {
+-            SwiftUI.Button("Restart Now", role: .destructive) {
+-                enableEMPforWireguard = pendingEMPOption
+-                UserDefaults.standard.enableEMPforWireguard = pendingEMPOption
+-                exit(0)
+-            }
+-            SwiftUI.Button("Cancel", role: .cancel) {}
+-        } message: {
+-            Text("Changing the EMProxy setting requires restarting SideStore. If canceled, changes will not be saved.")
+-        }
+-        .alert("Restart Required", isPresented: $showBackendRestartConfirmation) {
+-            SwiftUI.Button("Restart Now", role: .destructive) {
+-                if let newBackend = pendingBackendOption {
+-                    applyBackendChange(newBackend, restartRequired: true)
+-                }
+-            }
+-            SwiftUI.Button("Cancel", role: .cancel) {
+-                pendingBackendOption = nil
+-            }
+-        } message: {
+-            Text("Changing the Minimuxer backend requires restarting SideStore. If canceled, changes will not be saved.")
+-        }
+-        .alert(pendingPreferIPAOngoing ? "Prefer Resigned IPA" : "Prefer App Bundle", isPresented: $showPreferIPAToggleAlert) {
+-            SwiftUI.Button("Switch") {
+-                preferResignedIPA = pendingPreferIPAOngoing
+-                UserDefaults.standard.preferResignedIPA = pendingPreferIPAOngoing
+-            }
+-            SwiftUI.Button("Cancel", role: .cancel) {
+-                pendingPreferIPAOngoing = preferResignedIPA
+-            }
+-        } message: {
+-            if pendingPreferIPAOngoing {
+-                Text("Switching to Resigned IPA prioritizes install speed (~40% faster) by packaging an uncompressed IPA for fast transfer, but temporarily uses additional disk space during packaging.")
+-            } else {
+-                Text("Switching to App Bundle prioritizes storage efficiency by transferring the app bundle directly without packaging a temporary IPA, but transfer speeds will be noticeably slower.")
+-            }
+-        }
+-        .sheet(isPresented: Binding<Bool>(
+-            get: { wireGuardExportURL != nil },
+-            set: { if !$0 { wireGuardExportURL = nil } }
+-        )) {
+-            if let url = wireGuardExportURL {
+-                ActivityViewController(activityItems: [url])
+-            }
+-        }
+-        .alert(
+-            editDialog?.title ?? "",
+-            isPresented: Binding<Bool>(
+-                get: { editDialog != nil },
+-                set: { if !$0 { editDialog = nil } }
+-            )
+-        ) {
+-            TextField(editDialog?.placeholder ?? "", text: $editingValueText)
+-                #if !os(tvOS)
+-                .keyboardType(editDialog?.keyboardType ?? .default)
+-                #endif
+-            SwiftUI.Button("OK") {
+-                if let dialog = editDialog {
+-                    dialog.onSave(editingValueText)
+-                }
+-                editDialog = nil
+-            }
+-            SwiftUI.Button("Cancel", role: .cancel) {
+-                editDialog = nil
+-            }
+-        } message: {
+-            Text(editDialog?.message ?? "")
+-        }
+-        .task {
+-            isFreeAccount = (try? await AuthManager.shared.getAuthenticatedTeam())?.type == .free
+-        }
++        })
+     }

@@ -44,6 +44,9 @@ jobs:
       - name: Apply Swift compiler workaround
         run: git -C Vendor/SideStore apply ../../patches/sidestore-compiler-workarounds.patch
 
+      - name: Isolate upstream SwiftUI settings expression
+        run: git -C Vendor/SideStore apply ../../patches/sidestore-view-body-compile.patch
+
       - name: Build integrated SideKick app for iOS
         run: |
           xcodebuild -project Vendor/SideStore/AltStore.xcodeproj \
