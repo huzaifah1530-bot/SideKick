@@ -121,7 +121,7 @@ private struct SigningAccountDetailView: View {
                 }
             }
 
-            SwiftUI.Section("Apple Developer") {
+            SwiftUI.Section {
                 if !currentAccount.hasSavedSession {
                     Text("Sign in again to check App IDs and profiles.")
                         .font(.footnote)
@@ -154,6 +154,8 @@ private struct SigningAccountDetailView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
+            } header: {
+                Text("Apple Developer")
             } footer: {
                 Text("This is the live Apple Developer account inventory. A profile can remain after its app is removed, so it doesn’t prove the app is installed.")
             }
