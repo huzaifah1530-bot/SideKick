@@ -11,6 +11,7 @@ enum DatabaseStartupState: Equatable {
 @Observable
 final class AppEnvironment {
     let ipaImportStore: IPAImportStore
+    let githubUpdateDownloads = GitHubUpdateDownloadStore()
     private(set) var databaseState: DatabaseStartupState = .starting
 
     init(ipaImportStore: IPAImportStore = IPAImportStore()) {

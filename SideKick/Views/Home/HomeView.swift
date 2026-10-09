@@ -299,6 +299,7 @@ struct HomeView: View {
             }
         }
         githubUpdates = candidates
+        await GitHubUpdateNotificationScheduler.notify(candidates)
         githubUpdateCheckFailed = didFailCheck
     }
 

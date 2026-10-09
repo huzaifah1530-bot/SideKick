@@ -76,12 +76,17 @@ actor GitHubUpdateService {
         return user.login
     }
 
-    func downloadIPA(for candidate: GitHubUpdateCandidate, token: String? = nil) async throws -> URL {
+    func downloadIPA(
+        for candidate: GitHubUpdateCandidate,
+        token: String? = nil,
+        onProgress: @escaping @Sendable (Double?) -> Void = { _ in }
+    ) async throws -> URL {
         var request = URLRequest(url: candidate.downloadURL)
         request.setValue(candidate.source == .latestRelease ? "application/octet-stream" : "application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("SideKick iOS app", forHTTPHeaderField: "User-Agent")
         if let token, !token.isEmpty { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
-        let (downloadURL, response) = try await URLSession.shared.download(for: request)
+        let delegate = GitHubDownloadProgressDelegate(onProgress: onProgress)
+        let (downloadURL, response) = try await URLSession.shared.download(for: request, delegate: delegate)
         guard let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else {
             try? FileManager.default.removeItem(at: downloadURL)
             throw GitHubUpdateError.downloadFailed
@@ -155,6 +160,27 @@ actor GitHubUpdateService {
             if a != b { return a > b }
         }
         return false
+    }
+}
+
+private final class GitHubDownloadProgressDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
+    private let onProgress: @Sendable (Double?) -> Void
+
+    init(onProgress: @escaping @Sendable (Double?) -> Void) {
+        self.onProgress = onProgress
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        downloadTask: URLSessionDownloadTask,
+        didWriteData bytesWritten: Int64,
+        totalBytesWritten: Int64,
+        totalBytesExpectedToWrite: Int64
+    ) {
+        let progress = totalBytesExpectedToWrite > 0
+            ? min(max(Double(totalBytesWritten) / Double(totalBytesExpectedToWrite), 0), 1)
+            : nil
+        onProgress(progress)
     }
 }
 

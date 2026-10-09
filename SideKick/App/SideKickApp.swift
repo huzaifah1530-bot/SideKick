@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import UserNotifications
 
 @main
 struct SideKickApp: App {
@@ -8,6 +9,7 @@ struct SideKickApp: App {
     init() {
         UITableView.appearance().separatorInset = .zero
         UITableView.appearance().separatorInsetReference = .fromCellEdges
+        UNUserNotificationCenter.current().delegate = SideKickNotificationPresentationDelegate.shared
     }
 
     var body: some Scene {

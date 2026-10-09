@@ -129,10 +129,11 @@ actor IPAImportStore {
         return app
     }
 
-    func importManagedIPA(from sourceURL: URL, expectedBundleIdentifier: String) throws -> ImportedIPA {
+    func importManagedIPA(from sourceURL: URL, expectedBundleIdentifiers: Set<String>) throws -> ImportedIPA {
         let metadata = try readMetadata(from: sourceURL)
-        guard metadata.bundleIdentifier.caseInsensitiveCompare(expectedBundleIdentifier) == .orderedSame else {
-            throw IPAImportError.bundleIdentifierMismatch(expectedBundleIdentifier, metadata.bundleIdentifier)
+        let expected = expectedBundleIdentifiers.map { $0.lowercased() }
+        guard expected.contains(metadata.bundleIdentifier.lowercased()) else {
+            throw IPAImportError.bundleIdentifierMismatch(expectedBundleIdentifiers.sorted().joined(separator: " or "), metadata.bundleIdentifier)
         }
         try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
         let fileName = "github-update-\(UUID().uuidString).ipa"

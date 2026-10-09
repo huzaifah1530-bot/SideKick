@@ -4,29 +4,47 @@ import UIKit
 struct GitHubUpdateRow: View {
     let candidate: GitHubUpdateCandidate
     let app: InstalledAppSummary
+    @Environment(AppEnvironment.self) private var environment
+
+    private var downloadJob: GitHubUpdateDownloadJob? { environment.githubUpdateDownloads.jobs[candidate.id] }
 
     var body: some View {
-        HStack(spacing: 12) {
-            if let data = app.iconData, let image = UIImage(data: data) {
-                Image(uiImage: image).resizable().scaledToFit().frame(width: 50, height: 50)
-                    .clipShape(.rect(cornerRadius: 11))
-            } else {
-                Image(systemName: "arrow.down.app.fill")
-                    .font(.system(size: 24)).foregroundStyle(.white)
-                    .frame(width: 50, height: 50).background(.blue.gradient, in: .rect(cornerRadius: 11))
+        VStack(spacing: 9) {
+            HStack(spacing: 12) {
+                if let data = app.iconData, let image = UIImage(data: data) {
+                    Image(uiImage: image).resizable().scaledToFit().frame(width: 50, height: 50)
+                        .clipShape(.rect(cornerRadius: 11))
+                } else {
+                    Image(systemName: "arrow.down.app.fill")
+                        .font(.system(size: 24)).foregroundStyle(.white)
+                        .frame(width: 50, height: 50).background(.blue.gradient, in: .rect(cornerRadius: 11))
+                }
+                VStack(alignment: .leading, spacing: 4) {
+                    Text(candidate.appName).font(.body.weight(.semibold))
+                    Text(updateStatus)
+                        .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Spacer()
+                Text(downloadJob?.isDownloading == true ? "DOWNLOADING" : "UPDATE")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(downloadJob?.isDownloading == true ? Color.sideKickAccent : .blue)
+                Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
             }
-            VStack(alignment: .leading, spacing: 4) {
-                Text(candidate.appName).font(.body.weight(.semibold))
-                Text("Update available · \(candidate.newVersion)")
-                    .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+            if let progress = downloadJob?.progress, downloadJob?.isDownloading == true {
+                DownloadProgressBar(progress: progress).frame(height: 3)
             }
-            Spacer()
-            Text("UPDATE")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.blue)
-            Image(systemName: "chevron.right").font(.caption.weight(.semibold)).foregroundStyle(.tertiary)
         }
         .padding(.vertical, 5)
+    }
+
+    private var updateStatus: String {
+        guard let job = downloadJob else { return "Update available · \(candidate.newVersion)" }
+        if job.isDownloading {
+            return job.progress.map { "Downloading · \(Int($0 * 100))%" } ?? "Downloading…"
+        }
+        if job.queuedIPA != nil { return "Downloaded · Ready to update" }
+        if job.errorMessage != nil { return "Download failed · Tap to retry" }
+        return "Update available · \(candidate.newVersion)"
     }
 }
 
@@ -37,15 +55,22 @@ struct GitHubUpdateDetailView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
     @State private var accountStore = SigningAccountStore()
-    @State private var queuedIPA: ImportedIPA?
-    @State private var isDownloading = false
     @State private var errorMessage: String?
     @State private var account: SigningAccountSummary?
 
     private let configurationStore = GitHubUpdateConfigurationStore()
 
+    private var downloadJob: GitHubUpdateDownloadJob? { environment.githubUpdateDownloads.jobs[candidate.id] }
+
     var body: some View {
         List {
+            if let errorMessage {
+                Section {
+                    Label(errorMessage, systemImage: "exclamationmark.triangle")
+                        .font(.footnote).foregroundStyle(.red).textSelection(.enabled)
+                }
+            }
+
             Section {
                 HStack(spacing: 15) {
                     if let data = app.iconData, let image = UIImage(data: data) {
@@ -57,7 +82,7 @@ struct GitHubUpdateDetailView: View {
                     }
                     VStack(alignment: .leading, spacing: 5) {
                         Text(app.name).font(.title3.weight(.semibold))
-                        Text("\(app.version)  →  \(queuedIPA?.version ?? candidate.newVersion)")
+                        Text("\(app.version)  →  \(downloadJob?.queuedIPA?.version ?? candidate.newVersion)")
                             .foregroundStyle(.secondary)
                     }
                 }
@@ -72,16 +97,39 @@ struct GitHubUpdateDetailView: View {
             }
 
             Section {
-                if isDownloading {
-                    HStack(spacing: 12) {
-                        ProgressView()
-                        VStack(alignment: .leading, spacing: 3) {
+                if let job = downloadJob, job.isDownloading {
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
                             Text("Downloading IPA…").font(.body.weight(.medium))
-                            Text("The update is checked before it’s queued.").font(.footnote).foregroundStyle(.secondary)
+                            Spacer()
+                            if let progress = job.progress { Text("\(Int(progress * 100))%") }
+                            else { ProgressView().controlSize(.small) }
+                        }
+                        Text("You can leave this page; the download will continue.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                    .padding(16)
+                    .padding(.bottom, 8)
+                    .background(Color(uiColor: .secondarySystemGroupedBackground), in: .rect(cornerRadius: 17))
+                    .overlay(alignment: .bottom) {
+                        if let progress = job.progress {
+                            DownloadProgressBar(progress: progress)
+                                .frame(height: 3)
+                                .padding(.horizontal, 14)
+                                .padding(.bottom, 8)
                         }
                     }
-                    .padding(.vertical, 5)
-                } else if let queuedIPA {
+                    .listRowInsets(EdgeInsets(top: 5, leading: 0, bottom: 5, trailing: 0))
+                    .listRowBackground(Color.clear)
+                } else if let message = job?.errorMessage {
+                    VStack(alignment: .leading, spacing: 11) {
+                        Label(message, systemImage: "exclamationmark.triangle")
+                            .font(.footnote).foregroundStyle(.red).textSelection(.enabled)
+                        downloadButton(title: "Try Again") { startDownload() }
+                    }
+                    .listRowInsets(EdgeInsets(top: 5, leading: 0, bottom: 5, trailing: 0))
+                    .listRowBackground(Color.clear)
+                } else if let queuedIPA = job?.queuedIPA {
                     if let account {
                         NavigationLink {
                             InstallConsoleView(
@@ -103,13 +151,7 @@ struct GitHubUpdateDetailView: View {
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                 } else {
-                    SwiftUI.Button {
-                        Task { await downloadUpdate() }
-                    } label: {
-                        Label("Install New IPA", systemImage: "arrow.down.circle")
-                            .fontWeight(.semibold)
-                    }
-                    .disabled(isDownloading)
+                    downloadButton(title: "Install New IPA") { startDownload() }
                 }
             }
         }
@@ -124,31 +166,31 @@ struct GitHubUpdateDetailView: View {
                     && $0.hasSavedSession
             }
         }
-        .alert("Couldn’t get update", isPresented: Binding(
-            get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
-        )) {
-            SwiftUI.Button("OK", role: .cancel) { errorMessage = nil }
-        } message: { Text(errorMessage ?? "") }
     }
 
     @MainActor
-    private func downloadUpdate() async {
-        isDownloading = true
-        defer { isDownloading = false }
-        var temporaryURL: URL?
-        do {
-            let token = try GitHubCredentialStore().load()
-            let downloaded = try await GitHubUpdateService().downloadIPA(for: candidate, token: token)
-            temporaryURL = downloaded
-            let queued = try await environment.ipaImportStore.importManagedIPA(
-                from: downloaded,
-                expectedBundleIdentifier: app.bundleIdentifier
-            )
-            queuedIPA = queued
-        } catch {
-            errorMessage = error.localizedDescription
+    private func startDownload() {
+        let token = try? GitHubCredentialStore().load()
+        environment.githubUpdateDownloads.start(
+            candidate: candidate,
+            expectedBundleIdentifiers: [app.bundleIdentifier, app.resignedBundleIdentifier],
+            ipaImportStore: environment.ipaImportStore,
+            token: token
+        )
+    }
+
+    private func downloadButton(title: String, action: @escaping () -> Void) -> some View {
+        SwiftUI.Button(action: action) {
+            Label(title, systemImage: "arrow.down.circle")
+                .fontWeight(.semibold)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .background(Color(uiColor: .secondarySystemGroupedBackground), in: .rect(cornerRadius: 17))
         }
-        if let temporaryURL { try? FileManager.default.removeItem(at: temporaryURL) }
+        .buttonStyle(.plain)
+        .listRowInsets(EdgeInsets(top: 5, leading: 0, bottom: 5, trailing: 0))
+        .listRowBackground(Color.clear)
     }
 
     @MainActor
@@ -158,9 +200,28 @@ struct GitHubUpdateDetailView: View {
             configuration?.lastInstalledUpdateKey = candidate.updateKey
             if let configuration { try await configurationStore.save(configuration) }
             try await environment.ipaImportStore.delete(ipa)
+            environment.githubUpdateDownloads.removeJob(for: candidate)
             dismiss()
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+}
+
+private struct DownloadProgressBar: View {
+    let progress: Double
+
+    var body: some View {
+        GeometryReader { geometry in
+            ZStack(alignment: .leading) {
+                Capsule().fill(Color.primary.opacity(0.10))
+                Capsule()
+                    .fill(Color.sideKickAccentGradient)
+                    .frame(width: geometry.size.width * min(max(progress, 0), 1))
+            }
+        }
+        .accessibilityElement()
+        .accessibilityLabel("Download progress")
+        .accessibilityValue("\(Int(progress * 100)) percent")
     }
 }
