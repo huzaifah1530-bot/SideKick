@@ -33,7 +33,7 @@ struct ContentView: View {
         VStack(spacing: 18) {
             switch environment.databaseState {
             case .starting:
-                ProgressView("Opening SideStore data…")
+                ProgressView("Opening SideKick data…")
             case .failed(let message):
                 Image(systemName: "externaldrive.badge.exclamationmark")
                     .font(.system(size: 42))

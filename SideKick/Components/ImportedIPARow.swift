@@ -8,7 +8,7 @@ struct ImportedIPARow: View {
             Image(systemName: "app.dashed")
                 .font(.title2.weight(.semibold))
                 .foregroundStyle(.white)
-                .frame(width: 56, height: 56)
+                .frame(width: 52, height: 52)
                 .background(.blue.gradient, in: .rect(cornerRadius: 14))
             VStack(alignment: .leading, spacing: 5) {
                 Text(app.name).font(.headline)
@@ -19,7 +19,7 @@ struct ImportedIPARow: View {
             Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
                 .accessibilityLabel("Imported")
         }
-        .padding(14)
+        .padding(12)
         .background(.background, in: .rect(cornerRadius: 20))
     }
 }

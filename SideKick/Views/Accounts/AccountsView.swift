@@ -16,7 +16,7 @@ struct AccountsView: View {
                         Text("Add Apple IDs here, then choose which one SideKick should use as its active signing account. Each saved session is kept separately in the iOS Keychain.")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
-                        Text("Initial Apple device registration may require the one-time computer pairing setup. LocalDevVPN is a separate app and must be installed and connected when SideStore’s device workflow requires it.")
+                        Text("Initial Apple device registration may require one-time computer pairing. LocalDevVPN is a separate app and must be installed and connected when device installation requires it.")
                             .font(.footnote)
                             .foregroundStyle(.secondary)
                         Text("Adding an Apple ID now saves its session first. Device registration and certificate setup are deferred so they can’t block account sign-in.")
@@ -57,10 +57,10 @@ struct AccountsView: View {
                 }
 
                 Section {
-                    Label("Install and refresh use SideStore", systemImage: "info.circle")
+                    Label("Signing is handled per Apple ID", systemImage: "info.circle")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                    Text("SideKick routes installs through the Apple ID you choose and refreshes each app with the account recorded by SideStore. Real-device signing and refresh still need device testing.")
+                    Text("SideKick uses the Apple ID you choose for installation and refreshes each app with its recorded signing account. Real-device signing and refresh still need device testing.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

@@ -20,11 +20,11 @@ struct AppleIDSignInSheet: View {
                 } header: {
                     Text("Apple Account")
                 } footer: {
-                    Text("Credentials are sent directly to SideStore’s sign-in engine and saved in this device’s Keychain after successful authentication.")
+                    Text("Credentials are used only to authenticate this Apple ID and are saved in this device’s Keychain after successful authentication.")
                 }
 
                 Section {
-                    Label("Two-factor verification and device setup may still show SideStore’s native prompts.", systemImage: "lock.shield")
+                    Label("Two-factor verification and device setup may still show Apple’s security prompts.", systemImage: "lock.shield")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }

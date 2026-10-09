@@ -92,8 +92,8 @@ private enum SideStoreOperationError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .presentationUnavailable: "SideKick couldn’t open the signing operation. Try again."
-        case .installedAppUnavailable: "This installed app or its signing account is no longer available in SideStore."
-        case .noRefreshResult: "SideStore finished without returning a refresh result."
+        case .installedAppUnavailable: "This installed app or its signing account is no longer available."
+        case .noRefreshResult: "The refresh operation finished without returning a result."
         }
     }
 }

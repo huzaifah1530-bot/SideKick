@@ -55,7 +55,7 @@ struct HomeView: View {
                 .font(.caption.weight(.bold)).foregroundStyle(.secondary)
             Text("Bring your IPA files into SideKick")
                 .font(.title3.weight(.bold))
-            Text("Your IPA files are stored in your library. Apple ID sign-in, installation, and refresh are not connected yet. Device pairing and LocalDevVPN setup will also be required before the engine can be used.")
+            Text("Your IPA files are stored in your library. Sign in with an Apple ID, then open an app in Library to install or refresh it. Device pairing and LocalDevVPN setup may be required on the first device setup.")
                 .font(.subheadline).foregroundStyle(.secondary)
             SwiftUI.Button { showingImporter = true } label: {
                 Label(viewModel.isImporting ? "Importing…" : "Choose an IPA", systemImage: "square.and.arrow.down")
@@ -82,7 +82,11 @@ struct HomeView: View {
                     .padding(.vertical, 14)
             } else {
                 ForEach(viewModel.importedApps) { app in
-                    ImportedIPARow(app: app)
+                    NavigationLink {
+                        AppManagementView(importedApp: app)
+                    } label: {
+                        ImportedIPARow(app: app)
+                    }
                 }
             }
         }

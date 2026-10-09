@@ -85,7 +85,7 @@ final class SigningAccountStore {
         isWorking = true
         defer { isWorking = false }
 
-        setSignInCheckpoint("Starting SideStore authentication")
+        setSignInCheckpoint("Starting Apple ID authentication")
         let previousAccount = await activeAccountSummary()
         if let previousAccount,
            let previousCredentials = try? currentSessionCredentials(for: previousAccount) {
@@ -116,7 +116,7 @@ final class SigningAccountStore {
                 skipHowTos: true
             )
         } catch {
-            setSignInCheckpoint("Sign-in failed before SideStore returned an account")
+            setSignInCheckpoint("Sign-in failed before the account could be saved")
             throw error
         }
 
@@ -425,15 +425,15 @@ private enum SigningAccountError: LocalizedError {
         case .presentationUnavailable:
             return "SideKick couldn’t open Apple’s sign-in sheet. Please try again."
         case .engineBusy:
-            return "SideKick can’t change accounts while SideStore is installing or refreshing an app. Wait for that operation to finish and try again."
+            return "SideKick can’t change accounts while an app operation is running. Wait for it to finish and try again."
         case .sessionNotAvailable:
-            return "SideStore completed sign-in but did not return a complete Apple ID session. This account was not saved."
+            return "Apple ID sign-in completed without a complete session. This account was not saved."
         case .savedAccountMissing:
-            return "This account or team is missing from SideStore’s database. Sign in again to restore it."
+            return "This account or team is missing from SideKick’s local data. Sign in again to restore it."
         case .credentialsUnavailable:
             return "SideKick couldn’t retrieve the Apple ID details. Please try signing in again."
         case .databaseUnavailable:
-            return "SideStore’s local database isn’t available. Restart SideKick and use its recovery prompt before signing in."
+            return "SideKick’s local database isn’t available. Restart the app and try again before signing in."
         case .keychain(let status):
             return "SideKick couldn’t securely save or load this Apple ID session (Keychain status \(status))."
         }
