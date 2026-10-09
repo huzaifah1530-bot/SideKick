@@ -72,6 +72,9 @@ final class SigningAccountStore {
 
     func addAccount(appleID: String, password: String) async throws {
         guard !isWorking else { return }
+        guard DatabaseManager.shared.isStarted else {
+            throw SigningAccountError.databaseUnavailable
+        }
         guard !AppManager.shared.isActivelyManagingAnyApp else {
             throw SigningAccountError.engineBusy
         }
@@ -414,6 +417,7 @@ private enum SigningAccountError: LocalizedError {
     case sessionNotAvailable
     case savedAccountMissing
     case credentialsUnavailable
+    case databaseUnavailable
     case keychain(OSStatus)
 
     var errorDescription: String? {
@@ -428,6 +432,8 @@ private enum SigningAccountError: LocalizedError {
             return "This account or team is missing from SideStore’s database. Sign in again to restore it."
         case .credentialsUnavailable:
             return "SideKick couldn’t retrieve the Apple ID details. Please try signing in again."
+        case .databaseUnavailable:
+            return "SideStore’s local database isn’t available. Restart SideKick and use its recovery prompt before signing in."
         case .keychain(let status):
             return "SideKick couldn’t securely save or load this Apple ID session (Keychain status \(status))."
         }
