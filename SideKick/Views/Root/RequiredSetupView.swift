@@ -11,6 +11,7 @@ final class SetupStatus {
     let accounts = SigningAccountStore()
     private(set) var notificationsEnabled = false
     private(set) var backgroundRefreshEnabled = false
+    private(set) var backgroundRefreshRestricted = false
     private(set) var vpnInstalled = false
     private(set) var pairingVerified = false
     private(set) var isCheckingPairing = false
@@ -28,7 +29,9 @@ final class SetupStatus {
     func refresh() async {
         let notificationSettings = await UNUserNotificationCenter.current().notificationSettings()
         notificationsEnabled = notificationSettings.authorizationStatus == .authorized
-        backgroundRefreshEnabled = UIApplication.shared.backgroundRefreshStatus == .available
+        let refreshStatus = UIApplication.shared.backgroundRefreshStatus
+        backgroundRefreshEnabled = refreshStatus == .available
+        backgroundRefreshRestricted = refreshStatus == .restricted
         vpnInstalled = UIApplication.shared.canOpenURL(URL(string: "localdevvpn://")!)
         await accounts.reload()
 
@@ -148,13 +151,20 @@ struct RequiredSetupView: View {
 
                     setupRow(
                         title: "Background App Refresh",
-                        detail: status.backgroundRefreshEnabled ? "On" : "Turn it on in Settings → General → Background App Refresh",
+                        detail: status.backgroundRefreshEnabled
+                            ? "On"
+                            : status.backgroundRefreshRestricted
+                                ? "Unavailable because this device restricts background refresh"
+                                : "Turn it on in Settings → General → Background App Refresh; Low Power Mode also pauses it",
                         symbol: "arrow.clockwise"
                     ) {
-                        UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
+                        if !status.backgroundRefreshRestricted {
+                            UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
+                        }
                     } label: {
-                        "Open Settings"
+                        status.backgroundRefreshEnabled ? "On" : status.backgroundRefreshRestricted ? "Unavailable" : "Open Settings"
                     }
+                    .disabled(status.backgroundRefreshRestricted || status.backgroundRefreshEnabled)
 
                     setupRow(
                         title: "LocalDevVPN",
