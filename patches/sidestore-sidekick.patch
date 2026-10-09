@@ -71,6 +71,16 @@ diff --git a/AltStore/Info.plist b/AltStore/Info.plist
 index 868efe81..a5a9a77c 100644
 --- a/AltStore/Info.plist
 +++ b/AltStore/Info.plist
+@@ -14,7 +14,7 @@
+ 			<key>CFBundleTypeName</key>
+ 			<string>iOS App</string>
+ 			<key>CFBundleTypeRole</key>
+-			<string>Viewer</string>
++			<string>Editor</string>
+ 			<key>LSHandlerRank</key>
+-			<string>Alternate</string>
++			<string>Owner</string>
+ 			<key>LSItemContentTypes</key>
 @@ -41,7 +41,9 @@
  	<key>CFBundleInfoDictionaryVersion</key>
  	<string>6.0</string>
@@ -280,11 +290,12 @@ diff --git a/AltStore/Intents/App Intents/AppShortcuts.swift b/AltStore/Intents/
 diff --git a/SideStore/DeepLinks/URLHandler.swift b/SideStore/DeepLinks/URLHandler.swift
 --- a/SideStore/DeepLinks/URLHandler.swift
 +++ b/SideStore/DeepLinks/URLHandler.swift
-@@ -16,6 +16,7 @@ class URLHandler {
+@@ -16,6 +16,8 @@ class URLHandler {
      @discardableResult
      func handle(_ url: URL) -> Bool {
          debugLog("[URLHandler] handle(_:) called with URL: \(url.absoluteString)")
 +        if SideKickShareLink.handle(url) { return true }
++        if SideKickIncomingIPA.handle(url) { return true }
          if url.isFileURL {
              return FileImportHandler.shared.handle(fileURL: url)
          }

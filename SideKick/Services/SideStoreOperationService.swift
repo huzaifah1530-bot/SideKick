@@ -74,6 +74,7 @@ final class SideStoreOperationService {
             throw SideStoreOperationError.presentationUnavailable
         }
         let url = try await ipaStore.fileURL(for: ipa)
+        defer { try? FileManager.default.removeItem(at: url) }
         try await accountStore.withAccount(
             accountIdentifier: account.accountIdentifier,
             teamIdentifier: account.teamIdentifier

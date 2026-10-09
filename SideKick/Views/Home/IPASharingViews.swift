@@ -17,10 +17,8 @@ struct ShareIPAView: View {
             }
 
             Section {
-                Text("SideKick uploads this IPA to Buzzheavier and creates a link that opens in SideKick. Anyone who gets the link can download the file.")
-                Text("Buzzheavier’s free uploads are temporary and may expire. SideKick can’t delete an anonymous upload after it’s created.")
-                Text("The SideKick link conceals the provider URL for convenience; it is not encryption or access control.")
-                    .foregroundStyle(.secondary)
+                Text("This IPA is uploaded to a third-party site. Anyone with the link can download it.")
+                Text("Links are temporary and may expire.")
             } header: {
                 Text("Before you share")
             }
@@ -77,6 +75,7 @@ struct ShareIPAView: View {
         defer { isUploading = false }
         do {
             let fileURL = try await environment.ipaImportStore.fileURL(for: app)
+            defer { try? FileManager.default.removeItem(at: fileURL) }
             let providerURL = try await BuzzheavierClient().upload(
                 ipaURL: fileURL,
                 fileName: "\(app.name)-\(app.version).ipa"
@@ -100,6 +99,7 @@ struct URLImportView: View {
     @State private var isDownloading = false
     @State private var errorMessage: String?
     @State private var importedApp: ImportedIPA?
+    @State private var didStartIncomingImport = false
 
     var body: some View {
         List {
@@ -151,7 +151,7 @@ struct URLImportView: View {
             }
 
             Section {
-                Text("Only download apps you trust. Downloaded IPAs are saved in SideKick before you choose whether to install them.")
+                Text("Only download apps you trust. SideKick points to the original file or download link. If it’s moved, deleted, or expires, choose it again.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -160,7 +160,11 @@ struct URLImportView: View {
         .navigationTitle("Import from URL")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear {
-            if let initialURL, linkText.isEmpty { linkText = initialURL.absoluteString }
+            guard let initialURL else { return }
+            if linkText.isEmpty { linkText = initialURL.absoluteString }
+            guard !didStartIncomingImport else { return }
+            didStartIncomingImport = true
+            Task { await download() }
         }
     }
 
@@ -174,36 +178,32 @@ struct URLImportView: View {
             guard let pastedURL = URL(string: linkText.trimmingCharacters(in: .whitespacesAndNewlines)) else {
                 throw AppSharingError.invalidShareLink
             }
-            let resolvedURL: URL
+            let sourceURL: URL
             if pastedURL.scheme?.lowercased() == "sidekick" {
                 guard let sharedURL = SideKickShareLink.downloadURL(from: pastedURL) else {
                     throw AppSharingError.invalidShareLink
                 }
-                resolvedURL = sharedURL
+                sourceURL = sharedURL
             } else {
                 guard pastedURL.scheme?.lowercased() == "https" else {
                     throw AppSharingError.insecureURL
                 }
-                resolvedURL = buzzheavierDirectURL(for: pastedURL)
+                sourceURL = pastedURL
             }
-            let (downloadedURL, response) = try await URLSession.shared.download(from: resolvedURL)
+            let (downloadedURL, response) = try await BuzzheavierClient().download(from: sourceURL)
+            defer { try? FileManager.default.removeItem(at: downloadedURL) }
             if let response = response as? HTTPURLResponse, !(200..<300).contains(response.statusCode) {
                 throw AppSharingError.downloadFailed(response.statusCode)
             }
 
-            let ipaURL = FileManager.default.temporaryDirectory
-                .appendingPathComponent(UUID().uuidString)
-                .appendingPathExtension("ipa")
-            defer { try? FileManager.default.removeItem(at: ipaURL) }
-            try FileManager.default.copyItem(at: downloadedURL, to: ipaURL)
-            let app = try await environment.ipaImportStore.importIPA(from: ipaURL)
+            let app = try await environment.ipaImportStore.importIPA(from: downloadedURL, remoteSourceURL: sourceURL)
             importedApp = app
             await onImported(app)
         } catch let error as IPAImportError {
             switch error {
             case .invalidArchive, .missingAppBundle, .missingBundleIdentifier, .notAnIPA:
                 errorMessage = "That link returned a web page or a file that isn’t a valid IPA. Use a direct IPA download link."
-            case .inaccessibleFile:
+            case .inaccessibleFile, .sourceFileMissing, .sourceBookmarkUnavailable:
                 errorMessage = error.localizedDescription
             }
         } catch {
@@ -211,16 +211,4 @@ struct URLImportView: View {
         }
     }
 
-    private func buzzheavierDirectURL(for url: URL) -> URL {
-        guard
-            let host = url.host?.lowercased(),
-            host == "buzzheavier.com" || host == "www.buzzheavier.com",
-            !url.path.hasPrefix("/d/"),
-            url.pathComponents.count == 2
-        else { return url }
-
-        var components = URLComponents(url: url, resolvingAgainstBaseURL: false)
-        components?.path = "/d\(url.path)"
-        return components?.url ?? url
-    }
 }

@@ -20,46 +20,138 @@ actor IPAImportStore {
             .sorted { $0.importedAt > $1.importedAt }
     }
 
-    func fileURL(for app: ImportedIPA) throws -> URL {
-        let url = directory.appendingPathComponent(app.fileName)
-        guard fileManager.isReadableFile(atPath: url.path) else { throw IPAImportError.inaccessibleFile }
-        return url
-    }
-
-    func importIPA(from sourceURL: URL) throws -> ImportedIPA {
-        guard sourceURL.pathExtension.lowercased() == "ipa" else { throw IPAImportError.notAnIPA }
+    func importIPA(from sourceURL: URL, remoteSourceURL: URL? = nil) throws -> ImportedIPA {
+        guard remoteSourceURL != nil || sourceURL.pathExtension.lowercased() == "ipa" else {
+            throw IPAImportError.notAnIPA
+        }
         let securityScoped = sourceURL.startAccessingSecurityScopedResource()
         defer { if securityScoped { sourceURL.stopAccessingSecurityScopedResource() } }
 
         guard fileManager.isReadableFile(atPath: sourceURL.path) else { throw IPAImportError.inaccessibleFile }
         let metadata = try readMetadata(from: sourceURL)
-
-        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
-        let storedName = "\(UUID().uuidString).ipa"
-        let destinationURL = directory.appendingPathComponent(storedName)
-        try fileManager.copyItem(at: sourceURL, to: destinationURL)
-
-        do {
-            var entries = try importedApps()
-            if let previous = entries.first(where: { $0.bundleIdentifier == metadata.bundleIdentifier }) {
-                try? fileManager.removeItem(at: directory.appendingPathComponent(previous.fileName))
-                entries.removeAll { $0.bundleIdentifier == metadata.bundleIdentifier }
+        let bookmarkData: Data?
+        if remoteSourceURL == nil {
+            do {
+                bookmarkData = try sourceURL.bookmarkData(
+                    options: [],
+                    includingResourceValuesForKeys: nil,
+                    relativeTo: nil
+                )
+            } catch {
+                throw IPAImportError.sourceBookmarkUnavailable
             }
+        } else {
+            bookmarkData = nil
+        }
+        let app = ImportedIPA(
+            bundleIdentifier: metadata.bundleIdentifier,
+            name: metadata.name,
+            version: metadata.version,
+            fileName: nil,
+            sourceBookmarkData: bookmarkData,
+            sourceURLString: remoteSourceURL?.absoluteString,
+            importedAt: .now,
+            iconData: metadata.iconData
+        )
+        var entries = try importedApps()
+        if let previous = entries.first(where: { $0.bundleIdentifier == metadata.bundleIdentifier }) {
+            removeLegacyStoredIPA(previous)
+            entries.removeAll { $0.bundleIdentifier == metadata.bundleIdentifier }
+        }
+        entries.insert(app, at: 0)
+        try save(entries)
+        return app
+    }
 
-            let app = ImportedIPA(
-                bundleIdentifier: metadata.bundleIdentifier,
-                name: metadata.name,
-                version: metadata.version,
-                fileName: storedName,
-                importedAt: .now,
-                iconData: metadata.iconData
+    func importIPA(bookmarkData: Data) throws -> ImportedIPA {
+        var isStale = false
+        let sourceURL: URL
+        do {
+            sourceURL = try URL(
+                resolvingBookmarkData: bookmarkData,
+                options: [],
+                relativeTo: nil,
+                bookmarkDataIsStale: &isStale
             )
-            entries.insert(app, at: 0)
-            try save(entries)
-            return app
         } catch {
-            try? fileManager.removeItem(at: destinationURL)
-            throw error
+            throw IPAImportError.sourceFileMissing
+        }
+        guard sourceURL.pathExtension.lowercased() == "ipa" else {
+            throw IPAImportError.sourceFileMissing
+        }
+        let securityScoped = sourceURL.startAccessingSecurityScopedResource()
+        defer { if securityScoped { sourceURL.stopAccessingSecurityScopedResource() } }
+        guard fileManager.fileExists(atPath: sourceURL.path),
+              fileManager.isReadableFile(atPath: sourceURL.path) else {
+            throw IPAImportError.sourceFileMissing
+        }
+        let metadata = try readMetadata(from: sourceURL)
+        let app = ImportedIPA(
+            bundleIdentifier: metadata.bundleIdentifier,
+            name: metadata.name,
+            version: metadata.version,
+            fileName: nil,
+            sourceBookmarkData: bookmarkData,
+            sourceURLString: nil,
+            importedAt: .now,
+            iconData: metadata.iconData
+        )
+        var entries = try importedApps()
+        if let previous = entries.first(where: { $0.bundleIdentifier == metadata.bundleIdentifier }) {
+            removeLegacyStoredIPA(previous)
+            entries.removeAll { $0.bundleIdentifier == metadata.bundleIdentifier }
+        }
+        entries.insert(app, at: 0)
+        try save(entries)
+        return app
+    }
+
+    func fileURL(for app: ImportedIPA) async throws -> URL {
+        let sourceURL: URL
+        var securityScoped = false
+        if let fileName = app.fileName {
+            sourceURL = directory.appendingPathComponent(fileName)
+        } else if let bookmarkData = app.sourceBookmarkData {
+            var isStale = false
+            do {
+                sourceURL = try URL(
+                    resolvingBookmarkData: bookmarkData,
+                    options: [],
+                    relativeTo: nil,
+                    bookmarkDataIsStale: &isStale
+                )
+            } catch {
+                throw IPAImportError.sourceFileMissing
+            }
+            securityScoped = sourceURL.startAccessingSecurityScopedResource()
+        } else if let sourceURLString = app.sourceURLString,
+                  let url = URL(string: sourceURLString), url.scheme?.lowercased() == "https" {
+            let (downloadURL, response) = try await BuzzheavierClient().download(from: url)
+            guard let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else {
+                try? fileManager.removeItem(at: downloadURL)
+                throw IPAImportError.sourceFileMissing
+            }
+            guard fileManager.isReadableFile(atPath: downloadURL.path) else {
+                try? fileManager.removeItem(at: downloadURL)
+                throw IPAImportError.sourceFileMissing
+            }
+            // URLSession has already materialized this temporary download.
+            // Return it directly; callers own and remove this temporary file.
+            return downloadURL
+        } else {
+            throw IPAImportError.sourceFileMissing
+        }
+        defer { if securityScoped { sourceURL.stopAccessingSecurityScopedResource() } }
+        guard fileManager.isReadableFile(atPath: sourceURL.path) else { throw IPAImportError.sourceFileMissing }
+        let temporaryURL = fileManager.temporaryDirectory
+            .appendingPathComponent(UUID().uuidString)
+            .appendingPathExtension("ipa")
+        do {
+            try fileManager.copyItem(at: sourceURL, to: temporaryURL)
+            return temporaryURL
+        } catch {
+            try? fileManager.removeItem(at: temporaryURL)
+            throw IPAImportError.sourceFileMissing
         }
     }
 
@@ -67,7 +159,12 @@ actor IPAImportStore {
         var entries = try importedApps()
         entries.removeAll { $0.bundleIdentifier == app.bundleIdentifier }
         try save(entries)
-        try? fileManager.removeItem(at: directory.appendingPathComponent(app.fileName))
+        removeLegacyStoredIPA(app)
+    }
+
+    private func removeLegacyStoredIPA(_ app: ImportedIPA) {
+        guard let fileName = app.fileName else { return }
+        try? fileManager.removeItem(at: directory.appendingPathComponent(fileName))
     }
 
     private func save(_ entries: [ImportedIPA]) throws {

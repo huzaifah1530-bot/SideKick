@@ -10,13 +10,13 @@ enum AppSharingError: LocalizedError {
     var errorDescription: String? {
         switch self {
         case .invalidUploadResponse:
-            return "Buzzheavier accepted the upload but returned an unrecognized link."
+            return "The upload service returned an unrecognized link."
         case .uploadFailed(let status):
-            return "Buzzheavier couldn’t upload this IPA (HTTP \(status)). Try again later."
+            return "The upload service couldn’t upload this IPA (HTTP \(status)). Try again later."
         case .downloadFailed(let status):
             return "The file host couldn’t provide this IPA (HTTP \(status)). Check the link and try again."
         case .invalidShareLink:
-            return "This SideKick share link is incomplete or invalid."
+            return "This SideKick link is invalid or has expired."
         case .insecureURL:
             return "For safety, SideKick only downloads IPA files from HTTPS links."
         }
@@ -54,6 +54,68 @@ struct BuzzheavierClient {
             throw AppSharingError.invalidUploadResponse
         }
         return shareURL
+    }
+
+    func resolveDownloadURL(from shareURL: URL) async throws -> URL {
+        guard let host = shareURL.host?.lowercased(),
+              host == "buzzheavier.com" || host == "www.buzzheavier.com" else { return shareURL }
+
+        var pageURL = shareURL
+        if shareURL.pathComponents.count == 2 {
+            var components = URLComponents(url: shareURL, resolvingAgainstBaseURL: false)
+            components?.path = "/d\(shareURL.path)"
+            pageURL = components?.url ?? shareURL
+        }
+        guard pageURL.pathComponents.count >= 3,
+              pageURL.pathComponents[1] == "d" else { return shareURL }
+
+        var request = URLRequest(url: pageURL.appendingPathComponent("download"))
+        request.setValue("true", forHTTPHeaderField: "HX-Request")
+        request.setValue(pageURL.absoluteString, forHTTPHeaderField: "HX-Current-URL")
+        request.setValue(pageURL.absoluteString, forHTTPHeaderField: "Referer")
+        request.setValue("SideKick", forHTTPHeaderField: "User-Agent")
+        // Do not allow URLSession to follow the download redirect here. If it
+        // does, `data(for:)` can buffer the entire IPA in memory just to learn
+        // its final URL. The redirect response contains the destination.
+        let session = URLSession(
+            configuration: .ephemeral,
+            delegate: RedirectBlockingDelegate(),
+            delegateQueue: nil
+        )
+        defer { session.invalidateAndCancel() }
+        let (_, response) = try await session.data(for: request)
+        guard let response = response as? HTTPURLResponse else {
+            throw AppSharingError.invalidShareLink
+        }
+
+        let redirect = response.value(forHTTPHeaderField: "HX-Redirect")
+            ?? response.value(forHTTPHeaderField: "Location")
+        guard let redirect,
+              let resolvedURL = URL(string: redirect, relativeTo: request.url)?.absoluteURL,
+              resolvedURL.scheme?.lowercased() == "https" else {
+            throw AppSharingError.invalidShareLink
+        }
+        return resolvedURL
+    }
+
+    func download(from shareURL: URL) async throws -> (URL, URLResponse) {
+        let downloadURL = try await resolveDownloadURL(from: shareURL)
+        var request = URLRequest(url: downloadURL)
+        request.setValue("SideKick", forHTTPHeaderField: "User-Agent")
+        request.setValue(shareURL.absoluteString, forHTTPHeaderField: "Referer")
+        return try await URLSession.shared.download(for: request)
+    }
+}
+
+private final class RedirectBlockingDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+    func urlSession(
+        _ session: URLSession,
+        task: URLSessionTask,
+        willPerformHTTPRedirection response: HTTPURLResponse,
+        newRequest request: URLRequest,
+        completionHandler: @escaping (URLRequest?) -> Void
+    ) {
+        completionHandler(nil)
     }
 }
 
@@ -111,5 +173,36 @@ enum SideKickShareLink {
         guard let data = Data(base64Encoded: value),
               let string = String(data: data, encoding: .utf8) else { return nil }
         return URL(string: string)
+    }
+}
+
+enum SideKickIncomingIPA {
+    static let importNotification = Notification.Name("SideKick.ImportIncomingIPA")
+    private static let pendingBookmarkKey = "sidekick.pending-import-ipa-bookmark"
+    private static let pendingErrorKey = "sidekick.pending-import-ipa-error"
+
+    static func handle(_ url: URL) -> Bool {
+        guard url.isFileURL, url.pathExtension.lowercased() == "ipa" else { return false }
+        let securityScoped = url.startAccessingSecurityScopedResource()
+        defer { if securityScoped { url.stopAccessingSecurityScopedResource() } }
+        if let bookmark = try? url.bookmarkData(options: [], includingResourceValuesForKeys: nil, relativeTo: nil) {
+            UserDefaults.standard.set(bookmark, forKey: pendingBookmarkKey)
+            UserDefaults.standard.removeObject(forKey: pendingErrorKey)
+        } else {
+            UserDefaults.standard.removeObject(forKey: pendingBookmarkKey)
+            UserDefaults.standard.set(IPAImportError.sourceBookmarkUnavailable.localizedDescription, forKey: pendingErrorKey)
+        }
+        NotificationCenter.default.post(name: importNotification, object: nil)
+        return true
+    }
+
+    static func consumePendingError() -> String? {
+        defer { UserDefaults.standard.removeObject(forKey: pendingErrorKey) }
+        return UserDefaults.standard.string(forKey: pendingErrorKey)
+    }
+
+    static func consumePendingBookmark() -> Data? {
+        defer { UserDefaults.standard.removeObject(forKey: pendingBookmarkKey) }
+        return UserDefaults.standard.data(forKey: pendingBookmarkKey)
     }
 }

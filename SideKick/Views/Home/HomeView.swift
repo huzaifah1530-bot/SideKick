@@ -24,9 +24,16 @@ struct HomeView: View {
     }
 
     private var filteredInstalledApps: [InstalledAppSummary] {
-        installedApps.filter {
+        let matches = installedApps.filter {
             viewModel.searchText.isEmpty || $0.name.localizedCaseInsensitiveContains(viewModel.searchText)
                 || $0.bundleIdentifier.localizedCaseInsensitiveContains(viewModel.searchText)
+        }
+        var seenBundleIDs = Set<String>()
+        return matches.filter { app in
+            let identifiers = [app.bundleIdentifier, app.resignedBundleIdentifier].map { $0.lowercased() }
+            guard !identifiers.contains(where: seenBundleIDs.contains) else { return false }
+            identifiers.forEach { seenBundleIDs.insert($0) }
+            return true
         }
     }
 
@@ -44,8 +51,8 @@ struct HomeView: View {
                     .listRowBackground(Color.clear)
                 }
 
-                if !filteredInstalledApps.isEmpty || !filteredImportedApps.isEmpty {
-                    SwiftUI.Section("Ready to Install") {
+                if !filteredInstalledApps.isEmpty {
+                    SwiftUI.Section("Installed") {
                         ForEach(filteredInstalledApps) { app in
                             NavigationLink {
                                 AppManagementView(installedApp: app)
@@ -53,6 +60,11 @@ struct HomeView: View {
                                 installedAppRow(app)
                             }
                         }
+                    }
+                }
+
+                if !filteredImportedApps.isEmpty {
+                    SwiftUI.Section("Ready to Install") {
                         ForEach(filteredImportedApps) { app in
                             NavigationLink {
                                 AppManagementView(importedApp: app) {
@@ -109,11 +121,16 @@ struct HomeView: View {
                     incomingShareURL = url
                     showingURLImport = true
                 }
+                await importPendingIPA()
             }
             .onReceive(NotificationCenter.default.publisher(for: SideKickShareLink.importNotification)) { notification in
-                guard let url = notification.userInfo?[SideKickShareLink.urlKey] as? URL else { return }
+                guard let url = SideKickShareLink.consumePendingURL()
+                    ?? (notification.userInfo?[SideKickShareLink.urlKey] as? URL) else { return }
                 incomingShareURL = url
                 showingURLImport = true
+            }
+            .onReceive(NotificationCenter.default.publisher(for: SideKickIncomingIPA.importNotification)) { _ in
+                Task { await importPendingIPA() }
             }
             .refreshable { await load() }
             .alert(viewModel.errorMessage == nil ? "IPA imported" : "Couldn’t import IPA", isPresented: Binding(
@@ -161,5 +178,21 @@ struct HomeView: View {
             accountStore: SigningAccountStore(),
             ipaStore: environment.ipaImportStore
         ).installedApps()
+    }
+
+    private func importPendingIPA() async {
+        if let error = SideKickIncomingIPA.consumePendingError() {
+            viewModel.errorMessage = error
+            return
+        }
+        guard let bookmark = SideKickIncomingIPA.consumePendingBookmark() else { return }
+        do {
+            let app = try await environment.ipaImportStore.importIPA(bookmarkData: bookmark)
+            viewModel.importedApps = try await environment.ipaImportStore.importedApps()
+            viewModel.noticeMessage = "\(app.name) is ready to install."
+        } catch {
+            viewModel.errorMessage = error.localizedDescription
+        }
+        await load()
     }
 }
