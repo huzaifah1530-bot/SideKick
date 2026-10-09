@@ -1,5 +1,6 @@
 import CoreData
 import Foundation
+import SideSign
 import UIKit
 
 @MainActor
@@ -14,18 +15,65 @@ final class SideStoreOperationService {
 
     func installedApps() async -> [InstalledAppSummary] {
         let context = DatabaseManager.shared.viewContext
-        return await context.perform {
-            InstalledApp.fetchActiveApps(in: context).compactMap { app in
+        let records = await context.perform {
+            let selfTeamIdentifier = ALTApplication(fileURL: Bundle.Info.activeBundleURL)?
+                .provisioningProfile?.teamIdentifier
+            let apps = (try? context.fetch(InstalledApp.fetchRequest())) ?? []
+            let selfApp = InstalledApp.fetchAltStore(in: context)
+            let candidates = apps.contains(where: { $0.bundleIdentifier == StoreApp.altstoreAppID })
+                ? apps
+                : apps + (selfApp.map { [$0] } ?? [])
+
+            if let selfApp, selfApp.team == nil,
+               let teamIdentifier = selfTeamIdentifier,
+               let ownerTeam = (try? context.fetch(Team.fetchRequest()))?.first(where: { $0.identifier == teamIdentifier }) {
+                selfApp.team = ownerTeam
+                try? context.save()
+            }
+
+            return candidates.compactMap { app -> (InstalledApp, String, String, String, String, String, String, String, String)? in
                 guard let team = app.team, let account = team.account else { return nil }
-                return InstalledAppSummary(
-                    bundleIdentifier: app.bundleIdentifier,
-                    name: app.name,
-                    accountEmail: account.appleID,
-                    accountIdentifier: account.identifier,
-                    teamIdentifier: team.identifier
+                let capacityDescription: String
+                if team.type == .free {
+                    let usedSlots = team.installedApps
+                        .filter(\.isActive)
+                        .reduce(0) { $0 + $1.requiredActiveSlots }
+                    let slotLimit = InstalledApp.freeAccountActiveAppsLimit
+                    let appIDsRemaining = max(Team.maximumFreeAppIDs - team.appIDs.count, 0)
+                    capacityDescription = "\(max(slotLimit - usedSlots, 0)) of \(slotLimit) free app slots left · \(appIDsRemaining) App IDs left"
+                } else {
+                    capacityDescription = "Developer account"
+                }
+                return (
+                    app,
+                    app.bundleIdentifier,
+                    app.resignedBundleIdentifier,
+                    app.name,
+                    app.version,
+                    account.appleID,
+                    account.identifier,
+                    team.identifier,
+                    capacityDescription
                 )
-            }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+            }
         }
+
+        var summaries: [InstalledAppSummary] = []
+        for record in records {
+            let iconData = try? await record.0.loadIcon()?.pngData()
+            summaries.append(InstalledAppSummary(
+                bundleIdentifier: record.1,
+                resignedBundleIdentifier: record.2,
+                name: record.3,
+                version: record.4,
+                accountEmail: record.5,
+                accountIdentifier: record.6,
+                teamIdentifier: record.7,
+                iconData: iconData,
+                capacityDescription: record.8
+            ))
+        }
+        return summaries.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     func install(_ ipa: ImportedIPA, using account: SigningAccountSummary) async throws {
@@ -51,7 +99,8 @@ final class SideStoreOperationService {
         }
         let context = DatabaseManager.shared.viewContext
         guard let installedApp = try await context.perform({
-            InstalledApp.fetchActiveApps(in: context).first { $0.bundleIdentifier == bundleIdentifier }
+            (try? context.fetch(InstalledApp.fetchRequest()))?.first { $0.bundleIdentifier == bundleIdentifier }
+                ?? InstalledApp.fetchAltStore(in: context).flatMap { $0.bundleIdentifier == bundleIdentifier ? $0 : nil }
         }), let team = installedApp.team, let account = team.account else {
             throw SideStoreOperationError.installedAppUnavailable
         }
@@ -76,10 +125,14 @@ final class SideStoreOperationService {
 
 struct InstalledAppSummary: Identifiable {
     let bundleIdentifier: String
+    let resignedBundleIdentifier: String
     let name: String
+    let version: String
     let accountEmail: String
     let accountIdentifier: String
     let teamIdentifier: String
+    let iconData: Data?
+    let capacityDescription: String
 
     var id: String { bundleIdentifier }
 }

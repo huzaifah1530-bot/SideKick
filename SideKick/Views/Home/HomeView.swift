@@ -1,33 +1,52 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import UIKit
 
 struct HomeView: View {
     @State var viewModel: HomeViewModel
-    var onOpenLibrary: () -> Void = {}
     @State private var showingImporter = false
+    @State private var installedApps: [InstalledAppSummary] = []
+    @Environment(AppEnvironment.self) private var environment
+
+    private var capacityRows: [InstalledAppSummary] {
+        var seen = Set<String>()
+        return installedApps.filter { seen.insert($0.teamIdentifier).inserted }
+    }
 
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    Text("Sideload apps with your Apple ID.")
-                        .font(.title3)
-                        .foregroundStyle(.secondary)
+                Section("Installed") {
+                    if installedApps.isEmpty {
+                        ContentUnavailableView(
+                            "No installed apps yet",
+                            systemImage: "square.stack.3d.up",
+                            description: Text("Import an IPA from Library to get started.")
+                        )
                         .listRowBackground(Color.clear)
-
-                    SwiftUI.Button {
-                        showingImporter = true
-                    } label: {
-                        Label(viewModel.isImporting ? "Importing…" : "Import IPA", systemImage: "square.and.arrow.down")
+                    } else {
+                        ForEach(installedApps) { app in
+                            NavigationLink {
+                                AppManagementView(installedApp: app)
+                            } label: {
+                                installedAppRow(app)
+                            }
+                        }
                     }
-                    .disabled(viewModel.isImporting)
-                    .listRowBackground(Color.clear)
                 }
 
-                SwiftUI.Button(action: onOpenLibrary) {
-                    Label("Browse Library", systemImage: "square.stack.3d.up")
+                Section("Account capacity") {
+                    if capacityRows.isEmpty {
+                        Text("Add an Apple Account to see capacity.")
+                            .foregroundStyle(.secondary)
+                    } else {
+                        ForEach(capacityRows, id: \.teamIdentifier) { account in
+                            LabeledContent(account.accountEmail, value: account.capacityDescription)
+                        }
+                    }
+                } footer: {
+                    Text("Capacity reflects apps and App IDs recorded by SideKick. iOS doesn’t provide a reliable list of apps installed by other sideloaders.")
                 }
-                .listRowBackground(Color.clear)
             }
             .listStyle(.insetGrouped)
             .background(Color(uiColor: .systemGroupedBackground))
@@ -51,7 +70,8 @@ struct HomeView: View {
                     viewModel.errorMessage = error.localizedDescription
                 }
             }
-            .task { await viewModel.load() }
+            .task { await load() }
+            .refreshable { await load() }
             .alert(viewModel.errorMessage == nil ? "Added to library" : "Couldn’t import IPA", isPresented: Binding(
                 get: { viewModel.errorMessage != nil || viewModel.noticeMessage != nil },
                 set: { if !$0 { viewModel.errorMessage = nil; viewModel.noticeMessage = nil } }
@@ -61,5 +81,44 @@ struct HomeView: View {
                 Text(viewModel.errorMessage ?? viewModel.noticeMessage ?? "")
             }
         }
+    }
+
+    @ViewBuilder
+    private func installedAppRow(_ app: InstalledAppSummary) -> some View {
+        HStack(spacing: 12) {
+            if let data = app.iconData, let icon = UIImage(data: data) {
+                Image(uiImage: icon)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 56, height: 56)
+                    .clipShape(.rect(cornerRadius: 12))
+            } else {
+                Image(systemName: "app.fill")
+                    .font(.system(size: 28))
+                    .foregroundStyle(.white)
+                    .frame(width: 56, height: 56)
+                    .background(.blue.gradient, in: .rect(cornerRadius: 12))
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(app.name).font(.body.weight(.semibold))
+                Text("\(app.accountEmail) · Version \(app.version)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 4)
+            Image(systemName: "chevron.right")
+                .font(.footnote.weight(.semibold))
+                .foregroundStyle(.tertiary)
+        }
+        .padding(.vertical, 4)
+    }
+
+    private func load() async {
+        await viewModel.load()
+        installedApps = await SideStoreOperationService(
+            accountStore: SigningAccountStore(),
+            ipaStore: environment.ipaImportStore
+        ).installedApps()
     }
 }

@@ -2,32 +2,43 @@ import SwiftUI
 
 struct ContentView: View {
     @Environment(AppEnvironment.self) private var environment
+    @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab = 0
+    @State private var setupStatus = SetupStatus()
 
     var body: some View {
         Group {
             if case .ready = environment.databaseState {
-                TabView(selection: $selectedTab) {
-                    HomeView(viewModel: HomeViewModel(store: environment.ipaImportStore)) {
-                        selectedTab = 1
+                if setupStatus.isReady {
+                    TabView(selection: $selectedTab) {
+                        HomeView(viewModel: HomeViewModel(store: environment.ipaImportStore))
+                            .tabItem { Label("SideKick", systemImage: "bolt.fill") }
+                            .tag(0)
+                        LibraryView(viewModel: HomeViewModel(store: environment.ipaImportStore))
+                            .tabItem { Label("Library", systemImage: "square.stack.3d.up.fill") }
+                            .tag(1)
+                        AccountsView()
+                            .tabItem { Label("Accounts", systemImage: "person.2.fill") }
+                            .tag(2)
+                        SettingsView()
+                            .tabItem { Label("Settings", systemImage: "gearshape.fill") }
+                            .tag(3)
                     }
-                        .tabItem { Label("SideKick", systemImage: "bolt.fill") }
-                        .tag(0)
-                    LibraryView(viewModel: HomeViewModel(store: environment.ipaImportStore))
-                        .tabItem { Label("Library", systemImage: "square.stack.3d.up.fill") }
-                        .tag(1)
-                    AccountsView()
-                        .tabItem { Label("Accounts", systemImage: "person.2.fill") }
-                        .tag(2)
-                    SettingsView()
-                        .tabItem { Label("Settings", systemImage: "gearshape.fill") }
-                        .tag(3)
+                } else {
+                    RequiredSetupView(status: setupStatus)
                 }
             } else {
                 databaseStatusView
             }
         }
-        .task { await environment.startDatabase() }
+        .task {
+            await environment.startDatabase()
+            await setupStatus.refresh()
+        }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active, case .ready = environment.databaseState else { return }
+            Task { await setupStatus.refresh() }
+        }
     }
 
     @ViewBuilder

@@ -95,7 +95,7 @@ actor IPAImportStore {
 
         var plistData = Data()
         do {
-            try archive.extract(entry) { chunk in plistData.append(chunk) }
+            _ = try archive.extract(entry) { chunk in plistData.append(chunk) }
         } catch {
             throw IPAImportError.invalidArchive
         }

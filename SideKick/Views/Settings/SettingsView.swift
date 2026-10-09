@@ -64,6 +64,7 @@ struct SettingsView: View {
     private func importPairingFile(_ result: Result<[URL], Error>) async {
         do {
             guard let url = try result.get().first else { return }
+            UserDefaults.standard.set(false, forKey: "sidekick.setup.pairing-verified")
             try PairingFileManager.shared.importPairingFile(from: url)
             guard let pairingContent = PairingFileManager.shared.fetchPairingFile() else {
                 throw PairingSetupError.unreadableFile
@@ -72,6 +73,7 @@ struct SettingsView: View {
             do {
                 try await ensureMinimuxerReady()
                 _ = try await fetchUDID(forceLive: true)
+                UserDefaults.standard.set(true, forKey: "sidekick.setup.pairing-verified")
                 pairingStatus = "Pairing is set up and SideKick can reach this iPhone. Install and refresh are ready."
             } catch {
                 pairingStatus = "Pairing file imported. SideKick couldn’t reach the iPhone yet. Connect to Wi-Fi, open LocalDevVPN, tap Connect, then retry an install or refresh.\n\n\(error.localizedDescription)"

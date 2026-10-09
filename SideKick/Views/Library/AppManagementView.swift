@@ -38,7 +38,7 @@ struct AppManagementView: View {
                     VStack(alignment: .leading, spacing: 5) {
                         Text(appName)
                             .font(.title3.weight(.bold))
-                        Text(importedApp.map { "Version \($0.version)" } ?? "Installed")
+                        Text(importedApp.map { "Version \($0.version)" } ?? installedApp.map { "Version \($0.version)" } ?? "Installed")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
@@ -90,8 +90,18 @@ struct AppManagementView: View {
                     }
                 } else if let installedApp {
                     SwiftUI.Button {
+                        UIApplication.shared.open(InstalledApp.openAppURL(targetBundleIdentifier: installedApp.resignedBundleIdentifier))
+                    } label: {
+                        Text("Open")
+                            .fontWeight(.semibold)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.capsule)
+
+                    SwiftUI.Button {
                         Task { await refresh(installedApp) }
-                        } label: {
+                    } label: {
                             HStack {
                                 if isWorking { ProgressView() }
                                 else { Text("Refresh").fontWeight(.semibold) }
@@ -130,7 +140,7 @@ struct AppManagementView: View {
 
     @ViewBuilder
     private var appIcon: some View {
-        if let data = importedApp?.iconData, let icon = UIImage(data: data) {
+        if let data = importedApp?.iconData ?? installedApp?.iconData, let icon = UIImage(data: data) {
             Image(uiImage: icon).resizable().scaledToFit()
         } else {
             Image(systemName: "app.fill")

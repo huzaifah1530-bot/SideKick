@@ -28,9 +28,9 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: com.sidekick.app
         INFOPLIST_KEY_CFBundleDisplayName: SideKick
         PRODUCT_NAME: SideKick
-        INFOPLIST_FILE: SideKick/Info.plist
+        INFOPLIST_FILE: $(SRCROOT)/SideKick/Info.plist
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
-        GENERATE_INFOPLIST_FILE: NO
+        GENERATE_INFOPLIST_FILE: YES
         TARGETED_DEVICE_FAMILY: "1,2"
     scheme:
       testTargets: []
