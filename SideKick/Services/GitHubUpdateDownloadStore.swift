@@ -3,6 +3,8 @@ import Observation
 
 struct GitHubUpdateDownloadJob: Equatable {
     var progress: Double?
+    var bytesWritten: Int64
+    var totalBytesExpected: Int64?
     var isDownloading: Bool
     var queuedIPA: ImportedIPA?
     var errorMessage: String?
@@ -23,6 +25,8 @@ final class GitHubUpdateDownloadStore {
         guard tasks[candidate.id] == nil else { return }
         jobs[candidate.id] = GitHubUpdateDownloadJob(
             progress: 0,
+            bytesWritten: 0,
+            totalBytesExpected: nil,
             isDownloading: true,
             queuedIPA: nil,
             errorMessage: nil
@@ -44,6 +48,8 @@ final class GitHubUpdateDownloadStore {
                 )
                 self.jobs[candidate.id] = GitHubUpdateDownloadJob(
                     progress: 1,
+                    bytesWritten: self.jobs[candidate.id]?.bytesWritten ?? 0,
+                    totalBytesExpected: self.jobs[candidate.id]?.totalBytesExpected,
                     isDownloading: false,
                     queuedIPA: queuedIPA,
                     errorMessage: nil
@@ -51,6 +57,8 @@ final class GitHubUpdateDownloadStore {
             } catch {
                 self.jobs[candidate.id] = GitHubUpdateDownloadJob(
                     progress: nil,
+                    bytesWritten: self.jobs[candidate.id]?.bytesWritten ?? 0,
+                    totalBytesExpected: self.jobs[candidate.id]?.totalBytesExpected,
                     isDownloading: false,
                     queuedIPA: nil,
                     errorMessage: error.localizedDescription
@@ -67,9 +75,11 @@ final class GitHubUpdateDownloadStore {
         jobs[candidate.id] = nil
     }
 
-    private func setProgress(_ progress: Double?, for identifier: String) {
+    private func setProgress(_ downloadProgress: GitHubDownloadProgress, for identifier: String) {
         guard var job = jobs[identifier], job.isDownloading else { return }
-        job.progress = progress
+        job.progress = downloadProgress.fractionCompleted
+        job.bytesWritten = downloadProgress.bytesWritten
+        job.totalBytesExpected = downloadProgress.totalBytesExpected
         jobs[identifier] = job
     }
 }

@@ -29,8 +29,12 @@ struct GitHubUpdateRow: View {
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(downloadJob?.isDownloading == true ? Color.sideKickAccent : .blue)
             }
-            if let progress = downloadJob?.progress, downloadJob?.isDownloading == true {
-                DownloadProgressBar(progress: progress).frame(height: 3)
+            if let job = downloadJob, job.isDownloading {
+                if let progress = job.progress {
+                    DownloadProgressBar(progress: progress).frame(height: 3)
+                } else {
+                    ProgressView().progressViewStyle(.linear)
+                }
             }
         }
         .padding(.vertical, 5)
@@ -39,7 +43,14 @@ struct GitHubUpdateRow: View {
     private var updateStatus: String {
         guard let job = downloadJob else { return "Update available · \(candidate.newVersion)" }
         if job.isDownloading {
-            return job.progress.map { "Downloading · \(Int($0 * 100))%" } ?? "Downloading…"
+            let transferred = job.bytesWritten > 0
+                ? ByteCountFormatter.string(fromByteCount: job.bytesWritten, countStyle: .file)
+                : nil
+            if let progress = job.progress {
+                let percent = progress > 0 && progress < 0.01 ? "<1%" : String(format: "%.1f%%", progress * 100)
+                return "Downloading · \(percent)" + (transferred.map { " · \($0)" } ?? "")
+            }
+            return transferred.map { "Downloading · \($0)" } ?? "Downloading…"
         }
         if job.queuedIPA != nil { return "Downloaded · Ready to update" }
         if job.errorMessage != nil { return "Download failed · Tap to retry" }
@@ -105,11 +116,17 @@ struct GitHubUpdateDetailView: View {
                         HStack {
                             Text("Downloading IPA…").font(.body.weight(.medium))
                             Spacer()
-                            if let progress = job.progress { Text("\(Int(progress * 100))%") }
+                            if let progress = job.progress {
+                                Text(progress > 0 && progress < 0.01 ? "<1%" : String(format: "%.1f%%", progress * 100))
+                            }
                             else { ProgressView().controlSize(.small) }
                         }
                         Text("You can leave this page; the download will continue.")
                             .font(.footnote).foregroundStyle(.secondary)
+                        if job.bytesWritten > 0 {
+                            Text("Downloaded \(ByteCountFormatter.string(fromByteCount: job.bytesWritten, countStyle: .file))")
+                                .font(.footnote.monospacedDigit()).foregroundStyle(.secondary)
+                        }
                     }
                     .padding(16)
                     .padding(.bottom, 8)
@@ -118,6 +135,10 @@ struct GitHubUpdateDetailView: View {
                         if let progress = job.progress {
                             DownloadProgressBar(progress: progress)
                                 .frame(height: 3)
+                                .padding(.horizontal, 14)
+                                .padding(.bottom, 8)
+                        } else {
+                            ProgressView().progressViewStyle(.linear)
                                 .padding(.horizontal, 14)
                                 .padding(.bottom, 8)
                         }

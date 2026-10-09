@@ -81,7 +81,7 @@ actor GitHubUpdateService {
     func downloadIPA(
         for candidate: GitHubUpdateCandidate,
         token: String? = nil,
-        onProgress: @escaping @Sendable (Double?) -> Void = { _ in }
+        onProgress: @escaping @Sendable (GitHubDownloadProgress) -> Void = { _ in }
     ) async throws -> URL {
         var request = URLRequest(url: candidate.downloadURL)
         request.setValue(candidate.source == .latestRelease ? "application/octet-stream" : "application/vnd.github+json", forHTTPHeaderField: "Accept")
@@ -166,9 +166,9 @@ actor GitHubUpdateService {
 }
 
 private final class GitHubDownloadProgressDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
-    private let onProgress: @Sendable (Double?) -> Void
+    private let onProgress: @Sendable (GitHubDownloadProgress) -> Void
 
-    init(onProgress: @escaping @Sendable (Double?) -> Void) {
+    init(onProgress: @escaping @Sendable (GitHubDownloadProgress) -> Void) {
         self.onProgress = onProgress
     }
 
@@ -179,13 +179,23 @@ private final class GitHubDownloadProgressDelegate: NSObject, URLSessionDownload
         totalBytesWritten: Int64,
         totalBytesExpectedToWrite: Int64
     ) {
-        let progress = totalBytesExpectedToWrite > 0
-            ? min(max(Double(totalBytesWritten) / Double(totalBytesExpectedToWrite), 0), 1)
-            : nil
-        onProgress(progress)
+        onProgress(GitHubDownloadProgress(
+            bytesWritten: totalBytesWritten,
+            totalBytesExpected: totalBytesExpectedToWrite > 0 ? totalBytesExpectedToWrite : nil
+        ))
     }
 
     func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) { }
+}
+
+struct GitHubDownloadProgress: Sendable {
+    let bytesWritten: Int64
+    let totalBytesExpected: Int64?
+
+    var fractionCompleted: Double? {
+        guard let totalBytesExpected, totalBytesExpected > 0 else { return nil }
+        return min(max(Double(bytesWritten) / Double(totalBytesExpected), 0), 1)
+    }
 }
 
 enum GitHubUpdateError: LocalizedError {
