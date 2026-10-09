@@ -1,0 +1,16 @@
+diff --git a/SideStore/Core/Operations/PipelineOperations/UpdateAppCertificateOperation.swift b/SideStore/Core/Operations/PipelineOperations/UpdateAppCertificateOperation.swift
+index 89411573..8c165f20 100644
+--- a/SideStore/Core/Operations/PipelineOperations/UpdateAppCertificateOperation.swift
++++ b/SideStore/Core/Operations/PipelineOperations/UpdateAppCertificateOperation.swift
+@@ -35,11 +34,0 @@
+-            } else if let serialNumber = self.context.installedApp?.certificateSerialNumber,
+-                      let customCert = CertificateManager.shared.getSignableCertificate(for: serialNumber) {
+-                self.context.overrideSigningCertificate = customCert
+-            }
+-        } else if let installedApp = self.context.installedApp, let serialNumber = installedApp.certificateSerialNumber {
+-            debugLog("[UpdateAppCertificateOperation] InstalledApp '\(installedApp.name)' has custom certificate serial: '\(serialNumber)'")
+-            if let customCert = CertificateManager.shared.getSignableCertificate(for: serialNumber) {
+-                debugLog("[UpdateAppCertificateOperation] Loaded custom certificate '\(customCert.serialNumber)' for app '\(installedApp.name)'. Setting context.overrideSigningCertificate.")
+-                self.context.overrideSigningCertificate = customCert
+-            } else {
+-                debugLog("[UpdateAppCertificateOperation] WARNING: Signable certificate with serial '\(serialNumber)' not found for app '\(installedApp.name)'.")

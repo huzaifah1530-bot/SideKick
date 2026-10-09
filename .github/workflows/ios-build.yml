@@ -44,6 +44,9 @@ jobs:
       - name: Classify the certificate being checked for install errors
         run: git -C Vendor/SideStore apply --unidiff-zero ../../patches/sidestore-certificate-error-classification.patch
 
+      - name: Use the selected account certificate instead of stale per-app certificate records
+        run: git -C Vendor/SideStore apply --unidiff-zero ../../patches/sidestore-use-account-certificate-for-refresh.patch
+
       - name: Apply Swift compiler workaround
         run: git -C Vendor/SideStore apply ../../patches/sidestore-compiler-workarounds.patch
 

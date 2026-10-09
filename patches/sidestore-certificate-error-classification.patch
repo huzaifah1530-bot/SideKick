@@ -1,14 +1,15 @@
 diff --git a/SideStore/Core/Operations/PipelineOperations/VerifyCertificateOperation.swift b/SideStore/Core/Operations/PipelineOperations/VerifyCertificateOperation.swift
-index 01054d10..3924aae1 100644
+index 01054d10..0485a2ae 100644
 --- a/SideStore/Core/Operations/PipelineOperations/VerifyCertificateOperation.swift
 +++ b/SideStore/Core/Operations/PipelineOperations/VerifyCertificateOperation.swift
 @@ -70 +70 @@ final class VerifyCertificateOperation: BasePipelineOperation<InstallAppOperatio
 -                try processValidationResult(result, description: "Target bundle binary certificate", appName: appName, team: team)
-+                try processValidationResult(result, certificate: lastSigningCert, description: "Target bundle binary certificate", appName: appName, team: team)
-@@ -84 +84 @@ final class VerifyCertificateOperation: BasePipelineOperation<InstallAppOperatio
++                try processValidationResult(result, certificate: lastSigningCert, allowsCustomCertificateMessage: false, description: "Target bundle binary certificate", appName: appName, team: team)
+@@ -84 +84,2 @@ final class VerifyCertificateOperation: BasePipelineOperation<InstallAppOperatio
 -                try processValidationResult(result, description: "Target signing certificate", appName: appName, team: team)
-+                try processValidationResult(result, certificate: target.x509, description: "Target signing certificate", appName: appName, team: team)
-@@ -167,18 +167,11 @@ final class VerifyCertificateOperation: BasePipelineOperation<InstallAppOperatio
++                let isExplicitOverride = self.context.overrideSigningCertificate?.serialNumber == target.serialNumber
++                try processValidationResult(result, certificate: target.x509, allowsCustomCertificateMessage: isExplicitOverride, description: "Target signing certificate", appName: appName, team: team)
+@@ -167,18 +168,14 @@ final class VerifyCertificateOperation: BasePipelineOperation<InstallAppOperatio
 -    private func processValidationResult(_ result: CertificateStatus, description: String, appName: String, team: ALTTeam) throws {
 -        // Check if there is a team ID mismatch with the active certificate
 -        var activeTeamID: String? = nil
@@ -27,9 +28,12 @@ index 01054d10..3924aae1 100644
 -                    }
 -                }
 -            }
-+    private func processValidationResult(_ result: CertificateStatus, certificate: ALTX509Certificate, description: String, appName: String, team: ALTTeam) throws {
-+        // Classify the certificate being checked, not a separate globally active certificate.
++    private func processValidationResult(_ result: CertificateStatus, certificate: ALTX509Certificate, allowsCustomCertificateMessage: Bool, description: String, appName: String, team: ALTTeam) throws {
++        // Only app-specific signing overrides may use the custom-certificate diagnostic.
++        // An app's existing/embedded certificate or the account's ordinary signing certificate
++        // must not be mislabeled as a custom certificate based on parsed team text alone.
 +        let customTeamID: String? = {
++            guard allowsCustomCertificateMessage else { return nil }
 +            guard let data = certificate.data else { return nil }
 +            let details = parseCertificate(derData: data)
 +            let belongsToAuthenticatedTeam = details.subject.contains(team.identifier) || details.issuer.contains(team.identifier)
@@ -38,15 +42,15 @@ index 01054d10..3924aae1 100644
 +                .first(where: { $0.hasPrefix("Organizational Unit=") })?
 +                .replacingOccurrences(of: "Organizational Unit=", with: "") ?? "Unknown Custom Team"
 +        }()
-@@ -195 +188 @@ final class VerifyCertificateOperation: BasePipelineOperation<InstallAppOperatio
+@@ -195 +192 @@ final class VerifyCertificateOperation: BasePipelineOperation<InstallAppOperatio
 -            if isCustomCertActive {
 +            if let customTeamID {
-@@ -198 +191 @@ final class VerifyCertificateOperation: BasePipelineOperation<InstallAppOperatio
+@@ -198 +195 @@ final class VerifyCertificateOperation: BasePipelineOperation<InstallAppOperatio
 -                    activeTeam: activeTeamID ?? "Unknown Custom Team"
 +                    activeTeam: customTeamID
-@@ -204 +197 @@ final class VerifyCertificateOperation: BasePipelineOperation<InstallAppOperatio
+@@ -204 +201 @@ final class VerifyCertificateOperation: BasePipelineOperation<InstallAppOperatio
 -            if isCustomCertActive {
 +            if let customTeamID {
-@@ -207 +200 @@ final class VerifyCertificateOperation: BasePipelineOperation<InstallAppOperatio
+@@ -207 +204 @@ final class VerifyCertificateOperation: BasePipelineOperation<InstallAppOperatio
 -                    activeTeam: activeTeamID ?? "Unknown Custom Team"
 +                    activeTeam: customTeamID
