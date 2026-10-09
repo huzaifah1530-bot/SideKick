@@ -23,7 +23,7 @@ struct LibraryView: View {
                 }
 
                 if !filteredApps.isEmpty {
-                    Section("Imported") {
+                    SwiftUI.Section("Imported") {
                         ForEach(filteredApps) { app in
                             NavigationLink {
                                 AppManagementView(importedApp: app) {
@@ -41,8 +41,12 @@ struct LibraryView: View {
             .background(Color(uiColor: .systemGroupedBackground))
             .searchable(text: $query, prompt: "Search apps")
             .navigationTitle("Library")
-            .task { await viewModel.load() }
-            .refreshable { await viewModel.load() }
+            .task { await load() }
+            .refreshable { await load() }
         }
+    }
+
+    private func load() async {
+        await viewModel.load()
     }
 }

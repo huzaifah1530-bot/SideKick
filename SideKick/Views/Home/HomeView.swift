@@ -16,7 +16,7 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Installed") {
+                SwiftUI.Section("Installed") {
                     if installedApps.isEmpty {
                         ContentUnavailableView(
                             "No installed apps yet",
@@ -35,7 +35,7 @@ struct HomeView: View {
                     }
                 }
 
-                Section("Account capacity") {
+                SwiftUI.Section("Account capacity") {
                     if capacityRows.isEmpty {
                         Text("Add an Apple Account to see capacity.")
                             .foregroundStyle(.secondary)

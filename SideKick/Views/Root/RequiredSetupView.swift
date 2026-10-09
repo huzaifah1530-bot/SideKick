@@ -190,7 +190,7 @@ struct RequiredSetupView: View {
                     Link("How to create a pairing file", destination: AppConstants.URLs.pairingDocumentation)
 
                     if !status.pairingVerified && status.vpnInstalled && PairingFileManager.shared.hasPairingFile() {
-                        Button {
+                        SwiftUI.Button {
                             UIApplication.shared.open(vpnURL)
                             Task { try? await Task.sleep(for: .seconds(2)); await status.verifyPairing() }
                         } label: {
@@ -213,7 +213,7 @@ struct RequiredSetupView: View {
                     Text("iOS controls notifications and Background App Refresh. SideKick can check these settings and guide you to change them, but it can’t turn them on for you.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                    Button("Check Setup Again") { Task { await status.refresh() } }
+                    SwiftUI.Button("Check Setup Again") { Task { await status.refresh() } }
                 }
             }
             .listStyle(.insetGrouped)
@@ -239,7 +239,7 @@ struct RequiredSetupView: View {
                 get: { status.message != nil },
                 set: { if !$0 { status.message = nil } }
             )) {
-                Button("OK", role: .cancel) { status.message = nil }
+                SwiftUI.Button("OK", role: .cancel) { status.message = nil }
             } message: {
                 Text(status.message ?? "")
             }
@@ -261,7 +261,7 @@ struct RequiredSetupView: View {
                     .frame(width: 26)
                 Text(title).font(.body.weight(.medium))
                 Spacer()
-                Button(action: action) { Text(label()).font(.subheadline.weight(.semibold)) }
+                SwiftUI.Button(action: action) { Text(label()).font(.subheadline.weight(.semibold)) }
                     .buttonStyle(.borderless)
             }
             Text(detail)

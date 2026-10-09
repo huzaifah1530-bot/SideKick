@@ -19,7 +19,7 @@ struct SettingsView: View {
 
                 Section("Device pairing") {
                     LabeledContent("Pairing file", value: PairingFileManager.shared.hasPairingFile() ? "Added" : "Not set up")
-                    Button("Import pairing file…") { isChoosingPairingFile = true }
+                    SwiftUI.Button("Import pairing file…") { isChoosingPairingFile = true }
                     Link("How to get a pairing file", destination: AppConstants.URLs.pairingDocumentation)
                     Text("This file is a trust record for this iPhone, created once using a computer and iLoader. Import it here. SideStore itself is not required.")
                         .font(.footnote)
@@ -53,7 +53,7 @@ struct SettingsView: View {
                 Task { await importPairingFile(result) }
             }
             .alert("Device pairing", isPresented: $isShowingPairingStatus) {
-                Button("OK", role: .cancel) { pairingStatus = nil }
+                SwiftUI.Button("OK", role: .cancel) { pairingStatus = nil }
             } message: {
                 Text(pairingStatus ?? "")
             }
