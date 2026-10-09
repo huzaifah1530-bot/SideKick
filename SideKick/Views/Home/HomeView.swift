@@ -7,26 +7,38 @@ struct HomeView: View {
 
     var body: some View {
         NavigationStack {
-            ScrollView {
-                VStack(alignment: .leading, spacing: 24) {
-                    capabilityCard
-                    librarySection
+            List {
+                Section {
+                    SwiftUI.Button {
+                        showingImporter = true
+                    } label: {
+                        Label(viewModel.isImporting ? "Importing…" : "Import IPA", systemImage: "square.and.arrow.down")
+                    }
+                    .disabled(viewModel.isImporting)
                 }
-                .padding(.horizontal, 20)
-                .padding(.top, 8)
-                .padding(.bottom, 110)
+
+                if !viewModel.importedApps.isEmpty {
+                    Section("Recently Added") {
+                        ForEach(viewModel.importedApps.prefix(5)) { app in
+                            NavigationLink {
+                                AppManagementView(importedApp: app)
+                            } label: {
+                                ImportedIPARow(app: app)
+                            }
+                        }
+                    }
+                }
             }
-            .background(Color.sideKickCanvas)
-            .navigationTitle("SideKick")
-            .navigationBarTitleDisplayMode(.large)
+            .listStyle(.insetGrouped)
+            .background(Color(uiColor: .systemGroupedBackground))
+            .navigationTitle("Today")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    SwiftUI.Button { showingImporter = true } label: {
+                    SwiftUI.Button {
+                        showingImporter = true
+                    } label: {
                         Image(systemName: "plus")
-                            .font(.body.weight(.semibold))
                     }
-                    .buttonStyle(.glassProminent)
-                    .tint(.sideKickBlue)
                     .accessibilityLabel("Import IPA")
                 }
             }
@@ -45,49 +57,8 @@ struct HomeView: View {
                 set: { if !$0 { viewModel.errorMessage = nil; viewModel.noticeMessage = nil } }
             )) {
                 SwiftUI.Button("OK", role: .cancel) { }
-            } message: { Text(viewModel.errorMessage ?? viewModel.noticeMessage ?? "") }
-        }
-    }
-
-    private var capabilityCard: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Label("IPA LIBRARY READY · ENGINE INTEGRATION IN PROGRESS", systemImage: "shippingbox.fill")
-                .font(.caption.weight(.bold)).foregroundStyle(.secondary)
-            Text("Bring your IPA files into SideKick")
-                .font(.title3.weight(.bold))
-            Text("Your IPA files are stored in your library. Sign in with an Apple ID, then open an app in Library to install or refresh it. Device pairing and LocalDevVPN setup may be required on the first device setup.")
-                .font(.subheadline).foregroundStyle(.secondary)
-            SwiftUI.Button { showingImporter = true } label: {
-                Label(viewModel.isImporting ? "Importing…" : "Choose an IPA", systemImage: "square.and.arrow.down")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .controlSize(.large)
-            .disabled(viewModel.isImporting)
-        }
-        .padding(20)
-        .background(.blue.opacity(0.10), in: .rect(cornerRadius: 24))
-    }
-
-    private var librarySection: some View {
-        VStack(alignment: .leading, spacing: 14) {
-            HStack {
-                Text("Imported IPAs").font(.title2.weight(.bold))
-                Spacer()
-                Text("\(viewModel.importedApps.count)").foregroundStyle(.secondary)
-            }
-
-            if viewModel.importedApps.isEmpty {
-                ContentUnavailableView("No IPAs yet", systemImage: "square.and.arrow.down", description: Text("Choose an IPA file to add it to your library."))
-                    .padding(.vertical, 14)
-            } else {
-                ForEach(viewModel.importedApps) { app in
-                    NavigationLink {
-                        AppManagementView(importedApp: app)
-                    } label: {
-                        ImportedIPARow(app: app)
-                    }
-                }
+            } message: {
+                Text(viewModel.errorMessage ?? viewModel.noticeMessage ?? "")
             }
         }
     }

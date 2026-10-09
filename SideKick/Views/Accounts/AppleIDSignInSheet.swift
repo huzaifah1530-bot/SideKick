@@ -20,13 +20,7 @@ struct AppleIDSignInSheet: View {
                 } header: {
                     Text("Apple Account")
                 } footer: {
-                    Text("Credentials are used only to authenticate this Apple ID and are saved in this device’s Keychain after successful authentication.")
-                }
-
-                Section {
-                    Label("Two-factor verification and device setup may still show Apple’s security prompts.", systemImage: "lock.shield")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                    Text("Your credentials are saved securely on this device after sign-in.")
                 }
             }
             .navigationTitle("Sign In")

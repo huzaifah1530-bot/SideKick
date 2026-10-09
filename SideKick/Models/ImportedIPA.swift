@@ -7,6 +7,7 @@ struct ImportedIPA: Codable, Identifiable, Hashable, Sendable {
     let version: String
     let fileName: String
     let importedAt: Date
+    let iconData: Data?
 
     var formattedImportDate: String {
         importedAt.formatted(date: .abbreviated, time: .omitted)

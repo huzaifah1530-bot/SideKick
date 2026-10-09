@@ -51,7 +51,8 @@ actor IPAImportStore {
                 name: metadata.name,
                 version: metadata.version,
                 fileName: storedName,
-                importedAt: .now
+                importedAt: .now,
+                iconData: metadata.iconData
             )
             entries.insert(app, at: 0)
             try save(entries)
@@ -76,7 +77,7 @@ actor IPAImportStore {
         try encoder.encode(entries).write(to: indexURL, options: .atomic)
     }
 
-    private func readMetadata(from ipaURL: URL) throws -> (bundleIdentifier: String, name: String, version: String) {
+    private func readMetadata(from ipaURL: URL) throws -> (bundleIdentifier: String, name: String, version: String, iconData: Data?) {
         let archive: Archive
         do {
             archive = try Archive(url: ipaURL, accessMode: .read)
@@ -113,6 +114,19 @@ actor IPAImportStore {
         let version = (plist["CFBundleShortVersionString"] as? String)
             ?? (plist["CFBundleVersion"] as? String)
             ?? "Unknown"
-        return (bundleIdentifier, name, version)
+
+        let appPath = URL(fileURLWithPath: entry.path).deletingLastPathComponent().path
+        let iconNames = (plist["CFBundleIcons"] as? [String: Any])
+            .flatMap { $0["CFBundlePrimaryIcon"] as? [String: Any] }?["CFBundleIconFiles"] as? [String] ?? []
+        let iconEntry = iconNames.reversed().lazy.compactMap { iconName in
+            archive.first { $0.path == "\(appPath)/\(iconName).png" || $0.path == "\(appPath)/\(iconName)@2x.png" || $0.path == "\(appPath)/\(iconName)@3x.png" }
+        }.first
+        var iconData: Data?
+        if let iconEntry {
+            var data = Data()
+            try? archive.extract(iconEntry) { data.append($0) }
+            iconData = data.isEmpty ? nil : data
+        }
+        return (bundleIdentifier, name, version, iconData)
     }
 }

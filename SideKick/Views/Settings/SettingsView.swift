@@ -4,21 +4,22 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Sideloading setup") {
-                    LabeledContent("IPA import", value: "Available")
-                    LabeledContent("Apple ID accounts", value: "Available")
-                    LabeledContent("IPA signing and install", value: "Not connected")
-                    LabeledContent("App refresh", value: "Not connected")
-                }
                 Section("About") {
                     LabeledContent("Version", value: "1.0.0")
-                    Link(destination: URL(string: "https://github.com/SideStore/SideStore")!) {
-                        Label("SideStore project", systemImage: "arrow.up.right.square")
+                    Link(destination: URL(string: "https://github.com/huzaifah1530-bot/SideKick")!) {
+                        Label("SideKick on GitHub", systemImage: "arrow.up.right")
                     }
                 }
+
+                Section {
+                    Text("SideKick uses open-source signing components. Their notices and licenses are available in the project source.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                } header: {
+                    Text("Open Source")
+                }
             }
-            .scrollContentBackground(.hidden)
-            .background(Color.sideKickCanvas)
+            .listStyle(.insetGrouped)
             .navigationTitle("Settings")
         }
     }

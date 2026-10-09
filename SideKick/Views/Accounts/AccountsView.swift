@@ -9,74 +9,37 @@ struct AccountsView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section {
-                    VStack(alignment: .leading, spacing: 12) {
-                        Label("Choose a signing account", systemImage: "person.crop.circle.badge.checkmark")
-                            .font(.headline)
-                        Text("Add Apple IDs here, then choose which one SideKick should use as its active signing account. Each saved session is kept separately in the iOS Keychain.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                        Text("Initial Apple device registration may require one-time computer pairing. LocalDevVPN is a separate app and must be installed and connected when device installation requires it.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                        Text("Adding an Apple ID now saves its session first. Device registration and certificate setup are deferred so they can’t block account sign-in.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                    .padding(.vertical, 6)
-
-                    SwiftUI.Button {
-                        isShowingSignIn = true
-                    } label: {
-                        Label(accountStore.isWorking ? "Connecting…" : "Add Apple ID", systemImage: "plus.circle.fill")
-                    }
-                    .disabled(accountStore.isWorking)
-                }
-
-                Section("Saved Apple IDs") {
-                    if accountStore.accounts.isEmpty {
-                        ContentUnavailableView(
-                            "No Apple IDs yet",
-                            systemImage: "person.crop.circle.badge.questionmark",
-                            description: Text("Add an Apple ID to begin setting up SideKick’s signing engine.")
-                        )
-                        .listRowBackground(Color.clear)
-                    } else {
+                if accountStore.accounts.isEmpty {
+                    ContentUnavailableView(
+                        "No Apple IDs",
+                        systemImage: "person.crop.circle",
+                        description: Text("Add an Apple ID to sign and install apps.")
+                    )
+                    .listRowBackground(Color.clear)
+                } else {
+                    Section("Apple IDs") {
                         ForEach(accountStore.accounts) { account in
-                            accountRow(account)
+                            NavigationLink {
+                                SigningAccountDetailView(account: account, accountStore: accountStore)
+                            } label: {
+                                accountRow(account)
+                            }
                         }
                     }
                 }
-
-                if let signInCheckpoint = accountStore.signInCheckpoint {
-                    Section("Sign-in status") {
-                        Label(signInCheckpoint, systemImage: signInCheckpoint == "Account saved successfully" ? "checkmark.circle" : "info.circle")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-
-                Section {
-                    Label("Signing is handled per Apple ID", systemImage: "info.circle")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                    Text("SideKick uses the Apple ID you choose for installation and refreshes each app with its recorded signing account. Real-device signing and refresh still need device testing.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
             }
-            .scrollContentBackground(.hidden)
-            .background(Color.sideKickCanvas)
-            .navigationTitle("Apple IDs")
+            .listStyle(.insetGrouped)
+            .navigationTitle("Accounts")
+            .background(Color(uiColor: .systemGroupedBackground))
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     SwiftUI.Button {
-                        Task { await accountStore.reload() }
+                        isShowingSignIn = true
                     } label: {
-                        Image(systemName: "arrow.clockwise")
+                        Image(systemName: "plus")
                     }
+                    .accessibilityLabel("Add Apple ID")
                     .disabled(accountStore.isWorking)
-                    .accessibilityLabel("Reload Apple IDs")
                 }
             }
             .task { await accountStore.reload() }
@@ -86,15 +49,34 @@ struct AccountsView: View {
                     submittedCredentials = (appleID, password)
                 }
             }
-            .alert("Couldn’t update Apple IDs", isPresented: Binding(
+            .alert("Couldn’t add Apple ID", isPresented: Binding(
                 get: { errorMessage != nil },
                 set: { if !$0 { errorMessage = nil } }
             )) {
-                    SwiftUI.Button("OK", role: .cancel) { errorMessage = nil }
+                SwiftUI.Button("OK", role: .cancel) { errorMessage = nil }
             } message: {
                 Text(errorMessage ?? "")
             }
         }
+    }
+
+    private func accountRow(_ account: SigningAccountSummary) -> some View {
+        HStack {
+            VStack(alignment: .leading, spacing: 3) {
+                Text(account.email)
+                    .foregroundStyle(.primary)
+                Text(account.teamName.isEmpty ? account.teamType : account.teamName)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+            Spacer()
+            if account.isActive {
+                Text("Active")
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .padding(.vertical, 3)
     }
 
     private func beginSignIn() {
@@ -111,33 +93,29 @@ struct AccountsView: View {
             }
         }
     }
+}
 
-    @ViewBuilder
-    private func accountRow(_ account: SigningAccountSummary) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(alignment: .top) {
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(account.email)
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.primary)
-                    Text(account.teamName)
-                        .font(.subheadline)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer(minLength: 10)
-                if account.isActive {
-                    Label("Active", systemImage: "checkmark.circle.fill")
-                        .font(.caption.weight(.semibold))
-                        .foregroundStyle(.green)
-                }
+private struct SigningAccountDetailView: View {
+    let account: SigningAccountSummary
+    let accountStore: SigningAccountStore
+    @State private var errorMessage: String?
+
+    private var currentAccount: SigningAccountSummary {
+        accountStore.accounts.first(where: { $0.id == account.id }) ?? account
+    }
+
+    var body: some View {
+        List {
+            Section {
+                LabeledContent("Apple ID", value: currentAccount.email)
+                LabeledContent("Team", value: currentAccount.teamName)
+                LabeledContent("Account type", value: currentAccount.teamType)
             }
 
-            HStack {
-                Text(account.teamType)
-                    .font(.caption)
-                    .foregroundStyle(.secondary)
-                Spacer()
-                if !account.isActive {
+            Section {
+                if currentAccount.isActive {
+                    LabeledContent("Signing account", value: "Active")
+                } else {
                     SwiftUI.Button("Use for signing") {
                         Task {
                             do {
@@ -147,17 +125,27 @@ struct AccountsView: View {
                             }
                         }
                     }
-                    .font(.subheadline.weight(.semibold))
-                    .disabled(accountStore.isWorking || !account.hasSavedSession)
+                    .disabled(accountStore.isWorking || !currentAccount.hasSavedSession)
+                }
+
+                if !currentAccount.hasSavedSession {
+                    Text("Sign in again to use this account on this device.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
                 }
             }
-
-            if !account.hasSavedSession {
-                Text("Sign in again to save this account’s session on this device.")
-                    .font(.caption)
-                    .foregroundStyle(.orange)
-            }
         }
-        .padding(.vertical, 5)
+        .listStyle(.insetGrouped)
+        .background(Color(uiColor: .systemGroupedBackground))
+        .navigationTitle("Apple ID")
+        .navigationBarTitleDisplayMode(.inline)
+        .alert("Couldn’t switch account", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            SwiftUI.Button("OK", role: .cancel) { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "")
+        }
     }
 }

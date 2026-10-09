@@ -1,25 +1,37 @@
 import SwiftUI
+import UIKit
 
 struct ImportedIPARow: View {
     let app: ImportedIPA
 
     var body: some View {
-        HStack(spacing: 14) {
-            Image(systemName: "app.dashed")
-                .font(.title2.weight(.semibold))
-                .foregroundStyle(.white)
-                .frame(width: 52, height: 52)
-                .background(.blue.gradient, in: .rect(cornerRadius: 14))
-            VStack(alignment: .leading, spacing: 5) {
-                Text(app.name).font(.headline)
-                Text("Version \(app.version)").font(.caption).foregroundStyle(.secondary)
-                Text(app.bundleIdentifier).font(.caption2).foregroundStyle(.tertiary).lineLimit(1)
+        HStack(spacing: 12) {
+            Group {
+                if let data = app.iconData, let icon = UIImage(data: data) {
+                    Image(uiImage: icon).resizable().scaledToFit()
+                } else {
+                    Image(systemName: "app.fill")
+                        .font(.title2)
+                        .foregroundStyle(.white)
+                        .frame(maxWidth: .infinity, maxHeight: .infinity)
+                        .background(.blue.gradient)
+                }
             }
-            Spacer(minLength: 0)
-            Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                .accessibilityLabel("Imported")
+            .frame(width: 58, height: 58)
+            .clipShape(.rect(cornerRadius: 13))
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text(app.name)
+                    .font(.body.weight(.semibold))
+                    .foregroundStyle(.primary)
+                Text("Version \(app.version)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+            }
+
+            Spacer(minLength: 8)
         }
-        .padding(12)
-        .background(.background, in: .rect(cornerRadius: 20))
+        .contentShape(Rectangle())
+        .padding(.vertical, 5)
     }
 }

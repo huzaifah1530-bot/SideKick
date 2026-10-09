@@ -24,7 +24,7 @@ final class HomeViewModel {
         do {
             let app = try await store.importIPA(from: url)
             importedApps = try await store.importedApps()
-            noticeMessage = "\(app.name) was added to your IPA library. Choose Install to sign it with a saved Apple ID."
+            noticeMessage = "\(app.name) was added to your library."
         } catch {
             errorMessage = error.localizedDescription
         }

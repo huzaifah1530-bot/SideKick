@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct AppManagementView: View {
     @Environment(AppEnvironment.self) private var environment
@@ -27,20 +28,83 @@ struct AppManagementView: View {
     private var bundleIdentifier: String { importedApp?.bundleIdentifier ?? installedApp?.bundleIdentifier ?? "" }
 
     var body: some View {
-        ScrollView {
-            VStack(alignment: .leading, spacing: 24) {
-                appHeader
-                if let importedApp {
-                    importedDetails(importedApp)
-                } else if let installedApp {
-                    installedDetails(installedApp)
+        List {
+            Section {
+                HStack(spacing: 16) {
+                    appIcon
+                        .frame(width: 76, height: 76)
+                        .clipShape(.rect(cornerRadius: 17))
+                    VStack(alignment: .leading, spacing: 5) {
+                        Text(appName)
+                            .font(.title3.weight(.bold))
+                        Text(importedApp.map { "Version \($0.version)" } ?? "Installed")
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                    }
                 }
-                dangerZone
+                .padding(.vertical, 8)
             }
-            .padding(20)
-            .padding(.bottom, 24)
+
+            Section("Details") {
+                LabeledContent("Bundle ID", value: bundleIdentifier)
+                    .lineLimit(2)
+                    .textSelection(.enabled)
+                if let importedApp {
+                    LabeledContent("Imported", value: importedApp.formattedImportDate)
+                }
+                if let installedApp {
+                    LabeledContent("Signing account", value: installedApp.accountEmail)
+                    LabeledContent("Team", value: installedApp.teamIdentifier)
+                }
+            }
+
+            Section {
+                if let importedApp {
+                    if let account = accountStore.accounts.first(where: { $0.isActive && $0.hasSavedSession }) {
+                        SwiftUI.Button {
+                            Task { await install(importedApp, using: account) }
+                        } label: {
+                            HStack {
+                                if isWorking { ProgressView() }
+                                else { Text("Install").fontWeight(.semibold) }
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .buttonBorderShape(.capsule)
+                        .disabled(isWorking || accountStore.isWorking)
+                    } else {
+                        Text("Add or select a signing account in Accounts to install this app.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+
+                    if onDelete != nil {
+                        SwiftUI.Button("Remove from Library", role: .destructive) {
+                            Task {
+                                await onDelete?()
+                                dismiss()
+                            }
+                        }
+                    }
+                } else if let installedApp {
+                    SwiftUI.Button {
+                        Task { await refresh(installedApp) }
+                        } label: {
+                            HStack {
+                                if isWorking { ProgressView() }
+                                else { Text("Refresh").fontWeight(.semibold) }
+                            }
+                            .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                        .buttonBorderShape(.capsule)
+                        .disabled(isWorking)
+                }
+            }
         }
-        .background(Color.sideKickCanvas)
+        .listStyle(.insetGrouped)
+        .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle(appName)
         .navigationBarTitleDisplayMode(.inline)
         .task { await accountStore.reload() }
@@ -51,104 +115,16 @@ struct AppManagementView: View {
         } message: { Text(errorMessage ?? "") }
     }
 
-    private var appHeader: some View {
-        HStack(spacing: 16) {
-            Image(systemName: importedApp == nil ? "app.fill" : "app.dashed")
-                .font(.system(size: 30, weight: .semibold))
+    @ViewBuilder
+    private var appIcon: some View {
+        if let data = importedApp?.iconData, let icon = UIImage(data: data) {
+            Image(uiImage: icon).resizable().scaledToFit()
+        } else {
+            Image(systemName: "app.fill")
+                .font(.system(size: 34))
                 .foregroundStyle(.white)
-                .frame(width: 76, height: 76)
-                .background((importedApp == nil ? Color.indigo : Color.blue).gradient, in: .rect(cornerRadius: 20))
-            VStack(alignment: .leading, spacing: 5) {
-                Text(appName).font(.title2.weight(.bold))
-                Text(installedApp?.isSideKick == true ? "SideKick · Installed app" : (importedApp == nil ? "Installed app" : "Imported IPA"))
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-            }
-            Spacer(minLength: 0)
-        }
-    }
-
-    private func importedDetails(_ app: ImportedIPA) -> some View {
-        VStack(alignment: .leading, spacing: 18) {
-            detailRow("Version", app.version)
-            detailRow("Bundle ID", app.bundleIdentifier)
-            detailRow("Imported", app.formattedImportDate)
-
-            Divider()
-
-            Text("Install")
-                .font(.title3.weight(.bold))
-            if accountStore.accounts.filter(\.hasSavedSession).isEmpty {
-                Label("Add an Apple ID in Accounts before installing.", systemImage: "person.crop.circle.badge.plus")
-                    .foregroundStyle(.secondary)
-            } else {
-                ForEach(accountStore.accounts.filter(\.hasSavedSession)) { account in
-                    SwiftUI.Button {
-                        Task { await install(app, using: account) }
-                    } label: {
-                        HStack {
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text(account.email).font(.body.weight(.semibold))
-                                Text(account.teamType).font(.caption).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Image(systemName: "arrow.down.app.fill")
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .disabled(isWorking)
-                }
-            }
-        }
-        .sectionCard()
-    }
-
-    private func installedDetails(_ app: InstalledAppSummary) -> some View {
-        VStack(alignment: .leading, spacing: 18) {
-            detailRow("Bundle ID", app.bundleIdentifier)
-            detailRow("Signing account", app.accountEmail)
-            detailRow("Team", app.teamIdentifier)
-
-            Divider()
-
-            SwiftUI.Button {
-                Task { await refresh(app) }
-            } label: {
-                Label(isWorking ? "Refreshing…" : (app.isSideKick ? "Refresh SideKick" : "Refresh app"), systemImage: "arrow.clockwise")
-                    .frame(maxWidth: .infinity)
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(isWorking)
-        }
-        .sectionCard()
-    }
-
-    private var dangerZone: some View {
-        Group {
-            if onDelete != nil {
-                SwiftUI.Button(role: .destructive) {
-                    Task {
-                        await onDelete?()
-                        dismiss()
-                    }
-                } label: {
-                    Label("Remove from library", systemImage: "trash")
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                .padding(.horizontal, 4)
-            }
-        }
-    }
-
-    private func detailRow(_ title: String, _ value: String) -> some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text(title.uppercased())
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.secondary)
-            Text(value)
-                .font(.body)
-                .textSelection(.enabled)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(.blue.gradient)
         }
     }
 
@@ -176,13 +152,5 @@ struct AppManagementView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
-    }
-}
-
-private extension View {
-    func sectionCard() -> some View {
-        padding(18)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .background(.background, in: .rect(cornerRadius: 22))
     }
 }
