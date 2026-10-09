@@ -114,26 +114,78 @@ final class SigningAccountStore {
         }
         isWorking = true
         defer { isWorking = false }
+        try await restoreAccountSession(account)
+        await reload()
+    }
 
+    func withAccount<T>(
+        accountIdentifier: String,
+        teamIdentifier: String,
+        operation: () async throws -> T
+    ) async throws -> T {
+        guard !isWorking else { throw SigningAccountError.engineBusy }
+        guard !AppManager.shared.isActivelyManagingAnyApp else {
+            throw SigningAccountError.engineBusy
+        }
+
+        let target = SigningAccountSummary(
+            accountIdentifier: accountIdentifier,
+            teamIdentifier: teamIdentifier,
+            email: "",
+            teamName: "",
+            teamType: "",
+            isActive: false,
+            hasSavedSession: true
+        )
+        isWorking = true
+        defer { isWorking = false }
+
+        let previous = await activeAccountSummary()
+        let previousCredentials = try? currentSessionCredentials(for: previous)
+
+        if previous?.id != target.id {
+            try await restoreAccountSession(target)
+        }
+
+        do {
+            let result = try await operation()
+            if previous?.id != target.id, let previousCredentials {
+                try await restoreSession(previousCredentials)
+            }
+            await reload()
+            return result
+        } catch {
+            if previous?.id != target.id, let previousCredentials {
+                try? await restoreSession(previousCredentials)
+            }
+            await reload()
+            throw error
+        }
+    }
+
+    private func restoreAccountSession(_ account: SigningAccountSummary) async throws {
         let key = SigningSessionVault.key(
             accountIdentifier: account.accountIdentifier,
             teamIdentifier: account.teamIdentifier
         )
         let credentials = try vault.load(key: key)
+        try await restoreSession(credentials)
+    }
+
+    private func restoreSession(_ credentials: SigningSessionCredentials) async throws {
         let signingCertificate = try credentials.certificateData.map {
             try CertificateManager.parse($0, password: credentials.certificatePassword)
         }
 
-        // AuthManager and CertificateManager are process-global in SideStore. Clear their
-        // cached identity before restoring this account's saved credentials and certificate.
+        // SideStore's authentication and certificate managers are process-global. Every
+        // operation is serialized here and the previous session is restored after completion.
         await AuthManager.shared.signOut(keepCertificate: true, keepAnisetteData: true)
         AuthManager.shared.currentAppleID = credentials.appleID
         AuthManager.shared.password = credentials.password
         AuthManager.shared.adsid = credentials.adsid
         AuthManager.shared.xcodeToken = credentials.xcodeToken
 
-        let database = DatabaseManager.shared
-        let context = database.persistentContainer.newBackgroundContext()
+        let context = DatabaseManager.shared.persistentContainer.newBackgroundContext()
         try await context.perform {
             let accounts = try context.fetch(Account.fetchRequest())
             let teams = try context.fetch(Team.fetchRequest())
@@ -151,14 +203,13 @@ final class SigningAccountStore {
                 savedTeam.isActiveTeam = savedTeam == selectedTeam
             }
 
-            let isSparseRestorePatched = ProcessInfo().sparseRestorePatched
-            let isAppLimitDisabled = UserDefaults.standard.isAppLimitDisabled
+            let sparseRestorePatched = ProcessInfo().sparseRestorePatched
+            let appLimitDisabled = UserDefaults.standard.isAppLimitDisabled
             UserDefaults.standard.activeAppsLimit = nil
             if selectedTeam.type == .free,
-               (!isAppLimitDisabled && isSparseRestorePatched || isAppLimitDisabled && !isSparseRestorePatched) {
+               (!appLimitDisabled && sparseRestorePatched || appLimitDisabled && !sparseRestorePatched) {
                 UserDefaults.standard.activeAppsLimit = InstalledApp.freeAccountActiveAppsLimit
             }
-
             try context.save()
         }
 
@@ -167,8 +218,45 @@ final class SigningAccountStore {
         } else {
             CertificateManager.shared.clearActiveCertificate()
         }
+    }
 
-        await reload()
+    private func activeAccountSummary() async -> SigningAccountSummary? {
+        guard DatabaseManager.shared.isStarted else { return nil }
+        let context = DatabaseManager.shared.viewContext
+        return await context.perform {
+            guard let team = DatabaseManager.shared.activeTeam(in: context),
+                  let account = team.account else { return nil }
+            return SigningAccountSummary(
+                accountIdentifier: account.identifier,
+                teamIdentifier: team.identifier,
+                email: account.appleID,
+                teamName: team.name,
+                teamType: team.type.localizedDescription,
+                isActive: true,
+                hasSavedSession: true
+            )
+        }
+    }
+
+    private func currentSessionCredentials(for account: SigningAccountSummary?) throws -> SigningSessionCredentials {
+        guard let account,
+              let appleID = AuthManager.shared.currentAppleID,
+              let password = AuthManager.shared.password,
+              let adsid = AuthManager.shared.adsid,
+              let xcodeToken = AuthManager.shared.xcodeToken else {
+            throw SigningAccountError.sessionNotAvailable
+        }
+        let certificate = CertificateManager.shared.activeCertificate
+        return SigningSessionCredentials(
+            appleID: appleID,
+            password: password,
+            adsid: adsid,
+            xcodeToken: xcodeToken,
+            accountIdentifier: account.accountIdentifier,
+            teamIdentifier: account.teamIdentifier,
+            certificateData: certificate?.p12Data,
+            certificatePassword: certificate?.password
+        )
     }
 }
 

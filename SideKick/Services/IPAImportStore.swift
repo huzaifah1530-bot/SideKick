@@ -20,6 +20,12 @@ actor IPAImportStore {
             .sorted { $0.importedAt > $1.importedAt }
     }
 
+    func fileURL(for app: ImportedIPA) throws -> URL {
+        let url = directory.appendingPathComponent(app.fileName)
+        guard fileManager.isReadableFile(atPath: url.path) else { throw IPAImportError.inaccessibleFile }
+        return url
+    }
+
     func importIPA(from sourceURL: URL) throws -> ImportedIPA {
         guard sourceURL.pathExtension.lowercased() == "ipa" else { throw IPAImportError.notAnIPA }
         let securityScoped = sourceURL.startAccessingSecurityScopedResource()

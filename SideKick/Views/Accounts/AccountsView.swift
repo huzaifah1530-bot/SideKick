@@ -50,10 +50,10 @@ struct AccountsView: View {
                 }
 
                 Section {
-                    Label("Install and refresh are not enabled yet", systemImage: "info.circle")
+                    Label("Install and refresh use SideStore", systemImage: "info.circle")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
-                    Text("This stage connects SideStore’s account sign-in and per-account Keychain storage. App installation and refresh will remain unavailable until their operations are routed through the selected account and verified on a device.")
+                    Text("SideKick routes installs through the Apple ID you choose and refreshes each app with the account recorded by SideStore. Real-device signing and refresh still need device testing.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 }
