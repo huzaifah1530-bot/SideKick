@@ -200,7 +200,7 @@ private final class ProgressObservationBox: @unchecked Sendable {
     }
 }
 
-struct InstalledAppSummary: Identifiable {
+struct InstalledAppSummary: Identifiable, Sendable {
     let bundleIdentifier: String
     let resignedBundleIdentifier: String
     let name: String

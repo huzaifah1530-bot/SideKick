@@ -107,6 +107,12 @@ struct AppManagementView: View {
                         }
                     }
                 } else if let installedApp {
+                    NavigationLink {
+                        GitHubUpdateSettingsView(app: installedApp)
+                    } label: {
+                        Label("GitHub Update Source", systemImage: "chevron.left.forwardslash.chevron.right")
+                    }
+
                     SwiftUI.Button {
                         Task { await findIPAForSharing(installedApp) }
                     } label: {
@@ -119,11 +125,15 @@ struct AppManagementView: View {
                     .disabled(isFindingShareIPA)
 
                     if let pendingUpdateIPA {
-                        if accountStore.accounts.contains(where: \.hasSavedSession) {
+                        if let originalAccount = accountStore.accounts.first(where: {
+                            $0.accountIdentifier == installedApp.accountIdentifier
+                                && $0.teamIdentifier == installedApp.teamIdentifier
+                                && $0.hasSavedSession
+                        }) {
                             NavigationLink {
-                                InstallAccountSelectionView(
+                                InstallConsoleView(
                                     app: pendingUpdateIPA,
-                                    accounts: accountStore.accounts.filter(\.hasSavedSession),
+                                    account: originalAccount,
                                     accountStore: accountStore,
                                     ipaStore: environment.ipaImportStore,
                                     isUpdate: true,
@@ -144,7 +154,7 @@ struct AppManagementView: View {
                             .buttonStyle(.borderedProminent)
                             .buttonBorderShape(.capsule)
                         } else {
-                            Text("Add an Apple ID in Accounts to update this app.")
+                            Text("Updates must be signed with the account that installed this app (\(installedApp.accountEmail)). Add that account back in Accounts to continue.")
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
@@ -372,7 +382,7 @@ private struct InstallAccountSelectionView: View {
     }
 }
 
-private struct InstallConsoleView: View {
+struct InstallConsoleView: View {
     let app: ImportedIPA
     let account: SigningAccountSummary
     let accountStore: SigningAccountStore

@@ -9,6 +9,12 @@ struct HomeView: View {
     @State private var incomingShareURL: URL?
     @State private var ipaAwaitingUpdateChoice: ImportedIPA?
     @State private var installedApps: [InstalledAppSummary] = []
+    @State private var accountStore = SigningAccountStore()
+    @State private var remainingAppIDs: Int?
+    @State private var isRefreshingAll = false
+    @State private var refreshAllProgress: (completed: Int, total: Int)?
+    @State private var githubUpdates: [GitHubUpdateCandidate] = []
+    @State private var isCheckingGitHubUpdates = false
     @Environment(AppEnvironment.self) private var environment
 
     private var installedBundleIdentifiers: Set<String> {
@@ -41,6 +47,32 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             List {
+                if !githubUpdates.isEmpty {
+                    SwiftUI.Section("Updates") {
+                        ForEach(filteredGitHubUpdates) { update in
+                            if let app = installedApps.first(where: { $0.bundleIdentifier == update.bundleIdentifier }) {
+                                NavigationLink {
+                                    GitHubUpdateDetailView(candidate: update, app: app)
+                                } label: {
+                                    GitHubUpdateRow(candidate: update, app: app)
+                                }
+                            }
+                        }
+                    }
+                } else {
+                    Section {
+                        HStack(spacing: 9) {
+                            if isCheckingGitHubUpdates { ProgressView() }
+                            else { Image(systemName: "checkmark.circle.fill").foregroundStyle(.secondary) }
+                            Text(isCheckingGitHubUpdates ? "Checking for Updates" : "No Updates Available")
+                                .font(.subheadline.weight(.medium))
+                            Spacer()
+                        }
+                        .padding(.vertical, 5)
+                        .listRowBackground(Color(uiColor: .secondarySystemGroupedBackground))
+                    }
+                }
+
                 if filteredInstalledApps.isEmpty && filteredImportedApps.isEmpty {
                     ContentUnavailableView(
                         viewModel.searchText.isEmpty ? "Your apps appear here" : "No matching apps",
@@ -53,13 +85,41 @@ struct HomeView: View {
                 }
 
                 if !filteredInstalledApps.isEmpty {
-                    SwiftUI.Section("Installed") {
+                    SwiftUI.Section {
                         ForEach(filteredInstalledApps) { app in
                             NavigationLink {
                                 AppManagementView(installedApp: app)
                             } label: {
                                 installedAppRow(app)
                             }
+                        }
+                        if let remainingAppIDs {
+                            HStack {
+                                Spacer()
+                                Text("\(remainingAppIDs) App IDs Remaining")
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                                Spacer()
+                            }
+                            .listRowBackground(Color.clear)
+                        }
+                    } header: {
+                        HStack {
+                            Text("Active")
+                            Spacer()
+                            SwiftUI.Button {
+                                Task { await refreshAllApps() }
+                            } label: {
+                                if isRefreshingAll {
+                                    if let refreshAllProgress {
+                                        Text("\(refreshAllProgress.completed)/\(refreshAllProgress.total)")
+                                    } else { ProgressView() }
+                                } else {
+                                    Text("Refresh All")
+                                }
+                            }
+                            .font(.caption.weight(.medium))
+                            .disabled(isRefreshingAll || filteredInstalledApps.isEmpty)
                         }
                     }
                 }
@@ -80,7 +140,7 @@ struct HomeView: View {
             }
             .listStyle(.insetGrouped)
             .background(Color(uiColor: .systemGroupedBackground))
-            .navigationTitle("SideKick")
+            .navigationTitle("My Apps")
             .searchable(text: $viewModel.searchText, prompt: "Search apps")
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
@@ -119,6 +179,7 @@ struct HomeView: View {
             .task {
                 await environment.ipaImportStore.cleanupAbandonedTemporaryIPAImports()
                 await load()
+                await loadAppIDCapacity()
             }
             .task {
                 if let url = SideKickShareLink.consumePendingURL() {
@@ -136,7 +197,10 @@ struct HomeView: View {
             .onReceive(NotificationCenter.default.publisher(for: SideKickIncomingIPA.importNotification)) { _ in
                 Task { await importPendingIPA() }
             }
-            .refreshable { await load() }
+            .refreshable {
+                await load()
+                await loadAppIDCapacity()
+            }
             .confirmationDialog(
                 "\(ipaAwaitingUpdateChoice?.name ?? "This app") is already installed",
                 isPresented: Binding(
@@ -185,8 +249,21 @@ struct HomeView: View {
                     .lineLimit(1)
             }
             Spacer(minLength: 4)
+            VStack(alignment: .trailing, spacing: 4) {
+                Text("Expires in")
+                    .font(.caption2)
+                    .foregroundStyle(.secondary)
+                Text("\(daysRemaining(for: app.expirationDate)) DAYS")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(.white)
+                    .padding(.horizontal, 9)
+                    .padding(.vertical, 5)
+                    .background(expirationColor(for: app.expirationDate), in: .capsule)
+            }
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, 6)
+        .padding(.horizontal, 4)
+        .listRowBackground(Color(uiColor: .secondarySystemGroupedBackground))
     }
 
     private func load() async {
@@ -195,6 +272,85 @@ struct HomeView: View {
             accountStore: SigningAccountStore(),
             ipaStore: environment.ipaImportStore
         ).installedApps()
+        await scanGitHubUpdates()
+    }
+
+    private var filteredGitHubUpdates: [GitHubUpdateCandidate] {
+        githubUpdates.filter {
+            viewModel.searchText.isEmpty || $0.appName.localizedCaseInsensitiveContains(viewModel.searchText)
+                || $0.bundleIdentifier.localizedCaseInsensitiveContains(viewModel.searchText)
+        }
+    }
+
+    private func scanGitHubUpdates() async {
+        isCheckingGitHubUpdates = true
+        defer { isCheckingGitHubUpdates = false }
+        let configurationStore = GitHubUpdateConfigurationStore()
+        let service = GitHubUpdateService()
+        let token = try? GitHubCredentialStore().load()
+        var candidates: [GitHubUpdateCandidate] = []
+        for app in filteredInstalledApps {
+            let configuration: GitHubUpdateConfiguration?
+            do { configuration = try await configurationStore.configuration(for: app.bundleIdentifier) }
+            catch { continue }
+            guard let configuration else { continue }
+            do {
+                if let candidate = try await service.candidate(for: app, configuration: configuration, token: token) {
+                    candidates.append(candidate)
+                }
+            } catch {
+                debugLog("[SideKick] GitHub update check failed for \(app.name): \(error.localizedDescription)")
+            }
+        }
+        githubUpdates = candidates
+    }
+
+    private func loadAppIDCapacity() async {
+        await accountStore.reload()
+        let eligibleAccounts = accountStore.accounts.filter { $0.isFreeAccount && $0.hasSavedSession }
+        guard !eligibleAccounts.isEmpty else {
+            remainingAppIDs = nil
+            return
+        }
+
+        var totalRemaining = 0
+        var loadedInventoryCount = 0
+        for account in eligibleAccounts {
+            do {
+                let inventory = try await accountStore.fetchDeveloperInventory(for: account)
+                totalRemaining += max(10 - inventory.appIDs.count, 0)
+                loadedInventoryCount += 1
+            } catch {
+                debugLog("[SideKick] Couldn’t check App ID capacity for \(account.email): \(error.localizedDescription)")
+            }
+        }
+        remainingAppIDs = loadedInventoryCount > 0 ? totalRemaining : nil
+    }
+
+    private func refreshAllApps() async {
+        guard !isRefreshingAll else { return }
+        isRefreshingAll = true
+        refreshAllProgress = nil
+        defer {
+            isRefreshingAll = false
+            refreshAllProgress = nil
+        }
+        let service = SideStoreOperationService(accountStore: accountStore, ipaStore: environment.ipaImportStore)
+        _ = await service.refreshAllManagedAppsQuietly { completed, total in
+            refreshAllProgress = (completed, total)
+        }
+        installedApps = await service.installedApps()
+        await scanGitHubUpdates()
+    }
+
+    private func daysRemaining(for date: Date) -> Int {
+        max(Int(ceil(date.timeIntervalSinceNow / 86_400)), 0)
+    }
+
+    private func expirationColor(for date: Date) -> Color {
+        let days = min(max(daysRemaining(for: date), 1), 7)
+        let greenToRed = Double(days - 1) / 6
+        return Color(hue: greenToRed * 0.33, saturation: 0.82, brightness: 0.86)
     }
 
     private func importPendingIPA() async {

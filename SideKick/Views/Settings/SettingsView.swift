@@ -35,6 +35,14 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
 
+                Section("App updates") {
+                    NavigationLink {
+                        GitHubAccountSettingsView()
+                    } label: {
+                        Label("GitHub Account", systemImage: "chevron.left.forwardslash.chevron.right")
+                    }
+                }
+
                 Section {
                     Text("SideKick uses open-source signing components. Their notices and licenses are available in the project source.")
                         .font(.footnote)
