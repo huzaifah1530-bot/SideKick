@@ -363,23 +363,16 @@ struct RequiredSetupView: View {
     private var refreshAutomationPage: some View {
         onboardingPage(
             symbol: "clock.arrow.circlepath",
-            title: "Schedule app refreshes",
-            message: "Add two daily Personal Automations in Shortcuts: run SideKick’s “Refresh Apps” action at 2:00 AM and again at 8:00 PM. The evening run skips if the morning refresh succeeded. Missed attempts stay quiet; SideKick only notifies you when an app has about two days left.") {
+            title: "Add the refresh shortcut",
+            message: "Install SideKick’s daily refresh shortcut to finish setup.") {
             VStack(spacing: 12) {
-                SwiftUI.Button("Open Shortcuts") {
-                    UIApplication.shared.open(URL(string: "shortcuts://")!)
-                }
+                Link("Get Shortcut", destination: URL(string: "https://www.icloud.com/shortcuts/41b951c189ec4ca78188604524f868e2")!)
                 .buttonStyle(.borderedProminent)
-
-                Text("In Shortcuts, create a Time of Day automation for each time, choose Daily, add the “Refresh SideKick Apps” action, and turn off Ask Before Running. iOS does not let apps create or verify personal automations for you.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .multilineTextAlignment(.center)
 
                 SwiftUI.Button {
                     status.confirmRefreshAutomationsConfigured()
                 } label: {
-                    Label(status.refreshAutomationsConfigured ? "Automations Added" : "I’ve Added Both Automations",
+                    Label(status.refreshAutomationsConfigured ? "Shortcut Added" : "I’ve Added the Shortcut",
                           systemImage: status.refreshAutomationsConfigured ? "checkmark.circle.fill" : "checkmark.circle")
                 }
                 .buttonStyle(.bordered)
