@@ -8,10 +8,10 @@ SideKick is a native SwiftUI iOS sideloading app. The existing SwiftUI screens a
 - The build uses SideStore's Xcode project and runtime bootstrap, while the app scene presents SideKick's SwiftUI UI.
 - The IPA library imports IPA files from Files, validates their bundle metadata, stores them locally, supports search, and removes imported files.
 - Apple ID sign-in is connected to SideStore's native authentication flow. SideKick stores each account/team session and its signing certificate separately in the iOS Keychain and can switch the active SideStore identity.
-- IPA install, app-specific account selection, account-scoped refresh, pairing setup, and LocalDevVPN readiness are not yet wired into SideKick's screens. Do not treat these as working until they pass on a physical device.
-- SideStore persists each installed app's signing team, but SideKick does not yet route installs or refreshes through that ownership. Its account UI explicitly warns that install and refresh remain disabled.
+- IPA install and account-scoped refresh are routed through the integrated signing engine; these still need physical-device validation. SideKick now exposes pairing-file import and connection validation in Settings.
+- A pairing file must first be created on a computer paired with the iPhone. SideKick does not create that trust record on-device. SideStore's app is not required.
 
-SideKick stores its database in private app storage and does not require SideStore's App Group. The unsigned CI build still does not verify signing or on-device functionality. Initial SideStore-style installation and pairing also require the external computer/iLoader setup; LocalDevVPN is a separate app that must be installed and connected by the user.
+SideKick stores its database in private app storage and does not require SideStore's App Group or app. The unsigned CI build still does not verify signing or on-device functionality. Pairing-file creation requires a previously paired computer; LocalDevVPN may be needed for some remote/WireGuard workflows.
 
 The upstream SideStore scheme also builds a widget extension. SideKick removes that extension from the packaged IPA because it is not part of the standalone app and an unsigned extension cannot be installed without its own valid provisioning profile.
 
