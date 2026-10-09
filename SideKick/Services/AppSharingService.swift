@@ -6,6 +6,7 @@ enum AppSharingError: LocalizedError {
     case downloadFailed(Int)
     case invalidShareLink
     case insecureURL
+    case browserVerificationRequired
 
     var errorDescription: String? {
         switch self {
@@ -19,6 +20,8 @@ enum AppSharingError: LocalizedError {
             return "This SideKick link is invalid or has expired."
         case .insecureURL:
             return "For safety, SideKick only downloads IPA files from HTTPS links."
+        case .browserVerificationRequired:
+            return "Buzzheavier is showing a browser verification page instead of the file. Open the link in Safari, choose Copy download link, then import that link into SideKick."
         }
     }
 }
@@ -60,18 +63,48 @@ struct BuzzheavierClient {
         guard let host = shareURL.host?.lowercased(),
               host == "buzzheavier.com" || host == "www.buzzheavier.com" else { return shareURL }
 
+        // Buzzheavier's signed links are already direct download URLs. Keep
+        // their host, path, and query intact; the `v` query is the signature.
+        if URLComponents(url: shareURL, resolvingAgainstBaseURL: false)?.queryItems?.contains(where: { $0.name == "v" }) == true {
+            return shareURL
+        }
+
         var pageURL = shareURL
-        if shareURL.pathComponents.count == 3,
-           shareURL.pathComponents[1] == "d",
-           let fileID = shareURL.pathComponents.last {
+        let pathComponents = shareURL.pathComponents.filter { $0 != "/" }
+        if pathComponents.count == 2, pathComponents[0] == "d" {
+            let fileID = pathComponents[1]
             var components = URLComponents(url: shareURL, resolvingAgainstBaseURL: false)
             components?.path = "/\(fileID)"
             pageURL = components?.url ?? shareURL
         }
-        guard pageURL.pathComponents.count == 2,
-              pageURL.pathComponents[1] != "download" else { return shareURL }
 
-        var request = URLRequest(url: pageURL.appendingPathComponent("download"))
+        let pageComponents = pageURL.pathComponents.filter { $0 != "/" }
+        guard pageComponents.count == 1 else { return shareURL }
+
+        var pageRequest = URLRequest(url: pageURL)
+        pageRequest.setValue("text/html,application/xhtml+xml", forHTTPHeaderField: "Accept")
+        pageRequest.setValue("SideKick", forHTTPHeaderField: "User-Agent")
+        let (pageData, pageResponse) = try await URLSession.shared.data(for: pageRequest)
+        guard let pageHTTPResponse = pageResponse as? HTTPURLResponse else {
+            throw AppSharingError.invalidShareLink
+        }
+        if pageHTTPResponse.value(forHTTPHeaderField: "cf-mitigated")?.lowercased() == "challenge" {
+            throw AppSharingError.browserVerificationRequired
+        }
+        guard (200..<300).contains(pageHTTPResponse.statusCode) else {
+            let status = (pageResponse as? HTTPURLResponse)?.statusCode ?? -1
+            throw AppSharingError.downloadFailed(status)
+        }
+        guard let html = String(data: pageData, encoding: .utf8),
+              let endpoint = Self.downloadEndpoint(in: html),
+              let endpointURL = URL(string: endpoint, relativeTo: pageURL)?.absoluteURL,
+              endpointURL.scheme?.lowercased() == "https",
+              let endpointHost = endpointURL.host?.lowercased(),
+              endpointHost == host || endpointHost.hasSuffix(".buzzheavier.com") else {
+            throw AppSharingError.browserVerificationRequired
+        }
+
+        var request = URLRequest(url: endpointURL)
         request.setValue("true", forHTTPHeaderField: "HX-Request")
         request.setValue(pageURL.absoluteString, forHTTPHeaderField: "HX-Current-URL")
         request.setValue(pageURL.absoluteString, forHTTPHeaderField: "Referer")
@@ -98,6 +131,23 @@ struct BuzzheavierClient {
             throw AppSharingError.invalidShareLink
         }
         return resolvedURL
+    }
+
+    private static func downloadEndpoint(in html: String) -> String? {
+        let patterns = [
+            #"(?is)\bhx-get\s*=\s*[\"']([^\"']*?/download(?:\?[^\"']*)?)[\"']"#,
+            #"(?is)copyDownloadLink\(\s*[\"']([^\"']+)[\"']\s*\)"#
+        ]
+        for pattern in patterns {
+            guard let expression = try? NSRegularExpression(pattern: pattern),
+                  let match = expression.firstMatch(in: html, range: NSRange(html.startIndex..., in: html)),
+                  let range = Range(match.range(at: 1), in: html) else { continue }
+            return String(html[range])
+                .replacingOccurrences(of: "&amp;", with: "&")
+                .replacingOccurrences(of: #"\\/"#, with: "/")
+                .replacingOccurrences(of: #"\\u0026"#, with: "&")
+        }
+        return nil
     }
 
     func download(from shareURL: URL) async throws -> (URL, URLResponse) {
