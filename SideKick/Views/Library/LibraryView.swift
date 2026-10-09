@@ -12,7 +12,7 @@ struct LibraryView: View {
 
     var body: some View {
         NavigationStack {
-            Group {
+            SwiftUI.Group {
                 if filteredApps.isEmpty {
                     ContentUnavailableView(
                         query.isEmpty ? "Your library is empty" : "No matching IPAs",
@@ -27,7 +27,7 @@ struct LibraryView: View {
                                 .listRowSeparator(.hidden)
                                 .listRowBackground(Color.clear)
                                 .swipeActions {
-                                    Button(role: .destructive) {
+                                    SwiftUI.Button(role: .destructive) {
                                         Task { await viewModel.delete(app) }
                                     } label: {
                                         Label("Remove IPA", systemImage: "trash")

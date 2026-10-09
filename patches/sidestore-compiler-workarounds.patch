@@ -1,0 +1,70 @@
+diff --git a/SideStore/Views/Settings/Advanced/UserCustomizations/UserCustomizationsView.swift b/SideStore/Views/Settings/Advanced/UserCustomizations/UserCustomizationsView.swift
+index 6d6a7232..6bbd0a54 100644
+--- a/SideStore/Views/Settings/Advanced/UserCustomizations/UserCustomizationsView.swift
++++ b/SideStore/Views/Settings/Advanced/UserCustomizations/UserCustomizationsView.swift
+@@ -108,6 +108,7 @@ struct UserCustomizationsView: View {
+                     .background(Color.settingsRowBackground)
+                     .cornerRadius(14)
+                 }
++                .eraseToAnyView()
+ 
+                 // Section 1: ANISETTE
+                 VStack(alignment: .leading, spacing: 8) {
+@@ -172,6 +173,7 @@ struct UserCustomizationsView: View {
+                     .background(Color.settingsRowBackground)
+                     .cornerRadius(14)
+                 }
++                .eraseToAnyView()
+ 
+                 // Section: SIDESIGN
+                 VStack(alignment: .leading, spacing: 8) {
+@@ -198,6 +200,7 @@ struct UserCustomizationsView: View {
+                     .background(Color.settingsRowBackground)
+                     .cornerRadius(14)
+                 }
++                .eraseToAnyView()
+ 
+                 // Section 2: GENERAL
+                 generalSection
+@@ -285,6 +288,7 @@ struct UserCustomizationsView: View {
+                     .background(Color.settingsRowBackground)
+                     .cornerRadius(14)
+                 }
++                .eraseToAnyView()
+ 
+                 // Section 3: EMPROXY & WIREGUARD
+                 VStack(alignment: .leading, spacing: 8) {
+@@ -336,6 +340,7 @@ struct UserCustomizationsView: View {
+                     .background(Color.settingsRowBackground)
+                     .cornerRadius(14)
+                 }
++                .eraseToAnyView()
+ 
+                 // Section 4: CELLULAR REFRESH
+                 cellularRefreshShortcutsSection
+@@ -381,6 +386,7 @@ struct UserCustomizationsView.swift {
+                     .background(Color.settingsRowBackground)
+                     .cornerRadius(14)
+                 }
++                .eraseToAnyView()
+ 
+                 // Section 6: BACKGROUND SERVICE
+                 VStack(alignment: .leading, spacing: 8) {
+@@ -434,6 +440,7 @@ struct UserCustomizationsView.swift {
+                     .background(Color.settingsRowBackground)
+                     .cornerRadius(14)
+                 }
++                .eraseToAnyView()
+             }
+             .padding(.horizontal, 16)
+             .padding(.top, 16)
+@@ -1076,3 +1083,9 @@ struct UserCustomizationsView: View {
+         }
+     }
+ }
++
++private extension View {
++    func eraseToAnyView() -> AnyView {
++        AnyView(self)
++    }
++}

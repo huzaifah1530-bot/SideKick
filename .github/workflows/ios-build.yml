@@ -41,6 +41,9 @@ jobs:
       - name: Apply SideKick integration patch to SideStore
         run: git -C Vendor/SideStore apply ../../patches/sidestore-sidekick.patch
 
+      - name: Apply Swift compiler workaround
+        run: git -C Vendor/SideStore apply ../../patches/sidestore-compiler-workarounds.patch
+
       - name: Build integrated SideKick app for iOS
         run: |
           xcodebuild -project Vendor/SideStore/AltStore.xcodeproj \

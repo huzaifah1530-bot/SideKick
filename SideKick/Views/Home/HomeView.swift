@@ -21,7 +21,7 @@ struct HomeView: View {
             .navigationBarTitleDisplayMode(.large)
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
-                    Button { showingImporter = true } label: {
+                    SwiftUI.Button { showingImporter = true } label: {
                         Image(systemName: "plus")
                             .font(.body.weight(.semibold))
                     }
@@ -44,7 +44,7 @@ struct HomeView: View {
                 get: { viewModel.errorMessage != nil || viewModel.noticeMessage != nil },
                 set: { if !$0 { viewModel.errorMessage = nil; viewModel.noticeMessage = nil } }
             )) {
-                Button("OK", role: .cancel) { }
+                SwiftUI.Button("OK", role: .cancel) { }
             } message: { Text(viewModel.errorMessage ?? viewModel.noticeMessage ?? "") }
         }
     }
@@ -57,7 +57,7 @@ struct HomeView: View {
                 .font(.title3.weight(.bold))
             Text("Your IPA files are stored in your library. Apple ID sign-in, installation, and refresh are not connected yet. Device pairing and LocalDevVPN setup will also be required before the engine can be used.")
                 .font(.subheadline).foregroundStyle(.secondary)
-            Button { showingImporter = true } label: {
+            SwiftUI.Button { showingImporter = true } label: {
                 Label(viewModel.isImporting ? "Importing…" : "Choose an IPA", systemImage: "square.and.arrow.down")
                     .frame(maxWidth: .infinity)
             }
