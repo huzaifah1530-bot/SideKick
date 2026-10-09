@@ -15,17 +15,6 @@ struct RefreshManagedAppsIntent: AppIntent {
     }
 }
 
-struct SideKickShortcuts: AppShortcutsProvider {
-    static var appShortcuts: [AppShortcut] {
-        AppShortcut(
-            intent: RefreshManagedAppsIntent(),
-            phrases: ["Refresh eligible apps with \(.applicationName)"],
-            shortTitle: "Refresh Apps",
-            systemImageName: "arrow.clockwise"
-        )
-    }
-}
-
 @MainActor
 private enum DailyRefreshAutomation {
     private static let lastSuccessfulRunKey = "sidekick.automation.last-successful-refresh"

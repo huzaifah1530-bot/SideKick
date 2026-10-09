@@ -254,6 +254,23 @@ diff --git a/SideStore/Core/Operations/PipelineOperations/InstallAppOperation.sw
 +                if let _ = provisioningProfiles[self.context.targetBundleIdentifier],
 +                   let containerURL = FileManager.default.altstoreSharedDirectory
                  {
+diff --git a/AltStore/Intents/App Intents/AppShortcuts.swift b/AltStore/Intents/App Intents/AppShortcuts.swift
+--- a/AltStore/Intents/App Intents/AppShortcuts.swift
++++ b/AltStore/Intents/App Intents/AppShortcuts.swift
+@@ -29,6 +29,13 @@ public struct ShortcutsProvider: AppShortcutsProvider
+                     ],
+                     shortTitle: "Install IPA",
+                     systemImageName: "square.and.arrow.down")
++
++        AppShortcut(intent: RefreshManagedAppsIntent(),
++                    phrases: [
++                        "Refresh managed apps with \(.applicationName)",
++                    ],
++                    shortTitle: "Refresh SideKick Apps",
++                    systemImageName: "arrow.clockwise")
+     }
+     
+     public static var shortcutTileColor: ShortcutTileColor {
 diff --git a/SideStore/DeepLinks/URLHandler.swift b/SideStore/DeepLinks/URLHandler.swift
 --- a/SideStore/DeepLinks/URLHandler.swift
 +++ b/SideStore/DeepLinks/URLHandler.swift

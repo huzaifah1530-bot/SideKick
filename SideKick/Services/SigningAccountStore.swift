@@ -314,17 +314,12 @@ final class SigningAccountStore {
                     $0.bundleIdentifier.localizedCaseInsensitiveContains("livecontainer") ||
                     $0.resignedBundleIdentifier.localizedCaseInsensitiveContains("livecontainer")
             }
-            if let team = liveContainer?.team, let account = team.account {
-                return (account.identifier, team.identifier)
-            }
-
-            let sideKickTeamIdentifier = ALTApplication(fileURL: Bundle.Info.activeBundleURL)?
-                .provisioningProfile?.teamIdentifier
-            guard let sideKickTeamIdentifier,
-                  let team = try context.fetch(Team.fetchRequest()).first(where: { $0.identifier == sideKickTeamIdentifier }) else {
+            guard let liveContainer,
+                  let team = liveContainer.team,
+                  let account = team.account else {
                 throw SigningAccountError.savedAccountMissing
             }
-            return (team.account.identifier, team.identifier)
+            return (account.identifier, team.identifier)
         }
 
         let credentials = try vault.load(key: SigningSessionVault.key(
