@@ -16,10 +16,11 @@ struct GitHubUpdateSettingsView: View {
 
     init(app: InstalledAppSummary) {
         self.app = app
-        let defaultRepo = app.bundleIdentifier == Bundle.main.bundleIdentifier
-            ? "https://github.com/huzaifah1530-bot/SideKick"
-            : ""
-        _repositoryURL = State(initialValue: defaultRepo)
+        let isSideKick = app.bundleIdentifier == Bundle.main.bundleIdentifier
+        _repositoryURL = State(initialValue: isSideKick ? "https://github.com/huzaifah1530-bot/SideKick" : "")
+        _source = State(initialValue: isSideKick ? .actionsArtifact : .latestRelease)
+        _workflowFile = State(initialValue: isSideKick ? "ios-build.yml" : "build.yml")
+        _assetName = State(initialValue: isSideKick ? "SideKick-unsigned-ipa" : "")
     }
 
     var body: some View {

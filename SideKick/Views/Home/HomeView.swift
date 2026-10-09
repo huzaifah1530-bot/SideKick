@@ -15,6 +15,7 @@ struct HomeView: View {
     @State private var refreshAllProgress: (completed: Int, total: Int)?
     @State private var githubUpdates: [GitHubUpdateCandidate] = []
     @State private var isCheckingGitHubUpdates = false
+    @State private var githubUpdateCheckFailed = false
     @Environment(AppEnvironment.self) private var environment
 
     private var installedBundleIdentifiers: Set<String> {
@@ -63,8 +64,8 @@ struct HomeView: View {
                     Section {
                         HStack(spacing: 9) {
                             if isCheckingGitHubUpdates { ProgressView() }
-                            else { Image(systemName: "checkmark.circle.fill").foregroundStyle(.secondary) }
-                            Text(isCheckingGitHubUpdates ? "Checking for Updates" : "No Updates Available")
+                            else if githubUpdateCheckFailed { Image(systemName: "exclamationmark.circle.fill").foregroundStyle(.orange) }
+                            Text(isCheckingGitHubUpdates ? "Checking for Updates" : (githubUpdateCheckFailed ? "Couldn’t Check GitHub Updates" : "No Updates Available"))
                                 .font(.subheadline.weight(.medium))
                             Spacer()
                         }
@@ -289,20 +290,23 @@ struct HomeView: View {
         let service = GitHubUpdateService()
         let token = try? GitHubCredentialStore().load()
         var candidates: [GitHubUpdateCandidate] = []
+        var didFailCheck = false
         for app in filteredInstalledApps {
             let configuration: GitHubUpdateConfiguration?
             do { configuration = try await configurationStore.configuration(for: app.bundleIdentifier) }
-            catch { continue }
+            catch { didFailCheck = true; continue }
             guard let configuration else { continue }
             do {
                 if let candidate = try await service.candidate(for: app, configuration: configuration, token: token) {
                     candidates.append(candidate)
                 }
             } catch {
+                didFailCheck = true
                 debugLog("[SideKick] GitHub update check failed for \(app.name): \(error.localizedDescription)")
             }
         }
         githubUpdates = candidates
+        githubUpdateCheckFailed = didFailCheck
     }
 
     private func loadAppIDCapacity() async {
