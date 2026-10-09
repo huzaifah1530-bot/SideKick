@@ -49,6 +49,7 @@ jobs:
 
       - name: Build integrated SideKick app for iOS
         run: |
+          # Each CI run stamps a higher build number so SideKick can test update detection.
           xcodebuild -project Vendor/SideStore/AltStore.xcodeproj \
             -scheme SideStore \
             -configuration Release \
