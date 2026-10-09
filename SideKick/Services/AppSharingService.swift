@@ -84,7 +84,13 @@ struct BuzzheavierClient {
         var pageRequest = URLRequest(url: pageURL)
         pageRequest.setValue("text/html,application/xhtml+xml", forHTTPHeaderField: "Accept")
         pageRequest.setValue("SideKick", forHTTPHeaderField: "User-Agent")
-        let (pageData, pageResponse) = try await URLSession.shared.data(for: pageRequest)
+        let session = URLSession(
+            configuration: .ephemeral,
+            delegate: RedirectBlockingDelegate(),
+            delegateQueue: nil
+        )
+        defer { session.invalidateAndCancel() }
+        let (pageData, pageResponse) = try await session.data(for: pageRequest)
         guard let pageHTTPResponse = pageResponse as? HTTPURLResponse else {
             throw AppSharingError.invalidShareLink
         }
@@ -112,12 +118,6 @@ struct BuzzheavierClient {
         // Do not allow URLSession to follow the download redirect here. If it
         // does, `data(for:)` can buffer the entire IPA in memory just to learn
         // its final URL. The redirect response contains the destination.
-        let session = URLSession(
-            configuration: .ephemeral,
-            delegate: RedirectBlockingDelegate(),
-            delegateQueue: nil
-        )
-        defer { session.invalidateAndCancel() }
         let (_, response) = try await session.data(for: request)
         guard let response = response as? HTTPURLResponse else {
             throw AppSharingError.invalidShareLink
@@ -167,7 +167,11 @@ private final class RedirectBlockingDelegate: NSObject, URLSessionTaskDelegate, 
         newRequest request: URLRequest,
         completionHandler: @escaping (URLRequest?) -> Void
     ) {
-        completionHandler(nil)
+        if task.currentRequest?.value(forHTTPHeaderField: "HX-Request") == "true" {
+            completionHandler(nil)
+        } else {
+            completionHandler(request)
+        }
     }
 }
 
