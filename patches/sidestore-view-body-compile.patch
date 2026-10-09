@@ -199,5 +199,5 @@ index 6d6a7232..3f236708 100644
 -        .task {
 -            isFreeAccount = (try? await AuthManager.shared.getAuthenticatedTeam())?.type == .free
 -        }
-+        })
++        )
      }
