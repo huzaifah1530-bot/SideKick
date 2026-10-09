@@ -60,7 +60,7 @@ struct AppManagementView: View {
                 .background((importedApp == nil ? Color.indigo : Color.blue).gradient, in: .rect(cornerRadius: 20))
             VStack(alignment: .leading, spacing: 5) {
                 Text(appName).font(.title2.weight(.bold))
-                Text(importedApp == nil ? "Installed app" : "Imported IPA")
+                Text(installedApp?.isSideKick == true ? "SideKick · Installed app" : (importedApp == nil ? "Installed app" : "Imported IPA"))
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }
@@ -115,7 +115,7 @@ struct AppManagementView: View {
             SwiftUI.Button {
                 Task { await refresh(app) }
             } label: {
-                Label(isWorking ? "Refreshing…" : "Refresh app", systemImage: "arrow.clockwise")
+                Label(isWorking ? "Refreshing…" : (app.isSideKick ? "Refresh SideKick" : "Refresh app"), systemImage: "arrow.clockwise")
                     .frame(maxWidth: .infinity)
             }
             .buttonStyle(.borderedProminent)

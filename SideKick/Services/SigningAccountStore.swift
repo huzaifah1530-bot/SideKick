@@ -205,6 +205,7 @@ final class SigningAccountStore {
         }
 
         do {
+            try await ensureSigningReady(for: target)
             let result = try await operation()
             if previous?.id != target.id, let previousCredentials {
                 try await restoreSession(previousCredentials)
@@ -218,6 +219,68 @@ final class SigningAccountStore {
             await reload()
             throw error
         }
+    }
+
+    /// Completes the device registration and certificate setup deferred by the
+    /// account sign-in screen before a real signing operation begins.
+    private func ensureSigningReady(for target: SigningAccountSummary) async throws {
+        let key = SigningSessionVault.key(
+            accountIdentifier: target.accountIdentifier,
+            teamIdentifier: target.teamIdentifier
+        )
+        let savedCredentials = try vault.load(key: key)
+
+        if CertificateManager.shared.activeCertificate != nil,
+           UserDefaults.standard.isDeviceRegistered {
+            return
+        }
+
+        guard let presenter = UIApplication.shared.topViewController() else {
+            throw SigningAccountError.presentationUnavailable
+        }
+
+        let handler = SideKickSignInFlowHandler(
+            presentingViewController: presenter,
+            appleID: savedCredentials.appleID,
+            password: savedCredentials.password,
+            onAuthenticationSuccess: { [weak self] in
+                self?.setSignInCheckpoint("Apple ID authenticated; preparing this device for signing")
+            }
+        )
+
+        let result = try await AuthManager.shared.signIn(
+            presentingViewController: presenter,
+            signInHandler: handler,
+            skipDeviceRegistration: false,
+            skipCertificateProvisioning: false,
+            skipResign: true,
+            skipHowTos: true
+        )
+
+        guard let appleID = AuthManager.shared.currentAppleID,
+              let password = AuthManager.shared.password,
+              let adsid = AuthManager.shared.adsid,
+              let xcodeToken = AuthManager.shared.xcodeToken else {
+            throw SigningAccountError.sessionNotAvailable
+        }
+
+        let accountIdentifier = result.team.account?.identifier ?? target.accountIdentifier
+        let certificate = CertificateManager.shared.activeCertificate
+        let credentials = SigningSessionCredentials(
+            appleID: appleID,
+            password: password,
+            adsid: adsid,
+            xcodeToken: xcodeToken,
+            accountIdentifier: accountIdentifier,
+            teamIdentifier: result.team.identifier,
+            certificateData: certificate?.p12Data,
+            certificatePassword: certificate?.password
+        )
+        try vault.save(credentials, key: SigningSessionVault.key(
+            accountIdentifier: accountIdentifier,
+            teamIdentifier: result.team.identifier
+        ))
+        await reload()
     }
 
     private func restoreAccountSession(_ account: SigningAccountSummary) async throws {

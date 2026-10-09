@@ -217,3 +217,40 @@ index 0000000..0000000 100644
 -    </array>
  </dict>
  </plist>
+diff --git a/Shared/Extensions/Bundle+AltStore.swift b/Shared/Extensions/Bundle+AltStore.swift
+--- a/Shared/Extensions/Bundle+AltStore.swift
++++ b/Shared/Extensions/Bundle+AltStore.swift
+@@ -16,4 +16,5 @@ private extension Bundle {
+     @objc dynamic static let activeBundle: Bundle = Bundle.main
+     @objc dynamic static let storeAppBundleIdentifier = "com.SideStore.SideStore"
+-    @objc dynamic static let appbundleIdentifier = "com.SideStore.SideStore"
++    // SideKick is the managed app. Keep the engine's self-app identity tied to the actual bundle.
++    @objc dynamic static let appbundleIdentifier = Bundle.activeBundle.bundleIdentifier ?? "com.sidekick.app"
+ }
+diff --git a/AltStore/AppDelegate.swift b/AltStore/AppDelegate.swift
+--- a/AltStore/AppDelegate.swift
++++ b/AltStore/AppDelegate.swift
+@@ -655,8 +655,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
+     }
+     
+     static func reconcileSelfReinstallationIfNeeded() {
+-        guard let appGroup = Bundle.main.altstoreAppGroup,
+-              let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) else {
+-            debugLog("[AppDelegate] reconcileSelfReinstallation: Failed to get App Group container.")
++        guard let containerURL = FileManager.default.altstoreSharedDirectory else {
++            debugLog("[AppDelegate] reconcileSelfReinstallation: Failed to get SideKick private data directory.")
+             return
+         }
+diff --git a/SideStore/Core/Operations/PipelineOperations/InstallAppOperation.swift b/SideStore/Core/Operations/PipelineOperations/InstallAppOperation.swift
+--- a/SideStore/Core/Operations/PipelineOperations/InstallAppOperation.swift
++++ b/SideStore/Core/Operations/PipelineOperations/InstallAppOperation.swift
+@@ -152,7 +152,6 @@ final class InstallAppOperation: BasePipelineOperation<InstallAppOperationContext, InstalledApp>, @unchecked Sendable {
+             let isSelfReinstall = !isDifferentSideStore &&
+                                    installedApp.storeApp?.bundleIdentifier.range(of: Bundle.Info.appbundleIdentifier) != nil
+             if isSelfReinstall {
+-                if let _ = provisioningProfiles[self.context.targetBundleIdentifier],
+-                   let appGroup = Bundle.main.altstoreAppGroup,
+-                   let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) 
++                if let _ = provisioningProfiles[self.context.targetBundleIdentifier],
++                   let containerURL = FileManager.default.altstoreSharedDirectory
+                 {

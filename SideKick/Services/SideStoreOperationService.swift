@@ -82,6 +82,7 @@ struct InstalledAppSummary: Identifiable {
     let teamIdentifier: String
 
     var id: String { bundleIdentifier }
+    var isSideKick: Bool { bundleIdentifier == Bundle.main.bundleIdentifier }
 }
 
 private enum SideStoreOperationError: LocalizedError {

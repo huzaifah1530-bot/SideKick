@@ -91,7 +91,7 @@ private struct InstalledAppRow: View {
                 .background(.indigo.gradient, in: .rect(cornerRadius: 14))
             VStack(alignment: .leading, spacing: 4) {
                 Text(app.name).font(.headline)
-                Text("Signed with \(app.accountEmail)")
+                Text(app.isSideKick ? "This app · Signed with \(app.accountEmail)" : "Signed with \(app.accountEmail)")
                     .font(.caption)
                     .foregroundStyle(.secondary)
             }
