@@ -2,22 +2,15 @@ import AppIntents
 import Foundation
 import Minimuxer
 
-struct RefreshManagedAppsIntent: LongRunningIntent {
+struct RefreshManagedAppsIntent: AppIntent {
     static let title: LocalizedStringResource = "Refresh SideKick Apps"
     static let description = IntentDescription(
         "Quietly attempts to refresh every app managed by SideKick. If today's attempt does not finish successfully, the evening automation can retry."
     )
-    static let supportedModes: IntentModes = .background
+    static let openAppWhenRun = false
 
     func perform() async throws -> some IntentResult {
-        try await performBackgroundTask {
-            await DailyRefreshAutomation.run { completed, total in
-                self.progress.totalUnitCount = Int64(max(total, 1))
-                self.progress.completedUnitCount = Int64(completed)
-                self.progress.localizedDescription = "Refreshing SideKick apps"
-                self.progress.localizedAdditionalDescription = "\(completed) of \(total)"
-            }
-        }
+        await DailyRefreshAutomation.run()
         return .result()
     }
 }
@@ -37,7 +30,7 @@ struct SideKickShortcuts: AppShortcutsProvider {
 private enum DailyRefreshAutomation {
     private static let lastSuccessfulRunKey = "sidekick.automation.last-successful-refresh"
 
-    static func run(progressHandler: @escaping @MainActor @Sendable (Int, Int) -> Void) async {
+    static func run() async {
         let calendar = Calendar.current
         if let lastSuccessfulRun = UserDefaults.standard.object(forKey: lastSuccessfulRunKey) as? Date,
            calendar.isDate(lastSuccessfulRun, inSameDayAs: .now) {
@@ -60,7 +53,7 @@ private enum DailyRefreshAutomation {
             let store = SigningAccountStore()
             await store.reload()
             let outcome = await SideStoreOperationService(accountStore: store, ipaStore: IPAImportStore())
-                .refreshAllManagedAppsQuietly(progressHandler: progressHandler)
+                .refreshAllManagedAppsQuietly()
             guard outcome.attempted > 0, outcome.succeeded == outcome.attempted else { return }
             UserDefaults.standard.set(Date.now, forKey: lastSuccessfulRunKey)
         } catch {

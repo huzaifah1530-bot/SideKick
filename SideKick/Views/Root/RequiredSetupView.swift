@@ -16,7 +16,7 @@ final class SetupStatus {
     private(set) var vpnInstalled = false
     private(set) var vpnConnected = false
     private(set) var pairingVerified = false
-    private(set) var refreshAutomationsConfigured = UserDefaults.standard.bool(forKey: Self.refreshAutomationsConfiguredKey)
+    private(set) var refreshAutomationsConfigured = UserDefaults.standard.bool(forKey: "sidekick.setup.refresh-automations-configured")
     private(set) var isCheckingPairing = false
     private(set) var isReady = false
     var message: String?
