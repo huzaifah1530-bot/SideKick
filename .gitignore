@@ -7,3 +7,4 @@ Payload/
 artifacts/
 action-logs-*/
 action-logs-*.zip
+/sidestore-reference/

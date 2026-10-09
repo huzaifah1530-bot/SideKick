@@ -10,6 +10,10 @@ settings:
     MARKETING_VERSION: "1.0.0"
     CURRENT_PROJECT_VERSION: "1"
     DEVELOPMENT_TEAM: ""
+packages:
+  ZIPFoundation:
+    url: https://github.com/weichsel/ZIPFoundation.git
+    from: 0.9.0
 targets:
   SideKick:
     type: application
@@ -30,3 +34,5 @@ targets:
         TARGETED_DEVICE_FAMILY: "1,2"
     scheme:
       testTargets: []
+    dependencies:
+      - package: ZIPFoundation

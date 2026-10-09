@@ -6,13 +6,13 @@ struct ContentView: View {
 
     var body: some View {
         TabView(selection: $selectedTab) {
-            HomeView(viewModel: HomeViewModel(service: environment.sideloadingService))
+            HomeView(viewModel: HomeViewModel(store: environment.ipaImportStore))
                 .tabItem { Label("Today", systemImage: "square.grid.2x2.fill") }
                 .tag(0)
-            LibraryView(viewModel: HomeViewModel(service: environment.sideloadingService))
+            LibraryView(viewModel: HomeViewModel(store: environment.ipaImportStore))
                 .tabItem { Label("Library", systemImage: "square.stack.3d.up.fill") }
                 .tag(1)
-            AccountsView(viewModel: HomeViewModel(service: environment.sideloadingService))
+            AccountsView()
                 .tabItem { Label("Accounts", systemImage: "person.2.fill") }
                 .tag(2)
             SettingsView()

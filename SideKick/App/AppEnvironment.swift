@@ -3,9 +3,7 @@ import Observation
 
 @Observable
 final class AppEnvironment {
-    let sideloadingService: any SideloadingService
+    let ipaImportStore: IPAImportStore
 
-    init(sideloadingService: any SideloadingService = DemoSideloadingService()) {
-        self.sideloadingService = sideloadingService
-    }
+    init(ipaImportStore: IPAImportStore = IPAImportStore()) { self.ipaImportStore = ipaImportStore }
 }
