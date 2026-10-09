@@ -49,7 +49,7 @@ struct BuzzheavierClient {
                 ?? ((payload["data"] as? [String: Any])?["id"] as? String),
             !fileID.isEmpty,
             fileID.range(of: #"^[A-Za-z0-9_-]+$"#, options: .regularExpression) != nil,
-            let shareURL = URL(string: "https://buzzheavier.com/\(fileID)")
+            let shareURL = URL(string: "https://buzzheavier.com/d/\(fileID)")
         else {
             throw AppSharingError.invalidUploadResponse
         }
@@ -61,13 +61,15 @@ struct BuzzheavierClient {
               host == "buzzheavier.com" || host == "www.buzzheavier.com" else { return shareURL }
 
         var pageURL = shareURL
-        if shareURL.pathComponents.count == 2 {
+        if shareURL.pathComponents.count == 3,
+           shareURL.pathComponents[1] == "d",
+           let fileID = shareURL.pathComponents.last {
             var components = URLComponents(url: shareURL, resolvingAgainstBaseURL: false)
-            components?.path = "/d\(shareURL.path)"
+            components?.path = "/\(fileID)"
             pageURL = components?.url ?? shareURL
         }
-        guard pageURL.pathComponents.count >= 3,
-              pageURL.pathComponents[1] == "d" else { return shareURL }
+        guard pageURL.pathComponents.count == 2,
+              pageURL.pathComponents[1] != "download" else { return shareURL }
 
         var request = URLRequest(url: pageURL.appendingPathComponent("download"))
         request.setValue("true", forHTTPHeaderField: "HX-Request")
