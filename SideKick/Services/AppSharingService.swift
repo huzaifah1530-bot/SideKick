@@ -144,8 +144,8 @@ struct BuzzheavierClient {
                   let range = Range(match.range(at: 1), in: html) else { continue }
             return String(html[range])
                 .replacingOccurrences(of: "&amp;", with: "&")
-                .replacingOccurrences(of: #"\\/"#, with: "/")
-                .replacingOccurrences(of: #"\\u0026"#, with: "&")
+                .replacingOccurrences(of: #"\/"#, with: "/")
+                .replacingOccurrences(of: #"\u0026"#, with: "&")
         }
         return nil
     }
