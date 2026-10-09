@@ -35,7 +35,7 @@ struct HomeView: View {
                     }
                 }
 
-                SwiftUI.Section("Account capacity") {
+                SwiftUI.Section {
                     if capacityRows.isEmpty {
                         Text("Add an Apple Account to see capacity.")
                             .foregroundStyle(.secondary)
@@ -44,6 +44,8 @@ struct HomeView: View {
                             LabeledContent(account.accountEmail, value: account.capacityDescription)
                         }
                     }
+                } header: {
+                    Text("Account capacity")
                 } footer: {
                     Text("Capacity reflects apps and App IDs recorded by SideKick. iOS doesn’t provide a reliable list of apps installed by other sideloaders.")
                 }

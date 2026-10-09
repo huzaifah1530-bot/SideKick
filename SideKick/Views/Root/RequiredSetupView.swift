@@ -142,7 +142,7 @@ struct RequiredSetupView: View {
                         Task {
                             await status.requestNotifications()
                             if !status.notificationsEnabled {
-                                UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
+                                await UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
                             }
                         }
                     } label: {
