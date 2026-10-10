@@ -171,6 +171,7 @@ struct GitHubUpdateDetailView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .buttonBorderShape(.capsule)
+                        .fullWidthListSeparators()
                         if eligibleAccounts.count > 1 {
                             NavigationLink {
                                 InstallAccountSelectionView(
@@ -187,6 +188,7 @@ struct GitHubUpdateDetailView: View {
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
                             .buttonStyle(.plain)
+                            .fullWidthListSeparators()
                         }
                     } else {
                         Text(eligibleAccounts.isEmpty

@@ -16,20 +16,22 @@ struct SettingsView: View {
                         RefreshSettingsView()
                     } label: {
                         Label("App Refresh", systemImage: "arrow.clockwise")
-                            .fullWidthListSeparators()
                     }
+                    .fullWidthListSeparators()
                     NavigationLink {
                         InstallSigningSettingsView()
                     } label: {
                         Label("Install & Signing", systemImage: "signature")
-                            .fullWidthListSeparators()
                     }
+                    .fullWidthListSeparators()
                     Link(destination: URL(string: "https://apps.apple.com/app/id6755608044")!) {
                         Label("Get LocalDevVPN", systemImage: "arrow.up.right")
                     }
+                    .fullWidthListSeparators()
                     Text("The current signing engine needs Wi-Fi and LocalDevVPN connected while installing or refreshing. Apple requires a Network Extension entitlement and tunnel extension; this SideKick build doesn’t have either, so it can’t switch the tunnel on itself. Open LocalDevVPN, tap Connect, then return here.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
+                        .fullWidthListSeparators()
                 }
 
                 Section("Device & Services") {
@@ -37,20 +39,20 @@ struct SettingsView: View {
                         ConnectionSettingsView()
                     } label: {
                         Label("Connection & Pairing", systemImage: "network")
-                            .fullWidthListSeparators()
                     }
+                    .fullWidthListSeparators()
                     NavigationLink {
                         AnisetteSettingsView()
                     } label: {
                         Label("Anisette", systemImage: "lock.shield")
-                            .fullWidthListSeparators()
                     }
+                    .fullWidthListSeparators()
                     NavigationLink {
                         SettingsStorageView()
                     } label: {
                         Label("Storage", systemImage: "internaldrive")
-                            .fullWidthListSeparators()
                     }
+                    .fullWidthListSeparators()
                 }
 
                 Section("App updates") {
@@ -58,8 +60,8 @@ struct SettingsView: View {
                         GitHubAccountSettingsView()
                     } label: {
                         Label("GitHub Account", systemImage: "chevron.left.forwardslash.chevron.right")
-                            .fullWidthListSeparators()
                     }
+                    .fullWidthListSeparators()
                 }
 
                 Section {

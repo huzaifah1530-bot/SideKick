@@ -99,8 +99,8 @@ struct HomeView: View {
                                 AppManagementView(installedApp: queuedUpdate.installedApp)
                             } label: {
                                 QueuedManualUpdateRow(update: queuedUpdate)
-                                    .fullWidthListSeparators()
                             }
+                            .fullWidthListSeparators()
                             .navigationLinkIndicatorVisibility(.hidden)
                         }
                         ForEach(filteredGitHubUpdates) { update in
@@ -109,8 +109,8 @@ struct HomeView: View {
                                     GitHubUpdateDetailView(candidate: update, app: app)
                                 } label: {
                                     GitHubUpdateRow(candidate: update, app: app)
-                                        .fullWidthListSeparators()
                                 }
+                                .fullWidthListSeparators()
                             }
                         }
                     }
@@ -153,8 +153,8 @@ struct HomeView: View {
                                 AppManagementView(installedApp: app)
                             } label: {
                                 installedAppRow(app)
-                                    .fullWidthListSeparators()
                             }
+                            .fullWidthListSeparators()
                             .navigationLinkIndicatorVisibility(.hidden)
                         }
                     } header: {
@@ -193,8 +193,8 @@ struct HomeView: View {
                                 }
                             } label: {
                                 ImportedIPARow(app: app)
-                                    .fullWidthListSeparators()
                             }
+                            .fullWidthListSeparators()
                             .navigationLinkIndicatorVisibility(.hidden)
                         }
                     }
@@ -415,7 +415,7 @@ struct HomeView: View {
     }
 
     private func daysRemaining(for date: Date, now: Date) -> Int {
-        max(Int(ceil(date.timeIntervalSince(now) / 86_400)), 0)
+        max(Calendar.current.dateComponents([.day], from: now, to: date).day ?? 0, 0)
     }
 
     private func expirationColor(for date: Date, now: Date) -> Color {

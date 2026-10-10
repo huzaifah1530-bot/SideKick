@@ -85,6 +85,7 @@ struct AppManagementView: View {
                             Label("Install", systemImage: "arrow.down.circle")
                                 .fontWeight(.semibold)
                         }
+                        .fullWidthListSeparators()
                         .disabled(accountStore.isWorking)
                     } else {
                         Text("Add an Apple ID in Accounts to install this app.")
@@ -98,6 +99,7 @@ struct AppManagementView: View {
                         Label("Share IPA", systemImage: "square.and.arrow.up")
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
+                    .fullWidthListSeparators()
 
                     if onDelete != nil {
                         SwiftUI.Button("Remove Imported IPA", role: .destructive) {
@@ -106,6 +108,7 @@ struct AppManagementView: View {
                                 dismiss()
                             }
                         }
+                        .fullWidthListSeparators()
                     }
                 } else if let installedApp {
                     NavigationLink {
@@ -113,6 +116,7 @@ struct AppManagementView: View {
                     } label: {
                         Label("GitHub Update Source", systemImage: "chevron.left.forwardslash.chevron.right")
                     }
+                    .fullWidthListSeparators()
 
                     SwiftUI.Button {
                         Task { await findIPAForSharing(installedApp) }
@@ -124,6 +128,7 @@ struct AppManagementView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .disabled(isFindingShareIPA)
+                    .fullWidthListSeparators()
 
                     if let pendingUpdateIPA {
                         let updateAccounts = accountStore.accounts.filter {
@@ -155,6 +160,7 @@ struct AppManagementView: View {
                             }
                             .buttonStyle(.borderedProminent)
                             .buttonBorderShape(.capsule)
+                            .fullWidthListSeparators()
                             if updateAccounts.count > 1 {
                                 NavigationLink {
                                     InstallAccountSelectionView(
@@ -178,6 +184,7 @@ struct AppManagementView: View {
                                         .frame(maxWidth: .infinity)
                                 }
                                 .buttonStyle(.plain)
+                                .fullWidthListSeparators()
                             }
                         } else {
                             Text("Updates must be signed with the account that installed this app (\(installedApp.accountEmail)). Add that account back in Accounts to continue.")
@@ -187,6 +194,7 @@ struct AppManagementView: View {
                         SwiftUI.Button("Remove Queued IPA", role: .destructive) {
                             isConfirmingQueuedUpdateRemoval = true
                         }
+                        .fullWidthListSeparators()
                         .alert("Remove queued update?", isPresented: $isConfirmingQueuedUpdateRemoval) {
                             SwiftUI.Button("Remove IPA", role: .destructive) {
                                 Task { await removeQueuedUpdate() }
@@ -205,6 +213,7 @@ struct AppManagementView: View {
                         }
                         .buttonStyle(.bordered)
                         .buttonBorderShape(.capsule)
+                        .fullWidthListSeparators()
                     }
 
                     SwiftUI.Button {
@@ -216,6 +225,7 @@ struct AppManagementView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .buttonBorderShape(.capsule)
+                        .fullWidthListSeparators()
 
                     NavigationLink {
                         RefreshOptionsView(
@@ -228,6 +238,7 @@ struct AppManagementView: View {
                             .frame(maxWidth: .infinity)
                     }
                     .buttonStyle(.plain)
+                    .fullWidthListSeparators()
 
                     NavigationLink {
                         JITEnableView(app: installedApp)
@@ -238,6 +249,7 @@ struct AppManagementView: View {
                     }
                     .buttonStyle(.bordered)
                     .buttonBorderShape(.capsule)
+                    .fullWidthListSeparators()
                 }
             }
         }
