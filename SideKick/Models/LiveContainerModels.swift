@@ -34,6 +34,7 @@ struct LiveContainerGuest: Codable, Identifiable, Sendable, Equatable {
     var iconData: Data?
     var lastSeen: Date
     var isAvailable: Bool = true
+    var observation: String? = nil
     var warning: String?
     var id: String { Self.identifier(connectionID: connectionID, folder: folder) }
 
@@ -42,7 +43,7 @@ struct LiveContainerGuest: Codable, Identifiable, Sendable, Equatable {
     }
 
     var updateTarget: GitHubUpdateTarget {
-        GitHubUpdateTarget(id: id, name: name, version: version, kind: .liveContainer)
+        GitHubUpdateTarget(id: id, name: name, version: version, kind: .liveContainer, observation: observation ?? [version, build].joined(separator: "|"))
     }
 }
 

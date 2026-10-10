@@ -23,7 +23,7 @@ final class GitHubUpdateDownloadStore {
         ipaImportStore: IPAImportStore,
         token: String?
     ) {
-        guard tasks[candidate.id] == nil, candidate.targetKind == .installed, !SideKickStorageCleanup.isRemovingFiles else { return }
+        guard tasks[candidate.id] == nil, !SideKickStorageCleanup.isRemovingFiles else { return }
         let generation = UUID()
         generations[candidate.id] = generation
         jobs[candidate.id] = GitHubUpdateDownloadJob(
@@ -52,7 +52,8 @@ final class GitHubUpdateDownloadStore {
                     expectedBundleIdentifiers: expectedBundleIdentifiers,
                     updateKey: candidate.updateKey,
                     repositoryURL: candidate.repositoryURL,
-                    targetID: candidate.bundleIdentifier
+                    targetID: candidate.bundleIdentifier,
+                    sourceIdentity: candidate.sourceIdentity
                 )
                 guard self.generations[candidate.id] == generation else { return }
                 self.jobs[candidate.id] = GitHubUpdateDownloadJob(
@@ -106,7 +107,7 @@ final class GitHubUpdateDownloadStore {
         for candidate in candidates {
             guard jobs[candidate.id] == nil,
                   let ipa = imports.first(where: {
-                      $0.queuedForInstalledAppID == candidate.bundleIdentifier && $0.githubUpdateKey == candidate.updateKey && $0.githubRepositoryURL == candidate.repositoryURL
+                      $0.githubSourceIdentity == candidate.sourceIdentity && $0.queuedForInstalledAppID == candidate.bundleIdentifier && $0.githubUpdateKey == candidate.updateKey && $0.githubRepositoryURL == candidate.repositoryURL
                   }) else { continue }
             let available = await ipaImportStore.isManagedIPAAvailable(ipa)
             guard jobs[candidate.id] == nil else { continue }

@@ -55,6 +55,8 @@ struct HomeView: View {
     @State private var remainingAppIDs: Int?
     @State private var isRefreshingAll = false
     @State private var refreshAllProgress: (completed: Int, total: Int)?
+    @State private var guestApps: [LiveContainerGuest] = []
+    @State private var githubChecks: [GitHubCheckResult] = []
     @State private var githubUpdates: [GitHubUpdateCandidate] = []
     @State private var isCheckingGitHubUpdates = false
     @State private var githubUpdateCheckFailed = false
@@ -68,7 +70,7 @@ struct HomeView: View {
     }
 
     private var filteredImportedApps: [ImportedIPA] {
-        viewModel.importedApps.filter { !installedBundleIdentifiers.contains($0.bundleIdentifier.lowercased()) }
+        viewModel.importedApps.filter { $0.queuedForInstalledAppID?.hasPrefix("livecontainer:") != true && !installedBundleIdentifiers.contains($0.bundleIdentifier.lowercased()) }
     }
 
     private var queuedManualUpdates: [QueuedManualUpdate] {
@@ -94,7 +96,6 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             List {
-                LiveContainerLibrarySection()
                 if !githubUpdates.isEmpty || !queuedManualUpdates.isEmpty {
                     SwiftUI.Section("Updates") {
                         ForEach(queuedManualUpdates) { queuedUpdate in
@@ -107,7 +108,12 @@ struct HomeView: View {
                             .navigationLinkIndicatorVisibility(.hidden)
                         }
                         ForEach(filteredGitHubUpdates) { update in
-                            if let app = installedApps.first(where: { $0.id == update.bundleIdentifier }) {
+                            if update.targetKind == .liveContainer {
+                                NavigationLink { LiveContainerGuestDetailView(guestID: update.bundleIdentifier) } label: {
+                                    GitHubUpdateRow(candidate: update, iconData: guestApps.first { $0.id == update.bundleIdentifier }?.iconData)
+                                }
+                                .fullWidthListSeparators()
+                            } else if let app = installedApps.first(where: { $0.id == update.bundleIdentifier }) {
                                 NavigationLink {
                                     GitHubUpdateDetailView(candidate: update, app: app)
                                 } label: {
@@ -115,6 +121,9 @@ struct HomeView: View {
                                 }
                                 .fullWidthListSeparators()
                             }
+                        }
+                        if let attention = githubChecks.first(where: { $0.state.needsAttention }) {
+                            Text(attention.detail ?? attention.state.message).font(.footnote).foregroundStyle(.secondary)
                         }
                     }
                 } else {
@@ -126,7 +135,7 @@ struct HomeView: View {
                             } else {
                                 Image(systemName: "arrow.down.circle").foregroundStyle(Color.sideKickAccentGradient)
                             }
-                            Text(isCheckingGitHubUpdates ? "Checking for Updates" : (githubUpdateCheckFailed ? "Couldn’t Check GitHub Updates" : "No Updates Available"))
+                            Text(updateCheckStatus)
                                 .font(.subheadline.weight(.medium))
                             Spacer()
                         }
@@ -186,6 +195,8 @@ struct HomeView: View {
                         }
                     }
                 }
+
+                LiveContainerLibrarySection()
 
                 if !filteredImportedApps.isEmpty {
                     SwiftUI.Section("Ready to Install") {
@@ -366,24 +377,34 @@ struct HomeView: View {
         await scanGitHubUpdates()
     }
 
+    private var updateCheckStatus: String {
+        if isCheckingGitHubUpdates { return "Checking for Updates" }
+        if githubUpdateCheckFailed { return "Couldn’t Check GitHub Updates" }
+        if githubChecks.contains(where: { $0.state.needsAttention }) { return "Update Tracking Needs Attention" }
+        if githubChecks.contains(where: { $0.state == .skipped }) { return "Latest Builds Were Skipped" }
+        if githubChecks.contains(where: { $0.state == .current }) { return "Confirmed Builds Are Current" }
+        return "No Confirmed Updates"
+    }
+
     private var filteredGitHubUpdates: [GitHubUpdateCandidate] {
         githubUpdates
     }
 
     private func scanGitHubUpdates() async {
-        NotificationCenter.default.post(name: .sideKickLiveContainerCheckRequested, object: nil)
         let generation = UUID()
         githubScanGeneration = generation
         isCheckingGitHubUpdates = true
         defer {
             if githubScanGeneration == generation { isCheckingGitHubUpdates = false }
         }
-        let result = await GitHubUpdateScanner.scan(filteredInstalledApps)
+        let result = await GitHubUpdateScanner.scanAll(filteredInstalledApps)
         let candidates = result.candidates
         let didFailCheck = result.didFail
         guard githubScanGeneration == generation else { return }
         await environment.githubUpdateDownloads.restoreQueuedFiles(for: candidates, ipaImportStore: environment.ipaImportStore)
         guard githubScanGeneration == generation else { return }
+        guestApps = (try? await environment.liveContainerStore.snapshot().apps) ?? []
+        githubChecks = result.checks
         githubUpdates = candidates
         await GitHubUpdateNotificationScheduler.notify(candidates)
         githubUpdateCheckFailed = didFailCheck

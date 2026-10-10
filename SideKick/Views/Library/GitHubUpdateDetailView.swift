@@ -3,7 +3,9 @@ import UIKit
 
 struct GitHubUpdateRow: View {
     let candidate: GitHubUpdateCandidate
-    let app: InstalledAppSummary
+    let iconData: Data?
+    init(candidate: GitHubUpdateCandidate, app: InstalledAppSummary) { self.candidate = candidate; iconData = app.iconData }
+    init(candidate: GitHubUpdateCandidate, iconData: Data?) { self.candidate = candidate; self.iconData = iconData }
     @Environment(AppEnvironment.self) private var environment
 
     private var downloadJob: GitHubUpdateDownloadJob? { environment.githubUpdateDownloads.jobs[candidate.id] }
@@ -11,7 +13,7 @@ struct GitHubUpdateRow: View {
     var body: some View {
         VStack(spacing: 9) {
             HStack(spacing: 12) {
-                if let data = app.iconData, let image = UIImage(data: data) {
+                if let data = iconData, let image = UIImage(data: data) {
                     Image(uiImage: image).resizable().scaledToFit().frame(width: 50, height: 50)
                         .clipShape(.rect(cornerRadius: 11))
                 } else {
@@ -25,7 +27,7 @@ struct GitHubUpdateRow: View {
                         .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                 }
                 Spacer()
-                Text(downloadJob?.isDownloading == true ? "DOWNLOADING" : "UPDATE")
+                Text(downloadJob?.isDownloading == true ? "DOWNLOADING" : candidate.isKnownNewer ? "UPDATE" : "REVIEW")
                     .font(.caption.weight(.semibold))
                     .foregroundStyle(downloadJob?.isDownloading == true ? Color.sideKickAccent : .blue)
             }
@@ -41,7 +43,7 @@ struct GitHubUpdateRow: View {
     }
 
     private var updateStatus: String {
-        guard let job = downloadJob else { return "Update available · \(candidate.newVersion)" }
+        guard let job = downloadJob else { return "\(candidate.isKnownNewer ? "Update available" : "Confirm installed build") · \(candidate.newVersion)" }
         if job.isDownloading {
             let transferred = job.bytesWritten > 0
                 ? ByteCountFormatter.string(fromByteCount: job.bytesWritten, countStyle: .file)
@@ -54,7 +56,7 @@ struct GitHubUpdateRow: View {
         }
         if job.queuedIPA != nil { return "Downloaded · Ready to update" }
         if job.errorMessage != nil { return "Download failed · Tap to retry" }
-        return "Update available · \(candidate.newVersion)"
+        return "\(candidate.isKnownNewer ? "Update available" : "Confirm installed build") · \(candidate.newVersion)"
     }
 }
 
@@ -84,6 +86,9 @@ struct GitHubUpdateDetailView: View {
 
     var body: some View {
         List {
+            if !candidate.isKnownNewer {
+                Section { Text("The installed GitHub build is unverified. Review this downloadable build or confirm the build you already installed.").foregroundStyle(.secondary) }
+            }
             Section { GitHubTokenSelectionLink(selection: $tokenID).disabled(downloadJob?.isDownloading == true) }
             if let errorMessage {
                 Section {
@@ -103,9 +108,9 @@ struct GitHubUpdateDetailView: View {
                     }
                     VStack(alignment: .leading, spacing: 5) {
                         Text(app.name).font(.title3.weight(.semibold))
-                        Text(app.version == downloadJob?.queuedIPA?.version
-                            ? "Version \(app.version)"
-                            : "\(app.version)  →  \(downloadJob?.queuedIPA?.version ?? candidate.newVersion)")
+                        Text(app.version == downloadJob?.queuedIPA?.version && app.buildVersion == downloadJob?.queuedIPA?.buildVersion
+                            ? "Version \(app.version) · Build \(app.buildVersion)"
+                            : "\(app.version) (\(app.buildVersion))  →  \(downloadJob?.queuedIPA?.version ?? candidate.newVersion) (\(downloadJob?.queuedIPA?.buildVersion ?? "unknown build"))")
                             .foregroundStyle(.secondary)
                         if candidate.source == .actionsArtifact {
                             Text(candidate.newVersion)
@@ -302,7 +307,7 @@ struct GitHubUpdateDetailView: View {
     @MainActor
     private func resolveUpdate(markInstalled: Bool) async {
         do {
-            guard var configuration = try await configurationStore.configuration(for: app.id) else { return }
+            guard let configuration = try await configurationStore.configuration(for: app.id) else { return }
             guard configuration.sourceIdentity == candidate.sourceIdentity else {
                 environment.githubUpdateDownloads.removeJob(for: candidate)
                 dismiss()
@@ -315,13 +320,15 @@ struct GitHubUpdateDetailView: View {
                 try await environment.ipaImportStore.delete(ipa)
             }
             environment.githubUpdateDownloads.removeJob(for: candidate)
-            if markInstalled {
-                configuration.lastInstalledUpdateKey = candidate.updateKey
-                configuration.dismissedUpdateKey = nil
-            } else {
-                configuration.dismissedUpdateKey = candidate.updateKey
+            if let source = candidate.sourceIdentity {
+                if markInstalled {
+                    let apps = await SideStoreOperationService(accountStore: accountStore, ipaStore: environment.ipaImportStore).installedApps()
+                    guard let fresh = apps.first(where: { $0.id == app.id }) else { return }
+                    _ = try await configurationStore.recordInstalled(key: candidate.updateKey, for: fresh.updateTarget, expectedSource: source)
+                } else {
+                    _ = try await configurationStore.skip(key: candidate.updateKey, targetID: app.id, expectedSource: source)
+                }
             }
-            try await configurationStore.save(configuration)
             dismiss()
         } catch { errorMessage = error.localizedDescription }
     }
@@ -343,12 +350,6 @@ struct GitHubUpdateDetailView: View {
     @MainActor
     private func finishUpdate(_ ipa: ImportedIPA) async {
         do {
-            var configuration = try await configurationStore.configuration(for: app.id)
-            if configuration?.sourceIdentity == candidate.sourceIdentity {
-                configuration?.lastInstalledUpdateKey = candidate.updateKey
-                configuration?.dismissedUpdateKey = nil
-            }
-            if let configuration { try await configurationStore.save(configuration) }
             try await environment.ipaImportStore.delete(ipa)
             environment.githubUpdateDownloads.removeJob(for: candidate)
             dismiss()

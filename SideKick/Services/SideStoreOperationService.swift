@@ -33,20 +33,23 @@ final class SideStoreOperationService {
 
             // Keep an installed record visible even if its saved account needs
             // reconnecting after a certificate/session change.
-            return candidates.map { app -> (InstalledApp, String, String, String, String, String, String, String, String, Date) in
+            return candidates.map { app -> (InstalledApp, String, String, String, String, String, String, String, String, Date, String?) in
                 let team = app.team
                 let account = team?.account
+                let runningBundle = app.bundleIdentifier == StoreApp.altstoreAppID ? Bundle(url: Bundle.Info.activeBundleURL) : nil
+                let runningIdentity = runningBundle?.executableURL.flatMap { try? Data(contentsOf: $0) }.flatMap { GitHubExecutableIdentity.read($0) }
                 return (
                     app,
                     app.bundleIdentifier,
                     app.resignedBundleIdentifier,
                     app.name,
-                    app.version,
-                    app.buildVersion,
+                    runningBundle?.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? app.version,
+                    runningBundle?.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? app.buildVersion,
                     account?.appleID ?? "Sign in required",
                     account?.identifier ?? "",
                     team?.identifier ?? app.customProvisioningProfile?.teamIdentifier ?? "",
-                    app.expirationDate
+                    app.expirationDate,
+                    runningIdentity ?? app.appBundleFingerprint
                 )
             }
         }
@@ -64,12 +67,18 @@ final class SideStoreOperationService {
                 accountIdentifier: record.7,
                 teamIdentifier: record.8,
                 iconData: iconData,
-                expirationDate: record.9
+                expirationDate: record.9,
+                contentFingerprint: record.10
             ))
         }
         let identities = Dictionary(grouping: summaries, by: \.bundleIdentifier).mapValues { $0.map(\.id) }
         try? await GitHubUpdateConfigurationStore.shared.migrateInstalledIdentifiers(identities)
         try? await ipaStore.migrateQueuedInstallations(identities)
+        if let bundle = Bundle(url: Bundle.Info.activeBundleURL), let binaryURL = bundle.executableURL,
+           let binary = try? Data(contentsOf: binaryURL), let identity = GitHubExecutableIdentity.read(binary),
+           let target = summaries.first(where: { $0.id == bundle.bundleIdentifier })?.updateTarget {
+            _ = try? await GitHubUpdateConfigurationStore.shared.recoverSelfUpdate(for: target, executableIdentity: identity)
+        }
         return summaries.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
@@ -87,41 +96,68 @@ final class SideStoreOperationService {
         try SideKickStorageCleanup.ensureOperationAllowed()
         let vpnLease = try await LocalVPNService.shared.acquire()
         defer { LocalVPNService.shared.release(vpnLease) }
-        try await retryAfterClearingRevokedAssignedProfile(
-            for: ipa.bundleIdentifier,
-            recoveryHandler: recoveryHandler
-        ) {
-            try await accountStore.withAccount(
-                accountIdentifier: account.accountIdentifier,
-                teamIdentifier: account.teamIdentifier
+        let runningBundle = Bundle(url: Bundle.Info.activeBundleURL)
+        let selfTargetID = ipa.queuedForInstalledAppID == runningBundle?.bundleIdentifier ? ipa.queuedForInstalledAppID : nil
+        if let targetID = selfTargetID, let key = ipa.githubUpdateKey,
+           let source = ipa.githubSourceIdentity, let identity = ipa.executableIdentity,
+           ALTApplication(fileURL: Bundle.Info.activeBundleURL)?.provisioningProfile?.teamIdentifier == account.teamIdentifier {
+            try await GitHubUpdateConfigurationStore.shared.prepareSelfUpdate(key: key, targetID: targetID,
+                expectedSource: source, executableIdentity: identity)
+        }
+        let installedID: String
+        do {
+            installedID = try await retryAfterClearingRevokedAssignedProfile(
+                for: ipa.bundleIdentifier,
+                recoveryHandler: recoveryHandler
             ) {
-                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                    guard !SideKickStorageCleanup.isRemovingFiles else {
-                        continuation.resume(throwing: StorageCleanupError.operationRunning)
-                        return
+                try await accountStore.withAccount(
+                    accountIdentifier: account.accountIdentifier,
+                    teamIdentifier: account.teamIdentifier
+                ) {
+                    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+                        guard !SideKickStorageCleanup.isRemovingFiles else {
+                            continuation.resume(throwing: StorageCleanupError.operationRunning)
+                            return
+                        }
+                        let observationBox = ProgressObservationBox()
+                        let group = AppManager.shared.install(.url(url), presentingViewController: presenter) { result in
+                            observationBox.finish()
+                            switch result {
+                            case .failure(let error): continuation.resume(throwing: error)
+                            case .success(let app):
+                                guard let context = app.managedObjectContext else {
+                                    continuation.resume(throwing: SideStoreOperationError.installedAppUnavailable)
+                                    return
+                                }
+                                context.perform { continuation.resume(returning: app.resignedBundleIdentifier) }
+                            }
+                        }
+                        let observation = group.progress.observe(\.fractionCompleted, options: [.initial, .new]) { progress, _ in
+                            let fraction = progress.fractionCompleted
+                            Task { @MainActor in progressHandler(fraction) }
+                        }
+                        observationBox.retain(observation)
                     }
-                    let observationBox = ProgressObservationBox()
-                    let group = AppManager.shared.install(.url(url), presentingViewController: presenter) { result in
-                        observationBox.finish()
-                        continuation.resume(with: result.map { _ in () })
-                    }
-                    let observation = group.progress.observe(\.fractionCompleted, options: [.initial, .new]) { progress, _ in
-                        let fraction = progress.fractionCompleted
-                        Task { @MainActor in progressHandler(fraction) }
-                    }
-                    observationBox.retain(observation)
                 }
             }
+        } catch {
+            if let targetID = selfTargetID, let key = ipa.githubUpdateKey {
+                try? await GitHubUpdateConfigurationStore.shared.cancelSelfUpdate(targetID: targetID, key: key)
+            }
+            throw error
         }
-        if let origin = ipa.githubImportConfiguration {
-            let installed = await installedApps()
-            let bundleID = installed.first { $0.teamIdentifier == account.teamIdentifier && $0.updateMatchingBundleIdentifiers.contains(ipa.bundleIdentifier.lowercased()) }?.id ?? ipa.bundleIdentifier
-            let configuration = GitHubUpdateConfiguration(bundleIdentifier: bundleID,
-                repositoryURL: origin.repositoryURL, source: origin.source,
-                workflowFile: origin.workflowFile, branch: origin.branch, assetName: origin.assetName,
-                baselineUpdateKey: origin.baselineUpdateKey, lastInstalledUpdateKey: origin.lastInstalledUpdateKey,
-                tokenID: origin.tokenID)
-            try await GitHubUpdateConfigurationStore.shared.save(configuration)
+        // A self-install callback can arrive in the old process before replacement.
+        // Leave the pending receipt for the new binary to confirm on its next launch.
+        let selfBinaryMatches = selfTargetID == nil || (ipa.executableIdentity != nil &&
+            runningBundle?.executableURL.flatMap { try? Data(contentsOf: $0) }.flatMap { GitHubExecutableIdentity.read($0) } == ipa.executableIdentity)
+        if selfBinaryMatches, let target = await installedApps().first(where: { $0.id == installedID })?.updateTarget,
+           let key = ipa.githubUpdateKey ?? ipa.githubImportConfiguration?.effectiveBaselineKey {
+            let store = GitHubUpdateConfigurationStore.shared
+            if let origin = ipa.githubImportConfiguration {
+                _ = try await store.recordSuccessfulImport(origin, key: key, for: target)
+            } else if let expectedSource = ipa.githubSourceIdentity, ipa.queuedForInstalledAppID == target.id {
+                _ = try await store.recordInstalled(key: key, for: target, expectedSource: expectedSource)
+            }
         }
         await Self.pruneUnusedCaches()
         await ExpirationNotificationScheduler.update()
@@ -364,7 +400,7 @@ private final class ProgressObservationBox: @unchecked Sendable {
 
 struct InstalledAppSummary: Identifiable, Sendable {
     let bundleIdentifier: String
-    var updateTarget: GitHubUpdateTarget { GitHubUpdateTarget(id: id, name: name, version: version) }
+    var updateTarget: GitHubUpdateTarget { GitHubUpdateTarget(id: id, name: name, version: version, observation: [version, buildVersion, contentFingerprint ?? "no-content-fingerprint"].joined(separator: "|")) }
     let resignedBundleIdentifier: String
     let name: String
     let version: String
@@ -374,6 +410,7 @@ struct InstalledAppSummary: Identifiable, Sendable {
     let teamIdentifier: String
     let iconData: Data?
     let expirationDate: Date
+    var contentFingerprint: String? = nil
 
     var id: String { resignedBundleIdentifier }
 

@@ -3,35 +3,6 @@ import ZIPFoundation
 
 actor GitHubUpdateService {
     private struct GitHubUser: Decodable { let login: String }
-    private struct Release: Decodable {
-        let id: Int
-        let tag_name: String
-        let name: String?
-        let published_at: String?
-        let assets: [ReleaseAsset]
-    }
-    private struct ReleaseAsset: Decodable {
-        let name: String
-        let url: URL
-    }
-    private struct WorkflowRuns: Decodable { let workflow_runs: [WorkflowRun] }
-    private struct WorkflowRun: Decodable {
-        let id: Int
-        let run_number: Int
-        let name: String?
-        let display_title: String?
-        let head_branch: String
-        let conclusion: String?
-        let created_at: String?
-    }
-    private struct Artifacts: Decodable { let artifacts: [Artifact] }
-    private struct Artifact: Decodable {
-        let id: Int
-        let name: String
-        let expired: Bool
-        let archive_download_url: URL
-    }
-
     struct Repository: Decodable, Sendable { let default_branch: String }
     struct Workflow: Decodable, Identifiable, Sendable {
         let id: Int
@@ -51,137 +22,44 @@ actor GitHubUpdateService {
         return result.workflows
     }
 
+    private let historyClient = GitHubHistoryClient()
+
     func importChoices(repositoryURL: String, source: GitHubUpdateSource, workflow: String, branch: String, token: String?, page: Int) async throws -> GitHubImportPage {
-        let repo = try parseRepository(repositoryURL)
-        let canonicalURL = "https://github.com/\(repo.owner)/\(repo.name)"
-        func choice(key: String, title: String, version: String, name: String, url: URL, date: String?) -> GitHubImportChoice {
-            GitHubImportChoice(candidate: GitHubUpdateCandidate(
-                bundleIdentifier: "", appName: title, currentVersion: "", newVersion: version,
-                title: title, assetName: name, downloadURL: url, updateKey: key,
-                source: source, repositoryURL: canonicalURL
-            ), workflow: workflow, branch: branch, date: parseGitHubDate(date))
-        }
-        if source == .latestRelease {
-            let releases: [Release] = try await fetch(apiRequest(path: "/repos/\(repo.owner)/\(repo.name)/releases?per_page=100&page=\(page)", token: token))
-            let choices = releases.flatMap { release in
-                release.assets.filter { $0.name.lowercased().hasSuffix(".ipa") }.map { asset in
-                    choice(key: "release:\(release.id):\(release.tag_name):\(asset.name)", title: release.name ?? release.tag_name, version: release.tag_name, name: asset.name, url: asset.url, date: release.published_at)
-                }
-            }
-            return GitHubImportPage(choices: choices, hasMore: releases.count == 100)
-        }
-        let allowed = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~"))
-        guard let workflowPath = workflow.addingPercentEncoding(withAllowedCharacters: allowed),
-              let branchQuery = branch.addingPercentEncoding(withAllowedCharacters: allowed) else { throw GitHubUpdateError.invalidRepository }
-        let runs: WorkflowRuns = try await fetch(apiRequest(path: "/repos/\(repo.owner)/\(repo.name)/actions/workflows/\(workflowPath)/runs?branch=\(branchQuery)&status=success&per_page=10&page=\(page)", token: token))
-        var choices: [GitHubImportChoice] = []
-        for run in runs.workflow_runs where run.conclusion == "success" && run.head_branch == branch {
-            try Task.checkCancellation()
-            var artifactPage = 1
-            while true {
-                let artifacts: Artifacts = try await fetch(apiRequest(path: "/repos/\(repo.owner)/\(repo.name)/actions/runs/\(run.id)/artifacts?per_page=100&page=\(artifactPage)", token: token))
-                choices += artifacts.artifacts.filter { !$0.expired }.map { artifact in
-                    choice(key: "actions:\(run.id):\(artifact.id)", title: "Build \(run.run_number) · \(run.display_title ?? run.name ?? "Build")", version: "Build \(run.run_number)", name: artifact.name, url: artifact.archive_download_url, date: run.created_at)
-                }
-                if artifacts.artifacts.count < 100 { break }
-                artifactPage += 1
-            }
-        }
-        return GitHubImportPage(choices: choices, hasMore: runs.workflow_runs.count == 10)
+        let configuration = GitHubUpdateConfiguration(bundleIdentifier: "", repositoryURL: repositoryURL,
+            source: source, workflowFile: workflow, branch: branch, assetName: "", lastInstalledUpdateKey: nil)
+        let result = try await historyClient.page(configuration: configuration, token: token, page: page, allowMultiple: true)
+        return GitHubImportPage(choices: result.builds.map { build in
+            GitHubImportChoice(candidate: GitHubUpdateCandidate(bundleIdentifier: "", appName: build.title,
+                currentVersion: "", newVersion: build.version, title: build.title, assetName: build.assetName,
+                downloadURL: build.downloadURL, updateKey: build.key, source: source,
+                repositoryURL: GitHubSourceIdentity.repository(repositoryURL)), workflow: workflow, branch: branch, date: build.date)
+        }, hasMore: result.hasMore)
     }
 
-    func candidate(for app: GitHubUpdateTarget, configuration: GitHubUpdateConfiguration, token: String? = nil) async throws -> GitHubUpdateCandidate? {
-        let repository = try parseRepository(configuration.repositoryURL)
-        switch configuration.source {
-        case .latestRelease:
-            let history = try await releaseHistory(owner: repository.owner, name: repository.name, assetName: configuration.assetName, token: token)
-            return candidate(from: history, for: app, configuration: configuration)
-        case .actionsArtifact:
-            let history = try await actionsHistory(owner: repository.owner, name: repository.name, configuration: configuration, token: token)
-            return candidate(from: history, for: app, configuration: configuration)
+    func check(for target: GitHubUpdateTarget, configuration: GitHubUpdateConfiguration, token: String? = nil) async throws -> GitHubCheckResult {
+        var history: [GitHubTrackedBuild] = []
+        var missingNewerDownload = false
+        for page in 1...5 {
+            try Task.checkCancellation()
+            let result = try await historyClient.page(configuration: configuration, token: token, page: page)
+            history += result.builds
+            missingNewerDownload = missingNewerDownload || result.newerBuildHasNoDownload
+            if !history.isEmpty || !result.hasMore { break }
         }
+        let result = GitHubTrackingPolicy.check(target: target, configuration: configuration, history: history)
+        if result.state == .current && missingNewerDownload {
+            return GitHubCheckResult(targetID: target.id, state: .noMatchingDownload,
+                detail: "A more recent successful build has no matching downloadable file yet.")
+        }
+        return result
+    }
+
+    func candidate(for target: GitHubUpdateTarget, configuration: GitHubUpdateConfiguration, token: String? = nil) async throws -> GitHubUpdateCandidate? {
+        try await check(for: target, configuration: configuration, token: token).candidate
     }
 
     func history(for configuration: GitHubUpdateConfiguration, token: String? = nil, page: Int = 1) async throws -> [GitHubUpdateHistoryEntry] {
-        let repository = try parseRepository(configuration.repositoryURL)
-        switch configuration.source {
-        case .latestRelease:
-            return try await releaseHistory(owner: repository.owner, name: repository.name, assetName: configuration.assetName, token: token, page: page)
-                .map(\.entry)
-        case .actionsArtifact:
-            return try await actionsHistory(owner: repository.owner, name: repository.name, configuration: configuration, token: token, page: page)
-                .map(\.entry)
-        }
-    }
-
-    private struct UpdateItem {
-        let entry: GitHubUpdateHistoryEntry
-        let version: String
-        let title: String
-        let assetName: String
-        let url: URL
-    }
-
-    private func matchesAsset(_ name: String, filter: String) -> Bool {
-        guard !filter.isEmpty else { return true }
-        if !filter.contains("*") { return name.localizedCaseInsensitiveContains(filter) }
-        let pattern = "^" + filter.components(separatedBy: "*").map(NSRegularExpression.escapedPattern(for:)).joined(separator: ".*") + "$"
-        return name.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
-    }
-
-    private func releaseHistory(owner: String, name: String, assetName: String, token: String?, page: Int = 1) async throws -> [UpdateItem] {
-        var request = apiRequest(path: "/repos/\(owner)/\(name)/releases?per_page=100&page=\(page)", token: token)
-        request.httpMethod = "GET"
-        let releases: [Release] = try await fetch(request)
-        return releases.compactMap { release in
-            guard let asset = release.assets.first(where: {
-                $0.name.lowercased().hasSuffix(".ipa")
-                    && matchesAsset($0.name, filter: assetName)
-            }) else { return nil }
-            let key = "release:\(release.id):\(release.tag_name):\(asset.name)"
-            return UpdateItem(
-                entry: GitHubUpdateHistoryEntry(key: key, title: release.name ?? release.tag_name, date: parseGitHubDate(release.published_at)),
-                version: release.tag_name, title: release.name ?? release.tag_name, assetName: asset.name, url: asset.url
-            )
-        }
-    }
-
-    private func actionsHistory(owner: String, name: String, configuration: GitHubUpdateConfiguration, token: String?, page: Int = 1) async throws -> [UpdateItem] {
-        let componentCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~"))
-        let workflow = configuration.workflowFile.addingPercentEncoding(withAllowedCharacters: componentCharacters) ?? configuration.workflowFile
-        let branch = configuration.branch.addingPercentEncoding(withAllowedCharacters: componentCharacters) ?? configuration.branch
-        var request = apiRequest(path: "/repos/\(owner)/\(name)/actions/workflows/\(workflow)/runs?branch=\(branch)&status=success&per_page=10&page=\(page)", token: token)
-        request.httpMethod = "GET"
-        let runs: WorkflowRuns = try await fetch(request)
-        var items: [UpdateItem] = []
-        for run in runs.workflow_runs where run.conclusion == "success" && run.head_branch == configuration.branch {
-            var artifactRequest = apiRequest(path: "/repos/\(owner)/\(name)/actions/runs/\(run.id)/artifacts?per_page=100", token: token)
-            artifactRequest.httpMethod = "GET"
-            let artifacts: Artifacts = try await fetch(artifactRequest)
-            guard let artifact = artifacts.artifacts.first(where: {
-                !$0.expired && matchesAsset($0.name, filter: configuration.assetName)
-            }) else { continue }
-            let key = "actions:\(run.id):\(artifact.id)"
-            let title = run.name ?? run.display_title ?? "Successful GitHub Actions build"
-            items.append(UpdateItem(
-                entry: GitHubUpdateHistoryEntry(key: key, title: "Build \(run.run_number) · \(title)", date: parseGitHubDate(run.created_at)),
-                version: "Build \(run.run_number)", title: title, assetName: artifact.name, url: artifact.archive_download_url
-            ))
-        }
-        return items
-    }
-
-    private func candidate(from history: [UpdateItem], for app: GitHubUpdateTarget, configuration: GitHubUpdateConfiguration) -> GitHubUpdateCandidate? {
-        guard let baselineKey = configuration.effectiveBaselineKey, let item = history.first,
-              GitHubBuildComparison.isNewer(item.entry.key, than: baselineKey, historyKeys: history.map { $0.entry.key }) else { return nil }
-        guard item.entry.key != configuration.dismissedUpdateKey else { return nil }
-        guard item.entry.key != baselineKey else { return nil }
-        return GitHubUpdateCandidate(
-            bundleIdentifier: app.id, appName: app.name, currentVersion: app.version,
-            newVersion: item.version, title: item.title, assetName: item.assetName,
-            downloadURL: item.url, updateKey: item.entry.key, source: configuration.source,
-            repositoryURL: configuration.repositoryURL, targetKind: app.kind, sourceIdentity: configuration.sourceIdentity
-        )
+        try await historyClient.page(configuration: configuration, token: token, page: page).builds.map(\.historyEntry)
     }
 
     private func legacyReleaseKey(for currentKey: String) -> String? {
@@ -370,7 +248,7 @@ struct GitHubImportChoice: Identifiable, Sendable {
         return GitHubUpdateConfiguration(bundleIdentifier: bundleIdentifier,
             repositoryURL: candidate.repositoryURL ?? "", source: candidate.source,
             workflowFile: workflow, branch: branch, assetName: assetFilter,
-            baselineUpdateKey: candidate.updateKey, lastInstalledUpdateKey: candidate.updateKey,
+            baselineUpdateKey: nil, lastInstalledUpdateKey: nil,
             tokenID: tokenID)
     }
 }

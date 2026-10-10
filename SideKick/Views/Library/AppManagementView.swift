@@ -293,16 +293,6 @@ struct AppManagementView: View {
     @MainActor
     private func finishQueuedUpdate(_ ipa: ImportedIPA) async {
         do {
-            if let updateKey = ipa.githubUpdateKey,
-               let repositoryURL = ipa.githubRepositoryURL {
-                let store = GitHubUpdateConfigurationStore.shared
-                if var configuration = try await store.configuration(for: installedApp?.id ?? bundleIdentifier),
-                   configuration.repositoryURL == repositoryURL {
-                    configuration.lastInstalledUpdateKey = updateKey
-                    configuration.dismissedUpdateKey = nil
-                    try await store.save(configuration)
-                }
-            }
             try await environment.ipaImportStore.delete(ipa)
             pendingUpdateIPA = nil
             await reloadManagementState()

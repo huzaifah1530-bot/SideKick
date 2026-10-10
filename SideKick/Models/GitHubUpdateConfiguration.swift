@@ -6,6 +6,7 @@ struct GitHubUpdateTarget: Sendable {
     let name: String
     let version: String
     var kind: Kind = .installed
+    var observation: String? = nil
 }
 
 enum GitHubBuildComparison {
@@ -48,18 +49,36 @@ struct GitHubUpdateConfiguration: Codable, Identifiable, Hashable, Sendable {
     var lastInstalledUpdateKey: String?
     var dismissedUpdateKey: String? = nil
     var tokenID: String? = nil
+    var installedBuild: GitHubInstalledBuild? = nil
+    var pendingSelfUpdate: GitHubPendingSelfUpdate? = nil
 
     var effectiveBaselineKey: String? { lastInstalledUpdateKey ?? baselineUpdateKey }
-    var sourceIdentity: String { [repositoryURL, source.rawValue, workflowFile, branch, assetName].joined(separator: "\n") }
+    var sourceIdentity: String {
+        let repo = GitHubSourceIdentity.repository(repositoryURL)
+        let workflow = workflowFile.trimmingCharacters(in: .whitespacesAndNewlines).replacingOccurrences(of: ".github/workflows/", with: "")
+        let branch = branch.trimmingCharacters(in: .whitespacesAndNewlines)
+        return [repo, source.rawValue, source == .actionsArtifact ? workflow : "",
+            source == .actionsArtifact && branch != "*" ? branch : "", assetName.trimmingCharacters(in: .whitespacesAndNewlines).lowercased()].joined(separator: "\n")
+    }
 
-    mutating func setInstalledBaseline(_ key: String?) {
+    mutating func confirmInstalled(_ key: String, observation: String?) {
+        pendingSelfUpdate = nil
+        installedBuild = GitHubInstalledBuild(key: key, sourceIdentity: sourceIdentity, observation: observation, confirmedAt: .now)
+        baselineUpdateKey = key
+        lastInstalledUpdateKey = key
+        dismissedUpdateKey = nil
+    }
+
+    mutating func setInstalledBaseline(_ key: String?, observation: String? = nil) {
+        pendingSelfUpdate = nil
         if key != effectiveBaselineKey { lastInstalledUpdateKey = nil; dismissedUpdateKey = nil }
         baselineUpdateKey = key
+        if let key { confirmInstalled(key, observation: observation); lastInstalledUpdateKey = nil }
+        else { installedBuild = nil; lastInstalledUpdateKey = nil }
     }
 
     func hasSameSource(as other: GitHubUpdateConfiguration) -> Bool {
-        repositoryURL == other.repositoryURL && source == other.source && workflowFile == other.workflowFile
-            && branch == other.branch && assetName == other.assetName
+        sourceIdentity == other.sourceIdentity
     }
 }
 
@@ -84,6 +103,7 @@ struct GitHubUpdateCandidate: Identifiable, Equatable, Sendable {
     var repositoryURL: String? = nil
     var targetKind: GitHubUpdateTarget.Kind = .installed
     var sourceIdentity: String? = nil
+    var isKnownNewer: Bool = true
 
     var id: String { "\(bundleIdentifier):\(updateKey)" }
 }

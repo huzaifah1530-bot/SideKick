@@ -6,18 +6,12 @@ struct LiveContainerLibrarySection: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.scenePhase) private var scenePhase
     @State private var state = LiveContainerState()
-    @State private var updates: [GitHubUpdateCandidate] = []
     @State private var message: String?
-    @State private var checking = false
 
     var body: some View {
-        Section {
-            NavigationLink {
-                LiveContainerConnectionsView()
-            } label: {
-                Label(state.connections.isEmpty ? "Link LiveContainer" : "Manage LiveContainer", systemImage: "square.stack.3d.up")
-            }
-            .fullWidthListSeparators()
+        Group {
+            if !state.apps.isEmpty {
+                Section {
             ForEach(state.apps) { app in
                 NavigationLink {
                     LiveContainerGuestDetailView(guestID: app.id)
@@ -37,47 +31,31 @@ struct LiveContainerLibrarySection: View {
                             if !app.isAvailable { Text("Unavailable · previous metadata").font(.caption).foregroundStyle(.orange) }
                         }
                         Spacer()
-                        if updates.contains(where: { $0.bundleIdentifier == app.id }) {
-                            Image(systemName: "arrow.down.circle.fill").foregroundStyle(.blue).accessibilityLabel("Update available")
-                        }
                     }
                     .padding(.vertical, 4)
                 }
                 .fullWidthListSeparators()
             }
-            if checking { ProgressView("Checking guest updates…") }
             if let message { Text(message).font(.footnote).foregroundStyle(.secondary) }
-        } header: { Text("LiveContainer") } footer: {
-            if state.connections.isEmpty {
-                Text("Link an Applications folder exposed in Files. Guest apps are managed separately from signed apps.")
+                } header: { Text("LiveContainer") }
             }
         }
-        .task { await reload(checkUpdates: true) }
+        .task { await reload() }
         .onChange(of: scenePhase) { _, value in
-            if value == .active { Task { await reload(checkUpdates: true) } }
+            if value == .active { Task { await reload() } }
         }
         .onReceive(NotificationCenter.default.publisher(for: .sideKickLiveContainerDidChange)) { _ in
-            Task { await reload(checkUpdates: false) }
+            Task { await reload() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .sideKickGitHubSettingsDidChange)) { _ in
-            Task { await reload(checkUpdates: true) }
+            Task { await reload() }
         }
         .onReceive(NotificationCenter.default.publisher(for: .sideKickLiveContainerCheckRequested)) { _ in
-            Task { await reload(checkUpdates: true) }
+            Task { await reload() }
         }
     }
 
-    @MainActor
-    private func reload(checkUpdates: Bool) async {
-        do { state = try await environment.liveContainerStore.snapshot() }
-        catch { message = error.localizedDescription; return }
-        guard checkUpdates, !checking else { return }
-        checking = true
-        defer { checking = false }
-        let result = await GitHubUpdateScanner.scanGuests()
-        updates = result.candidates
-        message = result.didFail ? "Some guest update checks failed. Open connection or app details to retry." : nil
-        await GitHubUpdateNotificationScheduler.notify(updates)
+    @MainActor private func reload() async {
         do { state = try await environment.liveContainerStore.snapshot() }
         catch { message = error.localizedDescription }
     }
@@ -194,6 +172,14 @@ struct LiveContainerGuestDetailView: View {
     @State private var working = false
     @State private var message: String?
     @State private var markingInstalled = false
+    @State private var checkState: GitHubCheckState = .notConfigured
+    @State private var awaitingHandoff: String?
+    @State private var sharedIPA: LiveContainerSharedIPA?
+    @State private var handoffURL: URL?
+
+    private var downloadJob: GitHubUpdateDownloadJob? {
+        candidate.flatMap { environment.githubUpdateDownloads.jobs[$0.id] }
+    }
 
     var body: some View {
         List {
@@ -224,14 +210,20 @@ struct LiveContainerGuestDetailView: View {
                         LabeledContent("Installed GitHub build", value: configuration.effectiveBaselineKey ?? "Choose a baseline").textSelection(.enabled)
                     }
                     if let candidate {
+                        SwiftUI.Button { Task { await updateInLiveContainer(candidate) } } label: {
+                            Label(downloadJob?.isDownloading == true ? "Downloading IPA…" : "Update in LiveContainer", systemImage: "arrow.down.app")
+                        }
+                        .disabled(working || downloadJob?.isDownloading == true)
+                        if let progress = downloadJob?.progress, downloadJob?.isDownloading == true { ProgressView(value: progress) }
+                        if let error = downloadJob?.errorMessage { Text(error).foregroundStyle(.orange) }
                         LabeledContent("Available", value: candidate.newVersion)
                         if let url = URL(string: candidate.repositoryURL ?? "https://github.com") {
                             Link(destination: url) { Label("View on GitHub", systemImage: "arrow.up.right.square") }
                         }
                         SwiftUI.Button { markingInstalled = true } label: { Label("Already Installed This Build", systemImage: "checkmark.circle") }
                         SwiftUI.Button { Task { await resolve(markInstalled: false) } } label: { Label("Skip This Build", systemImage: "forward.end") }
-                        Text("Install guest updates through LiveContainer, then confirm the exact release or workflow build here. SideKick does not install guest IPAs in this phase.").font(.footnote).foregroundStyle(.secondary)
-                    } else if configuration != nil { Text(checkFailed ? "The last check could not finish. Try again after checking your connection and source settings." : hasChecked ? "No newer build found by the last check." : "Check this source for newer builds.").foregroundStyle(.secondary) }
+                        Text("Update downloads the IPA, then opens the share sheet. Choose LiveContainer to start installing it. Confirm this build after installation finishes.").font(.footnote).foregroundStyle(.secondary)
+                    } else if configuration != nil { Text(hasChecked ? checkState.message : "Check this source for newer builds.").foregroundStyle(.secondary) }
                     if working { ProgressView() }
                 }
                 Section("LiveContainer Details") {
@@ -251,6 +243,16 @@ struct LiveContainerGuestDetailView: View {
         .task { await reload(); await checkUpdates() }
         .onReceive(NotificationCenter.default.publisher(for: .sideKickLiveContainerDidChange)) { _ in Task { await reload() } }
         .onReceive(NotificationCenter.default.publisher(for: .sideKickGitHubSettingsDidChange)) { _ in Task { await reload(); await checkUpdates() } }
+        .onChange(of: downloadJob?.queuedIPA) { _, ipa in
+            if let ipa, let candidate, awaitingHandoff == candidate.id {
+                awaitingHandoff = nil
+                Task { await handoff(ipa, candidate: candidate) }
+            }
+        }
+        .sheet(item: $sharedIPA, onDismiss: {
+            if let handoffURL { try? FileManager.default.removeItem(at: handoffURL) }
+            handoffURL = nil
+        }) { item in LiveContainerIPAActivity(url: item.url) }
         .alert("LiveContainer", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
             SwiftUI.Button("OK", role: .cancel) { message = nil }
         } message: { Text(message ?? "") }
@@ -285,6 +287,8 @@ struct LiveContainerGuestDetailView: View {
         hasChecked = true
         checkFailed = result.didFail
         candidate = result.candidates.first
+        checkState = result.checks.first?.state ?? .failed
+        await environment.githubUpdateDownloads.restoreQueuedFiles(for: result.candidates, ipaImportStore: environment.ipaImportStore)
         if result.didFail { message = "GitHub could not check this source. Verify repository, workflow, and token settings." }
         await GitHubUpdateNotificationScheduler.notify(result.candidates)
     }
@@ -304,18 +308,59 @@ struct LiveContainerGuestDetailView: View {
             if !(await UIApplication.shared.open(url)) { message = "LiveContainer is unavailable for this scheme. Verify the installation and URL scheme." }
         } catch { message = error.localizedDescription }
     }
-    @MainActor private func resolve(markInstalled: Bool) async {
-        guard let candidate else { return }
+    @MainActor private func updateInLiveContainer(_ candidate: GitHubUpdateCandidate) async {
+        guard !working else { return }
+        if let ipa = downloadJob?.queuedIPA { await handoff(ipa, candidate: candidate); return }
         do {
-            guard var current = try await GitHubUpdateConfigurationStore.shared.configuration(for: guestID),
-                  current.sourceIdentity == candidate.sourceIdentity else { message = "The update source changed. Check for updates again."; self.candidate = nil; return }
-            if markInstalled { current.lastInstalledUpdateKey = candidate.updateKey; current.dismissedUpdateKey = nil }
-            else { current.dismissedUpdateKey = candidate.updateKey }
-            try await GitHubUpdateConfigurationStore.shared.save(current)
+            guard let configuration = try await GitHubUpdateConfigurationStore.shared.configuration(for: guestID),
+                  configuration.sourceIdentity == candidate.sourceIdentity, let guest else { return }
+            let token = try GitHubCredentialStore().load(id: configuration.tokenID)
+            awaitingHandoff = candidate.id
+            environment.githubUpdateDownloads.start(candidate: candidate,
+                expectedBundleIdentifiers: [guest.bundleIdentifier.lowercased()],
+                ipaImportStore: environment.ipaImportStore, token: token)
+        } catch { message = error.localizedDescription }
+    }
+
+    @MainActor private func handoff(_ ipa: ImportedIPA, candidate: GitHubUpdateCandidate) async {
+        working = true
+        defer { working = false }
+        do {
+            guard let current = try await GitHubUpdateConfigurationStore.shared.configuration(for: guestID),
+                  current.sourceIdentity == candidate.sourceIdentity,
+                  ipa.githubSourceIdentity == current.sourceIdentity else {
+                message = "The update source changed. Check for updates again."
+                return
+            }
+            let url = try await environment.ipaImportStore.fileURL(for: ipa)
+            handoffURL = url
+            sharedIPA = LiveContainerSharedIPA(url: url)
+        } catch { message = error.localizedDescription }
+    }
+
+    @MainActor private func resolve(markInstalled: Bool) async {
+        guard let candidate, let source = candidate.sourceIdentity else { return }
+        working = true
+        defer { working = false }
+        do {
+            let store = GitHubUpdateConfigurationStore.shared
+            let applied: Bool
+            if markInstalled {
+                if let connection { try await environment.liveContainerStore.rescan(connection.id) }
+                await reload()
+                guard let guest, guest.isAvailable else { return }
+                applied = try await store.recordInstalled(key: candidate.updateKey, for: guest.updateTarget, expectedSource: source)
+            } else {
+                applied = try await store.skip(key: candidate.updateKey, targetID: guestID, expectedSource: source)
+            }
+            guard applied else { message = "The update source changed. Check for updates again."; return }
+            if let ipa = downloadJob?.queuedIPA { try await environment.ipaImportStore.delete(ipa) }
+            environment.githubUpdateDownloads.removeJob(for: candidate)
             self.candidate = nil
             await reload()
         } catch { message = error.localizedDescription }
     }
+
 }
 
 private struct LiveContainerGuestIcon: View {
@@ -326,4 +371,17 @@ private struct LiveContainerGuestIcon: View {
             else { Image(systemName: "app.fill").resizable().scaledToFit().padding(12).foregroundStyle(.white).background(.blue.gradient) }
         }.clipShape(.rect(cornerRadius: 12))
     }
+}
+
+private struct LiveContainerSharedIPA: Identifiable {
+    let id = UUID()
+    let url: URL
+}
+
+private struct LiveContainerIPAActivity: UIViewControllerRepresentable {
+    let url: URL
+    func makeUIViewController(context: Context) -> UIActivityViewController {
+        UIActivityViewController(activityItems: [url], applicationActivities: nil)
+    }
+    func updateUIViewController(_ controller: UIActivityViewController, context: Context) { }
 }

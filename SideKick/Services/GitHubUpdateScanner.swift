@@ -8,6 +8,7 @@ enum GitHubUpdateScanner {
     struct Result: Sendable {
         var candidates: [GitHubUpdateCandidate] = []
         var didFail = false
+        var checks: [GitHubCheckResult] = []
     }
 
     static func scan(_ apps: [InstalledAppSummary]) async -> Result {
@@ -41,16 +42,29 @@ enum GitHubUpdateScanner {
         for app in apps {
             guard !Task.isCancelled else { break }
             do {
-                guard let configuration = try await configurations.configuration(for: app.id) else { continue }
-                let token = try GitHubCredentialStore().load(id: configuration.tokenID)
-                if let candidate = try await service.candidate(for: app, configuration: configuration, token: token) {
-                    result.candidates.append(candidate)
+                guard let configuration = try await configurations.configuration(for: app.id) else {
+                    result.checks.append(GitHubCheckResult(targetID: app.id, state: .notConfigured))
+                    continue
                 }
+                let token = try GitHubCredentialStore().load(id: configuration.tokenID)
+                let check = try await service.check(for: app, configuration: configuration, token: token)
+                result.checks.append(check)
+                if let candidate = check.candidate { result.candidates.append(candidate) }
             } catch {
                 result.didFail = true
+                result.checks.append(GitHubCheckResult(targetID: app.id, state: .failed, detail: error.localizedDescription))
                 debugLog("[SideKick] GitHub check failed for \(app.name): \(error.localizedDescription)")
             }
         }
+        return result
+    }
+
+    static func scanAll(_ apps: [InstalledAppSummary]) async -> Result {
+        var result = await scan(apps)
+        let guests = await scanGuests()
+        result.candidates += guests.candidates
+        result.checks += guests.checks
+        result.didFail = result.didFail || guests.didFail
         return result
     }
 
@@ -63,10 +77,7 @@ enum GitHubUpdateScanner {
         // the entire shortcut/background-refresh execution window.
         let result = await withTaskGroup(of: Result?.self) { group in
             group.addTask {
-                var result = await scan(apps)
-                let guests = await scanGuests()
-                result.candidates += guests.candidates
-                result.didFail = result.didFail || guests.didFail
+                let result = await scanAll(apps)
                 return result
             }
             group.addTask {

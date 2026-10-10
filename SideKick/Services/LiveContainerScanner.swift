@@ -34,8 +34,18 @@ enum LiveContainerScanner {
                 let version = string(info["CFBundleShortVersionString"]) ?? build
                 let icon = iconData(info: info, bundle: child, root: directory, budget: iconBudget)
                 iconBudget -= icon?.count ?? 0
-                result.apps.append(LiveContainerGuest(connectionID: connectionID, folder: child.lastPathComponent,
-                    name: name, bundleIdentifier: identifier, version: version, build: build, iconData: icon, lastSeen: .now))
+                var guest = LiveContainerGuest(connectionID: connectionID, folder: child.lastPathComponent,
+                    name: name, bundleIdentifier: identifier, version: version, build: build, iconData: icon, lastSeen: .now)
+                var stamp = [version, build]
+                for file in ["Info.plist", string(info["CFBundleExecutable"])].compactMap({ $0 }) {
+                    let url = child.appendingPathComponent(file)
+                    if (try? OwnedStoragePath.validate(url, inside: directory)) != nil,
+                       let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey]) {
+                        stamp.append("\(values.fileSize ?? 0):\(values.contentModificationDate?.timeIntervalSince1970 ?? 0)")
+                    }
+                }
+                guest.observation = stamp.joined(separator: "|")
+                result.apps.append(guest)
             } catch is CancellationError { throw CancellationError() }
             catch {
                 result.failedFolders.append(child.lastPathComponent)

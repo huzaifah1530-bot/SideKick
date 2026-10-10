@@ -12,7 +12,7 @@ enum GitHubUpdateNotificationScheduler {
 
         let pending = await center.pendingNotificationRequests()
         let delivered = await center.deliveredNotifications()
-        for candidate in candidates {
+        for candidate in candidates where candidate.isKnownNewer {
             let historyKey = prefix + candidate.bundleIdentifier + ".last-notified"
             if UserDefaults.standard.string(forKey: historyKey) == candidate.updateKey { continue }
             let appPrefix = prefix + candidate.bundleIdentifier + "."

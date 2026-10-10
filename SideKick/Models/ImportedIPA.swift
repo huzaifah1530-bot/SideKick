@@ -13,10 +13,13 @@ struct ImportedIPA: Codable, Identifiable, Hashable, Sendable {
     let sourceURLString: String?
     let importedAt: Date
     let iconData: Data?
+    var buildVersion: String? = nil
+    var executableIdentity: String? = nil
     var sourceCreatedAt: Date? = nil
     var isQueuedForUpdate: Bool? = nil
     var queuedForInstalledAppID: String? = nil
     var githubUpdateKey: String? = nil
+    var githubSourceIdentity: String? = nil
     var githubRepositoryURL: String? = nil
     var githubImportConfiguration: GitHubUpdateConfiguration? = nil
 

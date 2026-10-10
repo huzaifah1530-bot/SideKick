@@ -115,6 +115,7 @@ actor IPAImportStore {
             sourceURLString: remoteSourceURL?.absoluteString,
             importedAt: .now,
             iconData: metadata.iconData,
+            buildVersion: metadata.buildVersion, executableIdentity: metadata.executableIdentity,
             sourceCreatedAt: remoteSourceURL == nil ? sourceURLCreationDate(sourceURL) : nil
         )
         return app
@@ -152,6 +153,7 @@ actor IPAImportStore {
             sourceURLString: nil,
             importedAt: .now,
             iconData: metadata.iconData,
+            buildVersion: metadata.buildVersion, executableIdentity: metadata.executableIdentity,
             sourceCreatedAt: sourceURLCreationDate(sourceURL)
         )
         return app
@@ -173,6 +175,10 @@ actor IPAImportStore {
             return ImportedIPA(bundleIdentifier: metadata.bundleIdentifier, name: metadata.name,
                 version: metadata.version, fileName: fileName, sourceBookmarkData: nil,
                 sourceURLString: nil, importedAt: .now, iconData: metadata.iconData,
+                buildVersion: metadata.buildVersion, executableIdentity: metadata.executableIdentity,
+                githubUpdateKey: choice.candidate.updateKey,
+                githubSourceIdentity: choice.configuration(bundleIdentifier: metadata.bundleIdentifier, tokenID: tokenID).sourceIdentity,
+                githubRepositoryURL: choice.candidate.repositoryURL,
                 githubImportConfiguration: choice.configuration(bundleIdentifier: metadata.bundleIdentifier, tokenID: tokenID))
         } catch {
             try? fileManager.removeItem(at: destination)
@@ -188,7 +194,7 @@ actor IPAImportStore {
         }
     }
 
-    func importManagedIPA(from sourceURL: URL, expectedBundleIdentifiers: Set<String>, updateKey: String? = nil, repositoryURL: String? = nil, targetID: String? = nil) throws -> ImportedIPA {
+    func importManagedIPA(from sourceURL: URL, expectedBundleIdentifiers: Set<String>, updateKey: String? = nil, repositoryURL: String? = nil, targetID: String? = nil, sourceIdentity: String? = nil) throws -> ImportedIPA {
         try Task.checkCancellation()
         let metadata = try readMetadata(from: sourceURL)
         let expected = expectedBundleIdentifiers.map { $0.lowercased() }
@@ -209,8 +215,10 @@ actor IPAImportStore {
                 sourceURLString: nil,
                 importedAt: .now,
                 iconData: metadata.iconData,
+                buildVersion: metadata.buildVersion, executableIdentity: metadata.executableIdentity,
                 queuedForInstalledAppID: targetID,
                 githubUpdateKey: updateKey,
+                githubSourceIdentity: sourceIdentity,
                 githubRepositoryURL: repositoryURL
             )
             try Task.checkCancellation()
@@ -332,7 +340,7 @@ actor IPAImportStore {
         try encoder.encode(entries).write(to: indexURL, options: .atomic)
     }
 
-    private func readMetadata(from ipaURL: URL) throws -> (bundleIdentifier: String, name: String, version: String, iconData: Data?) {
+    private func readMetadata(from ipaURL: URL) throws -> (bundleIdentifier: String, name: String, version: String, iconData: Data?, buildVersion: String?, executableIdentity: String?) {
         let archive: Archive
         do {
             archive = try Archive(url: ipaURL, accessMode: .read)
@@ -382,6 +390,14 @@ actor IPAImportStore {
             try? archive.extract(iconEntry) { data.append($0) }
             iconData = data.isEmpty ? nil : data
         }
-        return (bundleIdentifier, name, version, iconData)
+        var executableIdentity: String?
+        if let executable = plist["CFBundleExecutable"] as? String,
+           !executable.contains("/"), !executable.contains("\\"),
+           let binary = archive.first(where: { $0.path == String(entry.path.dropLast("Info.plist".count)) + executable }) {
+            var data = Data()
+            _ = try archive.extract(binary) { data.append($0) }
+            executableIdentity = GitHubExecutableIdentity.read(data)
+        }
+        return (bundleIdentifier, name, version, iconData, plist["CFBundleVersion"] as? String, executableIdentity)
     }
 }

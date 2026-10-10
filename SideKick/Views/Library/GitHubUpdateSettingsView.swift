@@ -15,7 +15,8 @@ struct GitHubUpdateSettingsView: View {
     @State private var showingMessage = false
     @State private var history: [GitHubUpdateHistoryEntry] = []
     @State private var selectedBaselineKey: String?
-    @State private var recommendedBaselineKey: String?
+    @State private var baselineWasEdited = false
+    @State private var installedNeedsConfirmation = false
     @State private var isLoadingHistory = false
     @State private var didLoad = false
     @State private var loadedSource = ""
@@ -52,7 +53,7 @@ struct GitHubUpdateSettingsView: View {
                     TextField("Workflow file or ID", text: $workflowFile)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
-                    TextField("Branch", text: $branch)
+                    TextField("Branch (blank for all)", text: $branch)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                 }
@@ -72,7 +73,7 @@ struct GitHubUpdateSettingsView: View {
                             Task { await loadHistory() }
                         } label: {
                             HStack {
-                                Text("Find installed version")
+                                Text("Load Build History")
                                 Spacer()
                                 if isLoadingHistory { ProgressView() }
                             }
@@ -82,8 +83,8 @@ struct GitHubUpdateSettingsView: View {
                         NavigationLink {
                             GitHubBaselineSelectionView(
                                 history: history,
-                                selectedKey: $selectedBaselineKey,
-                                recommendedKey: recommendedBaselineKey
+                                selectedKey: Binding(get: { selectedBaselineKey }, set: { selectedBaselineKey = $0; baselineWasEdited = true }),
+                                recommendedKey: nil
                             )
                         } label: {
                             LabeledContent(
@@ -94,19 +95,11 @@ struct GitHubUpdateSettingsView: View {
                             )
                         }
                         .fullWidthListSeparators()
-                        if let recommendedBaselineKey,
-                           let recommendation = history.first(where: { $0.key == recommendedBaselineKey }) {
-                            Label("Suggested from the original IPA date: \(recommendation.title)", systemImage: "sparkles")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                            SwiftUI.Button("Use Suggested Version") { selectedBaselineKey = recommendedBaselineKey }
-                        } else {
-                            Text("Choose the version you already have installed. SideKick uses this as the starting point and won’t ask you to reinstall it.")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
+                        Text(installedNeedsConfirmation ? "Previous tracking or changed app files need confirmation. Choose the build you actually installed, or leave it unknown." : "Only choose a build you actually installed. Checking or downloading a build does not mark it installed.")
+                            .font(.footnote).foregroundStyle(.secondary)
                         SwiftUI.Button("Reload versions") { Task { await loadHistory() } }
                     }
+                    SwiftUI.Button("I Don’t Know the Installed Build") { selectedBaselineKey = nil; baselineWasEdited = true }
                     SwiftUI.Button("Load older versions") { Task { await loadHistory(append: true) } }
                         .disabled(isLoadingHistory)
                 } header: {
@@ -119,7 +112,6 @@ struct GitHubUpdateSettingsView: View {
             if !repositoryURL.isEmpty {
                 Section {
                     SwiftUI.Button("Save GitHub Update Settings") { Task { await save() } }
-                        .disabled(selectedBaselineKey == nil)
                     SwiftUI.Button("Remove GitHub Update Settings", role: .destructive) {
                         Task {
                             do { try await store.remove(bundleIdentifier: target.id); dismiss() }
@@ -138,7 +130,7 @@ struct GitHubUpdateSettingsView: View {
             queryGeneration = UUID()
             history = []
             historyPage = 1
-            recommendedBaselineKey = nil
+            baselineWasEdited = false
             selectedBaselineKey = nil
             isLoadingHistory = false
         }
@@ -163,6 +155,8 @@ struct GitHubUpdateSettingsView: View {
             branch = config.branch
             assetName = config.assetName
             selectedBaselineKey = config.effectiveBaselineKey
+            installedNeedsConfirmation = config.installedBuild == nil || config.installedBuild?.observation != target.observation
+            baselineWasEdited = false
             loadedSource = sourceIdentity
             await loadHistory(configuration: config)
         } catch { message = error.localizedDescription; showingMessage = true }
@@ -178,18 +172,11 @@ struct GitHubUpdateSettingsView: View {
             return
         }
         do {
-            let previous = try await store.configuration(for: target.id)
-            var configuration = GitHubUpdateConfiguration(
-                bundleIdentifier: target.id, repositoryURL: repositoryURL, source: source,
-                workflowFile: workflowFile, branch: branch, assetName: assetName,
-                baselineUpdateKey: selectedBaselineKey, lastInstalledUpdateKey: nil, tokenID: tokenID
-            )
-            if let previous, previous.hasSameSource(as: configuration) {
-                configuration = previous
-                configuration.tokenID = tokenID
-                configuration.setInstalledBaseline(selectedBaselineKey)
-            }
-            try await store.save(configuration)
+            let configuration = GitHubUpdateConfiguration(bundleIdentifier: target.id, repositoryURL: repositoryURL,
+                source: source, workflowFile: workflowFile, branch: branch, assetName: assetName,
+                lastInstalledUpdateKey: nil, tokenID: tokenID)
+            try await store.saveSettings(configuration, baselineKey: selectedBaselineKey,
+                baselineWasEdited: baselineWasEdited, observation: target.observation)
             dismiss()
         } catch { message = error.localizedDescription; showingMessage = true }
     }
@@ -221,23 +208,6 @@ struct GitHubUpdateSettingsView: View {
                 let known = Set(history.map(\.key))
                 history += entries.filter { !known.contains($0.key) }
             } else { history = entries }
-            recommendedBaselineKey = nil
-            if selectedBaselineKey == nil {
-                let storedKey = configuration.lastInstalledUpdateKey ?? configuration.baselineUpdateKey
-                if let storedKey, let migrated = history.first(where: { legacyKey(for: $0.key) == storedKey }) {
-                    selectedBaselineKey = migrated.key
-                }
-            }
-            let importedApps = (try? await environment.ipaImportStore.importedApps()) ?? []
-            let importedIPA = importedApps.first {
-                $0.bundleIdentifier.lowercased() == target.id.lowercased()
-            }
-            let ipaDate = importedIPA?.sourceCreatedAt
-            if let ipaDate, target.kind == .installed {
-                recommendedBaselineKey = history
-                    .filter { ($0.date ?? .distantFuture) <= ipaDate }
-                    .max(by: { ($0.date ?? .distantPast) < ($1.date ?? .distantPast) })?.key
-            }
             if history.isEmpty { message = "No matching releases or downloadable build artifacts were found. Check the source settings and asset name."; showingMessage = true }
         } catch {
             guard queryGeneration == generation else { return }

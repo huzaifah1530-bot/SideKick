@@ -31,6 +31,10 @@ struct SettingsView: View {
                 }
 
                 Section("Device & Services") {
+                    NavigationLink { LiveContainerConnectionsView() } label: {
+                        Label("LiveContainer", systemImage: "square.stack.3d.up")
+                    }
+                    .fullWidthListSeparators()
                     NavigationLink {
                         ConnectionSettingsView()
                     } label: {
