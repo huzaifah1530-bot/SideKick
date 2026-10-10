@@ -18,7 +18,7 @@ struct RefreshSettingsView: View {
                 Text("Automatic refresh renews signing before apps expire. iOS controls when background work runs, so open SideKick and refresh manually if a deadline is close.")
             }
 
-            Section("Background keep-alive") {
+            Section {
                 Toggle("Enable keep-alive service", isOn: $keepAliveEnabled)
                     .onChange(of: keepAliveEnabled) { _, enabled in
                         BackgroundServiceManager.setEnabled(enabled)
@@ -31,6 +31,8 @@ struct RefreshSettingsView: View {
                 .onChange(of: keepAliveMode) { _, value in
                     BackgroundServiceManager.switchTo(mode: BackgroundServiceMode(rawValue: value) ?? .audio)
                 }
+            } header: {
+                Text("Background keep-alive")
             } footer: {
                 Text("SideStore’s background service can help keep its refresh helper available. iOS may still pause background work.")
             }
@@ -56,10 +58,12 @@ struct InstallSigningSettingsView: View {
                 Toggle("Clear app customizations after uninstall", isOn: $clearCustomizations)
             }
 
-            Section("Signing") {
+            Section {
                 Toggle("Prefer the resigned IPA", isOn: $preferResignedIPA)
                 Toggle("Save a copy of resigned apps", isOn: $exportResignedApp)
                 Toggle("Disable SideStore app limit", isOn: $disableAppLimit)
+            } header: {
+                Text("Signing")
             } footer: {
                 Text("The app limit option depends on iOS and account type. Disabling it can make installs fail if Apple’s limit is reached.")
             }
@@ -86,13 +90,15 @@ struct ConnectionSettingsView: View {
 
     var body: some View {
         Form {
-            Section("Pairing") {
+            Section {
                 Toggle("Use Local VPN for device connection", isOn: $useLocalVPN)
                 Toggle("Retry remote pairing ports automatically", isOn: $autoRetryPort)
                 Stepper(value: $portOverride, in: 0...65_535) {
                     LabeledContent("Remote pairing port", value: portOverride == 0 ? "Automatic" : String(portOverride))
                 }
                 Toggle("Accept IPv6 connection configuration", isOn: $allowIPv6)
+            } header: {
+                Text("Pairing")
             } footer: {
                 Text("Set the port to Automatic unless your pairing setup requires a fixed port. LocalDevVPN must be connected separately before SideKick can contact this iPhone.")
             }
@@ -160,7 +166,7 @@ struct AnisetteSettingsView: View {
 
     var body: some View {
         Form {
-            Section("Authentication data") {
+            Section {
                 Toggle("Generate Anisette on this device", isOn: $useOnDeviceAnisette)
                 Toggle("Offline mode", isOn: $offlineMode)
                 if !useOnDeviceAnisette {
@@ -173,6 +179,8 @@ struct AnisetteSettingsView: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                 }
+            } header: {
+                Text("Authentication data")
             } footer: {
                 Text("Anisette is used by Apple ID authentication. Keep the recommended on-device option unless you have configured a trusted compatible server.")
             }
@@ -197,7 +205,7 @@ struct SettingsStorageView: View {
 
     var body: some View {
         List {
-            Section("Imported IPAs") {
+            Section {
                 LabeledContent("Items", value: "\(importedApps.count)")
                 LabeledContent("SideKick storage", value: ByteCountFormatter.string(fromByteCount: managedBytes, countStyle: .file))
                 if managedBytes > 0 {
@@ -205,6 +213,8 @@ struct SettingsStorageView: View {
                         isConfirmingClear = true
                     }
                 }
+            } header: {
+                Text("Imported IPAs")
             } footer: {
                 Text("This removes IPA copies stored by SideKick. Files linked from the Files app remain in their original location.")
             }
