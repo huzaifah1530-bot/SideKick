@@ -152,7 +152,7 @@ struct ConnectionSettingsView: View {
             } header: {
                 Text("Pairing")
             } footer: {
-                Text("Set the port to Automatic unless your pairing setup requires a fixed port. SideKick connects its built-in local VPN only while using the device connection.")
+                Text("Set the port to Automatic unless your pairing setup requires a fixed port. Choose LocalDevVPN for free Apple Accounts, or the optional built-in VPN when your signing profiles support it.")
             }
 
             Section("Pairing file") {

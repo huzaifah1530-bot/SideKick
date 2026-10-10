@@ -141,7 +141,21 @@ jobs:
           codesign --force --sign - --entitlements SideKickVPN/SideKickVPN.entitlements "$VPN_PATH"
           codesign --force --sign - --entitlements SideKickVPN/Host.entitlements "$APP_PATH"
 
-          mkdir -p Payload artifacts
+          # Optional build for profiles that support Network Extensions.
+          mkdir -p VPNPayload/Payload artifacts
+          cp -R "$APP_PATH" VPNPayload/Payload/
+          (cd VPNPayload && zip -r -X ../artifacts/SideKick-vpn-unsigned.ipa Payload)
+
+          # The default IPA works with free Apple IDs and external LocalDevVPN.
+          # Drop the extension AND the host's VPN entitlement requests.
+          rm -rf "$VPN_PATH"
+          python3 - <<'PY'
+          import os, pathlib, plistlib
+          path = pathlib.Path(os.environ["RUNNER_TEMP"]) / "sidekick-external.entitlements"
+          path.write_bytes(plistlib.dumps({}))
+          PY
+          codesign --force --sign - --entitlements "$RUNNER_TEMP/sidekick-external.entitlements" "$APP_PATH"
+          mkdir -p Payload
           cp -R "$APP_PATH" Payload/
           zip -r -X artifacts/SideKick-unsigned.ipa Payload
 
@@ -154,6 +168,7 @@ jobs:
             --exclude='./build' \
             --exclude='./artifacts' \
             --exclude='./Payload' \
+            --exclude='./VPNPayload' \
             --exclude='./sidestore-reference' \
             --exclude='./failed-run' \
             --exclude='./action-logs-*' \
@@ -164,6 +179,13 @@ jobs:
         with:
           name: SideKick-unsigned-ipa
           path: artifacts/SideKick-unsigned.ipa
+          if-no-files-found: error
+
+      - name: Upload optional built-in VPN IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: SideKick-vpn-unsigned-ipa
+          path: artifacts/SideKick-vpn-unsigned.ipa
           if-no-files-found: error
 
       - name: Upload corresponding source artifact

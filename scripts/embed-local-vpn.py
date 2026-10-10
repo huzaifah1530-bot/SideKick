@@ -112,23 +112,20 @@ source = removal_file.read_text(encoding="utf-8")
 original = "        if let preset = UserDefaults.standard.customizeAppExtensions.fixedDecision {"
 replacement = """        if (targetAppBundle.bundleIdentifier == StoreApp.altstoreAppID || targetAppBundle.bundleIdentifier.hasPrefix("com.sidekick.app")),
            targetAppBundle.appExtensions.contains(where: { $0.fileURL.lastPathComponent == "SideKickVPN.appex" }) {
-            // The local tunnel is required for the next SideKick install/refresh.
-            // Give it its own profile even if general extension customizations differ.
+            let team = try await AuthManager.shared.getAuthenticatedTeam()
+            if team.type == .free {
+                // An optional VPN extension must never block a free-account update.
+                let tunnelExtensions = Set(targetAppBundle.appExtensions.filter { $0.fileURL.lastPathComponent == "SideKickVPN.appex" })
+                try removeExtensions(from: tunnelExtensions, endPercent: 85)
+                try updateManifest()
+                self.setProgress(100)
+                return targetAppBundle
+            }
             decision = .keepAll(useMainProfile: false)
         } else if let preset = UserDefaults.standard.customizeAppExtensions.fixedDecision {"""
 if source.count(original) != 1:
     raise RuntimeError("Upstream extension-removal integration point changed")
-source = source.replace(original, replacement, 1)
-original_guard = "        // target App Bundle doesn't contain extensions so don't bother"
-replacement_guard = """        if (targetAppBundle.bundleIdentifier == StoreApp.altstoreAppID || targetAppBundle.bundleIdentifier.hasPrefix("com.sidekick.app")),
-           !targetAppBundle.appExtensions.contains(where: { $0.fileURL.lastPathComponent == "SideKickVPN.appex" }) {
-            throw OperationError.invalidParameters("This SideKick source has no built-in VPN extension. Import the complete current SideKick IPA before updating or refreshing it.")
-        }
-
-        // target App Bundle doesn't contain extensions so don't bother"""
-if source.count(original_guard) != 1:
-    raise RuntimeError("Upstream extension validation integration point changed")
-removal_file.write_text(source.replace(original_guard, replacement_guard, 1), encoding="utf-8")
+removal_file.write_text(source.replace(original, replacement, 1), encoding="utf-8")
 
 build_config = root / "Build.xcconfig"
 source = build_config.read_text(encoding="utf-8")

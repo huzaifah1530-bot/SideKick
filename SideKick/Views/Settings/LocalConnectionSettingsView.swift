@@ -1,6 +1,7 @@
 import SwiftUI
 
 struct LocalConnectionSettingsView: View {
+    @Environment(\.scenePhase) private var scenePhase
     @State private var vpn = LocalVPNService.shared
     @State private var isWorking = false
     @State private var message: String?
@@ -11,20 +12,32 @@ struct LocalConnectionSettingsView: View {
     var body: some View {
         Form {
             Section {
-                Label { LabeledContent("Local Connection", value: vpn.statusLabel) } icon: {
-                    Image(systemName: vpn.status == .connected ? "checkmark.shield.fill" : "network.badge.shield.half.filled")
-                        .foregroundStyle(vpn.status == .connected ? .green : .blue)
-                }
-                .fullWidthListSeparators()
-                LabeledContent("Connection Control", value: "Automatic")
+                NavigationLink { LocalConnectionModeView() } label: {
+                    Label { LabeledContent("Connection Method", value: vpn.mode.title) } icon: { Image(systemName: "network") }
+                }.fullWidthListSeparators()
+                LabeledContent("Status", value: vpn.statusLabel)
+                LabeledContent("Connection Control", value: vpn.mode == .builtIn ? "Automatic" : "LocalDevVPN")
                 if vpn.isBusy { Label("An operation is using the connection", systemImage: "arrow.triangle.2.circlepath") }
-                if !vpn.isConfigured {
-                    SwiftUI.Button { Task { await authorize() } } label: {
-                        Label("Allow Local Connection", systemImage: "checkmark.shield")
+            } header: { Text("Local Connection") }
+
+            if vpn.mode == .external {
+                Section {
+                    SwiftUI.Button {
+                        UIApplication.shared.open(vpn.externalInstalled ? LocalVPNService.externalURL : LocalVPNService.externalStoreURL)
+                    } label: {
+                        Label(vpn.externalInstalled ? "Connect LocalDevVPN" : "Get LocalDevVPN", systemImage: "arrow.up.forward.app")
                     }.disabled(isWorking || vpn.isBusy)
+                } header: { Text("LocalDevVPN") } footer: {
+                    Text("Connect LocalDevVPN, then return to SideKick. Free Apple Accounts use this separately signed VPN. SideKick cannot turn another app’s VPN off; disconnect it in LocalDevVPN when finished. Scheduled refreshes need its tunnel connected beforehand.")
                 }
-            } header: { Text("SideKick VPN") } footer: {
-                Text("SideKick connects for installs, refreshes, pairing checks, and JIT. It disconnects after the last operation finishes. If SideKick stops responding, its VPN disconnects automatically within 90 seconds. No on-demand or always-on VPN is configured.")
+            } else if !vpn.isConfigured {
+                Section {
+                    SwiftUI.Button { Task { await authorize() } } label: {
+                        HStack { Label("Allow Built-in VPN", systemImage: "checkmark.shield"); Spacer(); if isWorking { ProgressView() } }
+                    }.disabled(isWorking || vpn.isBusy)
+                } footer: {
+                    Text("Approve the iOS VPN alert once. SideKick connects for device operations and disconnects when the last operation finishes.")
+                }
             }
             Section {
                 SwiftUI.Button { Task { await verify() } } label: {
@@ -33,26 +46,25 @@ struct LocalConnectionSettingsView: View {
                         Spacer()
                         if isWorking { ProgressView() }
                     }
-                }.disabled(isWorking || vpn.isBusy || !vpn.isConfigured)
+                }.disabled(isWorking || vpn.isBusy || !vpn.isConnectionReady)
                 if let lastVerification { LabeledContent("Last Verified", value: lastVerification.formatted(date: .abbreviated, time: .shortened)) }
             } header: { Text("Connection Check") } footer: {
-                Text("This check briefly connects the VPN and verifies this iPhone using its pairing file. It disconnects automatically afterward. Another VPN may need to be disconnected before SideKick can use its local tunnel.")
+                Text(vpn.mode == .builtIn
+                    ? "Briefly connects SideKick’s VPN and checks this iPhone using its pairing file. The built-in tunnel disconnects afterward."
+                    : "Checks this iPhone using its pairing file and the connected LocalDevVPN tunnel. This does not disconnect LocalDevVPN.")
             }
             Section {
-                LabeledContent("Tunnel Extension", value: vpn.extensionBundleIdentifier == nil ? "Missing" : "Included")
-                LabeledContent("Signing Capability", value: vpn.hasSupportedProfiles ? "Supported" : "Re-sign Required")
-                LabeledContent("Local Interface", value: "10.7.1.1")
-                LabeledContent("Local Peer", value: "10.7.0.1")
-                LabeledContent("Internet Traffic", value: "Regular Connection")
+                LabeledContent("Optional VPN Extension", value: vpn.extensionBundleIdentifier == nil ? "Not Included" : "Included")
+                LabeledContent("Built-in VPN Signing", value: vpn.hasSupportedProfiles ? "Supported" : "Not Available")
                 NavigationLink { LocalConnectionHelpView() } label: {
-                    Label("Signing & VPN Permission", systemImage: "questionmark.circle")
+                    Label("Connection Help", systemImage: "questionmark.circle")
                 }.fullWidthListSeparators()
             } header: { Text("Details") }
             if vpn.isConfigured {
                 Section {
-                    SwiftUI.Button("Remove VPN Permission", role: .destructive) { confirmingRemoval = true }
+                    SwiftUI.Button("Remove Built-in VPN Permission", role: .destructive) { confirmingRemoval = true }
                         .disabled(isWorking || vpn.isBusy)
-                } footer: { Text("You will need to allow SideKick’s VPN again before installing or refreshing.") }
+                } footer: { Text("Only SideKick’s own VPN configuration is removed. LocalDevVPN is kept.") }
             }
             Section {
                 Link("LocalDevVPN Source & Credits", destination: URL(string: "https://github.com/seomin0610/LocalDevVPN")!)
@@ -63,6 +75,10 @@ struct LocalConnectionSettingsView: View {
         .navigationTitle("Local Connection")
         .navigationBarTitleDisplayMode(.inline)
         .task { await vpn.refreshStatus() }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await vpn.refreshStatus() } }
+        }
+        .refreshable { await vpn.refreshStatus() }
         .alert("Local Connection", isPresented: $showingMessage) {
             SwiftUI.Button("OK", role: .cancel) { }
         } message: { Text(message ?? "") }
@@ -94,7 +110,7 @@ struct LocalConnectionSettingsView: View {
             }
             lastVerification = .now
             UserDefaults.standard.set(true, forKey: "sidekick.setup.pairing-verified")
-            message = "This iPhone is reachable. SideKick has finished the connection check and requested VPN disconnection."
+            message = vpn.mode == .builtIn ? "This iPhone is reachable. The built-in VPN will disconnect after this check." : "This iPhone is reachable. LocalDevVPN remains connected."
         } catch { message = error.localizedDescription }
         showingMessage = true
     }
@@ -109,12 +125,16 @@ private struct LocalConnectionHelpView: View {
     var body: some View {
         List {
             Section {
+                Label("Free Apple Accounts", systemImage: "person.crop.circle")
+                Text("Use the standard SideKick IPA and LocalDevVPN from the App Store. Connect LocalDevVPN before installing, refreshing or enabling JIT. SideKick cannot control or disconnect another app’s tunnel.")
+            } header: { Text("LocalDevVPN") }
+            Section {
                 Label("Approve the iOS VPN alert", systemImage: "checkmark.shield")
                 Text("Choose Allow Local Connection in SideKick. iOS asks to add a VPN configuration and may require your passcode. This permission is needed once per installation or after removing the configuration.")
             } header: { Text("VPN Permission") }
             Section {
                 Label("Sign the app and extension", systemImage: "signature")
-                Text("Keep SideKickVPN enabled when signing the IPA. Both SideKick and its extension need provisioning profiles containing the Network Extension packet-tunnel-provider capability. Free Apple ID provisioning does not support this capability. Use an eligible Apple Developer signing profile and preserve the extension’s entitlements.")
+                Text("Use the optional SideKick-vpn-unsigned IPA and keep SideKickVPN enabled when signing it. Both SideKick and its extension need provisioning profiles containing the Network Extension packet-tunnel-provider capability. Free Apple ID provisioning does not support this capability. Use an eligible Apple Developer signing profile and preserve the extension’s entitlements.")
                 Link("Apple Network Extension Documentation", destination: URL(string: "https://developer.apple.com/documentation/networkextension/nepackettunnelprovider")!)
             } header: { Text("Signing Requirements") }
             Section {
@@ -128,5 +148,48 @@ private struct LocalConnectionHelpView: View {
         }
         .navigationTitle("Connection Help")
         .navigationBarTitleDisplayMode(.inline)
+    }
+}
+
+struct LocalConnectionModeView: View {
+    @State private var vpn = LocalVPNService.shared
+    @Environment(\.dismiss) private var dismiss
+    @State private var errorMessage: String?
+
+    var body: some View {
+        List {
+            Section {
+                ForEach(LocalConnectionMode.allCases) { mode in
+                    SwiftUI.Button {
+                        Task {
+                            do { try await vpn.selectMode(mode); dismiss() }
+                            catch { errorMessage = error.localizedDescription }
+                        }
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: mode == .external ? "arrow.up.forward.app" : "network.badge.shield.half.filled")
+                                .frame(width: 28).foregroundStyle(.tint)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(mode.title).foregroundStyle(.primary)
+                                Text(mode == .external ? "Works with free Apple Accounts. Connect in LocalDevVPN." : "Connects automatically. Requires the optional IPA and eligible signing profiles.")
+                                    .font(.subheadline).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if vpn.mode == mode { Image(systemName: "checkmark").foregroundStyle(.tint) }
+                        }
+                        .padding(.vertical, 6)
+                    }
+                    .disabled(vpn.isBusy || (mode == .builtIn && !vpn.hasSupportedProfiles))
+                    .fullWidthListSeparators()
+                }
+            } footer: {
+                Text("The built-in option is available only when both SideKick and its extension are signed with Network Extension permission. LocalDevVPN remains available for every account type.")
+            }
+        }
+        .navigationTitle("Connection Method")
+        .navigationBarTitleDisplayMode(.inline)
+        .alert("Connection Method", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
+            SwiftUI.Button("OK", role: .cancel) { errorMessage = nil }
+        } message: { Text(errorMessage ?? "") }
     }
 }

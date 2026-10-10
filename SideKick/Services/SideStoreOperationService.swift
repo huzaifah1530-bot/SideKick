@@ -79,9 +79,6 @@ final class SideStoreOperationService {
         guard let presenter = UIApplication.shared.topViewController() else {
             throw SideStoreOperationError.presentationUnavailable
         }
-        if account.isFreeAccount && (ipa.bundleIdentifier == StoreApp.altstoreAppID || ipa.bundleIdentifier.hasPrefix("com.sidekick.app")) {
-            throw LocalVPNError.unsupportedSignature
-        }
         let url = try await ipaStore.fileURL(for: ipa)
         defer { try? FileManager.default.removeItem(at: url) }
         let vpnLease = try await LocalVPNService.shared.acquire()
