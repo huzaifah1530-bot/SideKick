@@ -19,7 +19,7 @@ enum PairingSetupImporter {
         let manager = PairingFileManager.shared
         let preferenceOrder: [PairingProtocol]
         if #available(iOS 26.4, *) {
-            // On newer iOS, LocalDevVPN's loopback tunnel is compatible with
+            // On newer iOS, SideKick's built-in loopback tunnel is compatible with
             // Remote Pairing; Lockdown additionally requires IKEv2/IPSec.
             preferenceOrder = [.rppairing, .lockdown]
         } else {

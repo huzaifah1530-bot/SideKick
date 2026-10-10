@@ -5,6 +5,8 @@ on:
     branches: [main]
     paths:
       - "SideKick/**"
+      - "SideKickVPN/**"
+      - "scripts/**"
       - "Vendor/SideStore"
       - ".gitmodules"
       - "patches/**"
@@ -56,6 +58,9 @@ jobs:
 
       - name: Isolate upstream SwiftUI settings expression
         run: git -C Vendor/SideStore apply ../../patches/sidestore-view-body-compile.patch
+
+      - name: Embed SideKick local VPN extension
+        run: python3 scripts/embed-local-vpn.py Vendor/SideStore
 
       - name: Cache Swift package checkouts
         uses: actions/cache@v4
@@ -112,19 +117,29 @@ jobs:
           APP_PATH="build/Build/Products/Release-iphoneos/SideStore.app"
           test -d "$APP_PATH"
 
-          # SideKick is a standalone app and does not ship SideStore's widget.
-          # The upstream scheme embeds AltWidgetExtension.appex, but the
-          # unsigned CI build cannot carry a valid provisioning profile for it.
-          # Leaving it in the IPA makes iOS reject the whole install with
-          # "The app extension is missing a valid provisioning profile".
-          if [ -d "$APP_PATH/PlugIns" ]; then
-            find "$APP_PATH/PlugIns" -maxdepth 1 -type d -name '*.appex' -print -exec rm -rf {} +
-            rmdir "$APP_PATH/PlugIns" 2>/dev/null || true
+          # Preserve the local VPN provider; remove only the unsupported widget.
+          if [ -d "$APP_PATH/PlugIns/AltWidgetExtension.appex" ]; then
+            rm -rf "$APP_PATH/PlugIns/AltWidgetExtension.appex"
           fi
-          if [ -d "$APP_PATH/PlugIns" ]; then
+          VPN_PATH="$APP_PATH/PlugIns/SideKickVPN.appex"
+          test -d "$VPN_PATH"
+          test -f "$VPN_PATH/Info.plist"
+          test "$(/usr/libexec/PlistBuddy -c 'Print :NSExtension:NSExtensionPointIdentifier' "$VPN_PATH/Info.plist")" = "com.apple.networkextension.packet-tunnel"
+          if find "$APP_PATH/PlugIns" -maxdepth 1 -type d -name '*.appex' ! -name 'SideKickVPN.appex' | grep -q .; then
             echo "Unexpected app extensions remain in the SideKick bundle"
             exit 1
           fi
+          mkdir -p "$APP_PATH/ThirdPartyLicenses"
+          cp SideKickVPN/LICENSE "$APP_PATH/ThirdPartyLicenses/LocalDevVPN.txt"
+          # Ad-hoc signatures preserve entitlement requests for IPA re-signers.
+          # They are not provisioning profiles and do not make this IPA installable.
+          if [ -d "$APP_PATH/Frameworks" ]; then
+            while IFS= read -r -d '' framework; do
+              codesign --force --sign - "$framework"
+            done < <(find "$APP_PATH/Frameworks" -maxdepth 1 \( -name '*.framework' -o -name '*.dylib' \) -print0)
+          fi
+          codesign --force --sign - --entitlements SideKickVPN/SideKickVPN.entitlements "$VPN_PATH"
+          codesign --force --sign - --entitlements SideKickVPN/Host.entitlements "$APP_PATH"
 
           mkdir -p Payload artifacts
           cp -R "$APP_PATH" Payload/

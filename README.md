@@ -10,6 +10,10 @@ The integrated app derives its sideloading engine from SideStore. Specifically, 
 
 SideKick's app experience is implemented in this repository's `SideKick/` directory: its SwiftUI navigation and screens, visual design, IPA library and local storage, GitHub release and artifact update tracking, update queue, and notifications. The integration patch changes SideStore's launch scene to show SideKick's `ContentView`; it does not replace SideStore's underlying signing engine. Some SideKick settings expose or configure SideStore capabilities, while their presentation is built in SideKick.
 
+## LocalDevVPN credit and derived components
+
+SideKick uses code from [LocalDevVPN by seomin0610](https://github.com/seomin0610/LocalDevVPN), originally forked from jkcoxson/LocalDevVPN, with contributions credited to Stossy11, Magesh K, and the SideStore Team. The imported tunnel provider, CIDR validation, and tunnel constants are pinned to commit `8a97427bcbdf90cbb62c2eadb8cfe5751c50eccc` in `SideKickVPN/`. SideKick adds packet-loop shutdown, a heartbeat watchdog, a native extension target, operation-scoped connection management, and its own setup/settings UI. The original [StosVPN license](SideKickVPN/LICENSE) and [provenance](SideKickVPN/UPSTREAM.md) are included; CI bundles the license with the app.
+
 ## Integration status
 
 - The SideStore source is pinned as a recursive Git submodule at `Vendor/SideStore`.
@@ -26,9 +30,9 @@ SideKick's app experience is implemented in this repository's `SideKick/` direct
 - Expiry badges and Details use the same remaining-day calculation and reload on foreground opening. Partial days count toward the next day; the detail page also shows the exact expiry time.
 - A missing GitHub download can be downloaded again. Update options allow skipping one build or marking an exact build as already installed; future builds remain eligible. Identical app version names do not establish that two Actions builds are the same.
 - A pairing file must first be created on a computer paired with the iPhone. SideKick does not create that trust record on-device. SideStore's app is not required.
-- Install and refresh currently require Wi-Fi and the separate LocalDevVPN App Store app. This SideKick build has neither the Network Extension entitlement nor a tunnel extension, so it cannot enable that VPN itself. Settings links to LocalDevVPN and explains the setup.
+- SideKick embeds a local packet-tunnel extension based on [LocalDevVPN](https://github.com/seomin0610/LocalDevVPN). After one iOS VPN permission prompt, installs, refreshes, pairing verification, and JIT connect automatically and disconnect when the last operation finishes. A 90-second heartbeat watchdog closes an abandoned tunnel. Setup and Settings → Local Connection show permission, signing capability, and connection diagnostics.
 
-SideKick stores its database in private app storage and does not require SideStore's App Group or app. The unsigned CI build still does not verify signing or on-device functionality. Pairing-file creation requires a previously paired computer. The current install/refresh transport requires LocalDevVPN; it is not bundled in SideKick.
+SideKick stores its database in private app storage and does not require SideStore's App Group or app. The unsigned CI build still does not verify signing or on-device functionality. Pairing-file creation requires a previously paired computer. The local transport is now bundled in SideKick. Both the app and its SideKickVPN extension must be signed with the Network Extension packet-tunnel-provider capability; free Apple ID provisioning cannot supply this capability. The initial install or re-sign must retain the extension and use eligible profiles.
 
 Database storage stays at `Library/Application Support/SideKick` when signing entitlements change. If an older App Group database is accessible and no private database exists, SideKick copies it and its related files before opening the private database. An already inaccessible App Group or a different iOS app container cannot be recovered by this migration. Installed records remain visible when their signing account needs reconnecting.
 
@@ -63,7 +67,7 @@ SideKick/
 
 ## Build
 
-The canonical build is the GitHub Actions workflow in `.github/workflows/ios-build.yml`. Check out with `git clone --recurse-submodules` for local work. The workflow currently produces an unsigned iOS IPA; it does not sign the app for your device or prove on-device functionality.
+The canonical build is the GitHub Actions workflow in `.github/workflows/ios-build.yml`. Check out with `git clone --recurse-submodules` for local work. The workflow builds without provisioning and adds ad-hoc signatures to preserve Network Extension entitlement requests for re-signers. This is still not a device-signed or installable IPA: an eligible signer must provision both the app and extension. A CI build does not prove on-device functionality.
 
 ## Design references
 

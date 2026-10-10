@@ -79,8 +79,13 @@ final class SideStoreOperationService {
         guard let presenter = UIApplication.shared.topViewController() else {
             throw SideStoreOperationError.presentationUnavailable
         }
+        if account.isFreeAccount && (ipa.bundleIdentifier == StoreApp.altstoreAppID || ipa.bundleIdentifier.hasPrefix("com.sidekick.app")) {
+            throw LocalVPNError.unsupportedSignature
+        }
         let url = try await ipaStore.fileURL(for: ipa)
         defer { try? FileManager.default.removeItem(at: url) }
+        let vpnLease = try await LocalVPNService.shared.acquire()
+        defer { LocalVPNService.shared.release(vpnLease) }
         try await retryAfterClearingRevokedAssignedProfile(
             for: ipa.bundleIdentifier,
             recoveryHandler: recoveryHandler
@@ -141,6 +146,8 @@ final class SideStoreOperationService {
         let accountID = selectedAccount?.accountIdentifier ?? account.identifier
         let teamID = selectedAccount?.teamIdentifier ?? team.identifier
 
+        let vpnLease = try await LocalVPNService.shared.acquire()
+        defer { LocalVPNService.shared.release(vpnLease) }
         try await retryAfterClearingRevokedAssignedProfile(for: bundleIdentifier) {
             try await accountStore.withAccount(accountIdentifier: accountID, teamIdentifier: teamID) {
                 try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
@@ -188,6 +195,8 @@ final class SideStoreOperationService {
             throw SideStoreOperationError.incompatibleRefreshAccount
         }
 
+        let vpnLease = try await LocalVPNService.shared.acquire()
+        defer { LocalVPNService.shared.release(vpnLease) }
         try await retryAfterClearingRevokedAssignedProfile(for: bundleIdentifier) {
             try await accountStore.withAccount(
                 accountIdentifier: selectedAccount.accountIdentifier,
@@ -266,6 +275,8 @@ final class SideStoreOperationService {
             throw SideStoreOperationError.installedAppUnavailable
         }
 
+        let vpnLease = try await LocalVPNService.shared.acquire()
+        defer { LocalVPNService.shared.release(vpnLease) }
         try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
             AppManager.shared.enableJIT(for: installedApp) { result in
                 continuation.resume(with: result.map { _ in () })
@@ -281,6 +292,15 @@ final class SideStoreOperationService {
             await ExpirationNotificationScheduler.update()
             return (0, 0)
         }
+
+        let vpnLease: UUID
+        do { vpnLease = try await LocalVPNService.shared.acquire() }
+        catch {
+            debugLog("[SideKick] Could not connect for refresh: \(error.localizedDescription)")
+            progressHandler(apps.count, apps.count)
+            return (0, apps.count)
+        }
+        defer { LocalVPNService.shared.release(vpnLease) }
 
         var succeeded = 0
         for (index, app) in apps.enumerated() {

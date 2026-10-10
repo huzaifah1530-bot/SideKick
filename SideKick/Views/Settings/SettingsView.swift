@@ -24,14 +24,10 @@ struct SettingsView: View {
                         Label("Install & Signing", systemImage: "signature")
                     }
                     .fullWidthListSeparators()
-                    Link(destination: URL(string: "https://apps.apple.com/app/id6755608044")!) {
-                        Label("Get LocalDevVPN", systemImage: "arrow.up.right")
+                    NavigationLink { LocalConnectionSettingsView() } label: {
+                        Label("Local Connection", systemImage: "network.badge.shield.half.filled")
                     }
                     .fullWidthListSeparators()
-                    Text("The current signing engine needs Wi-Fi and LocalDevVPN connected while installing or refreshing. Apple requires a Network Extension entitlement and tunnel extension; this SideKick build doesn’t have either, so it can’t switch the tunnel on itself. Open LocalDevVPN, tap Connect, then return here.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                        .fullWidthListSeparators()
                 }
 
                 Section("Device & Services") {

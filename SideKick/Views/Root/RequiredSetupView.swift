@@ -13,10 +13,10 @@ final class SetupStatus {
     private(set) var notificationsEnabled = false
     private(set) var backgroundRefreshEnabled = false
     private(set) var backgroundRefreshRestricted = false
-    private(set) var vpnInstalled = false
-    private(set) var vpnConnected = false
+    private(set) var vpnAuthorized = false
     private(set) var pairingVerified = false
     private(set) var refreshAutomationsConfigured = UserDefaults.standard.bool(forKey: "sidekick.setup.refresh-automations-configured")
+    private(set) var isAuthorizingVPN = false
     private(set) var isCheckingPairing = false
     private(set) var isReady = false
     var message: String?
@@ -34,8 +34,8 @@ final class SetupStatus {
     }
 
     var isDeviceReady: Bool {
-        notificationsEnabled && backgroundRefreshEnabled && vpnInstalled && pairingVerified &&
-            vpnConnected && selfSigningAccount != nil
+        notificationsEnabled && backgroundRefreshEnabled && vpnAuthorized && pairingVerified &&
+            selfSigningAccount != nil
     }
 
     func refresh(reportConnectionErrors: Bool = false) async {
@@ -45,24 +45,13 @@ final class SetupStatus {
         let refreshStatus = UIApplication.shared.backgroundRefreshStatus
         backgroundRefreshEnabled = refreshStatus == .available
         backgroundRefreshRestricted = refreshStatus == .restricted
-        vpnInstalled = UIApplication.shared.canOpenURL(URL(string: "localdevvpn://")!)
-        vpnConnected = Minimuxer.shared.network.activeInterfaces.contains { interface in
-            interface.name.lowercased().hasPrefix("utun") && interface.ip.hasPrefix("10.7.")
-        }
+        await LocalVPNService.shared.refreshStatus()
+        vpnAuthorized = LocalVPNService.shared.isConfigured && LocalVPNService.shared.hasSupportedProfiles
         await accounts.reload()
 
-        guard notificationsEnabled, backgroundRefreshEnabled, vpnInstalled, selfSigningAccount != nil else {
+        guard notificationsEnabled, backgroundRefreshEnabled, vpnAuthorized, selfSigningAccount != nil else {
             pairingVerified = false
             updateReadyState()
-            return
-        }
-
-        guard vpnConnected else {
-            pairingVerified = false
-            updateReadyState()
-            if reportConnectionErrors {
-                message = "LocalDevVPN is installed, but SideKick can’t detect its connected tunnel. Open LocalDevVPN, connect it, then try again."
-            }
             return
         }
 
@@ -78,16 +67,17 @@ final class SetupStatus {
             return
         }
 
+        guard reportConnectionErrors, !isCheckingPairing else { updateReadyState(); return }
         isCheckingPairing = true
         defer { isCheckingPairing = false }
         do {
-            guard let contents = PairingFileManager.shared.fetchPairingFile() else {
+            guard PairingFileManager.shared.fetchPairingFile() != nil else {
                 pairingVerified = false
                 updateReadyState()
                 return
             }
-            try await AppBootManager.shared.startMinimuxer(pairingFile: contents)
-            try await ensureMinimuxerReady()
+            let vpnLease = try await LocalVPNService.shared.acquire()
+            defer { LocalVPNService.shared.release(vpnLease) }
             _ = try await fetchUDID(forceLive: true)
             pairingVerified = true
             UserDefaults.standard.set(true, forKey: Self.pairingVerifiedKey)
@@ -127,7 +117,7 @@ final class SetupStatus {
             UserDefaults.standard.set(false, forKey: Self.pairingVerifiedKey)
             try PairingSetupImporter.importFile(from: url)
             await refresh(reportConnectionErrors: true)
-            if notificationsEnabled && backgroundRefreshEnabled && vpnInstalled && selfSigningAccount != nil && vpnConnected && !pairingVerified && message == nil {
+            if notificationsEnabled && backgroundRefreshEnabled && vpnAuthorized && selfSigningAccount != nil && !pairingVerified && message == nil {
                 message = "The pairing file was imported, but SideKick couldn’t verify it. Check that it was made for this iPhone."
             }
         } catch {
@@ -135,10 +125,20 @@ final class SetupStatus {
         }
     }
 
+    func authorizeLocalConnection() async {
+        guard !isAuthorizingVPN else { return }
+        isAuthorizingVPN = true
+        defer { isAuthorizingVPN = false }
+        do {
+            try await LocalVPNService.shared.authorize()
+            await refresh(reportConnectionErrors: true)
+        } catch { message = error.localizedDescription }
+    }
+
     func verifyPairing() async {
         await refresh(reportConnectionErrors: true)
         if !pairingVerified, message == nil {
-            message = "Pairing is not ready. Connect LocalDevVPN and try again."
+            message = "Allow SideKick’s local VPN, then verify the pairing file again."
         }
     }
 }
@@ -150,8 +150,6 @@ struct RequiredSetupView: View {
     @State private var credentials: (appleID: String, password: String)?
     @State private var step = 0
 
-    private let vpnURL = URL(string: "localdevvpn://enable?scheme=sidestore")!
-    private let appStoreURL = URL(string: "https://apps.apple.com/app/id6755608044")!
     private let lastStep = 6
 
     var body: some View {
@@ -316,7 +314,7 @@ struct RequiredSetupView: View {
             symbol: "iphone.gen3.radiowaves.left.and.right",
             title: "Pair this iPhone",
             message: status.hasPairingFile
-                ? "Pairing file imported. Next, connect through LocalDevVPN to verify this iPhone."
+                ? "Pairing file imported. Next, allow SideKick’s built-in local connection to verify this iPhone."
                 : "iLoader can’t place the file because SideKick isn’t in its supported-app list yet. In iLoader choose Export, then AirDrop the file to this iPhone or save it in Files and import it here. Pairing files are sensitive; keep the transfer private."
         ) {
             SwiftUI.Button(status.hasPairingFile ? "Choose Pairing File Again" : "Import Pairing File") {
@@ -330,31 +328,32 @@ struct RequiredSetupView: View {
 
     private var vpnPage: some View {
         onboardingPage(
-            symbol: "network",
-            title: "Connect to this iPhone",
-            message: status.isDeviceReady
-                ? "Your iPhone is paired and ready."
-                : status.vpnConnected
-                    ? "LocalDevVPN’s tunnel is connected. Verify that this pairing file belongs to this iPhone."
-                    : "SideKick doesn’t currently detect LocalDevVPN’s connected tunnel. Open LocalDevVPN, connect it, return here, then verify."
+            symbol: "network.badge.shield.half.filled",
+            title: "Allow a local connection",
+            message: "SideKick has its own local VPN. Allow it once in the iOS permission alert. SideKick connects when installing, refreshing, or enabling JIT, then disconnects when the work finishes. Your internet traffic is not sent through a VPN server."
         ) {
-            SwiftUI.Button(status.vpnInstalled ? "Open LocalDevVPN" : "Get LocalDevVPN") {
-                UIApplication.shared.open(status.vpnInstalled ? vpnURL : appStoreURL)
+            if status.vpnAuthorized {
+                Label("VPN Permission Saved", systemImage: "checkmark.shield.fill")
+                    .foregroundStyle(.green)
+            } else {
+                SwiftUI.Button(status.isAuthorizingVPN ? "Allowing…" : "Allow Local Connection") {
+                    Task { await status.authorizeLocalConnection() }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(status.isAuthorizingVPN || status.isCheckingPairing)
             }
-            .buttonStyle(.borderedProminent)
-
-            Label(status.vpnConnected ? "VPN Connected" : "VPN Not Detected", systemImage: status.vpnConnected ? "checkmark.circle.fill" : "network.slash")
-                .font(.subheadline)
-                .foregroundStyle(status.vpnConnected ? .green : .secondary)
-
-            if status.vpnInstalled && status.hasPairingFile && !status.isReady {
-                SwiftUI.Button(status.isCheckingPairing ? "Checking…" : "Verify Connection") {
+            NavigationLink { LocalConnectionSettingsView() } label: {
+                Label("Connection Details", systemImage: "info.circle")
+            }
+            if status.vpnAuthorized && status.hasPairingFile && !status.pairingVerified {
+                SwiftUI.Button(status.isCheckingPairing ? "Verifying…" : "Verify This iPhone") {
                     Task { await status.verifyPairing() }
                 }
+                .buttonStyle(.borderedProminent)
                 .disabled(status.isCheckingPairing)
             }
             if status.isDeviceReady {
-                Label("Setup Complete", systemImage: "checkmark.circle.fill")
+                Label("iPhone Verified", systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
             }
         }

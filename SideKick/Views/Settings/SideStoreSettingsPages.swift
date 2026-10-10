@@ -82,7 +82,7 @@ private struct CellularShortcutSettingsView: View {
                     .onSubmit { CellularRefreshManager.shared.setTurnOnDataShortcutName(turnOnName) }
                 Link("Open Shortcuts", destination: URL(string: "shortcuts://")!)
             } footer: {
-                Text("Create two shortcuts using Set Cellular Data: one turns data off and one turns it on. Enter their exact names here. SideKick runs them around the device connection step and restores cellular data afterward. This does not turn on LocalDevVPN.")
+                Text("Create two shortcuts using Set Cellular Data: one turns data off and one turns it on. Enter their exact names here. SideKick runs them around the device connection step and restores cellular data afterward. SideKick manages its built-in local VPN automatically.")
             }
         }
         .navigationTitle("Cellular Shortcuts")
@@ -131,10 +131,8 @@ struct InstallSigningSettingsView: View {
 }
 
 struct ConnectionSettingsView: View {
-    @AppStorage("useLocalVPN") private var useLocalVPN = true
     @AppStorage("isAutoRetryRemotePairingPortEnabled") private var autoRetryPort = true
     @AppStorage("remotePairingPortOverride") private var portOverride = 0
-    @AppStorage("acceptIPv6ConnectionConfig") private var allowIPv6 = false
     @State private var isChoosingPairingFile = false
     @State private var pairingStatus: String?
     @State private var isShowingPairingStatus = false
@@ -142,26 +140,19 @@ struct ConnectionSettingsView: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Use Local VPN for device connection", isOn: $useLocalVPN)
-                    .onChange(of: useLocalVPN) { _, enabled in
-                        ConnectionConfig.shared.useLocalVPN = enabled
-                    }
+                NavigationLink { LocalConnectionSettingsView() } label: {
+                    Label("Local Connection", systemImage: "network.badge.shield.half.filled")
+                }
+                .fullWidthListSeparators()
                 Toggle("Retry remote pairing ports automatically", isOn: $autoRetryPort)
                 Stepper(value: $portOverride, in: 0...65_535) {
                     LabeledContent("Remote pairing port", value: portOverride == 0 ? "Automatic" : String(portOverride))
                 }
                 .onChange(of: portOverride) { _, _ in syncMinimuxerBackendFromUserDefaults() }
-                Toggle("Accept IPv6 connection configuration", isOn: $allowIPv6)
-                NavigationLink {
-                    ConnectionConfigView()
-                } label: {
-                    Label("Device Address & Connection", systemImage: "network")
-                }
-                .fullWidthListSeparators()
             } header: {
                 Text("Pairing")
             } footer: {
-                Text("Set the port to Automatic unless your pairing setup requires a fixed port. LocalDevVPN must be connected separately before SideKick can contact this iPhone.")
+                Text("Set the port to Automatic unless your pairing setup requires a fixed port. SideKick connects its built-in local VPN only while using the device connection.")
             }
 
             Section("Pairing file") {
@@ -191,24 +182,29 @@ struct ConnectionSettingsView: View {
 
     @MainActor
     private func importPairingFile(_ result: Result<[URL], Error>) async {
+        var didImport = false
         do {
             guard let url = try result.get().first else { return }
             UserDefaults.standard.set(false, forKey: "sidekick.setup.pairing-verified")
             try PairingSetupImporter.importFile(from: url)
-            guard let pairingContent = PairingFileManager.shared.fetchPairingFile() else {
+            didImport = true
+            guard PairingFileManager.shared.fetchPairingFile() != nil else {
                 throw PairingSetupError.unreadableFile
             }
-            try await AppBootManager.shared.startMinimuxer(pairingFile: pairingContent)
+            let vpnLease = try await LocalVPNService.shared.acquire()
+            defer { LocalVPNService.shared.release(vpnLease) }
             do {
                 try await ensureMinimuxerReady()
                 _ = try await fetchUDID(forceLive: true)
                 UserDefaults.standard.set(true, forKey: "sidekick.setup.pairing-verified")
                 pairingStatus = "Pairing is set up and SideKick can reach this iPhone. Install and refresh are ready."
             } catch {
-                pairingStatus = "Pairing file imported. SideKick couldn’t reach the iPhone yet. Connect to Wi-Fi, open LocalDevVPN, tap Connect, then retry an install or refresh.\n\n\(error.localizedDescription)"
+                pairingStatus = "Pairing file imported. SideKick couldn’t reach the iPhone yet. Allow SideKick’s Local Connection in Settings, check that this pairing file belongs to your iPhone, then retry.\n\n\(error.localizedDescription)"
             }
         } catch {
-            pairingStatus = "SideKick couldn’t import that pairing file. Make sure it was created for this iPhone and try again.\n\n\(error.localizedDescription)"
+            pairingStatus = didImport
+                ? "The pairing file is saved, but the local connection could not be verified.\n\n\(error.localizedDescription)"
+                : "SideKick couldn’t import that pairing file. Make sure it was created for this iPhone and try again.\n\n\(error.localizedDescription)"
         }
         isShowingPairingStatus = true
     }

@@ -1,6 +1,5 @@
 import AppIntents
 import Foundation
-import Minimuxer
 
 struct RefreshManagedAppsIntent: AppIntent {
     static let title: LocalizedStringResource = "Refresh SideKick Apps"
@@ -31,13 +30,8 @@ private enum DailyRefreshAutomation {
             if !DatabaseManager.shared.isStarted {
                 try await DatabaseManager.shared.start()
             }
-            guard let pairingFile = PairingFileManager.shared.fetchPairingFile() else { return }
-            guard Minimuxer.shared.network.activeInterfaces.contains(where: { $0.name.lowercased().hasPrefix("utun") && $0.ip.hasPrefix("10.7.") }) else {
-                return
-            }
-
-            try await AppBootManager.shared.startMinimuxer(pairingFile: pairingFile)
-            try await ensureMinimuxerReady()
+            let vpnLease = try await LocalVPNService.shared.acquire()
+            defer { LocalVPNService.shared.release(vpnLease) }
 
             let store = SigningAccountStore()
             await store.reload()
