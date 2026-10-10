@@ -58,8 +58,10 @@ struct HomeView: View {
     @State private var githubUpdates: [GitHubUpdateCandidate] = []
     @State private var isCheckingGitHubUpdates = false
     @State private var githubUpdateCheckFailed = false
+    @State private var githubScanGeneration = UUID()
     @State private var expirationClock = Date.now
     @Environment(AppEnvironment.self) private var environment
+    @Environment(\.scenePhase) private var scenePhase
 
     private var installedBundleIdentifiers: Set<String> {
         Set(installedApps.flatMap(\.updateMatchingBundleIdentifiers))
@@ -71,7 +73,8 @@ struct HomeView: View {
 
     private var queuedManualUpdates: [QueuedManualUpdate] {
         viewModel.importedApps.compactMap { ipa in
-            guard ipa.isUpdateQueued,
+            guard ipa.isUpdateQueued, ipa.githubUpdateKey == nil,
+                  ipa.fileName?.hasPrefix("github-update-") != true,
                   let installedApp = installedApps.first(where: {
                       $0.updateMatchingBundleIdentifiers.contains(ipa.bundleIdentifier.lowercased())
                   }) else { return nil }
@@ -205,7 +208,8 @@ struct HomeView: View {
             .navigationTitle("My Apps")
             .task {
                 while !Task.isCancelled {
-                    try? await Task.sleep(for: .seconds(60))
+                    do { try await Task.sleep(for: .seconds(60)) }
+                    catch { return }
                     expirationClock = .now
                 }
             }
@@ -243,7 +247,8 @@ struct HomeView: View {
                     viewModel.errorMessage = error.localizedDescription
                 }
             }
-            .task {
+            .task(id: scenePhase) {
+                guard scenePhase == .active else { return }
                 await environment.ipaImportStore.cleanupAbandonedTemporaryIPAImports()
                 await load()
                 await loadAppIDCapacity()
@@ -265,7 +270,13 @@ struct HomeView: View {
                 Task { await importPendingIPA() }
             }
             .onReceive(NotificationCenter.default.publisher(for: .sideKickImportedIPAsDidChange)) { _ in
-                Task { await viewModel.load() }
+                Task {
+                    await viewModel.load()
+                    await environment.githubUpdateDownloads.validateQueuedFiles(ipaImportStore: environment.ipaImportStore)
+                }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .sideKickGitHubSettingsDidChange)) { _ in
+                Task { await load() }
             }
             .refreshable {
                 await load()
@@ -337,11 +348,15 @@ struct HomeView: View {
     }
 
     private func load() async {
+        expirationClock = .now
+        await SideStoreOperationService.pruneUnusedCaches()
         await viewModel.load()
+        await environment.githubUpdateDownloads.validateQueuedFiles(ipaImportStore: environment.ipaImportStore)
         installedApps = await SideStoreOperationService(
             accountStore: SigningAccountStore(),
             ipaStore: environment.ipaImportStore
         ).installedApps()
+        expirationClock = .now
         await scanGitHubUpdates()
     }
 
@@ -350,8 +365,12 @@ struct HomeView: View {
     }
 
     private func scanGitHubUpdates() async {
+        let generation = UUID()
+        githubScanGeneration = generation
         isCheckingGitHubUpdates = true
-        defer { isCheckingGitHubUpdates = false }
+        defer {
+            if githubScanGeneration == generation { isCheckingGitHubUpdates = false }
+        }
         let configurationStore = GitHubUpdateConfigurationStore()
         let service = GitHubUpdateService()
         let token = try? GitHubCredentialStore().load()
@@ -371,6 +390,9 @@ struct HomeView: View {
                 debugLog("[SideKick] GitHub update check failed for \(app.name): \(error.localizedDescription)")
             }
         }
+        guard githubScanGeneration == generation else { return }
+        await environment.githubUpdateDownloads.restoreQueuedFiles(for: candidates, ipaImportStore: environment.ipaImportStore)
+        guard githubScanGeneration == generation else { return }
         githubUpdates = candidates
         await GitHubUpdateNotificationScheduler.notify(candidates)
         githubUpdateCheckFailed = didFailCheck
@@ -415,7 +437,7 @@ struct HomeView: View {
     }
 
     private func daysRemaining(for date: Date, now: Date) -> Int {
-        max(Calendar.current.dateComponents([.day], from: now, to: date).day ?? 0, 0)
+        SigningExpiry.daysRemaining(until: date, now: now)
     }
 
     private func expirationColor(for date: Date, now: Date) -> Color {

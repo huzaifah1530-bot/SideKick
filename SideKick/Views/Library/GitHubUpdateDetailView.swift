@@ -64,10 +64,13 @@ struct GitHubUpdateDetailView: View {
 
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
     @State private var accountStore = SigningAccountStore()
     @State private var errorMessage: String?
     @State private var account: SigningAccountSummary?
     @State private var eligibleAccounts: [SigningAccountSummary] = []
+    @State private var isConfirmingInstalledBuild = false
+    @State private var isConfirmingSkip = false
 
     private let configurationStore = GitHubUpdateConfigurationStore()
 
@@ -97,8 +100,15 @@ struct GitHubUpdateDetailView: View {
                     }
                     VStack(alignment: .leading, spacing: 5) {
                         Text(app.name).font(.title3.weight(.semibold))
-                        Text("\(app.version)  →  \(downloadJob?.queuedIPA?.version ?? candidate.newVersion)")
+                        Text(app.version == downloadJob?.queuedIPA?.version
+                            ? "Version \(app.version)"
+                            : "\(app.version)  →  \(downloadJob?.queuedIPA?.version ?? candidate.newVersion)")
                             .foregroundStyle(.secondary)
+                        if candidate.source == .actionsArtifact {
+                            Text(candidate.newVersion)
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
                     }
                 }
                 .padding(.vertical, 5)
@@ -163,7 +173,8 @@ struct GitHubUpdateDetailView: View {
                                 accountStore: accountStore,
                                 ipaStore: environment.ipaImportStore,
                                 isUpdate: true,
-                                onInstalled: { await finishUpdate(queuedIPA) }
+                                onInstalled: { await finishUpdate(queuedIPA) },
+                                onSourceMissing: { await validateDownload() }
                             )
                         } label: {
                             Label("Update App", systemImage: "arrow.down.app.fill")
@@ -180,11 +191,12 @@ struct GitHubUpdateDetailView: View {
                                     accountStore: accountStore,
                                     ipaStore: environment.ipaImportStore,
                                     isUpdate: true,
-                                    onInstalled: { await finishUpdate(queuedIPA) }
+                                    onInstalled: { await finishUpdate(queuedIPA) },
+                                    onSourceMissing: { await validateDownload() }
                                 )
                             } label: {
-                                Text("Options")
-                                    .font(.footnote)
+                                Label("Options", systemImage: "slider.horizontal.3")
+                                    .font(.body)
                                     .frame(maxWidth: .infinity, alignment: .leading)
                             }
                             .buttonStyle(.plain)
@@ -200,6 +212,31 @@ struct GitHubUpdateDetailView: View {
                     downloadButton(title: "Install New IPA") { startDownload() }
                 }
             }
+
+            Section("Update Options") {
+                if downloadJob?.isDownloading != true {
+                    if downloadJob?.queuedIPA != nil {
+                        SwiftUI.Button { startDownload() } label: {
+                            Label("Download Again", systemImage: "arrow.down.circle")
+                        }
+                        .fullWidthListSeparators()
+                    }
+                    SwiftUI.Button { isConfirmingInstalledBuild = true } label: {
+                        Label("Already Installed This Build", systemImage: "checkmark.circle")
+                    }
+                    .fullWidthListSeparators()
+                    SwiftUI.Button { isConfirmingSkip = true } label: {
+                        Label("Skip This Update", systemImage: "forward.end")
+                    }
+                    .fullWidthListSeparators()
+                }
+                NavigationLink {
+                    GitHubUpdateSettingsView(app: app)
+                } label: {
+                    Label("Update Source & Installed Version", systemImage: "chevron.left.forwardslash.chevron.right")
+                }
+                .fullWidthListSeparators()
+            }
         }
         .listStyle(.insetGrouped)
         .navigationTitle("App Update")
@@ -213,6 +250,25 @@ struct GitHubUpdateDetailView: View {
                 $0.accountIdentifier == app.accountIdentifier
             } ?? eligibleAccounts.first
         }
+        .onAppear { Task { await validateDownload() } }
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { Task { await validateDownload() } }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .sideKickImportedIPAsDidChange)) { _ in
+            Task { await validateDownload() }
+        }
+        .alert("Already installed this build?", isPresented: $isConfirmingInstalledBuild) {
+            SwiftUI.Button("Mark as Installed") { Task { await resolveUpdate(markInstalled: true) } }
+            SwiftUI.Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Only choose this if you installed this exact GitHub release or build. Matching version names alone do not identify an Actions build.")
+        }
+        .alert("Skip this update?", isPresented: $isConfirmingSkip) {
+            SwiftUI.Button("Skip Update") { Task { await resolveUpdate(markInstalled: false) } }
+            SwiftUI.Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This build will be hidden. SideKick will still show future updates from this source.")
+        }
     }
 
     @MainActor
@@ -224,6 +280,38 @@ struct GitHubUpdateDetailView: View {
             ipaImportStore: environment.ipaImportStore,
             token: token
         )
+    }
+
+    @MainActor
+    private func validateDownload() async {
+        await environment.githubUpdateDownloads.validateQueuedFiles(ipaImportStore: environment.ipaImportStore)
+    }
+
+    @MainActor
+    private func resolveUpdate(markInstalled: Bool) async {
+        do {
+            guard var configuration = try await configurationStore.configuration(for: app.bundleIdentifier) else { return }
+            guard configuration.repositoryURL == candidate.repositoryURL, configuration.source == candidate.source else {
+                environment.githubUpdateDownloads.removeJob(for: candidate)
+                dismiss()
+                return
+            }
+            let imports = try await environment.ipaImportStore.importedApps()
+            if let ipa = downloadJob?.queuedIPA ?? imports.first(where: {
+                $0.githubUpdateKey == candidate.updateKey && $0.githubRepositoryURL == candidate.repositoryURL
+            }) {
+                try await environment.ipaImportStore.delete(ipa)
+            }
+            environment.githubUpdateDownloads.removeJob(for: candidate)
+            if markInstalled {
+                configuration.lastInstalledUpdateKey = candidate.updateKey
+                configuration.dismissedUpdateKey = nil
+            } else {
+                configuration.dismissedUpdateKey = candidate.updateKey
+            }
+            try await configurationStore.save(configuration)
+            dismiss()
+        } catch { errorMessage = error.localizedDescription }
     }
 
     private func downloadButton(title: String, action: @escaping () -> Void) -> some View {
@@ -244,7 +332,10 @@ struct GitHubUpdateDetailView: View {
     private func finishUpdate(_ ipa: ImportedIPA) async {
         do {
             var configuration = try await configurationStore.configuration(for: app.bundleIdentifier)
-            configuration?.lastInstalledUpdateKey = candidate.updateKey
+            if configuration?.repositoryURL == candidate.repositoryURL {
+                configuration?.lastInstalledUpdateKey = candidate.updateKey
+                configuration?.dismissedUpdateKey = nil
+            }
             if let configuration { try await configurationStore.save(configuration) }
             try await environment.ipaImportStore.delete(ipa)
             environment.githubUpdateDownloads.removeJob(for: candidate)

@@ -18,6 +18,7 @@ struct GitHubUpdateConfiguration: Codable, Identifiable, Equatable, Sendable {
     var assetName: String
     var baselineUpdateKey: String? = nil
     var lastInstalledUpdateKey: String?
+    var dismissedUpdateKey: String? = nil
 }
 
 struct GitHubUpdateHistoryEntry: Identifiable, Hashable, Sendable {
@@ -38,6 +39,7 @@ struct GitHubUpdateCandidate: Identifiable, Equatable, Sendable {
     let downloadURL: URL
     let updateKey: String
     let source: GitHubUpdateSource
+    var repositoryURL: String? = nil
 
     var id: String { "\(bundleIdentifier):\(updateKey)" }
 }

@@ -24,6 +24,8 @@ final class AppEnvironment {
         do {
             try await DatabaseManager.shared.start()
             await ipaImportStore.cleanupAbandonedTemporaryIPAImports()
+            do { try await ipaImportStore.cleanupOrphanedManagedIPAs() }
+            catch { debugLog("[SideKick] Could not clean unused downloaded IPAs: \(error.localizedDescription)") }
             await SideStoreOperationService.pruneUnusedCaches()
             await ExpirationNotificationScheduler.update()
             databaseState = .ready

@@ -31,8 +31,11 @@ final class SideStoreOperationService {
                 try? context.save()
             }
 
-            return candidates.compactMap { app -> (InstalledApp, String, String, String, String, String, String, String, String, Date)? in
-                guard let team = app.team, let account = team.account else { return nil }
+            // Keep an installed record visible even if its saved account needs
+            // reconnecting after a certificate/session change.
+            return candidates.map { app -> (InstalledApp, String, String, String, String, String, String, String, String, Date) in
+                let team = app.team
+                let account = team?.account
                 return (
                     app,
                     app.bundleIdentifier,
@@ -40,9 +43,9 @@ final class SideStoreOperationService {
                     app.name,
                     app.version,
                     app.buildVersion,
-                    account.appleID,
-                    account.identifier,
-                    team.identifier,
+                    account?.appleID ?? "Sign in required",
+                    account?.identifier ?? "",
+                    team?.identifier ?? app.customProvisioningProfile?.teamIdentifier ?? "",
                     app.expirationDate
                 )
             }
@@ -220,7 +223,7 @@ final class SideStoreOperationService {
     }
 
     static func pruneUnusedCaches() async {
-        guard DatabaseManager.shared.isStarted else { return }
+        guard DatabaseManager.shared.isStarted, !AppManager.shared.isActivelyManagingAnyApp else { return }
 
         let context = DatabaseManager.shared.viewContext
         let references = await context.perform { () -> (bundleIdentifiers: Set<String>, signatures: Set<String>)? in

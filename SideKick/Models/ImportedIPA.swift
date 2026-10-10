@@ -12,6 +12,8 @@ struct ImportedIPA: Codable, Identifiable, Hashable, Sendable {
     let iconData: Data?
     var sourceCreatedAt: Date? = nil
     var isQueuedForUpdate: Bool? = nil
+    var githubUpdateKey: String? = nil
+    var githubRepositoryURL: String? = nil
 
     // Before queue state was persisted, every retained IPA matching an installed app
     // came from the explicit "Queue for Update" choice.

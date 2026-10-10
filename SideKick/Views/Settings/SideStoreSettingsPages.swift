@@ -1,5 +1,7 @@
 import SwiftUI
 import UniformTypeIdentifiers
+import UIKit
+import CoreLocation
 
 struct RefreshSettingsView: View {
     @AppStorage("isBackgroundRefreshEnabled") private var backgroundRefresh = true
@@ -7,13 +9,26 @@ struct RefreshSettingsView: View {
     @AppStorage("isCellularRefreshEnabled") private var cellularRefresh = false
     @AppStorage("isBackgroundServiceEnabled") private var keepAliveEnabled = true
     @AppStorage("backgroundServiceMode") private var keepAliveMode = "audio"
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var locationAccess = CLLocationManager().authorizationStatus
 
     var body: some View {
         Form {
             Section {
                 Toggle("Automatic app refresh", isOn: $backgroundRefresh)
+                    .onChange(of: backgroundRefresh) { _, enabled in
+                        UIApplication.shared.setMinimumBackgroundFetchInterval(enabled ? UIApplication.backgroundFetchIntervalMinimum : UIApplication.backgroundFetchIntervalNever)
+                    }
                 Toggle("Keep SideKick active during refresh", isOn: $keepScreenAwake)
                 Toggle("Refresh over cellular", isOn: $cellularRefresh)
+                if cellularRefresh {
+                    NavigationLink {
+                        CellularShortcutSettingsView()
+                    } label: {
+                        Label("Cellular Refresh Shortcuts", systemImage: "square.stack.3d.up")
+                    }
+                    .fullWidthListSeparators()
+                }
             } footer: {
                 Text("Automatic refresh renews signing before apps expire. iOS controls when background work runs, so open SideKick and refresh manually if a deadline is close.")
             }
@@ -28,8 +43,15 @@ struct RefreshSettingsView: View {
                     Text("Location").tag("location")
                 }
                 .disabled(!keepAliveEnabled)
-                .onChange(of: keepAliveMode) { _, value in
+                .onChange(of: keepAliveMode) { previous, value in
+                    BackgroundServiceManager.service(for: BackgroundServiceMode(rawValue: previous) ?? .audio).stop()
                     BackgroundServiceManager.switchTo(mode: BackgroundServiceMode(rawValue: value) ?? .audio)
+                    locationAccess = CLLocationManager().authorizationStatus
+                }
+                if keepAliveEnabled && keepAliveMode == "location" && (locationAccess == .denied || locationAccess == .restricted) {
+                    Label("Location access is required for this method", systemImage: "location.slash")
+                        .foregroundStyle(.secondary)
+                    Link("Open iOS Settings", destination: URL(string: UIApplication.openSettingsURLString)!)
                 }
             } header: {
                 Text("Background keep-alive")
@@ -38,6 +60,32 @@ struct RefreshSettingsView: View {
             }
         }
         .navigationTitle("App Refresh")
+        .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: scenePhase) { _, phase in
+            if phase == .active { locationAccess = CLLocationManager().authorizationStatus }
+        }
+    }
+}
+
+private struct CellularShortcutSettingsView: View {
+    @AppStorage("turnOffDataShortcutName") private var turnOffName = AppConstants.Shortcuts.defaultTurnOffDataShortcutName
+    @AppStorage("turnOnDataShortcutName") private var turnOnName = AppConstants.Shortcuts.defaultTurnOnDataShortcutName
+
+    var body: some View {
+        Form {
+            Section {
+                TextField("Turn cellular data off", text: $turnOffName)
+                    .autocorrectionDisabled()
+                    .onSubmit { CellularRefreshManager.shared.setTurnOffDataShortcutName(turnOffName) }
+                TextField("Turn cellular data on", text: $turnOnName)
+                    .autocorrectionDisabled()
+                    .onSubmit { CellularRefreshManager.shared.setTurnOnDataShortcutName(turnOnName) }
+                Link("Open Shortcuts", destination: URL(string: "shortcuts://")!)
+            } footer: {
+                Text("Create two shortcuts using Set Cellular Data: one turns data off and one turns it on. Enter their exact names here. SideKick runs them around the device connection step and restores cellular data afterward. This does not turn on LocalDevVPN.")
+            }
+        }
+        .navigationTitle("Cellular Shortcuts")
         .navigationBarTitleDisplayMode(.inline)
     }
 }
@@ -62,10 +110,13 @@ struct InstallSigningSettingsView: View {
                 Toggle("Prefer the resigned IPA", isOn: $preferResignedIPA)
                 Toggle("Save a copy of resigned apps", isOn: $exportResignedApp)
                 Toggle("Disable SideStore app limit", isOn: $disableAppLimit)
+                    .disabled(!isMacDirtyCowSupported && ProcessInfo().sparseRestorePatched)
             } header: {
                 Text("Signing")
             } footer: {
-                Text("The app limit option depends on iOS and account type. Disabling it can make installs fail if Apple’s limit is reached.")
+                Text(!isMacDirtyCowSupported && ProcessInfo().sparseRestorePatched
+                    ? "The app limit bypass is unavailable on this iOS version. Saving resigned apps keeps an extra IPA in Files → SideKick → ResignedApps."
+                    : "The app limit option depends on iOS and account type. Saving resigned apps keeps an extra IPA in Files → SideKick → ResignedApps.")
             }
 
             Section("Certificates and profiles") {
@@ -92,11 +143,21 @@ struct ConnectionSettingsView: View {
         Form {
             Section {
                 Toggle("Use Local VPN for device connection", isOn: $useLocalVPN)
+                    .onChange(of: useLocalVPN) { _, enabled in
+                        ConnectionConfig.shared.useLocalVPN = enabled
+                    }
                 Toggle("Retry remote pairing ports automatically", isOn: $autoRetryPort)
                 Stepper(value: $portOverride, in: 0...65_535) {
                     LabeledContent("Remote pairing port", value: portOverride == 0 ? "Automatic" : String(portOverride))
                 }
+                .onChange(of: portOverride) { _, _ in syncMinimuxerBackendFromUserDefaults() }
                 Toggle("Accept IPv6 connection configuration", isOn: $allowIPv6)
+                NavigationLink {
+                    ConnectionConfigView()
+                } label: {
+                    Label("Device Address & Connection", systemImage: "network")
+                }
+                .fullWidthListSeparators()
             } header: {
                 Text("Pairing")
             } footer: {
@@ -160,29 +221,21 @@ private enum PairingSetupError: LocalizedError {
 
 struct AnisetteSettingsView: View {
     @AppStorage("useOnDeviceAnisette") private var useOnDeviceAnisette = true
-    @AppStorage("isAnisetteOfflineMode") private var offlineMode = false
-    @AppStorage("menuAnisetteURL") private var serverURL = ""
-    @AppStorage("menuAnisetteList") private var serverListURL = ""
 
     var body: some View {
         Form {
             Section {
                 Toggle("Generate Anisette on this device", isOn: $useOnDeviceAnisette)
-                Toggle("Offline mode", isOn: $offlineMode)
-                if !useOnDeviceAnisette {
-                    TextField("Anisette server URL", text: $serverURL)
-                        .keyboardType(.URL)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                    TextField("Server list URL", text: $serverListURL)
-                        .keyboardType(.URL)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
+                NavigationLink {
+                    AnisetteServersView()
+                } label: {
+                    Label("Servers & Server Lists", systemImage: "server.rack")
                 }
+                .fullWidthListSeparators()
             } header: {
                 Text("Authentication data")
             } footer: {
-                Text("Anisette is used by Apple ID authentication. Keep the recommended on-device option unless you have configured a trusted compatible server.")
+                Text("Anisette is used by Apple ID authentication. Server management supports selecting or adding a server, importing a saved list, and updating the catalogue. Changes apply to the next authentication request.")
             }
 
             Section {
@@ -200,6 +253,8 @@ struct SettingsStorageView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var importedApps: [ImportedIPA] = []
     @State private var managedBytes: Int64 = 0
+    @State private var storageUsage = SideKickStorageUsage()
+    @State private var isCleaning = false
     @State private var isConfirmingClear = false
     @State private var errorMessage: String?
 
@@ -207,7 +262,7 @@ struct SettingsStorageView: View {
         List {
             Section {
                 LabeledContent("Items", value: "\(importedApps.count)")
-                LabeledContent("SideKick storage", value: ByteCountFormatter.string(fromByteCount: managedBytes, countStyle: .file))
+                LabeledContent("Downloaded IPA copies", value: ByteCountFormatter.string(fromByteCount: managedBytes, countStyle: .file))
                 if managedBytes > 0 {
                     SwiftUI.Button("Remove downloaded IPA copies", role: .destructive) {
                         isConfirmingClear = true
@@ -219,10 +274,23 @@ struct SettingsStorageView: View {
                 Text("This removes IPA copies stored by SideKick. Files linked from the Files app remain in their original location.")
             }
 
-            Section("SideStore data") {
-                Text("Signing records and app metadata are managed by SideStore. Removing an imported IPA does not uninstall its app.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+            Section {
+                LabeledContent("App signing cache", value: storageUsage.formatted(storageUsage.signingCache))
+                LabeledContent("Temporary install files", value: storageUsage.formatted(storageUsage.temporaryFiles))
+                LabeledContent("Saved resigned IPAs", value: storageUsage.formatted(storageUsage.exportedIPAs))
+                SwiftUI.Button { Task { await cleanUnusedFiles() } } label: {
+                    HStack {
+                        Label("Clean Unused Files", systemImage: "trash")
+                        Spacer()
+                        if isCleaning { ProgressView() }
+                    }
+                }
+                .disabled(isCleaning)
+                .fullWidthListSeparators()
+            } header: {
+                Text("Signing & Temporary Files")
+            } footer: {
+                Text("SideKick keeps the current extracted source for each app so it can re-sign it. Extracted apps can be larger than their compressed IPAs. Cleanup removes unused caches and abandoned temporary files. Saved resigned IPAs and app records are kept.")
             }
         }
         .listStyle(.insetGrouped)
@@ -253,6 +321,7 @@ struct SettingsStorageView: View {
                       let size = values.fileSize else { return nil }
                 return Int64(size)
             }.reduce(0, +)
+            storageUsage = await SideKickStorageUsage.measure()
         } catch {
             errorMessage = error.localizedDescription
         }
@@ -268,5 +337,18 @@ struct SettingsStorageView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+
+    @MainActor
+    private func cleanUnusedFiles() async {
+        guard !isCleaning else { return }
+        isCleaning = true
+        defer { isCleaning = false }
+        do {
+            await environment.ipaImportStore.cleanupAbandonedTemporaryIPAImports()
+            try await environment.ipaImportStore.cleanupOrphanedManagedIPAs()
+            await SideStoreOperationService.pruneUnusedCaches()
+            await reload()
+        } catch { errorMessage = error.localizedDescription }
     }
 }

@@ -5,7 +5,7 @@ struct SettingsView: View {
         NavigationStack {
             List {
                 Section("About") {
-                    LabeledContent("Version", value: "1.0.0")
+                    LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown")
                     Link(destination: URL(string: "https://github.com/huzaifah1530-bot/SideKick")!) {
                         Label("SideKick on GitHub", systemImage: "arrow.up.right")
                     }

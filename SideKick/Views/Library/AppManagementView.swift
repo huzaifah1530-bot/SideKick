@@ -4,6 +4,8 @@ import UIKit
 struct AppManagementView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
+    @Environment(\.scenePhase) private var scenePhase
+    @State private var expirationClock = Date.now
     @State private var accountStore = SigningAccountStore()
     @State private var isShowingRefreshConsole = false
     @State private var isFindingShareIPA = false
@@ -13,18 +15,18 @@ struct AppManagementView: View {
     @State private var isConfirmingQueuedUpdateRemoval = false
 
     private let importedApp: ImportedIPA?
-    private let installedApp: InstalledAppSummary?
+    @State private var installedApp: InstalledAppSummary?
     private let onDelete: (() async -> Void)?
 
     init(importedApp: ImportedIPA, onDelete: (() async -> Void)? = nil) {
         self.importedApp = importedApp
-        self.installedApp = nil
+        _installedApp = State(initialValue: nil)
         self.onDelete = onDelete
     }
 
     init(installedApp: InstalledAppSummary) {
         self.importedApp = nil
-        self.installedApp = installedApp
+        _installedApp = State(initialValue: installedApp)
         self.onDelete = nil
     }
 
@@ -49,28 +51,8 @@ struct AppManagementView: View {
                 .padding(.vertical, 8)
             }
 
-            Section("Details") {
-                LabeledContent("Bundle ID", value: bundleIdentifier)
-                    .lineLimit(2)
-                    .textSelection(.enabled)
-                if let importedApp {
-                    LabeledContent("Imported", value: importedApp.formattedImportDate)
-                }
-                if let installedApp {
-                    LabeledContent("Signing account", value: installedApp.accountEmail)
-                    LabeledContent("Team", value: installedApp.teamIdentifier)
-                    LabeledContent(
-                        "Signing expires",
-                        value: "\(installedApp.expirationDate.formatted(.relative(presentation: .numeric))) · \(installedApp.expirationDate.formatted(date: .abbreviated, time: .omitted))"
-                    )
-                }
-                if let pendingUpdateIPA {
-                    LabeledContent("Queued update", value: "Version \(pendingUpdateIPA.version)")
-                }
-            }
-
-            Section {
-                if let importedApp {
+            if let importedApp {
+                Section("Install") {
                     if accountStore.accounts.contains(where: \.hasSavedSession) {
                         NavigationLink {
                             InstallAccountSelectionView(
@@ -83,16 +65,115 @@ struct AppManagementView: View {
                             )
                         } label: {
                             Label("Install", systemImage: "arrow.down.circle")
-                                .fontWeight(.semibold)
+                                .font(.body.weight(.semibold))
+                                .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .fullWidthListSeparators()
                         .disabled(accountStore.isWorking)
                     } else {
                         Text("Add an Apple ID in Accounts to install this app.")
-                            .font(.footnote)
                             .foregroundStyle(.secondary)
                     }
+                }
+            } else if let installedApp {
+                Section(pendingUpdateIPA == nil ? "Open" : "Update") {
+                    if let pendingUpdateIPA {
+                        queuedUpdateActions(ipa: pendingUpdateIPA, installedApp: installedApp)
+                    } else {
+                        SwiftUI.Button {
+                            UIApplication.shared.open(InstalledApp.openAppURL(targetBundleIdentifier: installedApp.resignedBundleIdentifier))
+                        } label: {
+                            Text("Open")
+                                .font(.body.weight(.semibold))
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .buttonBorderShape(.capsule)
+                        .fullWidthListSeparators()
+                    }
+                }
 
+                Section("Refresh") {
+                    SwiftUI.Button {
+                        isShowingRefreshConsole = true
+                    } label: {
+                        Text("Refresh")
+                            .font(.body.weight(.semibold))
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .buttonBorderShape(.capsule)
+                    .fullWidthListSeparators()
+
+                    NavigationLink {
+                        RefreshOptionsView(app: installedApp, accountStore: accountStore)
+                    } label: {
+                        Label("Options", systemImage: "slider.horizontal.3")
+                            .font(.body)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .fullWidthListSeparators()
+                }
+            }
+
+            Section("Details") {
+                LabeledContent("Bundle ID", value: bundleIdentifier)
+                    .lineLimit(2)
+                    .textSelection(.enabled)
+                if let importedApp {
+                    LabeledContent("Imported", value: importedApp.formattedImportDate)
+                }
+                if let installedApp {
+                    LabeledContent("Signing account", value: installedApp.accountEmail)
+                    LabeledContent("Team", value: installedApp.teamIdentifier)
+                    LabeledContent(
+                        "Signing expires",
+                        value: "\(SigningExpiry.description(until: installedApp.expirationDate, now: expirationClock)) · \(installedApp.expirationDate.formatted(date: .abbreviated, time: .shortened))"
+                    )
+                }
+                if let pendingUpdateIPA {
+                    LabeledContent("Queued update", value: "Version \(pendingUpdateIPA.version)")
+                }
+            }
+
+            Section("App Settings") {
+                if let installedApp {
+                    NavigationLink {
+                        GitHubUpdateSettingsView(app: installedApp)
+                    } label: {
+                        Label("GitHub Update Source", systemImage: "chevron.left.forwardslash.chevron.right")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .fullWidthListSeparators()
+
+                    SwiftUI.Button {
+                        Task { await findIPAForSharing(installedApp) }
+                    } label: {
+                        HStack {
+                            Label("Share IPA", systemImage: "square.and.arrow.up")
+                            Spacer()
+                            if isFindingShareIPA { ProgressView() }
+                        }
+                    }
+                    .disabled(isFindingShareIPA)
+                    .fullWidthListSeparators()
+
+                    NavigationLink {
+                        ResignOptionsView(app: installedApp, accountStore: accountStore)
+                    } label: {
+                        Label("Re-sign", systemImage: "arrow.clockwise")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .fullWidthListSeparators()
+
+                    NavigationLink {
+                        JITEnableView(app: installedApp)
+                    } label: {
+                        Label("Enable JIT", systemImage: "bolt.fill")
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .fullWidthListSeparators()
+                } else if let importedApp {
                     NavigationLink {
                         ShareIPAView(app: importedApp)
                     } label: {
@@ -102,167 +183,19 @@ struct AppManagementView: View {
                     .fullWidthListSeparators()
 
                     if onDelete != nil {
-                        SwiftUI.Button("Remove Imported IPA", role: .destructive) {
+                        SwiftUI.Button(role: .destructive) {
                             Task {
                                 await onDelete?()
                                 dismiss()
                             }
-                        }
-                        .fullWidthListSeparators()
-                    }
-                } else if let installedApp {
-                    NavigationLink {
-                        GitHubUpdateSettingsView(app: installedApp)
-                    } label: {
-                        Label("GitHub Update Source", systemImage: "chevron.left.forwardslash.chevron.right")
-                    }
-                    .fullWidthListSeparators()
-
-                    SwiftUI.Button {
-                        Task { await findIPAForSharing(installedApp) }
-                    } label: {
-                        HStack {
-                            if isFindingShareIPA { ProgressView() }
-                            Label("Share IPA", systemImage: "square.and.arrow.up")
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .disabled(isFindingShareIPA)
-                    .fullWidthListSeparators()
-
-                    if let pendingUpdateIPA {
-                        let updateAccounts = accountStore.accounts.filter {
-                            $0.teamIdentifier == installedApp.teamIdentifier && $0.hasSavedSession
-                        }
-                        if let updateAccount = updateAccounts.first(where: {
-                            $0.accountIdentifier == installedApp.accountIdentifier
-                        }) ?? updateAccounts.first {
-                            NavigationLink {
-                                InstallConsoleView(
-                                    app: pendingUpdateIPA,
-                                    account: updateAccount,
-                                    accountStore: accountStore,
-                                    ipaStore: environment.ipaImportStore,
-                                    isUpdate: true,
-                                    onInstalled: {
-                                        do {
-                                            try await environment.ipaImportStore.delete(pendingUpdateIPA)
-                                            self.pendingUpdateIPA = nil
-                                        } catch {
-                                            self.errorMessage = error.localizedDescription
-                                        }
-                                    }
-                                )
-                            } label: {
-                                Text("Update")
-                                    .fontWeight(.semibold)
-                                    .frame(maxWidth: .infinity)
-                            }
-                            .buttonStyle(.borderedProminent)
-                            .buttonBorderShape(.capsule)
-                            .fullWidthListSeparators()
-                            if updateAccounts.count > 1 {
-                                NavigationLink {
-                                    InstallAccountSelectionView(
-                                        app: pendingUpdateIPA,
-                                        accounts: updateAccounts,
-                                        accountStore: accountStore,
-                                        ipaStore: environment.ipaImportStore,
-                                        isUpdate: true,
-                                        onInstalled: {
-                                            do {
-                                                try await environment.ipaImportStore.delete(pendingUpdateIPA)
-                                                self.pendingUpdateIPA = nil
-                                            } catch {
-                                                self.errorMessage = error.localizedDescription
-                                            }
-                                        }
-                                    )
-                                } label: {
-                                    Text("Options")
-                                        .font(.footnote)
-                                        .frame(maxWidth: .infinity)
-                                }
-                                .buttonStyle(.plain)
-                                .fullWidthListSeparators()
-                            }
-                        } else {
-                            Text("Updates must be signed with the account that installed this app (\(installedApp.accountEmail)). Add that account back in Accounts to continue.")
-                                .font(.footnote)
-                                .foregroundStyle(.secondary)
-                        }
-                        SwiftUI.Button("Remove Queued IPA", role: .destructive) {
-                            isConfirmingQueuedUpdateRemoval = true
-                        }
-                        .fullWidthListSeparators()
-                        .alert("Remove queued update?", isPresented: $isConfirmingQueuedUpdateRemoval) {
-                            SwiftUI.Button("Remove IPA", role: .destructive) {
-                                Task { await removeQueuedUpdate() }
-                            }
-                            SwiftUI.Button("Cancel", role: .cancel) { }
-                        } message: {
-                            Text("This removes the queued IPA from SideKick. The installed app will remain on your device.")
-                        }
-                    } else {
-                        SwiftUI.Button {
-                            UIApplication.shared.open(InstalledApp.openAppURL(targetBundleIdentifier: installedApp.resignedBundleIdentifier))
                         } label: {
-                            Text("Open")
-                                .fontWeight(.semibold)
-                                .frame(maxWidth: .infinity)
+                            Label("Remove Imported IPA", systemImage: "trash")
                         }
-                        .buttonStyle(.bordered)
-                        .buttonBorderShape(.capsule)
                         .fullWidthListSeparators()
                     }
-
-                    SwiftUI.Button {
-                        isShowingRefreshConsole = true
-                    } label: {
-                        Text("Refresh")
-                            .fontWeight(.semibold)
-                            .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.borderedProminent)
-                        .buttonBorderShape(.capsule)
-                        .fullWidthListSeparators()
-
-                    NavigationLink {
-                        RefreshOptionsView(
-                            app: installedApp,
-                            accountStore: accountStore
-                        )
-                    } label: {
-                        Text("Options")
-                            .font(.footnote)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.plain)
-                    .fullWidthListSeparators()
-
-                    NavigationLink {
-                        ResignOptionsView(app: installedApp, accountStore: accountStore)
-                    } label: {
-                        Label("Re-sign", systemImage: "arrow.clockwise")
-                            .fontWeight(.semibold)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .buttonStyle(.bordered)
-                    .buttonBorderShape(.capsule)
-                    .fullWidthListSeparators()
-
-                    NavigationLink {
-                        JITEnableView(app: installedApp)
-                    } label: {
-                        Label("Enable JIT", systemImage: "bolt.fill")
-                            .fontWeight(.semibold)
-                            .frame(maxWidth: .infinity)
-                    }
-                    .buttonStyle(.bordered)
-                    .buttonBorderShape(.capsule)
-                    .fullWidthListSeparators()
                 }
             }
+            .font(.body)
         }
         .listStyle(.insetGrouped)
         .background(Color(uiColor: .systemGroupedBackground))
@@ -277,11 +210,104 @@ struct AppManagementView: View {
             }
         }
         .onAppear { Task { await reloadManagementState() } }
+        .onChange(of: scenePhase) { _, phase in
+            guard phase == .active else { return }
+            Task { await reloadManagementState() }
+        }
+        .task {
+            while !Task.isCancelled {
+                do { try await Task.sleep(for: .seconds(60)) }
+                catch { return }
+                expirationClock = .now
+            }
+        }
         .alert("App action failed", isPresented: Binding(
             get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
         )) {
             SwiftUI.Button("OK", role: .cancel) { errorMessage = nil }
         } message: { Text(errorMessage ?? "") }
+    }
+
+    @ViewBuilder
+    private func queuedUpdateActions(ipa: ImportedIPA, installedApp: InstalledAppSummary) -> some View {
+        let updateAccounts = accountStore.accounts.filter {
+            $0.teamIdentifier == installedApp.teamIdentifier && $0.hasSavedSession
+        }
+        if let account = updateAccounts.first(where: {
+            $0.accountIdentifier == installedApp.accountIdentifier
+        }) ?? updateAccounts.first {
+            NavigationLink {
+                InstallConsoleView(
+                    app: ipa,
+                    account: account,
+                    accountStore: accountStore,
+                    ipaStore: environment.ipaImportStore,
+                    isUpdate: true,
+                    onInstalled: { await finishQueuedUpdate(ipa) }
+                )
+            } label: {
+                Text("Update")
+                    .font(.body.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+            }
+            .buttonStyle(.borderedProminent)
+            .buttonBorderShape(.capsule)
+            .fullWidthListSeparators()
+
+            if updateAccounts.count > 1 {
+                NavigationLink {
+                    InstallAccountSelectionView(
+                        app: ipa,
+                        accounts: updateAccounts,
+                        accountStore: accountStore,
+                        ipaStore: environment.ipaImportStore,
+                        isUpdate: true,
+                        onInstalled: { await finishQueuedUpdate(ipa) }
+                    )
+                } label: {
+                    Label("Options", systemImage: "slider.horizontal.3")
+                        .font(.body)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                .fullWidthListSeparators()
+            }
+        } else {
+            Text("Add the Apple account that installed this app (\(installedApp.accountEmail)) in Accounts to update it.")
+                .foregroundStyle(.secondary)
+        }
+        SwiftUI.Button(role: .destructive) {
+            isConfirmingQueuedUpdateRemoval = true
+        } label: {
+            Label("Remove Queued IPA", systemImage: "trash")
+        }
+        .fullWidthListSeparators()
+        .alert("Remove queued update?", isPresented: $isConfirmingQueuedUpdateRemoval) {
+            SwiftUI.Button("Remove IPA", role: .destructive) { Task { await removeQueuedUpdate() } }
+            SwiftUI.Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This removes the queued IPA from SideKick. The installed app will remain on your device.")
+        }
+    }
+
+    @MainActor
+    private func finishQueuedUpdate(_ ipa: ImportedIPA) async {
+        do {
+            if let updateKey = ipa.githubUpdateKey,
+               let repositoryURL = ipa.githubRepositoryURL {
+                let store = GitHubUpdateConfigurationStore()
+                if var configuration = try await store.configuration(for: bundleIdentifier),
+                   configuration.repositoryURL == repositoryURL {
+                    configuration.lastInstalledUpdateKey = updateKey
+                    configuration.dismissedUpdateKey = nil
+                    try await store.save(configuration)
+                }
+            }
+            try await environment.ipaImportStore.delete(ipa)
+            pendingUpdateIPA = nil
+            await reloadManagementState()
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     @ViewBuilder
@@ -299,6 +325,14 @@ struct AppManagementView: View {
 
     @MainActor
     private func reloadManagementState() async {
+        expirationClock = .now
+        if let current = installedApp {
+            let service = SideStoreOperationService(accountStore: accountStore, ipaStore: environment.ipaImportStore)
+            let apps = await service.installedApps()
+            if let latest = apps.first(where: { $0.bundleIdentifier == current.bundleIdentifier }) {
+                installedApp = latest
+            }
+        }
         if let installedApp {
             let matchingBundleIDs = installedApp.updateMatchingBundleIdentifiers
             let imports = (try? await environment.ipaImportStore.importedApps()) ?? []
@@ -681,13 +715,14 @@ struct InstallAccountSelectionView: View {
     let ipaStore: IPAImportStore
     let isUpdate: Bool
     let onInstalled: (() async -> Void)?
+    var onSourceMissing: (() async -> Void)? = nil
 
     var body: some View {
         List {
             Section {
                 ForEach(accounts) { account in
                     NavigationLink {
-                        InstallConsoleView(app: app, account: account, accountStore: accountStore, ipaStore: ipaStore, isUpdate: isUpdate, onInstalled: onInstalled)
+                        InstallConsoleView(app: app, account: account, accountStore: accountStore, ipaStore: ipaStore, isUpdate: isUpdate, onInstalled: onInstalled, onSourceMissing: onSourceMissing)
                     } label: {
                         VStack(alignment: .leading, spacing: 5) {
                             Text(account.email).font(.body.weight(.medium))
@@ -717,6 +752,7 @@ struct InstallConsoleView: View {
     let ipaStore: IPAImportStore
     let isUpdate: Bool
     let onInstalled: (() async -> Void)?
+    var onSourceMissing: (() async -> Void)? = nil
 
     @Environment(\.dismiss) private var dismiss
     @State private var lines: [String] = []
@@ -725,6 +761,7 @@ struct InstallConsoleView: View {
     @State private var didStart = false
     @State private var failure: String?
     @State private var lastLoggedPercent = -5
+    @State private var showingInstallConfirmation = false
 
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
@@ -782,7 +819,17 @@ struct InstallConsoleView: View {
         .task {
             guard !didStart else { return }
             didStart = true
-            await runInstall()
+            if UserDefaults.standard.isInstallConfirmationEnabled {
+                showingInstallConfirmation = true
+            } else {
+                await runInstall()
+            }
+        }
+        .alert(isUpdate ? "Update \(app.name)?" : "Install \(app.name)?", isPresented: $showingInstallConfirmation) {
+            SwiftUI.Button(isUpdate ? "Update" : "Install") { Task { await runInstall() } }
+            SwiftUI.Button("Cancel", role: .cancel) { isRunning = false; dismiss() }
+        } message: {
+            Text("Version \(app.version) will be signed using \(account.email).")
         }
     }
 
@@ -816,6 +863,9 @@ struct InstallConsoleView: View {
         } catch {
             failure = error.localizedDescription
             append("ERROR · \(error.localizedDescription)")
+            if let importError = error as? IPAImportError, case .sourceFileMissing = importError {
+                await onSourceMissing?()
+            }
         }
         isRunning = false
     }

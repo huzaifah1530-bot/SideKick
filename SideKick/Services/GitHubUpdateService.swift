@@ -112,11 +112,13 @@ actor GitHubUpdateService {
                   $0.entry.key == baselineKey || legacyReleaseKey(for: $0.entry.key) == baselineKey
               }), baselineIndex > 0 else { return nil }
         let item = history[0]
+        guard item.entry.key != configuration.dismissedUpdateKey else { return nil }
         guard item.entry.key != baselineKey else { return nil }
         return GitHubUpdateCandidate(
             bundleIdentifier: app.bundleIdentifier, appName: app.name, currentVersion: app.version,
             newVersion: item.version, title: item.title, assetName: item.assetName,
-            downloadURL: item.url, updateKey: item.entry.key, source: configuration.source
+            downloadURL: item.url, updateKey: item.entry.key, source: configuration.source,
+            repositoryURL: configuration.repositoryURL
         )
     }
 
@@ -172,7 +174,9 @@ actor GitHubUpdateService {
             try? FileManager.default.removeItem(at: downloadURL)
             throw GitHubUpdateError.noIPAInArtifact
         }
-        let output = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString).appendingPathExtension("ipa")
+        let output = FileManager.default.temporaryDirectory
+            .appendingPathComponent("sidekick-github-\(ProcessInfo.processInfo.processIdentifier)-\(UUID().uuidString)")
+            .appendingPathExtension("ipa")
         FileManager.default.createFile(atPath: output.path, contents: nil)
         let handle = try FileHandle(forWritingTo: output)
         do {

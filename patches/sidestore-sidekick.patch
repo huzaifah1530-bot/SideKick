@@ -179,7 +179,7 @@ diff --git a/Shared/Extensions/FileManager+SharedDirectories.swift b/Shared/Exte
 index 0000000..0000000 100644
 --- a/Shared/Extensions/FileManager+SharedDirectories.swift
 +++ b/Shared/Extensions/FileManager+SharedDirectories.swift
-@@ -13,11 +13,20 @@ public extension FileManager
+@@ -13,11 +13,12 @@ public extension FileManager
          #if os(tvOS)
          return self.cachesDirectory
          #else
@@ -189,21 +189,13 @@ index 0000000..0000000 100644
 -        
 -        let sharedDirectoryURL = self.containerURL(forSecurityApplicationGroupIdentifier: appGroup)
 -        return sharedDirectoryURL
-+        if let appGroup = Bundle.main.altstoreAppGroup,
-+           let sharedDirectoryURL = self.containerURL(forSecurityApplicationGroupIdentifier: appGroup) {
-+            return sharedDirectoryURL
-+        }
-+
-+        // SideKick is independently installed and cannot assume an App Group entitlement.
-+        let sideKickDirectoryURL = self.applicationSupportDirectory
-+            .appendingPathComponent("SideKick", isDirectory: true)
-+        do {
-+            try self.createDirectory(at: sideKickDirectoryURL, withIntermediateDirectories: true)
-+            return sideKickDirectoryURL
-+        } catch {
-+            debugLog("[FileManager] Could not create SideKick private data directory.")
-+            return nil
-+        }
++        #if WIDGET_EXTENSION
++        guard let group = Bundle.main.altstoreAppGroup else { return nil }
++        return self.containerURL(forSecurityApplicationGroupIdentifier: group)
++        #else
++        // Keep the app database independent of signing entitlements.
++        return SideKickDataDirectory.url
++        #endif
          #endif
      }
 diff --git a/SideStore/AppConstants.swift b/SideStore/AppConstants.swift
@@ -307,3 +299,45 @@ diff --git a/SideStore/DeepLinks/URLHandler.swift b/SideStore/DeepLinks/URLHandl
 +                SideKickCertificateExport.present(callbackTemplate: callbackTemplate)
              }
              return true
+diff --git a/SideStore/Core/Operations/OperationContexts.swift b/SideStore/Core/Operations/OperationContexts.swift
+--- a/SideStore/Core/Operations/OperationContexts.swift
++++ b/SideStore/Core/Operations/OperationContexts.swift
+@@ -297,3 +297,4 @@
+     lazy var temporaryDirectory: URL = {
+-        let temporaryDirectory = FileManager.default.uniqueTemporaryURL()
++        let temporaryDirectory = FileManager.default.temporaryDirectory
++            .appendingPathComponent("sidekick-pipeline-\(UUID().uuidString)", isDirectory: true)
+         do {
+@@ -302,2 +303,6 @@
+                                                     attributes: nil)
++            try String(ProcessInfo.processInfo.processIdentifier).write(
++                to: temporaryDirectory.appendingPathComponent(".sidekick-process"),
++                atomically: true, encoding: .utf8
++            )
+         }
+diff --git a/SideStore/Core/Operations/PipelineExecutor.swift b/SideStore/Core/Operations/PipelineExecutor.swift
+--- a/SideStore/Core/Operations/PipelineExecutor.swift
++++ b/SideStore/Core/Operations/PipelineExecutor.swift
+@@ -30,2 +30,11 @@
+     ) async throws -> InstalledApp {
++        // Failed and cancelled pipelines also own their staged files. Waiting
++        // for the last success-only step leaked extracted apps and generated IPAs.
++        let temporaryDirectory = context.temporaryDirectory
++        defer {
++            if FileManager.default.fileExists(atPath: temporaryDirectory.path) {
++                do { try FileManager.default.removeItem(at: temporaryDirectory) }
++                catch { debugLog("[SideKick] Could not remove pipeline staging files: \(error)") }
++            }
++        }
+         var finalApp: InstalledApp?
+diff --git a/AltStore/AppDelegate.swift b/AltStore/AppDelegate.swift
+--- a/AltStore/AppDelegate.swift
++++ b/AltStore/AppDelegate.swift
+@@ -381,2 +381,7 @@
+     {
++        UIApplication.shared.setMinimumBackgroundFetchInterval(
++            UserDefaults.standard.isBackgroundRefreshEnabled
++                ? UIApplication.backgroundFetchIntervalMinimum
++                : UIApplication.backgroundFetchIntervalNever
++        )
+         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { (success, error) in

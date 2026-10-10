@@ -1,5 +1,9 @@
 import Foundation
 
+extension Notification.Name {
+    static let sideKickGitHubSettingsDidChange = Notification.Name("SideKick.GitHubSettingsDidChange")
+}
+
 actor GitHubUpdateConfigurationStore {
     private let fileManager = FileManager.default
     private let fileURL: URL
@@ -25,11 +29,13 @@ actor GitHubUpdateConfigurationStore {
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         try encoder.encode(values).write(to: fileURL, options: .atomic)
+        NotificationCenter.default.post(name: .sideKickGitHubSettingsDidChange, object: nil)
     }
 
     func remove(bundleIdentifier: String) throws {
         let values = try all().filter { $0.bundleIdentifier != bundleIdentifier }
         try fileManager.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
         try JSONEncoder().encode(values).write(to: fileURL, options: .atomic)
+        NotificationCenter.default.post(name: .sideKickGitHubSettingsDidChange, object: nil)
     }
 }

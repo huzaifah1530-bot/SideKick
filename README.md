@@ -14,16 +14,27 @@ SideKick's app experience is implemented in this repository's `SideKick/` direct
 
 - The SideStore source is pinned as a recursive Git submodule at `Vendor/SideStore`.
 - The build uses SideStore's Xcode project and runtime bootstrap, while the app scene presents SideKick's SwiftUI UI.
-- The IPA library imports IPA files from Files, validates their bundle metadata, stores them locally, supports search, and removes imported files.
+- The IPA library validates bundle metadata, keeps links to originals selected from Files, and stores downloaded GitHub IPA copies locally. Removing a linked library entry keeps the original in Files.
 - When an imported IPA matches an installed app, choosing **Queue for Update** marks it as a pending update. It appears in the Home screen’s **Updates** section, and the installed app’s detail page offers **Update** instead of **Open** until the queued IPA is installed or removed. URL imports use the same flow.
 - GitHub update sources use release or workflow-artifact history to track new builds. During setup, choose the version already installed; SideKick can suggest one from the original IPA’s file date, so connecting a repository does not require reinstalling the app.
 - Apple ID sign-in is connected to SideStore's native authentication flow. SideKick stores each account/team session and its signing certificate separately in the iOS Keychain and can switch the active SideStore identity.
 - IPA install and account-scoped refresh are routed through the integrated signing engine; these still need physical-device validation. SideKick now exposes pairing-file import and connection validation in Settings.
 - Settings includes dedicated pages for app refresh, install/signing behavior, connection and pairing, Anisette, and imported-IPA storage. Developer Portal App IDs, profiles, and certificates are managed from each Apple ID in Accounts.
+- App details place Open/Update and Refresh in separate groups above Details. Each relevant Options row uses a full-size icon and label. GitHub sources, sharing, re-signing, and JIT live together under App Settings.
+- Expiry badges and Details use the same remaining-day calculation and reload on foreground opening. Partial days count toward the next day; the detail page also shows the exact expiry time.
+- A missing GitHub download can be downloaded again. Update options allow skipping one build or marking an exact build as already installed; future builds remain eligible. Identical app version names do not establish that two Actions builds are the same.
 - A pairing file must first be created on a computer paired with the iPhone. SideKick does not create that trust record on-device. SideStore's app is not required.
 - Install and refresh currently require Wi-Fi and the separate LocalDevVPN App Store app. This SideKick build has neither the Network Extension entitlement nor a tunnel extension, so it cannot enable that VPN itself. Settings links to LocalDevVPN and explains the setup.
 
 SideKick stores its database in private app storage and does not require SideStore's App Group or app. The unsigned CI build still does not verify signing or on-device functionality. Pairing-file creation requires a previously paired computer. The current install/refresh transport requires LocalDevVPN; it is not bundled in SideKick.
+
+Database storage stays at `Library/Application Support/SideKick` when signing entitlements change. If an older App Group database is accessible and no private database exists, SideKick copies it and its related files before opening the private database. An already inaccessible App Group or a different iOS app container cannot be recovered by this migration. Installed records remain visible when their signing account needs reconnecting.
+
+GitHub checks currently run when My Apps opens or is refreshed. They do not discover new releases while SideKick is closed. Expiry reminders are scheduled local notifications and can be delivered while SideKick is closed. Automatic signing refresh uses SideStore's background fetch callback, subject to iOS scheduling and a working device connection; this does not schedule GitHub checks.
+
+Storage retains the source bundle required to re-sign each managed app. Successful, failed, and cancelled pipelines clean up their staged app and IPA files. On startup, SideKick removes pipeline/import files left by previous processes and unreferenced managed IPA copies. Storage settings show downloaded IPAs, signing caches, temporary files, and explicitly saved resigned IPAs separately; **Clean Unused Files** keeps app records and user exports.
+
+The ported settings and their runtime connections are documented in [`docs/settings-functionality.md`](docs/settings-functionality.md). Code tracing and local checks do not replace physical-device validation.
 
 The upstream SideStore scheme also builds a widget extension. SideKick removes that extension from the packaged IPA because it is not part of the standalone app and an unsigned extension cannot be installed without its own valid provisioning profile.
 

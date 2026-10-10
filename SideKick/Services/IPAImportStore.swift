@@ -32,8 +32,24 @@ actor IPAImportStore {
             options: [.skipsHiddenFiles]
         ) else { return }
 
-        let cutoff = Date.now.addingTimeInterval(-7 * 24 * 60 * 60)
+        let cutoff = Date.now.addingTimeInterval(-24 * 60 * 60)
         for candidate in candidates {
+            let name = candidate.lastPathComponent
+            if name.hasPrefix("sidekick-import-") || name.hasPrefix("sidekick-github-") {
+                let components = name.split(separator: "-")
+                if components.count > 3, components[2] != Substring(String(ProcessInfo.processInfo.processIdentifier)) {
+                    try? fileManager.removeItem(at: candidate)
+                }
+                continue
+            }
+            if candidate.lastPathComponent.hasPrefix("sidekick-pipeline-") {
+                let owner = candidate.appendingPathComponent(".sidekick-process")
+                if let process = try? String(contentsOf: owner, encoding: .utf8),
+                   process != String(ProcessInfo.processInfo.processIdentifier) {
+                    try? fileManager.removeItem(at: candidate)
+                }
+                continue
+            }
             guard let values = try? candidate.resourceValues(forKeys: [.isDirectoryKey, .contentModificationDateKey]),
                   values.isDirectory == true,
                   let modifiedAt = values.contentModificationDate,
@@ -146,7 +162,7 @@ actor IPAImportStore {
         return app
     }
 
-    func importManagedIPA(from sourceURL: URL, expectedBundleIdentifiers: Set<String>) throws -> ImportedIPA {
+    func importManagedIPA(from sourceURL: URL, expectedBundleIdentifiers: Set<String>, updateKey: String? = nil, repositoryURL: String? = nil) throws -> ImportedIPA {
         let metadata = try readMetadata(from: sourceURL)
         let expected = expectedBundleIdentifiers.map { $0.lowercased() }
         guard expected.contains(metadata.bundleIdentifier.lowercased()) else {
@@ -165,7 +181,9 @@ actor IPAImportStore {
                 sourceBookmarkData: nil,
                 sourceURLString: nil,
                 importedAt: .now,
-                iconData: metadata.iconData
+                iconData: metadata.iconData,
+                githubUpdateKey: updateKey,
+                githubRepositoryURL: repositoryURL
             )
             try saveImportedIPA(app)
             return app
@@ -183,13 +201,29 @@ actor IPAImportStore {
 
     func saveImportedIPA(_ app: ImportedIPA) throws {
         var entries = try importedApps()
-        if let previous = entries.first(where: { $0.bundleIdentifier == app.bundleIdentifier }) {
-            removeLegacyStoredIPA(previous)
-            entries.removeAll { $0.bundleIdentifier == app.bundleIdentifier }
-        }
+        let previous = entries.first(where: { $0.bundleIdentifier == app.bundleIdentifier })
+        entries.removeAll { $0.bundleIdentifier == app.bundleIdentifier }
         entries.insert(app, at: 0)
         try save(entries)
+        // Updating queue metadata must not delete the IPA it still references.
+        if let previous, previous.fileName != app.fileName {
+            removeLegacyStoredIPA(previous)
+        }
         NotificationCenter.default.post(name: .sideKickImportedIPAsDidChange, object: nil)
+    }
+
+    func isManagedIPAAvailable(_ app: ImportedIPA) -> Bool {
+        guard let fileName = app.fileName else { return false }
+        return fileManager.isReadableFile(atPath: directory.appendingPathComponent(fileName).path)
+    }
+
+    func cleanupOrphanedManagedIPAs() throws {
+        let retainedNames = Set(try importedApps().compactMap(\.fileName))
+        guard fileManager.fileExists(atPath: directory.path) else { return }
+        for url in try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) {
+            guard url.pathExtension.lowercased() == "ipa", !retainedNames.contains(url.lastPathComponent) else { continue }
+            try fileManager.removeItem(at: url)
+        }
     }
 
     func fileURL(for app: ImportedIPA) async throws -> URL {
@@ -230,7 +264,7 @@ actor IPAImportStore {
         defer { if securityScoped { sourceURL.stopAccessingSecurityScopedResource() } }
         guard fileManager.isReadableFile(atPath: sourceURL.path) else { throw IPAImportError.sourceFileMissing }
         let temporaryURL = fileManager.temporaryDirectory
-            .appendingPathComponent(UUID().uuidString)
+            .appendingPathComponent("sidekick-import-\(ProcessInfo.processInfo.processIdentifier)-\(UUID().uuidString)")
             .appendingPathExtension("ipa")
         do {
             try fileManager.copyItem(at: sourceURL, to: temporaryURL)
@@ -243,9 +277,11 @@ actor IPAImportStore {
 
     func delete(_ app: ImportedIPA) throws {
         var entries = try importedApps()
-        entries.removeAll { $0.bundleIdentifier == app.bundleIdentifier }
+        entries.removeAll { $0.bundleIdentifier == app.bundleIdentifier && $0.importedAt == app.importedAt }
         try save(entries)
-        removeLegacyStoredIPA(app)
+        if !entries.contains(where: { $0.fileName != nil && $0.fileName == app.fileName }) {
+            removeLegacyStoredIPA(app)
+        }
         NotificationCenter.default.post(name: .sideKickImportedIPAsDidChange, object: nil)
     }
 
