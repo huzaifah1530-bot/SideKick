@@ -14,6 +14,8 @@ final class AppEnvironment {
     let githubUpdateDownloads = GitHubUpdateDownloadStore()
     let liveContainerStore = LiveContainerStore.shared
     private(set) var databaseState: DatabaseStartupState = .starting
+    @ObservationIgnored private var databaseStartupTask: Task<Void, Never>?
+    @ObservationIgnored private var maintenanceTask: Task<Void, Never>?
 
     init(ipaImportStore: IPAImportStore = IPAImportStore.shared) {
         self.ipaImportStore = ipaImportStore
@@ -21,17 +23,37 @@ final class AppEnvironment {
 
     func startDatabase() async {
         if case .ready = databaseState { return }
-        databaseState = .starting
-        do {
-            try await DatabaseManager.shared.start()
-            await ipaImportStore.cleanupAbandonedTemporaryIPAImports()
+        if let databaseStartupTask {
+            await databaseStartupTask.value
+            return
+        }
+        let task = Task { @MainActor in
+            databaseState = .starting
+            do {
+                try await DatabaseManager.shared.start()
+                databaseState = .ready
+            } catch {
+                databaseState = .failed(Self.readableDescription(for: error))
+            }
+        }
+        databaseStartupTask = task
+        await task.value
+        databaseStartupTask = nil
+    }
+
+    // Start only after the local catalogue has been published. Maintenance must
+    // never hold the launch screen or the app list behind filesystem work.
+    func scheduleMaintenance() {
+        guard case .ready = databaseState, maintenanceTask == nil else { return }
+        maintenanceTask = Task { @MainActor in
+            defer { maintenanceTask = nil }
+            guard !Task.isCancelled else { return }
             do { try await ipaImportStore.cleanupOrphanedManagedIPAs() }
             catch { debugLog("[SideKick] Could not clean unused downloaded IPAs: \(error.localizedDescription)") }
+            guard !Task.isCancelled else { return }
             await SideStoreOperationService.pruneUnusedCaches()
+            guard !Task.isCancelled else { return }
             await ExpirationNotificationScheduler.update()
-            databaseState = .ready
-        } catch {
-            databaseState = .failed(Self.readableDescription(for: error))
         }
     }
 

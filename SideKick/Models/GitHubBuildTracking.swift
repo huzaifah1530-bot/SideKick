@@ -78,7 +78,7 @@ enum GitHubTrackingPolicy {
     static func check(target: GitHubUpdateTarget, configuration: GitHubUpdateConfiguration, history: [GitHubTrackedBuild]) -> GitHubCheckResult {
         guard let latest = history.first else { return GitHubCheckResult(targetID: target.id, state: .noMatchingDownload) }
         let receipt = configuration.installedBuild
-        let trusted = receipt?.sourceIdentity == configuration.sourceIdentity && receipt?.observation == target.observation
+        let trusted = target.observation != nil && receipt?.sourceIdentity == configuration.sourceIdentity && receipt?.observation == target.observation
         let state: GitHubCheckState
         if !trusted || receipt == nil { state = .unknownInstalledBuild }
         else {
@@ -106,13 +106,16 @@ struct GitHubPendingSelfUpdate: Codable, Hashable, Sendable {
 // malformed binaries remain unverified rather than falling back to a version label.
 enum GitHubExecutableIdentity {
     static func read(_ data: Data) -> String? {
-        let bytes = Array(data)
-        guard bytes.count >= 32, Array(bytes.prefix(4)) == [0xcf, 0xfa, 0xed, 0xfe] else { return nil }
+        guard data.count >= 32 else { return nil }
+        var bytes = Array(data.prefix(32))
+        guard Array(bytes.prefix(4)) == [0xcf, 0xfa, 0xed, 0xfe] else { return nil }
         func word(_ offset: Int) -> UInt32 {
             (0..<4).reduce(UInt32(0)) { $0 | UInt32(bytes[offset + $1]) << (8 * $1) }
         }
         let count = Int(word(16)), size = Int(word(20))
-        guard size <= bytes.count - 32, count <= size / 8 else { return nil }
+        guard size <= data.count - 32, count <= size / 8 else { return nil }
+        // Only load commands are needed, not the executable or signature bytes.
+        bytes = Array(data.prefix(32 + size))
         let end = 32 + size
         var offset = 32
         for _ in 0..<count {

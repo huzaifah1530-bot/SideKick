@@ -10,12 +10,21 @@ final class HomeViewModel {
     var noticeMessage: String?
 
     private let store: IPAImportStore
+    private var loadGeneration = UUID()
 
     init(store: IPAImportStore) { self.store = store }
 
     func load() async {
-        do { importedApps = try await store.importedApps() }
-        catch { errorMessage = error.localizedDescription }
+        let generation = UUID()
+        loadGeneration = generation
+        do {
+            let apps = try await store.importedApps()
+            guard !Task.isCancelled, loadGeneration == generation else { return }
+            importedApps = apps
+        } catch {
+            guard !Task.isCancelled, loadGeneration == generation else { return }
+            errorMessage = error.localizedDescription
+        }
     }
 
     func importIPA(from url: URL) async {
@@ -23,7 +32,7 @@ final class HomeViewModel {
         defer { isImporting = false }
         do {
             let app = try await store.importIPA(from: url)
-            importedApps = try await store.importedApps()
+            await load()
             noticeMessage = "\(app.name) is ready to install."
         } catch {
             errorMessage = error.localizedDescription
@@ -33,7 +42,7 @@ final class HomeViewModel {
     func delete(_ app: ImportedIPA) async {
         do {
             try await store.delete(app)
-            importedApps = try await store.importedApps()
+            await load()
         } catch { errorMessage = error.localizedDescription }
     }
 }

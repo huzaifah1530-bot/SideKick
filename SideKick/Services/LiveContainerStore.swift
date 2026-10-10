@@ -128,6 +128,7 @@ actor LiveContainerStore {
     private let access: any LiveContainerDirectoryAccess
     private var scans: [UUID: UUID] = [:]
     private var links: [UUID: UUID] = [:]
+    private var accessRevisions: [UUID: UUID] = [:]
 
     init(fileURL: URL? = nil, access: any LiveContainerDirectoryAccess = SystemLiveContainerDirectoryAccess()) {
         let support = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
@@ -168,6 +169,7 @@ actor LiveContainerStore {
         merge(scan, into: &state, connectionID: connectionID)
         if old != nil { scans[connectionID] = nil }
         try save(state)
+        accessRevisions[connectionID] = UUID()
         return connection
     }
 
@@ -214,6 +216,7 @@ actor LiveContainerStore {
         scans[id] = nil
         links[id] = nil
         try save(state)
+        accessRevisions[id] = UUID()
     }
 
     @discardableResult
@@ -225,16 +228,32 @@ actor LiveContainerStore {
         scans[id] = nil
         links[id] = nil
         try save(state)
+        accessRevisions[id] = UUID()
         return ids
     }
 
     func launchURL(for guestID: String) async throws -> URL {
-        guard let guest = try snapshot().apps.first(where: { $0.id == guestID }) else { throw LiveContainerError.guestMissing }
-        try await rescan(guest.connectionID)
+        let before = try snapshot()
+        guard let guest = before.apps.first(where: { $0.id == guestID }) else { throw LiveContainerError.guestMissing }
+        guard let connection = before.connections.first(where: { $0.id == guest.connectionID }),
+              let bookmark = connection.bookmark else { throw LiveContainerError.disconnected }
+        guard connection.storageKind != .snapshot else { throw LiveContainerError.guestMissing }
+        let accessRevision = accessRevisions[connection.id]
+        // Launch validates local files independently of background catalogue scans.
+        // It neither waits for a repository check nor takes its scan ownership.
+        let (scan, _) = try await LiveContainerReadContext.scan(access: access, bookmark: bookmark, id: connection.id)
+        try Task.checkCancellation()
         let state = try snapshot()
-        guard let current = state.apps.first(where: { $0.id == guestID }), current.isAvailable, current.warning == nil,
-              let connection = state.connections.first(where: { $0.id == current.connectionID }), connection.isConnected,
-              connection.storageKind != .snapshot else { throw LiveContainerError.guestMissing }
+        // Access may have been disconnected, forgotten, or replaced during the read.
+        guard state.apps.contains(where: { $0.id == guestID }),
+              let linked = state.connections.first(where: { $0.id == connection.id }),
+              linked.isConnected, accessRevisions[connection.id] == accessRevision,
+              linked.scheme == connection.scheme,
+              linked.storageKind == connection.storageKind, links[connection.id] == nil else {
+            throw LiveContainerError.disconnected
+        }
+        guard let current = scan.apps.first(where: { $0.id == guestID }),
+              current.isAvailable, current.warning == nil else { throw LiveContainerError.guestMissing }
         return try LiveContainerLaunch.url(scheme: connection.scheme, folder: current.folder)
     }
 

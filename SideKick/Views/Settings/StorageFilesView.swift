@@ -8,7 +8,7 @@ struct StorageFilesView: View {
     var body: some View {
         List {
             Section {
-                Text("Signing sources let SideKick refresh apps without downloading them again. You can remove them to reclaim space, but may need to import the original IPA before the next refresh. Recent temporary files are protected until a later cleanup.")
+                Text("Signing sources let SideKick refresh apps without downloading them again. You can remove them to reclaim space, but may need to import the original IPA before the next refresh. SideKick automatically cleans completed install files. Recent recovery sources and temporary files in use stay protected.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
             if loading { ProgressView("Measuring files…") }

@@ -5,6 +5,8 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab = 0
     @State private var setupStatus = SetupStatus()
+    @State private var connectionWarning: LocalVPNService.ConnectionWarning?
+    @State private var showingConnectionSettings = false
 
     var body: some View {
         Group {
@@ -32,10 +34,47 @@ struct ContentView: View {
             await environment.startDatabase()
             await setupStatus.refresh()
         }
+        .task { await checkConnectionWarning() }
         .onChange(of: scenePhase) { _, phase in
-            guard phase == .active, case .ready = environment.databaseState else { return }
+            guard phase == .active else { return }
+            Task { await checkConnectionWarning() }
+            guard case .ready = environment.databaseState else { return }
             Task { await setupStatus.refresh() }
         }
+        .alert(connectionWarning?.title ?? "Local Connection", isPresented: Binding(
+            get: { connectionWarning != nil },
+            set: { if !$0 { connectionWarning = nil } }
+        )) {
+            SwiftUI.Button("Connection Settings") {
+                LocalVPNService.shared.acknowledgeConnectionWarning()
+                connectionWarning = nil
+                showingConnectionSettings = true
+            }
+            SwiftUI.Button("Not Now", role: .cancel) {
+                LocalVPNService.shared.acknowledgeConnectionWarning()
+                connectionWarning = nil
+            }
+        } message: {
+            Text(connectionWarning?.message ?? "")
+        }
+        .sheet(isPresented: $showingConnectionSettings) {
+            NavigationStack {
+                LocalConnectionSettingsView()
+                    .toolbar {
+                        ToolbarItem(placement: .confirmationAction) {
+                            SwiftUI.Button("Done") { showingConnectionSettings = false }
+                        }
+                    }
+            }
+        }
+    }
+
+    @MainActor private func checkConnectionWarning() async {
+        guard scenePhase == .active, connectionWarning == nil, !showingConnectionSettings else { return }
+        let warning = await LocalVPNService.shared.connectionWarningIfNeeded()
+        guard !Task.isCancelled, scenePhase == .active, connectionWarning == nil,
+              !showingConnectionSettings else { return }
+        connectionWarning = warning
     }
 
     @ViewBuilder

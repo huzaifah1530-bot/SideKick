@@ -307,7 +307,7 @@ struct SettingsStorageView: View {
             } header: {
                 Text("Signing & Temporary Files")
             } footer: {
-                Text("SideKick keeps the current extracted source for each app so it can re-sign it. Extracted apps can be larger than their compressed IPAs. Cleanup removes unused caches and abandoned temporary files. Saved resigned IPAs and app records are kept.")
+                Text("SideKick keeps the current extracted source for each app so it can re-sign it. Extracted apps can be larger than their compressed IPAs. SideKick automatically removes completed install files and expired unused sources. Recent sources are kept for 24 hours for recovery. Clean Unused Files also clears disposable network caches. Saved resigned IPAs and app records are kept.")
             }
         }
         .listStyle(.insetGrouped)
@@ -359,7 +359,6 @@ struct SettingsStorageView: View {
         isCleaning = true
         defer { isCleaning = false }
         do {
-            URLCache.shared.removeAllCachedResponses()
             let report = try await SideKickStorageCleanup.cleanUnused(downloads: environment.githubUpdateDownloads)
             try await environment.ipaImportStore.cleanupOrphanedManagedIPAs()
             await reload()

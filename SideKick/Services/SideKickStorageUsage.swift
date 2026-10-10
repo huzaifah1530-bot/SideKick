@@ -70,7 +70,8 @@ struct SideKickStorageUsage: Sendable {
                   values.isSymbolicLink != true, values.isRegularFile == true else { return 0 }
             return Int64(values.totalFileAllocatedSize ?? values.fileAllocatedSize ?? values.fileSize ?? 0)
         }
-        if let values = try? url.resourceValues(forKeys: keys), values.isRegularFile == true { return bytes(url) }
+        guard let values = try? url.resourceValues(forKeys: keys), values.isSymbolicLink != true else { return 0 }
+        if values.isRegularFile == true { return bytes(url) }
         guard let files = FileManager.default.enumerator(at: url,
             includingPropertiesForKeys: Array(keys), options: []) else { return 0 }
         var total: Int64 = 0

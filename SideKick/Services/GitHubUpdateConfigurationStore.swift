@@ -8,15 +8,46 @@ actor GitHubUpdateConfigurationStore {
     static let shared = GitHubUpdateConfigurationStore()
     private let fileManager = FileManager.default
     private let fileURL: URL
+    private let legacyFileURLs: [URL]
 
-    init(fileURL: URL? = nil) {
+    init(fileURL: URL? = nil, legacyFileURLs: [URL]? = nil) {
         let support = fileManager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-        self.fileURL = fileURL ?? support.appendingPathComponent("GitHubUpdates", isDirectory: true).appendingPathComponent("apps.json")
+        let relativePath = "GitHubUpdates/apps.json"
+        self.fileURL = fileURL ?? support.appendingPathComponent("SideKick", isDirectory: true).appendingPathComponent(relativePath)
+        if let legacyFileURLs {
+            self.legacyFileURLs = legacyFileURLs
+        } else if fileURL != nil {
+            self.legacyFileURLs = []
+        } else {
+            var locations = [support.appendingPathComponent(relativePath)]
+            #if canImport(UIKit)
+            if let group = Bundle.main.altstoreAppGroup,
+               let shared = fileManager.containerURL(forSecurityApplicationGroupIdentifier: group) {
+                locations += [shared.appendingPathComponent(relativePath),
+                    shared.appendingPathComponent("SideKick", isDirectory: true).appendingPathComponent(relativePath)]
+            }
+            #endif
+            self.legacyFileURLs = locations
+        }
     }
 
     func all() throws -> [GitHubUpdateConfiguration] {
-        guard fileManager.fileExists(atPath: fileURL.path) else { return [] }
-        return try JSONDecoder().decode([GitHubUpdateConfiguration].self, from: Data(contentsOf: fileURL))
+        if fileManager.fileExists(atPath: fileURL.path) {
+            return try JSONDecoder().decode([GitHubUpdateConfiguration].self, from: Data(contentsOf: fileURL))
+        }
+        // Import once. A valid empty current file is authoritative, so removed
+        // sources cannot reappear from an old copy on the next launch.
+        var values: [GitHubUpdateConfiguration] = []
+        var foundLegacyFile = false
+        for legacy in legacyFileURLs where legacy != fileURL && fileManager.fileExists(atPath: legacy.path) {
+            let old = try JSONDecoder().decode([GitHubUpdateConfiguration].self, from: Data(contentsOf: legacy))
+            foundLegacyFile = true
+            // Private legacy data wins over App Group copies. Never blend a
+            // receipt or skipped key from a different source into a record.
+            for value in old where !values.contains(where: { $0.id == value.id }) { values.append(value) }
+        }
+        if foundLegacyFile { try persist(values) }
+        return values
     }
 
     func configuration(for bundleIdentifier: String) throws -> GitHubUpdateConfiguration? {
@@ -26,11 +57,7 @@ actor GitHubUpdateConfigurationStore {
     func save(_ configuration: GitHubUpdateConfiguration) throws {
         var values = try all().filter { $0.bundleIdentifier != configuration.bundleIdentifier }
         values.append(configuration)
-        try fileManager.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        try encoder.encode(values).write(to: fileURL, options: .atomic)
-        NotificationCenter.default.post(name: .sideKickGitHubSettingsDidChange, object: nil)
+        try persist(values)
     }
 
 
@@ -107,32 +134,74 @@ actor GitHubUpdateConfigurationStore {
         return true
     }
 
-    // Old versions keyed sources by the IPA's original ID. Move them only when
-    // there is one installed copy, keeping every saved baseline and token intact.
+    // Move only an unambiguous obsolete ID. Keep conflicts intact for explicit
+    // resolution; a destination's existence is never permission to delete data.
     func migrateInstalledIdentifiers(_ installations: [String: [String]]) throws {
+        var values = try all()
+        let before = values
+        let activeIDs = Set(installations.values.flatMap { $0 })
         for (original, copies) in installations {
             let identities = Set(copies)
-            guard identities.count == 1, let identity = identities.first, identity != original,
-                  var old = try configuration(for: original) else { continue }
-            if try configuration(for: identity) == nil {
-                old.bundleIdentifier = identity
-                try save(old)
+            for index in values.indices where identities.contains(values[index].id) {
+                values[index].originalBundleIdentifier = original
             }
+            guard identities.count == 1, let identity = identities.first,
+                  !values.contains(where: { $0.id == identity }) else { continue }
+            let candidates = values.indices.filter { index in
+                let value = values[index]
+                guard !activeIDs.contains(value.id), !value.id.hasPrefix("livecontainer:") else { return false }
+                if let product = value.originalBundleIdentifier { return product == original }
+                if value.id == original { return true }
+                // Older signed records predate the explicit product ID. Only
+                // accept Apple's ten-character team suffix, never an arbitrary
+                // bundle ID with a shared prefix.
+                guard value.id.hasPrefix(original + ".") else { return false }
+                let suffix = value.id.dropFirst(original.count + 1)
+                return suffix.count == 10 && suffix.allSatisfy { $0.isASCII && ($0.isUppercase || $0.isNumber) }
+            }
+            guard candidates.count == 1, let index = candidates.first else { continue }
+            let oldID = values[index].id
+            values[index].bundleIdentifier = identity
+            values[index].originalBundleIdentifier = original
             let prefix = "sidekick.github-update."
-            let oldHistory = prefix + original + ".last-notified"
+            let oldHistory = prefix + oldID + ".last-notified"
             let newHistory = prefix + identity + ".last-notified"
             if UserDefaults.standard.string(forKey: newHistory) == nil,
                let key = UserDefaults.standard.string(forKey: oldHistory) {
                 UserDefaults.standard.set(key, forKey: newHistory)
             }
-            try remove(bundleIdentifier: original)
         }
+        if values != before { try persist(values) }
+    }
+
+    func migrateInstalledObservations(_ targets: [GitHubUpdateTarget]) throws {
+        var values = try all()
+        let before = values
+        for target in targets {
+            guard let index = values.firstIndex(where: { $0.id == target.id }),
+                  let receipt = values[index].installedBuild,
+                  receipt.sourceIdentity == values[index].sourceIdentity,
+                  let legacy = target.legacyObservation, receipt.observation == legacy,
+                  let observation = target.observation, observation != legacy,
+                  !legacy.hasSuffix("|no-content-fingerprint") else { continue }
+            // Upgrade evidence only while the original observation still matches.
+            // Do not reconfirm an externally replaced IPA from its version label.
+            values[index].installedBuild = GitHubInstalledBuild(key: receipt.key,
+                sourceIdentity: receipt.sourceIdentity, observation: observation, confirmedAt: receipt.confirmedAt)
+        }
+        if values != before { try persist(values) }
     }
 
     func remove(bundleIdentifier: String) throws {
         let values = try all().filter { $0.bundleIdentifier != bundleIdentifier }
+        try persist(values)
+    }
+
+    private func persist(_ values: [GitHubUpdateConfiguration]) throws {
         try fileManager.createDirectory(at: fileURL.deletingLastPathComponent(), withIntermediateDirectories: true)
-        try JSONEncoder().encode(values).write(to: fileURL, options: .atomic)
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        try encoder.encode(values).write(to: fileURL, options: .atomic)
         NotificationCenter.default.post(name: .sideKickGitHubSettingsDidChange, object: nil)
     }
 }

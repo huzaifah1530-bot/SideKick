@@ -10,6 +10,7 @@ actor IPAImportStore {
     private let fileManager: FileManager
     private let directory: URL
     private let indexURL: URL
+    private var pendingManagedFiles: Set<String> = []
 
     init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
@@ -25,62 +26,8 @@ actor IPAImportStore {
             .sorted { $0.importedAt > $1.importedAt }
     }
 
-    func cleanupAbandonedTemporaryIPAImports() {
-        let temporaryRoot = fileManager.temporaryDirectory
-        guard let candidates = try? fileManager.contentsOfDirectory(
-            at: temporaryRoot,
-            includingPropertiesForKeys: [.isDirectoryKey, .contentModificationDateKey],
-            options: [.skipsHiddenFiles]
-        ) else { return }
-
-        let cutoff = Date.now.addingTimeInterval(-24 * 60 * 60)
-        for candidate in candidates {
-            let name = candidate.lastPathComponent
-            if name.hasPrefix("sidekick-import-") || name.hasPrefix("sidekick-github-") {
-                let components = name.split(separator: "-")
-                if components.count > 3, components[2] != Substring(String(ProcessInfo.processInfo.processIdentifier)) {
-                    try? fileManager.removeItem(at: candidate)
-                }
-                continue
-            }
-            if candidate.lastPathComponent.hasPrefix("sidekick-pipeline-") {
-                let owner = candidate.appendingPathComponent(".sidekick-process")
-                if let process = try? String(contentsOf: owner, encoding: .utf8),
-                   process != String(ProcessInfo.processInfo.processIdentifier) {
-                    try? fileManager.removeItem(at: candidate)
-                }
-                continue
-            }
-            guard let values = try? candidate.resourceValues(forKeys: [.isDirectoryKey, .contentModificationDateKey]),
-                  values.isDirectory == true,
-                  let modifiedAt = values.contentModificationDate,
-                  modifiedAt < cutoff,
-                  let contents = try? fileManager.contentsOfDirectory(
-                    at: candidate,
-                    includingPropertiesForKeys: [.isRegularFileKey],
-                    options: [.skipsHiddenFiles]
-                  ) else {
-                continue
-            }
-
-            let isAbandonedIPAImport = contents.count == 1
-                && contents[0].pathExtension.lowercased() == "ipa"
-                && (try? contents[0].resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
-            let containsStagedApp = contents.contains { item in
-                item.lastPathComponent == "App.app"
-                    && (try? item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true
-            }
-            let containsStagedIPA = contents.contains { item in
-                item.lastPathComponent == "App.ipa"
-                    && (try? item.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true
-            }
-
-            // Failed SideStore pipelines skip CleanStagedAppOperation and can
-            // leave a full extracted app plus its generated IPA in this unique
-            // temporary directory. Prune only old folders with those markers.
-            guard isAbandonedIPAImport || containsStagedApp || containsStagedIPA else { continue }
-            try? fileManager.removeItem(at: candidate)
-        }
+    func cleanupAbandonedTemporaryIPAImports() async {
+        await SideKickStorageCleanup.performAutomaticMaintenance()
     }
 
     func prepareIPA(from sourceURL: URL, remoteSourceURL: URL? = nil) throws -> ImportedIPA {
@@ -172,6 +119,7 @@ actor IPAImportStore {
         let destination = directory.appendingPathComponent(fileName)
         do {
             try fileManager.copyItem(at: sourceURL, to: destination)
+            pendingManagedFiles.insert(fileName)
             return ImportedIPA(bundleIdentifier: metadata.bundleIdentifier, name: metadata.name,
                 version: metadata.version, fileName: fileName, sourceBookmarkData: nil,
                 sourceURLString: nil, importedAt: .now, iconData: metadata.iconData,
@@ -241,6 +189,7 @@ actor IPAImportStore {
         let previous = entries.filter { $0.id == app.id || ($0.bundleIdentifier == app.bundleIdentifier && $0.importedAt == app.importedAt) }
         entries = IPAImportIndex.replacing(app, in: entries)
         try save(entries)
+        if let fileName = app.fileName { pendingManagedFiles.remove(fileName) }
         // Updating queue metadata must not delete the IPA it still references.
         for old in previous where old.fileName != app.fileName {
             if !entries.contains(where: { $0.fileName != nil && $0.fileName == old.fileName }) {
@@ -256,10 +205,19 @@ actor IPAImportStore {
     }
 
     func cleanupOrphanedManagedIPAs() throws {
-        let retainedNames = Set(try importedApps().compactMap(\.fileName))
+        let retainedNames = Set(try importedApps().compactMap(\.fileName)).union(pendingManagedFiles)
         guard fileManager.fileExists(atPath: directory.path) else { return }
         for url in try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) {
-            guard url.pathExtension.lowercased() == "ipa", !retainedNames.contains(url.lastPathComponent) else { continue }
+            let name = url.deletingPathExtension().lastPathComponent
+            let prefix = ["repository-import-", "github-update-"].first { name.hasPrefix($0) }
+            // A repository import can be awaiting the user's final save. Keep
+            // recent files even before the library index references them.
+            guard url.pathExtension.lowercased() == "ipa", !retainedNames.contains(url.lastPathComponent),
+                  let prefix, UUID(uuidString: String(name.dropFirst(prefix.count))) != nil,
+                  (try? OwnedStoragePath.validate(url, inside: directory)) != nil,
+                  let values = try? url.resourceValues(forKeys: [.isRegularFileKey, .contentModificationDateKey]),
+                  values.isRegularFile == true, let modified = values.contentModificationDate,
+                  modified < Date.now.addingTimeInterval(-24 * 60 * 60) else { continue }
             try fileManager.removeItem(at: url)
         }
     }
@@ -330,6 +288,7 @@ actor IPAImportStore {
 
     private func removeLegacyStoredIPA(_ app: ImportedIPA) {
         guard let fileName = app.fileName else { return }
+        pendingManagedFiles.remove(fileName)
         try? fileManager.removeItem(at: directory.appendingPathComponent(fileName))
     }
 

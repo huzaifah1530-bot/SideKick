@@ -170,6 +170,7 @@ struct LiveContainerGuestDetailView: View {
     @State private var candidate: GitHubUpdateCandidate?
     @State private var configuration: GitHubUpdateConfiguration?
     @State private var working = false
+    @State private var isCheckingUpdates = false
     @State private var message: String?
     @State private var markingInstalled = false
     @State private var checkState: GitHubCheckState = .notConfigured
@@ -195,7 +196,7 @@ struct LiveContainerGuestDetailView: View {
                 }
                 Section {
                     SwiftUI.Button { Task { await launch() } } label: { Label("Open in LiveContainer", systemImage: "play.circle") }
-                        .disabled(working || connection?.isConnected != true || connection?.storageKind == .snapshot || !guest.isAvailable)
+                        .disabled(working || connection?.isConnected != true || connection?.storageKind == .snapshot || !guest.isAvailable || guest.warning != nil)
                     if let connection {
                         SwiftUI.Button { Task { await openContainer(connection) } } label: { Label("Open LiveContainer", systemImage: "square.stack.3d.up") }
                     }
@@ -205,15 +206,16 @@ struct LiveContainerGuestDetailView: View {
                         Label("Update Source & Installed Build", systemImage: "chevron.left.forwardslash.chevron.right")
                     }
                     SwiftUI.Button { Task { await checkUpdates() } } label: { Label("Check for Updates", systemImage: "arrow.clockwise") }
-                        .disabled(working || connection?.isConnected != true || connection?.storageKind == .snapshot)
+                        .disabled(working || isCheckingUpdates || connection?.isConnected != true || connection?.error != nil || connection?.storageKind == .snapshot || !guest.isAvailable || guest.warning != nil)
                     if let configuration {
-                        LabeledContent("Installed GitHub build", value: configuration.effectiveBaselineKey ?? "Choose a baseline").textSelection(.enabled)
+                        LiveContainerInstalledBuildDisclosure(configuration: configuration)
+                            .id(configuration.sourceIdentity + "\n" + (configuration.effectiveBaselineKey ?? ""))
                     }
                     if let candidate {
                         SwiftUI.Button { Task { await updateInLiveContainer(candidate) } } label: {
                             Label(downloadJob?.isDownloading == true ? "Downloading IPA…" : "Update in LiveContainer", systemImage: "arrow.down.app")
                         }
-                        .disabled(working || downloadJob?.isDownloading == true)
+                        .disabled(working || isCheckingUpdates || downloadJob?.isDownloading == true)
                         if let progress = downloadJob?.progress, downloadJob?.isDownloading == true { ProgressView(value: progress) }
                         if let error = downloadJob?.errorMessage { Text(error).foregroundStyle(.orange) }
                         LabeledContent("Available", value: candidate.newVersion)
@@ -221,10 +223,13 @@ struct LiveContainerGuestDetailView: View {
                             Link(destination: url) { Label("View on GitHub", systemImage: "arrow.up.right.square") }
                         }
                         SwiftUI.Button { markingInstalled = true } label: { Label("Already Installed This Build", systemImage: "checkmark.circle") }
+                            .disabled(working || isCheckingUpdates)
                         SwiftUI.Button { Task { await resolve(markInstalled: false) } } label: { Label("Skip This Build", systemImage: "forward.end") }
+                            .disabled(working || isCheckingUpdates)
                         Text("Update downloads the IPA, then opens the share sheet. Choose LiveContainer to start installing it. Confirm this build after installation finishes.").font(.footnote).foregroundStyle(.secondary)
                     } else if configuration != nil { Text(hasChecked ? checkState.message : "Check this source for newer builds.").foregroundStyle(.secondary) }
-                    if working { ProgressView() }
+                    if isCheckingUpdates { ProgressView("Checking for updates…") }
+                    else if working { ProgressView() }
                 }
                 Section("LiveContainer Details") {
                     LabeledContent("Bundle ID", value: guest.bundleIdentifier).textSelection(.enabled)
@@ -277,10 +282,11 @@ struct LiveContainerGuestDetailView: View {
         } catch { message = error.localizedDescription }
     }
     @MainActor private func checkUpdates() async {
-        guard !working, let guest, connection?.isConnected == true, connection?.error == nil,
+        guard !working, !isCheckingUpdates, let guest, connection?.isConnected == true, connection?.error == nil,
               connection?.storageKind != .snapshot, guest.isAvailable, guest.warning == nil else { return }
-        working = true
-        defer { working = false }
+        // Repository requests do not own the local launch/mutation gate.
+        isCheckingUpdates = true
+        defer { isCheckingUpdates = false }
         let result = await GitHubUpdateScanner.scanTargets([guest.updateTarget])
         guard let current = try? await GitHubUpdateConfigurationStore.shared.configuration(for: guestID),
               result.candidates.first?.sourceIdentity == nil || result.candidates.first?.sourceIdentity == current.sourceIdentity else { return }
@@ -309,7 +315,7 @@ struct LiveContainerGuestDetailView: View {
         } catch { message = error.localizedDescription }
     }
     @MainActor private func updateInLiveContainer(_ candidate: GitHubUpdateCandidate) async {
-        guard !working else { return }
+        guard !working, !isCheckingUpdates else { return }
         if let ipa = downloadJob?.queuedIPA { await handoff(ipa, candidate: candidate); return }
         do {
             guard let configuration = try await GitHubUpdateConfigurationStore.shared.configuration(for: guestID),
@@ -339,7 +345,7 @@ struct LiveContainerGuestDetailView: View {
     }
 
     @MainActor private func resolve(markInstalled: Bool) async {
-        guard let candidate, let source = candidate.sourceIdentity else { return }
+        guard !working, !isCheckingUpdates, let candidate, let source = candidate.sourceIdentity else { return }
         working = true
         defer { working = false }
         do {
@@ -361,6 +367,66 @@ struct LiveContainerGuestDetailView: View {
         } catch { message = error.localizedDescription }
     }
 
+}
+
+private struct LiveContainerInstalledBuildDisclosure: View {
+    let configuration: GitHubUpdateConfiguration
+    @State private var isExpanded = false
+
+    private var preview: String {
+        guard let key = configuration.effectiveBaselineKey else { return "Choose a baseline" }
+        let parts = key.split(separator: ":", omittingEmptySubsequences: false)
+        if parts.count == 4, parts[0] == "release-v2", Int64(parts[1]) != nil {
+            return "Release #\(parts[1])"
+        }
+        if parts.count == 6, parts[0] == "actions-v2", Int64(parts[2]) != nil {
+            return "Workflow run #\(parts[2])"
+        }
+        return "\(configuration.source.title) · Build selected"
+    }
+
+    var body: some View {
+        DisclosureGroup(isExpanded: $isExpanded) {
+            VStack(alignment: .leading, spacing: 12) {
+                if let key = configuration.effectiveBaselineKey {
+                    detail("Full build key", value: key)
+                }
+                detail("Repository", value: configuration.repositoryURL)
+                detail("Source", value: configuration.source.title)
+                if configuration.source == .actionsArtifact {
+                    detail("Workflow", value: configuration.workflowFile)
+                    detail("Branch", value: configuration.branch)
+                }
+                if !configuration.assetName.isEmpty {
+                    detail("Asset", value: configuration.assetName)
+                }
+                if let build = configuration.installedBuild,
+                   build.key == configuration.effectiveBaselineKey,
+                   build.sourceIdentity == configuration.sourceIdentity {
+                    detail("Confirmed", value: build.confirmedAt.formatted())
+                }
+            }
+            .padding(.vertical, 8)
+            .textSelection(.enabled)
+        } label: {
+            VStack(alignment: .leading, spacing: 4) {
+                Text("Installed GitHub build")
+                Text(preview)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            .accessibilityElement(children: .combine)
+        }
+    }
+
+    private func detail(_ title: String, value: String) -> some View {
+        VStack(alignment: .leading, spacing: 4) {
+            Text(title).font(.subheadline).foregroundStyle(.secondary)
+            Text(value).font(.body).fixedSize(horizontal: false, vertical: true)
+        }
+        .accessibilityElement(children: .combine)
+    }
 }
 
 private struct LiveContainerGuestIcon: View {

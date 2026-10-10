@@ -35,6 +35,54 @@ final class LocalVPNService {
     private var connectionTask: Task<Void, Error>?
     private var heartbeatTask: Task<Void, Never>?
     private var statusObserver: NSObjectProtocol?
+    private var hasAcknowledgedConnectionWarning = false
+    private var isCheckingConnectionWarning = false
+
+    enum ConnectionWarning: String, Identifiable {
+        case externalDisconnected, builtInPermissionNeeded
+        var id: String { rawValue }
+        var title: String {
+            self == .externalDisconnected ? "Connect LocalDevVPN" : "Allow Local Connection"
+        }
+        var message: String {
+            self == .externalDisconnected
+                ? "LocalDevVPN is disconnected. Connect it before installing, refreshing, or enabling JIT. You can keep browsing SideKick."
+                : "SideKick needs permission for its built-in VPN before device operations. Once allowed, it connects automatically for each operation and disconnects afterward. You can keep browsing SideKick."
+        }
+    }
+
+    func acknowledgeConnectionWarning() {
+        hasAcknowledgedConnectionWarning = true
+    }
+
+    // Observe availability without refreshStatus's interrupted-operation cleanup.
+    // A disconnected, authorized built-in tunnel is intentionally ready to use.
+    func connectionWarningIfNeeded() async -> ConnectionWarning? {
+        guard !hasAcknowledgedConnectionWarning, !isCheckingConnectionWarning else { return nil }
+        isCheckingConnectionWarning = true
+        defer { isCheckingConnectionWarning = false }
+        if mode == .external {
+            externalTunnelConnected = externalConnected
+            return externalTunnelConnected ? nil : .externalDisconnected
+        }
+        guard let identifier = extensionBundleIdentifier else { return .builtInPermissionNeeded }
+        do {
+            let configurations = try await NETunnelProviderManager.loadAllFromPreferences()
+            guard !Task.isCancelled, !hasAcknowledgedConnectionWarning else { return nil }
+            // Re-evaluate if the user changed methods while preferences loaded.
+            if mode == .external {
+                externalTunnelConnected = externalConnected
+                return externalTunnelConnected ? nil : .externalDisconnected
+            }
+            let configuration = configurations.first {
+                ($0.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier == identifier
+            }
+            return configuration?.isEnabled == true ? nil : .builtInPermissionNeeded
+        } catch {
+            // A preference read failure does not prove that permission is missing.
+            return nil
+        }
+    }
 
     var isBusy: Bool { !leases.isEmpty }
     var extensionURL: URL {

@@ -7,6 +7,7 @@ struct GitHubUpdateTarget: Sendable {
     let version: String
     var kind: Kind = .installed
     var observation: String? = nil
+    var legacyObservation: String? = nil
 }
 
 enum GitHubBuildComparison {
@@ -51,6 +52,8 @@ struct GitHubUpdateConfiguration: Codable, Identifiable, Hashable, Sendable {
     var tokenID: String? = nil
     var installedBuild: GitHubInstalledBuild? = nil
     var pendingSelfUpdate: GitHubPendingSelfUpdate? = nil
+    // The product ID is independent of the signing team's installed ID.
+    var originalBundleIdentifier: String? = nil
 
     var effectiveBaselineKey: String? { lastInstalledUpdateKey ?? baselineUpdateKey }
     var sourceIdentity: String {
@@ -62,11 +65,15 @@ struct GitHubUpdateConfiguration: Codable, Identifiable, Hashable, Sendable {
     }
 
     mutating func confirmInstalled(_ key: String, observation: String?) {
+        // Reinstalling the same build refreshes its evidence without undoing a
+        // decision to skip a different, newer build.
+        if effectiveBaselineKey != key || (installedBuild != nil && installedBuild?.sourceIdentity != sourceIdentity) {
+            dismissedUpdateKey = nil
+        }
         pendingSelfUpdate = nil
         installedBuild = GitHubInstalledBuild(key: key, sourceIdentity: sourceIdentity, observation: observation, confirmedAt: .now)
         baselineUpdateKey = key
         lastInstalledUpdateKey = key
-        dismissedUpdateKey = nil
     }
 
     mutating func setInstalledBaseline(_ key: String?, observation: String? = nil) {
