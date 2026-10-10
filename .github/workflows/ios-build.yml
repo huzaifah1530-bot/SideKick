@@ -65,6 +65,7 @@ jobs:
 
       - name: Build integrated SideKick app for iOS
         run: |
+          set -euo pipefail
           # Each CI run stamps a higher build number so SideKick can test update detection.
           xcodebuild -project Vendor/SideStore/AltStore.xcodeproj \
             -scheme SideStore \
@@ -78,7 +79,32 @@ jobs:
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
             CURRENT_PROJECT_VERSION="$GITHUB_RUN_NUMBER" \
-            clean build
+            clean build 2>&1 | tee "$RUNNER_TEMP/sidekick-build.log"
+
+      - name: Report compiler errors
+        if: failure()
+        run: |
+          python3 - <<'PY'
+          import os
+          import pathlib
+
+          log = pathlib.Path(os.environ["RUNNER_TEMP"]) / "sidekick-build.log"
+          if log.exists():
+              for line in log.read_text(errors="replace").splitlines():
+                  if "error:" not in line:
+                      continue
+                  # Surface compiler diagnostics in the job's public annotations.
+                  message = line.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+                  print(f"::error::{message}")
+          PY
+
+      - name: Upload build log
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: SideKick-build-log
+          path: ${{ runner.temp }}/sidekick-build.log
+          if-no-files-found: ignore
 
       - name: Package IPA
         run: |

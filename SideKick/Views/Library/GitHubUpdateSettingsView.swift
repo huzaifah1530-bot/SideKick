@@ -241,7 +241,7 @@ private struct GitHubBaselineSelectionView: View {
             Section {
                 if let recommendedKey,
                    let recommendation = history.first(where: { $0.key == recommendedKey }) {
-                    Button(action: {
+                    SwiftUI.Button(action: {
                         select(recommendation)
                     }) {
                         HStack(spacing: 12) {
@@ -268,7 +268,7 @@ private struct GitHubBaselineSelectionView: View {
                 }
 
                 ForEach(history) { item in
-                    Button(action: {
+                    SwiftUI.Button(action: {
                         select(item)
                     }) {
                         HStack {
