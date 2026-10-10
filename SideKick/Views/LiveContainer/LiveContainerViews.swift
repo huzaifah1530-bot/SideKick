@@ -187,6 +187,8 @@ struct LiveContainerGuestDetailView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var guest: LiveContainerGuest?
     @State private var connection: LiveContainerConnection?
+    @State private var hasChecked = false
+    @State private var checkFailed = false
     @State private var candidate: GitHubUpdateCandidate?
     @State private var configuration: GitHubUpdateConfiguration?
     @State private var working = false
@@ -229,7 +231,7 @@ struct LiveContainerGuestDetailView: View {
                         SwiftUI.Button { markingInstalled = true } label: { Label("Already Installed This Build", systemImage: "checkmark.circle") }
                         SwiftUI.Button { Task { await resolve(markInstalled: false) } } label: { Label("Skip This Build", systemImage: "forward.end") }
                         Text("Install guest updates through LiveContainer, then confirm the exact release or workflow build here. SideKick does not install guest IPAs in this phase.").font(.footnote).foregroundStyle(.secondary)
-                    } else if configuration != nil { Text("No newer build found by the last check.").foregroundStyle(.secondary) }
+                    } else if configuration != nil { Text(checkFailed ? "The last check could not finish. Try again after checking your connection and source settings." : hasChecked ? "No newer build found by the last check." : "Check this source for newer builds.").foregroundStyle(.secondary) }
                     if working { ProgressView() }
                 }
                 Section("LiveContainer Details") {
@@ -263,7 +265,13 @@ struct LiveContainerGuestDetailView: View {
             let state = try await environment.liveContainerStore.snapshot()
             guest = state.apps.first { $0.id == guestID }
             connection = state.connections.first { $0.id == guest?.connectionID }
-            configuration = try await GitHubUpdateConfigurationStore.shared.configuration(for: guestID)
+            let currentConfiguration = try await GitHubUpdateConfigurationStore.shared.configuration(for: guestID)
+            if configuration?.sourceIdentity != currentConfiguration?.sourceIdentity {
+                candidate = nil
+                hasChecked = false
+                checkFailed = false
+            }
+            configuration = currentConfiguration
         } catch { message = error.localizedDescription }
     }
     @MainActor private func checkUpdates() async {
@@ -274,6 +282,8 @@ struct LiveContainerGuestDetailView: View {
         let result = await GitHubUpdateScanner.scanTargets([guest.updateTarget])
         guard let current = try? await GitHubUpdateConfigurationStore.shared.configuration(for: guestID),
               result.candidates.first?.sourceIdentity == nil || result.candidates.first?.sourceIdentity == current.sourceIdentity else { return }
+        hasChecked = true
+        checkFailed = result.didFail
         candidate = result.candidates.first
         if result.didFail { message = "GitHub could not check this source. Verify repository, workflow, and token settings." }
         await GitHubUpdateNotificationScheduler.notify(result.candidates)

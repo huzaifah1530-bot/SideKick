@@ -170,6 +170,8 @@ jobs:
           tar -czf artifacts/SideKick-corresponding-source.tar.gz \
             --exclude='./.git' \
             --exclude='*/.git' \
+            --exclude='./.build' \
+            --exclude='./.swiftpm' \
             --exclude='./build' \
             --exclude='./artifacts' \
             --exclude='./Payload' \

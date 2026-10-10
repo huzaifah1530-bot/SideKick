@@ -27,6 +27,8 @@ Temporary items less than 24 hours old or owned by the running process are prote
 
 Different-team installation follows the existing signing engine, whose default app identity appends the selected team. If the user customizes identifiers, they must keep a distinct bundle ID to retain the original. SideKick's own separate installation has its own database and credentials. Physical-device validation is required before claiming account migration or data preservation.
 
+Foreground and background operations share a single IPA-store actor to serialize queue migration, download, and removal index writes. Failed guest checks show a retry status instead of claiming no newer build.
+
 Installed copies are keyed by their resigned bundle identifiers for management, update settings, and queued IPAs. Existing original-ID settings and queues migrate only when exactly one copy exists, preserving tokens and build baselines. Ambiguous legacy queues require choosing the installation again. Accounts without saved sessions stay visible and open their reconnect page. Retained-source deletion revalidates the stable set of owning installation IDs, even when their display names match.
 
 Cancellation immediately returns from a stalled provider scan, cancels its coordination request, and rejects late results. The worker keeps its security scope balanced until outstanding reads actually finish. Older history remains reachable even if the first page contains no usable artifacts.

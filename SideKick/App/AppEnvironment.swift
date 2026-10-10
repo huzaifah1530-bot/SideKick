@@ -15,7 +15,7 @@ final class AppEnvironment {
     let liveContainerStore = LiveContainerStore.shared
     private(set) var databaseState: DatabaseStartupState = .starting
 
-    init(ipaImportStore: IPAImportStore = IPAImportStore()) {
+    init(ipaImportStore: IPAImportStore = IPAImportStore.shared) {
         self.ipaImportStore = ipaImportStore
     }
 

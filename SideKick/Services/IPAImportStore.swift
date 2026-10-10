@@ -6,6 +6,7 @@ extension Notification.Name {
 }
 
 actor IPAImportStore {
+    static let shared = IPAImportStore()
     private let fileManager: FileManager
     private let directory: URL
     private let indexURL: URL

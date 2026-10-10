@@ -58,7 +58,7 @@ enum GitHubUpdateScanner {
     static func scanAndNotify() async {
         guard DatabaseManager.shared.isStarted else { return }
         let accounts = SigningAccountStore()
-        let apps = await SideStoreOperationService(accountStore: accounts, ipaStore: IPAImportStore()).installedApps()
+        let apps = await SideStoreOperationService(accountStore: accounts, ipaStore: IPAImportStore.shared).installedApps()
         // Keep background scans bounded so a slow repository cannot consume
         // the entire shortcut/background-refresh execution window.
         let result = await withTaskGroup(of: Result?.self) { group in

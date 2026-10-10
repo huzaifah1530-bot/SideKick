@@ -35,7 +35,7 @@ private enum DailyRefreshAutomation {
 
             let store = SigningAccountStore()
             await store.reload()
-            let outcome = await SideStoreOperationService(accountStore: store, ipaStore: IPAImportStore())
+            let outcome = await SideStoreOperationService(accountStore: store, ipaStore: IPAImportStore.shared)
                 .refreshAllManagedAppsQuietly()
             guard outcome.attempted > 0, outcome.succeeded == outcome.attempted else { return }
             UserDefaults.standard.set(Date.now, forKey: lastSuccessfulRunKey)
