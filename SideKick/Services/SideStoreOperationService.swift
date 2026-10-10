@@ -21,7 +21,7 @@ final class SideStoreOperationService {
         }
     }
 
-    func loadInstalledApps() async throws -> [InstalledAppSummary] {
+    func loadInstalledApps(loadIcons: Bool = true) async throws -> [InstalledAppSummary] {
         let context = DatabaseManager.shared.viewContext
         let records = try await context.perform {
             let selfTeamIdentifier = ALTApplication(fileURL: Bundle.Info.activeBundleURL)?
@@ -67,7 +67,9 @@ final class SideStoreOperationService {
 
         var summaries: [InstalledAppSummary] = []
         for record in records {
-            let iconData = try? await record.0.loadIcon()?.pngData()
+            let iconData: Data?
+            if loadIcons { iconData = try? await record.0.loadIcon()?.pngData() }
+            else { iconData = nil }
             summaries.append(InstalledAppSummary(
                 bundleIdentifier: record.1,
                 resignedBundleIdentifier: record.2,
@@ -413,7 +415,7 @@ struct InstalledAppSummary: Identifiable, Sendable {
     let accountEmail: String
     let accountIdentifier: String
     let teamIdentifier: String
-    let iconData: Data?
+    var iconData: Data?
     let expirationDate: Date
     var contentFingerprint: String? = nil
     var executableIdentity: String? = nil

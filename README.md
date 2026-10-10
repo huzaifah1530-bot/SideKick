@@ -2,6 +2,8 @@
 
 SideKick is a native SwiftUI iOS sideloading app. The existing SwiftUI screens and IPA library are being integrated with SideStore's on-device signing and installation engine.
 
+The deployment target is iOS 18. Native controls use the system appearance; custom Liquid Glass effects and hidden navigation indicators are gated to iOS 26, with regular material and standard disclosure indicators on iOS 18. These compatibility paths still need device validation.
+
 ## SideStore credit and derived components
 
 SideKick builds on [SideStore](https://github.com/SideStore/SideStore), an open-source sideloading project. The pinned upstream source is included as the recursive Git submodule `Vendor/SideStore`; SideStore is licensed under AGPL-3.0. SideKick also uses upstream SideStore dependencies, including Minimuxer and SideSign. Their notices and distribution notes are in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).

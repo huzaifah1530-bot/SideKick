@@ -69,7 +69,7 @@ actor GitHubHistoryClient {
         let updated_at: String?
     }
 
-    func page(configuration: GitHubUpdateConfiguration, token: String?, page: Int, allowMultiple: Bool = false) async throws -> GitHubHistoryPage {
+    func page(configuration: GitHubUpdateConfiguration, token: String?, page: Int, allowMultiple: Bool = false, latestOnly: Bool = false) async throws -> GitHubHistoryPage {
         guard page > 0, let url = URL(string: configuration.repositoryURL.trimmingCharacters(in: .whitespacesAndNewlines)),
               ["github.com", "www.github.com"].contains(url.host?.lowercased() ?? ""),
               ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { throw GitHubHistoryError.invalidSource }
@@ -94,6 +94,9 @@ actor GitHubHistoryClient {
                     builds.append(GitHubTrackedBuild(key: "release-v2:\(release.id):\(asset.id):\(revision)",
                         title: release.name ?? release.tag_name, version: release.tag_name,
                         assetName: asset.name, downloadURL: asset.url, date: date(release.published_at)))
+                }
+                if latestOnly, !builds.isEmpty {
+                    return GitHubHistoryPage(builds: builds, hasMore: false, newerBuildHasNoDownload: pending)
                 }
             }
             return GitHubHistoryPage(builds: builds, hasMore: releases.count == 100, newerBuildHasNoDownload: pending)
@@ -130,6 +133,9 @@ actor GitHubHistoryClient {
                     title: "Build \(run.run_number) - \(title)", version: "Build \(run.run_number)",
                     assetName: artifact.name, downloadURL: artifact.archive_download_url, date: date(run.created_at)))
             }
+            if latestOnly, !builds.isEmpty {
+                return GitHubHistoryPage(builds: builds, hasMore: false, newerBuildHasNoDownload: pending)
+            }
         }
         return GitHubHistoryPage(builds: builds, hasMore: runs.workflow_runs.count == 10, newerBuildHasNoDownload: pending)
     }
@@ -156,6 +162,7 @@ actor GitHubHistoryClient {
         components.percentEncodedPath = path
         components.queryItems = query.sorted(by: { $0.key < $1.key }).map { URLQueryItem(name: $0.key, value: $0.value) }
         var request = URLRequest(url: components.url!)
+        request.timeoutInterval = 20
         request.cachePolicy = .reloadIgnoringLocalCacheData
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("SideKick", forHTTPHeaderField: "User-Agent")

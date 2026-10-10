@@ -41,7 +41,7 @@ actor GitHubUpdateService {
         var missingNewerDownload = false
         for page in 1...5 {
             try Task.checkCancellation()
-            let result = try await historyClient.page(configuration: configuration, token: token, page: page)
+            let result = try await historyClient.page(configuration: configuration, token: token, page: page, latestOnly: true)
             history += result.builds
             missingNewerDownload = missingNewerDownload || result.newerBuildHasNoDownload
             if !history.isEmpty || !result.hasMore { break }

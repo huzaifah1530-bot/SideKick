@@ -1,4 +1,6 @@
 import SwiftUI
+import CoreData
+import Combine
 
 struct ContentView: View {
     @Environment(AppEnvironment.self) private var environment
@@ -31,16 +33,46 @@ struct ContentView: View {
             }
         }
         .task {
+            if scenePhase == .background { environment.pauseGitHubChecks() }
+            else { environment.resumeGitHubChecks() }
             await environment.startDatabase()
             await setupStatus.refresh()
         }
         .task { await checkConnectionWarning() }
         .onChange(of: scenePhase) { _, phase in
+            if phase == .background { environment.pauseGitHubChecks() }
             guard phase == .active else { return }
+            environment.resumeGitHubChecks()
             Task { await checkConnectionWarning() }
             guard case .ready = environment.databaseState else { return }
+            Task {
+                await environment.reloadLocalCatalogues(checkForUpdates: true)
+                environment.rescanLiveContainerApps()
+            }
             Task { await setupStatus.refresh() }
         }
+        .onReceive(NotificationCenter.default.publisher(for: .sideKickGitHubSettingsDidChange)
+            .debounce(for: .milliseconds(150), scheduler: RunLoop.main)) { _ in
+                Task { await environment.gitHubSettingsChanged() }
+            }
+        .onReceive(NotificationCenter.default.publisher(for: .sideKickLiveContainerDidChange)) { _ in
+            Task { await environment.reloadLiveContainerCatalogue() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .sideKickLiveContainerCheckRequested)) { _ in
+            environment.rescanLiveContainerApps()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange)
+            .filter { notification in
+                guard let context = notification.object as? NSManagedObjectContext,
+                      context === DatabaseManager.shared.viewContext else { return false }
+                if notification.userInfo?[NSInvalidatedAllObjectsKey] != nil { return true }
+                return [NSInsertedObjectsKey, NSUpdatedObjectsKey, NSDeletedObjectsKey].contains { key in
+                    (notification.userInfo?[key] as? Set<NSManagedObject>)?.contains { $0 is InstalledApp } == true
+                }
+            }
+            .debounce(for: .milliseconds(150), scheduler: RunLoop.main)) { _ in
+                Task { await environment.reloadLocalCatalogues() }
+            }
         .alert(connectionWarning?.title ?? "Local Connection", isPresented: Binding(
             get: { connectionWarning != nil },
             set: { if !$0 { connectionWarning = nil } }

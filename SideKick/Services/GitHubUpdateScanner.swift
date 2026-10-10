@@ -35,33 +35,66 @@ enum GitHubUpdateScanner {
         }
     }
 
-    static func scanTargets(_ apps: [GitHubUpdateTarget]) async -> Result {
+    static func scanTargets(_ apps: [GitHubUpdateTarget],
+        onCheck: @escaping @Sendable (GitHubCheckResult) async -> Void = { _ in }) async -> Result {
         var result = Result()
-        let configurations = GitHubUpdateConfigurationStore.shared
-        let service = GitHubUpdateService()
-        for app in apps {
-            guard !Task.isCancelled else { break }
-            do {
-                guard let configuration = try await configurations.configuration(for: app.id) else {
-                    result.checks.append(GitHubCheckResult(targetID: app.id, state: .notConfigured))
-                    continue
+        // Each repository has its own service. Bound concurrency, but publish
+        // completed checks immediately instead of waiting for a slow source.
+        await withTaskGroup(of: GitHubCheckResult?.self) { group in
+            var next = 0
+            for _ in 0..<min(3, apps.count) {
+                let app = apps[next]
+                next += 1
+                group.addTask { await checkTarget(app) }
+            }
+            while let completed = await group.next() {
+                guard !Task.isCancelled else { group.cancelAll(); return }
+                if let check = completed {
+                    result.checks.append(check)
+                    result.didFail = result.didFail || check.state == .failed
+                    if let candidate = check.candidate { result.candidates.append(candidate) }
+                    await onCheck(check)
                 }
-                let token = try GitHubCredentialStore().load(id: configuration.tokenID)
-                let check = try await service.check(for: app, configuration: configuration, token: token)
-                result.checks.append(check)
-                if let candidate = check.candidate { result.candidates.append(candidate) }
-            } catch {
-                result.didFail = true
-                result.checks.append(GitHubCheckResult(targetID: app.id, state: .failed, detail: error.localizedDescription))
-                debugLog("[SideKick] GitHub check failed for \(app.name): \(error.localizedDescription)")
+                if next < apps.count {
+                    let app = apps[next]
+                    next += 1
+                    group.addTask { await checkTarget(app) }
+                }
             }
         }
         return result
     }
 
+    private static func checkTarget(_ app: GitHubUpdateTarget) async -> GitHubCheckResult? {
+        var checkedConfiguration: GitHubUpdateConfiguration?
+        do {
+            try Task.checkCancellation()
+            let configurations = GitHubUpdateConfigurationStore.shared
+            guard let configuration = try await configurations.configuration(for: app.id) else {
+                return GitHubCheckResult(targetID: app.id, state: .notConfigured)
+            }
+            checkedConfiguration = configuration
+            let token = try GitHubCredentialStore().load(id: configuration.tokenID)
+            var check = try await GitHubUpdateService().check(for: app, configuration: configuration, token: token)
+            try Task.checkCancellation()
+            // A skip, installation, or source edit during the request supersedes
+            // its result. Never revive a dismissed or already installed update.
+            guard try await configurations.configuration(for: app.id) == configuration else { return nil }
+            check.checkedConfiguration = configuration
+            return check
+        } catch {
+            guard !Task.isCancelled else { return nil }
+            debugLog("[SideKick] GitHub check failed for \(app.name): \(error.localizedDescription)")
+            return GitHubCheckResult(targetID: app.id, state: .failed, detail: error.localizedDescription,
+                checkedConfiguration: checkedConfiguration)
+        }
+    }
+
     static func scanAll(_ apps: [InstalledAppSummary]) async -> Result {
-        var result = await scan(apps)
-        let guests = await scanGuests()
+        async let installedResult = scan(apps)
+        async let guestResult = scanGuests()
+        var result = await installedResult
+        let guests = await guestResult
         result.candidates += guests.candidates
         result.checks += guests.checks
         result.didFail = result.didFail || guests.didFail

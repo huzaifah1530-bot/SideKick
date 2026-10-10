@@ -1,8 +1,6 @@
 import SwiftUI
 import UniformTypeIdentifiers
 import UIKit
-import CoreData
-import Combine
 
 private struct QueuedManualUpdate: Identifiable {
     let ipa: ImportedIPA
@@ -52,27 +50,25 @@ struct HomeView: View {
     @State private var showingURLImport = false
     @State private var incomingShareURL: URL?
     @State private var ipaAwaitingUpdateChoice: ImportedIPA?
-    @State private var installedApps: [InstalledAppSummary] = []
     @State private var accountStore = SigningAccountStore()
     @State private var remainingAppIDs: Int?
     @State private var isRefreshingAll = false
     @State private var refreshAllProgress: (completed: Int, total: Int)?
-    @State private var guestApps: [LiveContainerGuest] = []
-    @State private var githubChecks: [GitHubCheckResult] = []
-    @State private var githubUpdates: [GitHubUpdateCandidate] = []
-    @State private var isCheckingGitHubUpdates = false
-    @State private var githubUpdateCheckFailed = false
-    @State private var githubScanGeneration = UUID()
-    @State private var localLoadGeneration = UUID()
-    @State private var hasLoadedLocalApps = false
-    @State private var isLoadingLocalApps = false
-    @State private var localLoadError: String?
-    @State private var githubScanTask: Task<Void, Never>?
     @State private var appIDCapacityTask: Task<Void, Never>?
     @State private var capacityGeneration = UUID()
     @State private var expirationClock = Date.now
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.scenePhase) private var scenePhase
+
+    private var installedApps: [InstalledAppSummary] { environment.installedApps }
+    private var guestApps: [LiveContainerGuest] { environment.liveContainerState.apps }
+    private var githubChecks: [GitHubCheckResult] { environment.githubChecks }
+    private var githubUpdates: [GitHubUpdateCandidate] { environment.githubUpdates }
+    private var isCheckingGitHubUpdates: Bool { environment.isCheckingGitHubUpdates }
+    private var githubUpdateCheckFailed: Bool { environment.githubUpdateCheckFailed }
+    private var hasLoadedLocalApps: Bool { environment.hasLoadedLocalApps }
+    private var isLoadingLocalApps: Bool { environment.isLoadingLocalApps }
+    private var localLoadError: String? { environment.localLoadError }
 
     private var installedBundleIdentifiers: Set<String> {
         Set(installedApps.flatMap(\.updateMatchingBundleIdentifiers))
@@ -114,7 +110,7 @@ struct HomeView: View {
                                 QueuedManualUpdateRow(update: queuedUpdate)
                             }
                             .fullWidthListSeparators()
-                            .navigationLinkIndicatorVisibility(.hidden)
+                            .sideKickNavigationLinkIndicator()
                         }
                         ForEach(filteredGitHubUpdates) { update in
                             if update.targetKind == .liveContainer {
@@ -173,7 +169,7 @@ struct HomeView: View {
                     }
                     .padding(.vertical, 24)
                     .listRowBackground(Color.clear)
-                } else if filteredInstalledApps.isEmpty && filteredImportedApps.isEmpty {
+                } else if filteredInstalledApps.isEmpty && filteredImportedApps.isEmpty && guestApps.isEmpty {
                     ContentUnavailableView(
                         "Your apps appear here",
                         systemImage: "square.stack.3d.up",
@@ -191,7 +187,7 @@ struct HomeView: View {
                                 installedAppRow(app)
                             }
                             .fullWidthListSeparators()
-                            .navigationLinkIndicatorVisibility(.hidden)
+                            .sideKickNavigationLinkIndicator()
                         }
                     } header: {
                         HStack {
@@ -233,7 +229,7 @@ struct HomeView: View {
                                 ImportedIPARow(app: app)
                             }
                             .fullWidthListSeparators()
-                            .navigationLinkIndicatorVisibility(.hidden)
+                            .sideKickNavigationLinkIndicator()
                         }
                     }
                 }
@@ -282,14 +278,10 @@ struct HomeView: View {
                     viewModel.errorMessage = error.localizedDescription
                 }
             }
-            .task {
-                // Opening an alert changes scene activity, but must not cancel
-                // the first local catalogue read.
-                await load()
-            }
+            .task { await viewModel.load(); startAppIDCapacityCheck() }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background { cancelBackgroundChecks() }
-                else if phase == .active { Task { await load() } }
+                else if phase == .active { startAppIDCapacityCheck() }
             }
             .onDisappear {
                 cancelBackgroundChecks()
@@ -316,24 +308,6 @@ struct HomeView: View {
                     await environment.githubUpdateDownloads.validateQueuedFiles(ipaImportStore: environment.ipaImportStore)
                 }
             }
-            .onReceive(NotificationCenter.default.publisher(for: .sideKickGitHubSettingsDidChange)) { _ in
-                startGitHubUpdateCheck()
-            }
-            .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange)
-                .filter { notification in
-                    guard let context = notification.object as? NSManagedObjectContext,
-                          context === DatabaseManager.shared.viewContext else { return false }
-                    if notification.userInfo?[NSInvalidatedAllObjectsKey] != nil { return true }
-                    return [NSInsertedObjectsKey, NSUpdatedObjectsKey, NSDeletedObjectsKey,
-                            NSRefreshedObjectsKey, NSInvalidatedObjectsKey].contains { key in
-                        (notification.userInfo?[key] as? Set<NSManagedObject>)?.contains { $0 is InstalledApp } == true
-                    }
-                }
-                .debounce(for: .milliseconds(100), scheduler: RunLoop.main)) { _ in
-                    // Startup preparation and installations can merge after the
-                    // first fetch. Keep the catalogue live without a manual pull.
-                    Task { await load() }
-                }
             .refreshable {
                 await load()
             }
@@ -409,47 +383,13 @@ struct HomeView: View {
     }
 
     private func load() async {
-        let generation = UUID()
-        localLoadGeneration = generation
-        isLoadingLocalApps = true
-        cancelBackgroundChecks()
-        defer {
-            if localLoadGeneration == generation { isLoadingLocalApps = false }
-        }
-        expirationClock = .now
-        let apps: [InstalledAppSummary]
-        do {
-            apps = try await SideStoreOperationService(
-                accountStore: SigningAccountStore(),
-                ipaStore: environment.ipaImportStore
-            ).loadInstalledApps()
-        } catch {
-            guard !Task.isCancelled, localLoadGeneration == generation else { return }
-            localLoadError = error.localizedDescription
-            return
-        }
-        guard !Task.isCancelled, localLoadGeneration == generation else { return }
-        installedApps = apps
+        await environment.reloadLocalCatalogues(checkForUpdates: true)
         await viewModel.load()
-        guard !Task.isCancelled, localLoadGeneration == generation else { return }
-        hasLoadedLocalApps = true
-        localLoadError = nil
-        isLoadingLocalApps = false
         expirationClock = .now
         environment.scheduleMaintenance()
+        environment.rescanLiveContainerApps()
         guard scenePhase != .background else { return }
-        startGitHubUpdateCheck()
         startAppIDCapacityCheck()
-    }
-
-    private func startGitHubUpdateCheck() {
-        guard hasLoadedLocalApps, !isLoadingLocalApps, localLoadError == nil, scenePhase != .background else { return }
-        githubScanTask?.cancel()
-        let generation = UUID()
-        githubScanGeneration = generation
-        isCheckingGitHubUpdates = true
-        let apps = filteredInstalledApps
-        githubScanTask = Task { await scanGitHubUpdates(apps, generation: generation) }
     }
 
     private func startAppIDCapacityCheck() {
@@ -460,13 +400,9 @@ struct HomeView: View {
     }
 
     private func cancelBackgroundChecks() {
-        githubScanGeneration = UUID()
         capacityGeneration = UUID()
-        githubScanTask?.cancel()
-        githubScanTask = nil
         appIDCapacityTask?.cancel()
         appIDCapacityTask = nil
-        isCheckingGitHubUpdates = false
     }
 
     private var updateCheckStatus: String {
@@ -482,30 +418,6 @@ struct HomeView: View {
 
     private var filteredGitHubUpdates: [GitHubUpdateCandidate] {
         githubUpdates
-    }
-
-    private func scanGitHubUpdates(_ apps: [InstalledAppSummary], generation: UUID) async {
-        defer {
-            if githubScanGeneration == generation {
-                isCheckingGitHubUpdates = false
-                githubScanTask = nil
-            }
-        }
-        await environment.githubUpdateDownloads.validateQueuedFiles(ipaImportStore: environment.ipaImportStore)
-        guard !Task.isCancelled, githubScanGeneration == generation else { return }
-        let result = await GitHubUpdateScanner.scanAll(apps)
-        let candidates = result.candidates
-        let didFailCheck = result.didFail
-        guard !Task.isCancelled, githubScanGeneration == generation else { return }
-        await environment.githubUpdateDownloads.restoreQueuedFiles(for: candidates, ipaImportStore: environment.ipaImportStore)
-        guard !Task.isCancelled, githubScanGeneration == generation else { return }
-        let guests = (try? await environment.liveContainerStore.snapshot().apps) ?? []
-        guard !Task.isCancelled, githubScanGeneration == generation else { return }
-        guestApps = guests
-        githubChecks = result.checks
-        githubUpdates = candidates
-        githubUpdateCheckFailed = didFailCheck
-        await GitHubUpdateNotificationScheduler.notify(candidates)
     }
 
     private func loadAppIDCapacity(generation: UUID) async {
@@ -590,10 +502,7 @@ struct HomeView: View {
     }
 
     private func handlePreparedIPA(_ app: ImportedIPA) async {
-        installedApps = await SideStoreOperationService(
-            accountStore: SigningAccountStore(),
-            ipaStore: environment.ipaImportStore
-        ).installedApps()
+        await environment.reloadLocalCatalogues()
         let installedIDs = Set(installedApps.flatMap(\.updateMatchingBundleIdentifiers))
         guard installedIDs.contains(app.bundleIdentifier.lowercased()) else {
             await savePreparedIPA(app, update: false)

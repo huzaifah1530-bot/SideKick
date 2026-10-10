@@ -4,9 +4,8 @@ import UniformTypeIdentifiers
 
 struct LiveContainerLibrarySection: View {
     @Environment(AppEnvironment.self) private var environment
-    @Environment(\.scenePhase) private var scenePhase
-    @State private var state = LiveContainerState()
-    @State private var message: String?
+    private var state: LiveContainerState { environment.liveContainerState }
+    private var message: String? { environment.liveContainerLoadError }
 
     var body: some View {
         Group {
@@ -38,26 +37,13 @@ struct LiveContainerLibrarySection: View {
             }
             if let message { Text(message).font(.footnote).foregroundStyle(.secondary) }
                 } header: { Text("LiveContainer") }
+            } else if let message {
+                Section("LiveContainer") {
+                    Label("Couldn’t Load LiveContainer Apps", systemImage: "exclamationmark.circle")
+                    Text(message).font(.footnote).foregroundStyle(.secondary)
+                }
             }
         }
-        .task { await reload() }
-        .onChange(of: scenePhase) { _, value in
-            if value == .active { Task { await reload() } }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .sideKickLiveContainerDidChange)) { _ in
-            Task { await reload() }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .sideKickGitHubSettingsDidChange)) { _ in
-            Task { await reload() }
-        }
-        .onReceive(NotificationCenter.default.publisher(for: .sideKickLiveContainerCheckRequested)) { _ in
-            Task { await reload() }
-        }
-    }
-
-    @MainActor private func reload() async {
-        do { state = try await environment.liveContainerStore.snapshot() }
-        catch { message = error.localizedDescription }
     }
 }
 

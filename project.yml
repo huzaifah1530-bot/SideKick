@@ -1,7 +1,7 @@
 name: SideKick
 options:
   deploymentTarget:
-    iOS: "26.0"
+    iOS: "18.0"
   bundleIdPrefix: com.sidekick
   createIntermediateGroups: true
 settings:
@@ -18,7 +18,7 @@ targets:
   SideKick:
     type: application
     platform: iOS
-    deploymentTarget: "26.0"
+    deploymentTarget: "18.0"
     sources:
       - path: SideKick
         excludes:

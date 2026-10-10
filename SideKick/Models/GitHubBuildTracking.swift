@@ -50,6 +50,7 @@ struct GitHubCheckResult: Sendable {
     let state: GitHubCheckState
     var candidate: GitHubUpdateCandidate? = nil
     var detail: String? = nil
+    var checkedConfiguration: GitHubUpdateConfiguration? = nil
 }
 
 enum GitHubTrackingPolicy {
