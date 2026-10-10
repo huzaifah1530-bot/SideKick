@@ -2,6 +2,14 @@
 
 SideKick is a native SwiftUI iOS sideloading app. The existing SwiftUI screens and IPA library are being integrated with SideStore's on-device signing and installation engine.
 
+## SideStore credit and derived components
+
+SideKick builds on [SideStore](https://github.com/SideStore/SideStore), an open-source sideloading project. The pinned upstream source is included as the recursive Git submodule `Vendor/SideStore`; SideStore is licensed under AGPL-3.0. SideKick also uses upstream SideStore dependencies, including Minimuxer and SideSign. Their notices and distribution notes are in [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
+
+The integrated app derives its sideloading engine from SideStore. Specifically, the build compiles SideStore's `SideStore` app target and uses its app bootstrap, Apple account authentication, Developer Portal access, signing certificates and provisioning profiles, pairing and Anisette support, and install and refresh operation pipelines. SideKick's `SigningAccountStore` and `SideStoreOperationService` call and adapt those upstream APIs for SideKick's account and install flows. The CI workflow applies the integration patches in `patches/` to the pinned upstream checkout.
+
+SideKick's app experience is implemented in this repository's `SideKick/` directory: its SwiftUI navigation and screens, visual design, IPA library and local storage, GitHub release and artifact update tracking, update queue, and notifications. The integration patch changes SideStore's launch scene to show SideKick's `ContentView`; it does not replace SideStore's underlying signing engine. Some SideKick settings expose or configure SideStore capabilities, while their presentation is built in SideKick.
+
 ## Integration status
 
 - The SideStore source is pinned as a recursive Git submodule at `Vendor/SideStore`.
