@@ -1,6 +1,8 @@
 import SwiftUI
 import UniformTypeIdentifiers
 import UIKit
+import CoreData
+import Combine
 
 private struct QueuedManualUpdate: Identifiable {
     let ipa: ImportedIPA
@@ -280,14 +282,14 @@ struct HomeView: View {
                     viewModel.errorMessage = error.localizedDescription
                 }
             }
-            .task(id: scenePhase) {
-                // A view can first appear while the scene is still inactive.
-                // Its initial local load must not depend on an active transition.
-                guard scenePhase != .background else { return }
+            .task {
+                // Opening an alert changes scene activity, but must not cancel
+                // the first local catalogue read.
                 await load()
             }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background { cancelBackgroundChecks() }
+                else if phase == .active { Task { await load() } }
             }
             .onDisappear {
                 cancelBackgroundChecks()
@@ -317,6 +319,21 @@ struct HomeView: View {
             .onReceive(NotificationCenter.default.publisher(for: .sideKickGitHubSettingsDidChange)) { _ in
                 startGitHubUpdateCheck()
             }
+            .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange)
+                .filter { notification in
+                    guard let context = notification.object as? NSManagedObjectContext,
+                          context === DatabaseManager.shared.viewContext else { return false }
+                    if notification.userInfo?[NSInvalidatedAllObjectsKey] != nil { return true }
+                    return [NSInsertedObjectsKey, NSUpdatedObjectsKey, NSDeletedObjectsKey,
+                            NSRefreshedObjectsKey, NSInvalidatedObjectsKey].contains { key in
+                        (notification.userInfo?[key] as? Set<NSManagedObject>)?.contains { $0 is InstalledApp } == true
+                    }
+                }
+                .debounce(for: .milliseconds(100), scheduler: RunLoop.main)) { _ in
+                    // Startup preparation and installations can merge after the
+                    // first fetch. Keep the catalogue live without a manual pull.
+                    Task { await load() }
+                }
             .refreshable {
                 await load()
             }
