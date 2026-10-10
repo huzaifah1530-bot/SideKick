@@ -13,6 +13,8 @@ enum GitHubUpdateNotificationScheduler {
         let pending = await center.pendingNotificationRequests()
         let delivered = await center.deliveredNotifications()
         for candidate in candidates {
+            let historyKey = prefix + candidate.bundleIdentifier + ".last-notified"
+            if UserDefaults.standard.string(forKey: historyKey) == candidate.updateKey { continue }
             let appPrefix = prefix + candidate.bundleIdentifier + "."
             let updateID = Data(candidate.updateKey.utf8).base64EncodedString()
                 .replacingOccurrences(of: "+", with: "-")
@@ -38,6 +40,7 @@ enum GitHubUpdateNotificationScheduler {
             content.userInfo = ["bundleIdentifier": candidate.bundleIdentifier, "updateKey": candidate.updateKey]
             do {
                 try await center.add(UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
+                UserDefaults.standard.set(candidate.updateKey, forKey: historyKey)
             } catch {
                 debugLog("[SideKick] Could not post update notification for \(candidate.appName): \(error.localizedDescription)")
             }

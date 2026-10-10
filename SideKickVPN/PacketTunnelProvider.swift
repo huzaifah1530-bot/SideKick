@@ -64,7 +64,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
 
     var tunnelIfaceIP: String = TunnelConstants.defaultIfaceIP
     var tunnelPeerIP: String = TunnelConstants.defaultPeerIP
-    
+
     override func startTunnel(options: [String : NSObject]?, completionHandler: @escaping (Error?) -> Void) {
         if let options = options {
             for (key, val) in options {
@@ -73,7 +73,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         } else {
             tunnelLog("startTunnel: options is nil")
         }
-        
+
         let providerConfiguration =
             (protocolConfiguration as? NETunnelProviderProtocol)?.providerConfiguration
 
@@ -87,12 +87,12 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             tunnelLog("TunnelPeerIP configured as: \(peerIp)")
             tunnelPeerIP = peerIp
         }
-        
+
         let ifaceEndpoint = CIDREndpoint(tunnelIfaceIP, defaultPrefix: 24)
         let peerEndpoint = CIDREndpoint(tunnelPeerIP, defaultPrefix: 32)
-        
+
         tunnelLog("Configuring P2P settings: peer=\(peerEndpoint.ip)/\(peerEndpoint.prefix) (\(peerEndpoint.subnetMask)), iface=\(ifaceEndpoint.ip)/\(ifaceEndpoint.prefix) (\(ifaceEndpoint.subnetMask))")
-        
+
         // tunnel iface configuration
         let ifaceIPv4 = NEIPv4Settings(addresses: [ifaceEndpoint.ip], subnetMasks: [ifaceEndpoint.subnetMask])
         let tunnelDestinationIPv4Routes = [
@@ -106,9 +106,9 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
         let settings = NEPacketTunnelNetworkSettings(
             // NOTE: 'tunnelRemoteAddress' is just for UI concerns and is not involved in routing
             tunnelRemoteAddress: peerEndpoint.ip
-        )   
+        )
         settings.ipv4Settings = ifaceIPv4
-        
+
         tunnelLog("Calling setTunnelNetworkSettings...")
         setTunnelNetworkSettings(settings) { error in
             if let error = error {
@@ -121,7 +121,7 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             completionHandler(nil)
         }
     }
-    
+
     func setPackets() {
         packetFlow.readPackets { [self] packets, protocols in
             lifecycleLock.lock()
@@ -129,12 +129,12 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             lifecycleLock.unlock()
             guard shouldContinue else { return }
             var modified = packets
-            
+
             for i in modified.indices where protocols[i].int32Value == AF_INET && modified[i].count >= 20 {
                 // Swap bytes without assuming Data's storage is UInt32-aligned.
                 for offset in 0..<4 { modified[i].swapAt(12 + offset, 16 + offset) }
             }
-            
+
             self.packetFlow.writePackets(modified, withProtocols: protocols)
             setPackets()
         }

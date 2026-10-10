@@ -32,16 +32,16 @@ public struct CIDREndpoint: Equatable, Sendable {
         let trimmed = input.trimmingCharacters(in: .whitespacesAndNewlines)
         self.raw = trimmed
         let parts = trimmed.split(separator: "/", omittingEmptySubsequences: false)
-        
+
         let ipPart = String(parts.first ?? "").trimmingCharacters(in: .whitespaces)
         self.ip = ipPart.isEmpty ? "0.0.0.0" : ipPart
-        
+
         if parts.count == 2, let parsedPrefix = Int(parts[1].trimmingCharacters(in: .whitespaces)), (0...32).contains(parsedPrefix) {
             self.prefix = parsedPrefix
         } else {
             self.prefix = defaultPrefix
         }
-        
+
         self.subnetMask = Self.prefixToSubnetMask(self.prefix)
     }
 
@@ -77,13 +77,13 @@ public struct CIDRParseResult: Equatable, Sendable {
     public let totalAddresses: UInt64
     public let category: IPCategory
     public let warnings: [String]
-    
+
     public var raw: String { endpoint.raw }
     public var ip: String { endpoint.ip }
     public var prefix: Int { endpoint.prefix }
     public var subnetMask: String { endpoint.subnetMask }
     public var formattedCIDR: String { endpoint.formattedCIDR }
-    
+
     public var canonicalCIDR: String {
         "\(networkBaseIP)/\(prefix)"
     }

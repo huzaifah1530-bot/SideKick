@@ -14,6 +14,7 @@ struct GitHubUpdateDownloadJob: Equatable {
 @Observable
 final class GitHubUpdateDownloadStore {
     private(set) var jobs: [String: GitHubUpdateDownloadJob] = [:]
+    @ObservationIgnored private var generations: [String: UUID] = [:]
     @ObservationIgnored private var tasks: [String: Task<Void, Never>] = [:]
 
     func start(
@@ -23,8 +24,10 @@ final class GitHubUpdateDownloadStore {
         token: String?
     ) {
         guard tasks[candidate.id] == nil else { return }
+        let generation = UUID()
+        generations[candidate.id] = generation
         jobs[candidate.id] = GitHubUpdateDownloadJob(
-            progress: 0,
+            progress: nil,
             bytesWritten: 0,
             totalBytesExpected: nil,
             isDownloading: true,
@@ -38,16 +41,19 @@ final class GitHubUpdateDownloadStore {
             do {
                 let downloaded = try await GitHubUpdateService().downloadIPA(for: candidate, token: token) { progress in
                     Task { @MainActor in
-                        self.setProgress(progress, for: candidate.id)
+                        if self.generations[candidate.id] == generation { self.setProgress(progress, for: candidate.id) }
                     }
                 }
                 temporaryURL = downloaded
+                defer { try? FileManager.default.removeItem(at: downloaded) }
+                try Task.checkCancellation()
                 let queuedIPA = try await ipaImportStore.importManagedIPA(
                     from: downloaded,
                     expectedBundleIdentifiers: expectedBundleIdentifiers,
                     updateKey: candidate.updateKey,
                     repositoryURL: candidate.repositoryURL
                 )
+                guard self.generations[candidate.id] == generation else { return }
                 self.jobs[candidate.id] = GitHubUpdateDownloadJob(
                     progress: 1,
                     bytesWritten: self.jobs[candidate.id]?.bytesWritten ?? 0,
@@ -57,6 +63,7 @@ final class GitHubUpdateDownloadStore {
                     errorMessage: nil
                 )
             } catch {
+                guard self.generations[candidate.id] == generation else { return }
                 self.jobs[candidate.id] = GitHubUpdateDownloadJob(
                     progress: nil,
                     bytesWritten: self.jobs[candidate.id]?.bytesWritten ?? 0,
@@ -67,11 +74,15 @@ final class GitHubUpdateDownloadStore {
                 )
             }
             if let temporaryURL { try? FileManager.default.removeItem(at: temporaryURL) }
-            self.tasks[candidate.id] = nil
+            if self.generations[candidate.id] == generation {
+                self.tasks[candidate.id] = nil
+                self.generations[candidate.id] = nil
+            }
         }
     }
 
     func removeJob(for candidate: GitHubUpdateCandidate) {
+        generations[candidate.id] = nil
         tasks[candidate.id]?.cancel()
         tasks[candidate.id] = nil
         jobs[candidate.id] = nil

@@ -5,7 +5,7 @@ import Security
 import SideSign
 import UIKit
 
-struct SigningAccountSummary: Identifiable, Equatable {
+struct SigningAccountSummary: Identifiable, Equatable, Codable, Sendable {
     let accountIdentifier: String
     let teamIdentifier: String
     let email: String
@@ -13,6 +13,8 @@ struct SigningAccountSummary: Identifiable, Equatable {
     let teamType: String
     let isFreeAccount: Bool
     let hasSavedSession: Bool
+
+    var rawTeamType: Int? = nil
 
     var id: String { "\(accountIdentifier)|\(teamIdentifier)" }
 }
@@ -24,48 +26,84 @@ final class SigningAccountStore {
     private(set) var isWorking = false
     private(set) var signInCheckpoint = UserDefaults.standard.string(forKey: "sidekick.sign-in-checkpoint")
 
+    private(set) var loadError: String?
     private let vault = SigningSessionVault()
 
     func reload() async {
-        guard DatabaseManager.shared.isStarted else {
-            accounts = []
-            return
-        }
-
-        let context = DatabaseManager.shared.viewContext
         do {
-            let records = try await context.perform {
-                let request = Account.fetchRequest()
-                return try context.fetch(request).flatMap { account in
-                    account.teams.map { team in
-                        (account.identifier,
-                         team.identifier,
-                         account.appleID,
-                         team.name,
-                         team.type.localizedDescription,
-                         team.type == .free)
+            var archive = try SigningAccountArchive.load()
+            var summaries = Dictionary(archive.accounts.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+            // The Keychain can outlive database metadata after a migration. Never
+            // put passwords or tokens in the account catalogue.
+            let sessions = try vault.all()
+            for session in sessions where !archive.removedAccountIdentifiers.contains(session.accountIdentifier) {
+                let summary = SigningAccountSummary(accountIdentifier: session.accountIdentifier,
+                    teamIdentifier: session.teamIdentifier, email: session.appleID,
+                    teamName: "", teamType: "Sign in to restore team details",
+                    isFreeAccount: false, hasSavedSession: true)
+                if summaries[summary.id] == nil { summaries[summary.id] = summary }
+            }
+            if DatabaseManager.shared.isStarted {
+                let context = DatabaseManager.shared.viewContext
+                let restored = Array(summaries.values)
+                let removedIdentifiers = archive.removedAccountIdentifiers
+                let records = try await context.perform {
+                    var savedAccounts = try context.fetch(Account.fetchRequest())
+                    // Recreate known team metadata without creating an active session.
+                    for summary in restored where !removedIdentifiers.contains(summary.accountIdentifier) {
+                        guard let rawTeamType = summary.rawTeamType else { continue }
+                        let account: Account
+                        if let existing = savedAccounts.first(where: { $0.identifier == summary.accountIdentifier }) {
+                            account = existing
+                        } else {
+                            account = Account(ALTAccount(appleID: summary.email, identifier: summary.accountIdentifier), context: context)
+                            savedAccounts.append(account)
+                        }
+                        if !account.teams.contains(where: { $0.identifier == summary.teamIdentifier }) {
+                            let team = ALTTeam(identifier: summary.teamIdentifier, name: summary.teamName,
+                                type: ALTTeamType(rawValue: rawTeamType) ?? .unknown)
+                            _ = Team(team, account: account, context: context)
+                        }
+                    }
+                    if context.hasChanges { try context.save() }
+                    return savedAccounts.flatMap { account in
+                        account.teams.map { team in
+                            var summary = SigningAccountSummary(accountIdentifier: account.identifier,
+                                teamIdentifier: team.identifier, email: account.appleID, teamName: team.name,
+                                teamType: team.type.localizedDescription, isFreeAccount: team.type == .free,
+                                hasSavedSession: false)
+                            summary.rawTeamType = team.type.rawValue
+                            return summary
+                        }
                     }
                 }
+                for record in records where !archive.removedAccountIdentifiers.contains(record.accountIdentifier) {
+                    summaries[record.id] = record
+                }
             }
-
-            accounts = records.map { record in
-                let key = SigningSessionVault.key(accountIdentifier: record.0, teamIdentifier: record.1)
-                return SigningAccountSummary(
-                    accountIdentifier: record.0,
-                    teamIdentifier: record.1,
-                    email: record.2,
-                    teamName: record.3,
-                    teamType: record.4,
-                    isFreeAccount: record.5,
-                    hasSavedSession: (try? vault.load(key: key)) != nil
-                )
-            }
-            .sorted { lhs, rhs in
-                return lhs.email.localizedCaseInsensitiveCompare(rhs.email) == .orderedAscending
-            }
+            let sessionKeys = Set(sessions.map { SigningSessionVault.key(accountIdentifier: $0.accountIdentifier, teamIdentifier: $0.teamIdentifier) })
+            accounts = summaries.values.map { summary in
+                SigningAccountSummary(accountIdentifier: summary.accountIdentifier,
+                    teamIdentifier: summary.teamIdentifier, email: summary.email, teamName: summary.teamName,
+                    teamType: summary.teamType, isFreeAccount: summary.isFreeAccount,
+                    hasSavedSession: sessionKeys.contains(SigningSessionVault.key(accountIdentifier: summary.accountIdentifier, teamIdentifier: summary.teamIdentifier)),
+                    rawTeamType: summary.rawTeamType)
+            }.sorted { $0.email.localizedCaseInsensitiveCompare($1.email) == .orderedAscending }
+            archive.accounts = accounts
+            try archive.save()
+            loadError = nil
         } catch {
-            accounts = []
-            debugLog("[SideKick] Failed to load signing accounts: \(error)")
+            // A locked Keychain or transient Core Data error must not erase the list.
+            if accounts.isEmpty, let archive = try? SigningAccountArchive.load() {
+                accounts = archive.accounts.map {
+                    SigningAccountSummary(accountIdentifier: $0.accountIdentifier,
+                        teamIdentifier: $0.teamIdentifier, email: $0.email, teamName: $0.teamName,
+                        teamType: $0.teamType, isFreeAccount: $0.isFreeAccount, hasSavedSession: false,
+                        rawTeamType: $0.rawTeamType)
+                }
+            }
+            loadError = "Saved accounts couldn’t be fully loaded. Unlock your device and try again."
+            debugLog("[SideKick] Failed to load signing accounts: \(error.localizedDescription)")
         }
     }
 
@@ -153,6 +191,9 @@ final class SigningAccountStore {
             certificatePassword: certificatePassword
         )
         try vault.save(credentials, key: sessionKey)
+        var archive = try SigningAccountArchive.load()
+        archive.removedAccountIdentifiers.remove(accountIdentifier)
+        try archive.save()
         setSignInCheckpoint("Session saved; refreshing the account list")
         await reload()
         setSignInCheckpoint("Account saved successfully")
@@ -180,19 +221,24 @@ final class SigningAccountStore {
         let teamIdentifiers = try await context.perform {
             let request = Account.fetchRequest()
             request.predicate = NSPredicate(format: "%K == %@", #keyPath(Account.identifier), account.accountIdentifier)
-            guard let savedAccount = try context.fetch(request).first else {
-                throw SigningAccountError.savedAccountMissing
-            }
+            guard let savedAccount = try context.fetch(request).first else { return [account.teamIdentifier] }
             let teamIdentifiers = savedAccount.teams.map(\.identifier)
             context.delete(savedAccount)
             try context.save()
             return teamIdentifiers
         }
 
+        var archive = try SigningAccountArchive.load()
+        archive.removedAccountIdentifiers.insert(account.accountIdentifier)
+        let archivedTeams = archive.accounts.filter { $0.accountIdentifier == account.accountIdentifier }.map(\.teamIdentifier)
+        archive.accounts.removeAll { $0.accountIdentifier == account.accountIdentifier }
+        try archive.save()
+        accounts.removeAll { $0.accountIdentifier == account.accountIdentifier }
+
         if wasActive {
             await AuthManager.shared.signOut(keepCertificate: false, keepAnisetteData: true)
         }
-        for teamIdentifier in teamIdentifiers {
+        for teamIdentifier in Set(teamIdentifiers + archivedTeams) {
             try vault.delete(key: SigningSessionVault.key(
                 accountIdentifier: account.accountIdentifier,
                 teamIdentifier: teamIdentifier
@@ -381,7 +427,8 @@ final class SigningAccountStore {
         )
         let savedCredentials = try vault.load(key: key)
 
-        if let activeCertificate = CertificateManager.shared.activeCertificate,
+        if target.rawTeamType != nil,
+           let activeCertificate = CertificateManager.shared.activeCertificate,
            UserDefaults.standard.isDeviceRegistered {
             guard forceRefreshCertificate else { return }
             let team = try await developerTeam(for: target)
@@ -448,7 +495,7 @@ final class SigningAccountStore {
             teamIdentifier: account.teamIdentifier
         )
         let credentials = try vault.load(key: key)
-        try await restoreSession(credentials, activateTeam: activateTeam)
+        try await restoreSession(credentials, activateTeam: activateTeam && account.rawTeamType != nil)
     }
 
     private func restoreSession(_ credentials: SigningSessionCredentials, activateTeam: Bool = true) async throws {
@@ -634,6 +681,18 @@ private struct SigningSessionVault {
         return try JSONDecoder().decode(SigningSessionCredentials.self, from: data)
     }
 
+    func all() throws -> [SigningSessionCredentials] {
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service, kSecReturnData as String: true,
+            kSecMatchLimit as String: kSecMatchLimitAll]
+        var result: CFTypeRef?
+        let status = SecItemCopyMatching(query as CFDictionary, &result)
+        if status == errSecItemNotFound { return [] }
+        guard status == errSecSuccess else { throw SigningAccountError.keychain(status) }
+        let data = (result as? [Data]) ?? (result as? Data).map { [$0] } ?? []
+        return try data.map { try JSONDecoder().decode(SigningSessionCredentials.self, from: $0) }
+    }
+
     func delete(key: String) throws {
         let status = SecItemDelete(baseQuery(key: key) as CFDictionary)
         guard status == errSecSuccess || status == errSecItemNotFound else {
@@ -647,6 +706,29 @@ private struct SigningSessionVault {
             kSecAttrService as String: service,
             kSecAttrAccount as String: key
         ]
+    }
+}
+
+/// Non-secret metadata only. Authentication remains in the Keychain.
+private struct SigningAccountArchive: Codable {
+    var accounts: [SigningAccountSummary] = []
+    var removedAccountIdentifiers: Set<String> = []
+
+    private static var url: URL {
+        get throws {
+            guard let directory = SideKickDataDirectory.url else { throw SigningAccountError.databaseUnavailable }
+            return directory.appendingPathComponent("SigningAccounts.json")
+        }
+    }
+
+    static func load() throws -> Self {
+        let url = try Self.url
+        guard FileManager.default.fileExists(atPath: url.path) else { return Self() }
+        return try JSONDecoder().decode(Self.self, from: Data(contentsOf: url))
+    }
+
+    func save() throws {
+        try JSONEncoder().encode(self).write(to: Self.url, options: [.atomic, .completeFileProtectionUntilFirstUserAuthentication])
     }
 }
 

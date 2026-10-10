@@ -158,35 +158,8 @@ struct BuzzheavierClient {
         var request = URLRequest(url: downloadURL)
         request.setValue("SideKick", forHTTPHeaderField: "User-Agent")
         request.setValue(shareURL.absoluteString, forHTTPHeaderField: "Referer")
-        return try await URLSession.shared.download(for: request, delegate: AppDownloadProgressDelegate(onProgress: onProgress))
+        return try await ProgressFileDownload(onProgress: onProgress).download(request)
     }
-}
-
-private final class AppDownloadProgressDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
-    private let onProgress: @Sendable (GitHubDownloadProgress) -> Void
-
-    init(onProgress: @escaping @Sendable (GitHubDownloadProgress) -> Void) {
-        self.onProgress = onProgress
-    }
-
-    func urlSession(
-        _ session: URLSession,
-        downloadTask: URLSessionDownloadTask,
-        didWriteData bytesWritten: Int64,
-        totalBytesWritten: Int64,
-        totalBytesExpectedToWrite: Int64
-    ) {
-        onProgress(GitHubDownloadProgress(
-            bytesWritten: totalBytesWritten,
-            totalBytesExpected: totalBytesExpectedToWrite > 0 ? totalBytesExpectedToWrite : nil
-        ))
-    }
-
-    func urlSession(
-        _ session: URLSession,
-        downloadTask: URLSessionDownloadTask,
-        didFinishDownloadingTo location: URL
-    ) { }
 }
 
 private final class RedirectBlockingDelegate: NSObject, URLSessionTaskDelegate, @unchecked Sendable {

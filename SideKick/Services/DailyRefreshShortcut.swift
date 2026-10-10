@@ -4,7 +4,7 @@ import Foundation
 struct RefreshManagedAppsIntent: AppIntent {
     static let title: LocalizedStringResource = "Refresh SideKick Apps"
     static let description = IntentDescription(
-        "Quietly attempts to refresh every app managed by SideKick. If today's attempt does not finish successfully, the evening automation can retry."
+        "Checks GitHub updates and quietly attempts to refresh every app managed by SideKick. If today's attempt does not finish successfully, the evening automation can retry."
     )
     static let openAppWhenRun = false
 
@@ -19,17 +19,17 @@ private enum DailyRefreshAutomation {
     private static let lastSuccessfulRunKey = "sidekick.automation.last-successful-refresh"
 
     static func run() async {
-        let calendar = Calendar.current
-        if let lastSuccessfulRun = UserDefaults.standard.object(forKey: lastSuccessfulRunKey) as? Date,
-           calendar.isDate(lastSuccessfulRun, inSameDayAs: .now) {
-            return
-        }
-
         UserDefaults.standard.set(Date.now, forKey: "sidekick.automation.last-attempt")
         do {
             if !DatabaseManager.shared.isStarted {
                 try await DatabaseManager.shared.start()
             }
+            // GitHub needs internet access, not a local tunnel. Check on every
+            // shortcut run, including retries and days already refreshed.
+            await GitHubUpdateScanner.scanAndNotify()
+            let calendar = Calendar.current
+            if let lastSuccessfulRun = UserDefaults.standard.object(forKey: lastSuccessfulRunKey) as? Date,
+               calendar.isDate(lastSuccessfulRun, inSameDayAs: .now) { return }
             let vpnLease = try await LocalVPNService.shared.acquire()
             defer { LocalVPNService.shared.release(vpnLease) }
 

@@ -16,10 +16,18 @@ final class SetupStatus {
     private(set) var vpnAuthorized = false
     private(set) var pairingVerified = false
     private(set) var refreshAutomationsConfigured = UserDefaults.standard.bool(forKey: "sidekick.setup.refresh-automations-configured")
+    private(set) var isRefreshing = false
+    private(set) var isRequestingNotifications = false
+    private(set) var isImportingPairing = false
     private(set) var isAuthorizingVPN = false
     private(set) var isCheckingPairing = false
-    private(set) var isReady = false
+    private(set) var isReady = UserDefaults.standard.bool(forKey: "sidekick.setup.completed")
     var message: String?
+
+    var isBusy: Bool {
+        isRefreshing || isRequestingNotifications || isImportingPairing ||
+            isAuthorizingVPN || isCheckingPairing || accounts.isWorking
+    }
 
     var hasPairingFile: Bool {
         PairingFileManager.shared.hasPairingFile()
@@ -30,15 +38,17 @@ final class SetupStatus {
     }
 
     var selfSigningAccount: SigningAccountSummary? {
-        accounts.accounts.first { $0.hasSavedSession && $0.teamIdentifier == requiredTeamIdentifier }
+        accounts.accounts.first { $0.hasSavedSession && $0.rawTeamType != nil && $0.teamIdentifier == requiredTeamIdentifier }
     }
 
     var isDeviceReady: Bool {
-        notificationsEnabled && backgroundRefreshEnabled && vpnAuthorized && pairingVerified &&
-            selfSigningAccount != nil
+        vpnAuthorized && pairingVerified && selfSigningAccount != nil
     }
 
     func refresh(reportConnectionErrors: Bool = false) async {
+        guard !isRefreshing else { return }
+        isRefreshing = true
+        defer { isRefreshing = false }
         message = nil
         let notificationSettings = await UNUserNotificationCenter.current().notificationSettings()
         notificationsEnabled = notificationSettings.authorizationStatus == .authorized
@@ -49,7 +59,7 @@ final class SetupStatus {
         vpnAuthorized = LocalVPNService.shared.isConfigured && LocalVPNService.shared.hasSupportedProfiles
         await accounts.reload()
 
-        guard notificationsEnabled, backgroundRefreshEnabled, vpnAuthorized, selfSigningAccount != nil else {
+        guard vpnAuthorized, selfSigningAccount != nil else {
             pairingVerified = false
             updateReadyState()
             return
@@ -100,10 +110,23 @@ final class SetupStatus {
     }
 
     func updateReadyState() {
-        isReady = isDeviceReady && refreshAutomationsConfigured
+        isReady = UserDefaults.standard.bool(forKey: "sidekick.setup.completed")
+    }
+
+    func completeSetup() async {
+        await refresh()
+        guard isDeviceReady && refreshAutomationsConfigured else {
+            message = "Finish the signing account, pairing, local connection and shortcut steps first."
+            return
+        }
+        UserDefaults.standard.set(true, forKey: "sidekick.setup.completed")
+        updateReadyState()
     }
 
     func requestNotifications() async {
+        guard !isRequestingNotifications else { return }
+        isRequestingNotifications = true
+        defer { isRequestingNotifications = false }
         do {
             _ = try await UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound])
         } catch {
@@ -113,11 +136,14 @@ final class SetupStatus {
     }
 
     func importPairingFile(from url: URL) async {
+        guard !isImportingPairing else { return }
+        isImportingPairing = true
+        defer { isImportingPairing = false }
         do {
             UserDefaults.standard.set(false, forKey: Self.pairingVerifiedKey)
             try PairingSetupImporter.importFile(from: url)
             await refresh(reportConnectionErrors: true)
-            if notificationsEnabled && backgroundRefreshEnabled && vpnAuthorized && selfSigningAccount != nil && !pairingVerified && message == nil {
+            if vpnAuthorized && selfSigningAccount != nil && !pairingVerified && message == nil {
                 message = "The pairing file was imported, but SideKick couldn’t verify it. Check that it was made for this iPhone."
             }
         } catch {
@@ -148,7 +174,7 @@ struct RequiredSetupView: View {
     @State private var isChoosingPairingFile = false
     @State private var isShowingSignIn = false
     @State private var credentials: (appleID: String, password: String)?
-    @State private var step = 0
+    @AppStorage("sidekick.setup.step") private var step = 0
 
     private let lastStep = 6
 
@@ -166,30 +192,52 @@ struct RequiredSetupView: View {
                 .padding(.horizontal, 24)
                 .padding(.top, 16)
 
-                TabView(selection: $step) {
-                    welcomePage.tag(0)
-                    notificationsPage.tag(1)
-                    backgroundRefreshPage.tag(2)
-                    accountPage.tag(3)
-                    pairingPage.tag(4)
-                    vpnPage.tag(5)
-                    refreshAutomationPage.tag(6)
-                }
-                .tabViewStyle(.page(indexDisplayMode: .never))
-
-                SwiftUI.Button(step == lastStep ? "Finish Setup" : "Continue") {
-                    if step == lastStep {
-                        Task { await status.refresh() }
-                    } else {
-                        withAnimation(.easeInOut(duration: 0.2)) { step += 1 }
+                Group {
+                    switch step {
+                    case 0: welcomePage
+                    case 1: notificationsPage
+                    case 2: backgroundRefreshPage
+                    case 3: accountPage
+                    case 4: pairingPage
+                    case 5: vpnPage
+                    default: refreshAutomationPage
                     }
                 }
-                .buttonStyle(.borderedProminent)
-                .controlSize(.large)
-                .frame(maxWidth: .infinity)
-                .disabled(!canContinue)
+                .id(step)
+                .transition(.opacity)
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+
+                VStack(spacing: 12) {
+                    SwiftUI.Button {
+                        if step == lastStep {
+                            Task { await status.completeSetup() }
+                        } else {
+                            withAnimation(.easeInOut(duration: 0.2)) { step += 1 }
+                        }
+                    } label: {
+                        HStack(spacing: 10) {
+                            if status.isBusy { ProgressView().tint(.white) }
+                            Text(step == 0 ? "Get Started" : step == lastStep ? "Finish Setup" : "Continue")
+                                .font(.headline)
+                        }
+                        .frame(maxWidth: .infinity, minHeight: 28)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .controlSize(.large)
+                    .disabled(!canContinue || status.isBusy)
+                    if (step == 1 && !status.notificationsEnabled) || (step == 2 && !status.backgroundRefreshEnabled) {
+                        SwiftUI.Button("Not Now") {
+                            withAnimation(.easeInOut(duration: 0.2)) { step += 1 }
+                        }
+                        .frame(minHeight: 44)
+                        .disabled(status.isBusy)
+                    }
+                }
+                .frame(maxWidth: 500)
                 .padding(.horizontal, 24)
-                .padding(.vertical, 16)
+                .padding(.top, 16)
+                .padding(.bottom, 20)
+                .background(.bar)
             }
             .background(Color(uiColor: .systemBackground))
             .navigationTitle("SideKick Setup")
@@ -203,6 +251,7 @@ struct RequiredSetupView: View {
                             Image(systemName: "chevron.left")
                         }
                         .accessibilityLabel("Back")
+                        .disabled(status.isBusy)
                     }
                 }
             }
@@ -258,7 +307,7 @@ struct RequiredSetupView: View {
         onboardingPage(
             symbol: "bell.badge",
             title: "Stay up to date",
-            message: "Notifications let SideKick tell you when an app needs attention or is nearing its refresh date."
+            message: "Get reminders before apps expire and notifications when a scheduled check finds a GitHub update. You can enable notifications later in Settings."
         ) {
             SwiftUI.Button(status.notificationsEnabled ? "Notifications Allowed" : "Allow Notifications") {
                 Task {
@@ -269,7 +318,7 @@ struct RequiredSetupView: View {
                 }
             }
             .buttonStyle(.borderedProminent)
-            .disabled(status.notificationsEnabled)
+            .disabled(status.notificationsEnabled || status.isBusy)
         }
     }
 
@@ -302,9 +351,17 @@ struct RequiredSetupView: View {
             if let account = status.selfSigningAccount {
                 Label(account.email, systemImage: "checkmark.circle.fill")
                     .foregroundStyle(.green)
+            } else if status.accounts.isWorking {
+                ProgressView("Signing in to Apple…")
+                    .frame(maxWidth: .infinity, minHeight: 52)
             } else {
                 SwiftUI.Button("Add Apple Account") { isShowingSignIn = true }
                     .buttonStyle(.borderedProminent)
+                    .disabled(status.isBusy)
+                if !status.accounts.accounts.isEmpty {
+                    Text("Use the Apple Account that signed this copy of SideKick.")
+                        .font(.subheadline).foregroundStyle(.secondary)
+                }
             }
         }
     }
@@ -321,6 +378,8 @@ struct RequiredSetupView: View {
                 isChoosingPairingFile = true
             }
             .buttonStyle(.borderedProminent)
+            .disabled(status.isBusy)
+            if status.isImportingPairing { ProgressView("Importing pairing file…") }
             Link("How to create a pairing file", destination: AppConstants.URLs.pairingDocumentation)
                 .font(.subheadline)
         }
@@ -332,6 +391,16 @@ struct RequiredSetupView: View {
             title: "Allow a local connection",
             message: "SideKick has its own local VPN. Allow it once in the iOS permission alert. SideKick connects when installing, refreshing, or enabling JIT, then disconnects when the work finishes. Your internet traffic is not sent through a VPN server."
         ) {
+            if !LocalVPNService.shared.hasSupportedProfiles {
+                Label("Signing permission required", systemImage: "exclamationmark.shield")
+                    .foregroundStyle(.orange)
+                Text("The app and its VPN extension need signing profiles that allow Network Extensions. Free Apple Account profiles do not include this permission.")
+                    .font(.subheadline).foregroundStyle(.secondary)
+            }
+            if status.isAuthorizingVPN || status.isCheckingPairing {
+                ProgressView(status.isCheckingPairing ? "Verifying this iPhone…" : "Saving VPN permission…")
+                    .frame(maxWidth: .infinity, minHeight: 44)
+            }
             if status.vpnAuthorized {
                 Label("VPN Permission Saved", systemImage: "checkmark.shield.fill")
                     .foregroundStyle(.green)
@@ -340,7 +409,7 @@ struct RequiredSetupView: View {
                     Task { await status.authorizeLocalConnection() }
                 }
                 .buttonStyle(.borderedProminent)
-                .disabled(status.isAuthorizingVPN || status.isCheckingPairing)
+                .disabled(status.isBusy || !LocalVPNService.shared.hasSupportedProfiles)
             }
             NavigationLink { LocalConnectionSettingsView() } label: {
                 Label("Connection Details", systemImage: "info.circle")
@@ -363,7 +432,7 @@ struct RequiredSetupView: View {
         onboardingPage(
             symbol: "clock.arrow.circlepath",
             title: "Add the refresh shortcut",
-            message: "Install SideKick’s daily refresh shortcut to finish setup.") {
+            message: "Add the shortcut, then create a daily automation in Shortcuts using Run Immediately. Each run checks GitHub for new versions and refreshes your apps. iOS controls whether background work can run.") {
             VStack(spacing: 12) {
                 Link("Get Shortcut", destination: URL(string: "https://www.icloud.com/shortcuts/41b951c189ec4ca78188604524f868e2")!)
                 .buttonStyle(.borderedProminent)
@@ -386,26 +455,41 @@ struct RequiredSetupView: View {
         message: String,
         @ViewBuilder actions: () -> Actions = { EmptyView() }
     ) -> some View {
-        VStack(spacing: 22) {
-            Spacer(minLength: 12)
-            Image(systemName: symbol)
-                .font(.system(size: 48, weight: .regular))
-                .foregroundStyle(.tint)
-                .frame(height: 64)
-                .accessibilityHidden(true)
-            Text(title)
-                .font(.largeTitle.weight(.bold))
-                .multilineTextAlignment(.center)
-            Text(message)
-                .font(.body)
-                .foregroundStyle(.secondary)
-                .multilineTextAlignment(.center)
-                .fixedSize(horizontal: false, vertical: true)
-            VStack(spacing: 16, content: actions)
-            Spacer(minLength: 12)
+        ScrollView {
+            VStack(spacing: 28) {
+                VStack(spacing: 20) {
+                    Image(systemName: symbol)
+                        .font(.system(size: 56, weight: .regular))
+                        .foregroundStyle(.tint)
+                        .frame(height: 84)
+                        .accessibilityHidden(true)
+                    Text(title)
+                        .font(.largeTitle.weight(.bold))
+                        .multilineTextAlignment(.center)
+                        .accessibilityAddTraits(.isHeader)
+                    Text(message)
+                        .font(.body)
+                        .foregroundStyle(.secondary)
+                        .multilineTextAlignment(.center)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                VStack(spacing: 18, content: actions)
+                    .controlSize(.large)
+                    .frame(maxWidth: .infinity)
+                    .padding(step == 0 ? 0 : 24)
+                    .background {
+                        if step != 0 {
+                            RoundedRectangle(cornerRadius: 24).fill(Color(uiColor: .secondarySystemGroupedBackground))
+                        }
+                    }
+            }
+            .frame(maxWidth: 500)
+            .padding(.horizontal, 24)
+            .padding(.top, 36)
+            .padding(.bottom, 28)
+            .frame(maxWidth: .infinity)
         }
-        .padding(.horizontal, 32)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .scrollBounceBehavior(.basedOnSize)
     }
 
     private func finishSignIn() {

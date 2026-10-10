@@ -371,25 +371,9 @@ struct HomeView: View {
         defer {
             if githubScanGeneration == generation { isCheckingGitHubUpdates = false }
         }
-        let configurationStore = GitHubUpdateConfigurationStore()
-        let service = GitHubUpdateService()
-        var candidates: [GitHubUpdateCandidate] = []
-        var didFailCheck = false
-        for app in filteredInstalledApps {
-            let configuration: GitHubUpdateConfiguration?
-            do { configuration = try await configurationStore.configuration(for: app.bundleIdentifier) }
-            catch { didFailCheck = true; continue }
-            guard let configuration else { continue }
-            do {
-                let token = try GitHubCredentialStore().load(id: configuration.tokenID)
-                if let candidate = try await service.candidate(for: app, configuration: configuration, token: token) {
-                    candidates.append(candidate)
-                }
-            } catch {
-                didFailCheck = true
-                debugLog("[SideKick] GitHub update check failed for \(app.name): \(error.localizedDescription)")
-            }
-        }
+        let result = await GitHubUpdateScanner.scan(filteredInstalledApps)
+        let candidates = result.candidates
+        let didFailCheck = result.didFail
         guard githubScanGeneration == generation else { return }
         await environment.githubUpdateDownloads.restoreQueuedFiles(for: candidates, ipaImportStore: environment.ipaImportStore)
         guard githubScanGeneration == generation else { return }

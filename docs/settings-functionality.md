@@ -25,3 +25,12 @@ This audit follows each SideKick control to the pinned SideStore implementation.
 | GitHub tokens | Named tokens are validated and kept in Keychain. Each app can select a default token and each GitHub download can override it. GitHub repository, Contents, and Actions permissions still determine access. |
 
 The integration patch also cleans pipeline staging in a `defer` so an error or cancellation does not bypass the success-only cleanup step. Owned staging directories record their process ID, allowing startup cleanup to distinguish abandoned work from operations in the current process.
+
+
+## Update checks, account recovery and storage
+
+The daily refresh App Intent and native background refresh callback both call `GitHubUpdateScanner`. It uses each app's selected token and update baseline, then posts notifications for newly detected builds. The shortcut scans before daily refresh deduplication and before attempting the local tunnel. Background execution remains subject to iOS; notification permission is required. Notification history prevents duplicate alerts for the same build after dismissal.
+
+`SigningAccountStore` stores non-secret account/team metadata in the private `SigningAccounts.json` catalogue and keeps all session secrets in its existing Keychain vault. Known missing Core Data account/team records can be recovered; explicitly removed accounts stay removed. A failed read retains the last list, exposes retry, and offers sign-in recovery. Setup completion is persisted so a missing session later directs users to Accounts instead of treating every update as a first install. Different signing teams or app containers cannot inherit protected Keychain secrets.
+
+Storage now counts the complete app container and any accessible App Group, including hidden files, allocated file sizes, database WALs, logs, caches and all temporary files. Folder pages expose the breakdown. Diagnostic output is capped at 5 MiB per active log and 10 MiB of retained older logs. Cleanup clears URL cache responses and retains the existing conservative orphan/pipeline pruning. iOS Storage accounting may differ or update later; device measurements are still needed to identify any remaining large directories.

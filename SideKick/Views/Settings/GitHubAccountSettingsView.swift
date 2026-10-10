@@ -35,7 +35,7 @@ struct GitHubAccountSettingsView: View {
             }
             Section {
                 NavigationLink {
-                    GitHubTokenPickerView(selection: $defaultID, includesDefault: false)
+                    GitHubDefaultTokenSettingsView(selection: $defaultID)
                 } label: {
                     LabeledContent("Default Token", value: credentials.first { $0.id == defaultID }?.label ?? "Public access")
                 }
@@ -124,57 +124,6 @@ struct GitHubTokenEditorView: View {
             try GitHubCredentialStore().save(label: label.trimmingCharacters(in: .whitespacesAndNewlines), username: username, token: savedToken, id: credential?.id)
             dismiss()
         } catch { errorMessage = error.localizedDescription }
-    }
-}
-
-struct GitHubTokenPickerView: View {
-    @Binding var selection: String?
-    var includesDefault = true
-    @Environment(\.dismiss) private var dismiss
-    @State private var credentials: [GitHubCredentialStore.Credential] = []
-    @State private var errorMessage: String?
-
-    var body: some View {
-        List {
-            Section {
-                if includesDefault { row("Use Default Token", subtitle: "Uses the default in Settings", id: nil, symbol: "key") }
-                row("Public Access", subtitle: "No token; public releases only", id: includesDefault ? GitHubCredentialStore.publicAccessID : nil, symbol: "globe")
-                ForEach(credentials) { credential in
-                    row(credential.label, subtitle: credential.username.isEmpty ? "Saved token" : "@\(credential.username)", id: credential.id, symbol: "key.fill")
-                }
-            }
-            Section {
-                NavigationLink { GitHubAccountSettingsView() } label: {
-                    Label("Manage GitHub Tokens", systemImage: "person.crop.circle.badge.plus")
-                }
-            }
-            if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
-        }
-        .navigationTitle("Choose GitHub Token")
-        .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            do { credentials = try GitHubCredentialStore().all() }
-            catch { errorMessage = error.localizedDescription }
-        }
-    }
-
-    private func row(_ title: String, subtitle: String, id: String?, symbol: String) -> some View {
-        SwiftUI.Button {
-            selection = id
-            dismiss()
-        } label: {
-            HStack {
-                Label {
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(title).foregroundStyle(.primary)
-                        Text(subtitle).font(.subheadline).foregroundStyle(.secondary)
-                    }
-                } icon: { Image(systemName: symbol) }
-                Spacer()
-                if selection == id { Image(systemName: "checkmark").foregroundStyle(.tint) }
-            }
-        }
-        .fullWidthListSeparators()
     }
 }
 

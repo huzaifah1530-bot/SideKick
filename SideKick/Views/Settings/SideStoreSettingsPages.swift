@@ -248,8 +248,8 @@ struct AnisetteSettingsView: View {
 struct SettingsStorageView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var importedApps: [ImportedIPA] = []
-    @State private var managedBytes: Int64 = 0
     @State private var storageUsage = SideKickStorageUsage()
+    @State private var isMeasuring = false
     @State private var isCleaning = false
     @State private var isConfirmingClear = false
     @State private var errorMessage: String?
@@ -257,9 +257,27 @@ struct SettingsStorageView: View {
     var body: some View {
         List {
             Section {
+                HStack {
+                    Text("Documents & Data")
+                    Spacer()
+                    if isMeasuring { ProgressView() }
+                    else { Text(storageUsage.formatted(storageUsage.totalContainer)).foregroundStyle(.secondary) }
+                }
+                ForEach(storageUsage.directories) { directory in
+                    NavigationLink {
+                        StorageDirectoryDetailView(directory: directory)
+                    } label: {
+                        LabeledContent(directory.name, value: storageUsage.formatted(directory.bytes))
+                    }
+                    .fullWidthListSeparators()
+                }
+            } header: { Text("All App Data") } footer: {
+                Text("Includes hidden files, databases, logs, caches and temporary downloads. Tap a folder to see what takes space. iOS Storage may update later or count shared storage differently.")
+            }
+            Section {
                 LabeledContent("Items", value: "\(importedApps.count)")
-                LabeledContent("Downloaded IPA copies", value: ByteCountFormatter.string(fromByteCount: managedBytes, countStyle: .file))
-                if managedBytes > 0 {
+                LabeledContent("Downloaded IPA copies", value: storageUsage.formatted(storageUsage.importedIPAs))
+                if storageUsage.importedIPAs > 0 {
                     SwiftUI.Button("Remove downloaded IPA copies", role: .destructive) {
                         isConfirmingClear = true
                     }
@@ -307,16 +325,11 @@ struct SettingsStorageView: View {
 
     @MainActor
     private func reload() async {
+        guard !isMeasuring else { return }
+        isMeasuring = true
+        defer { isMeasuring = false }
         do {
             importedApps = try await environment.ipaImportStore.importedApps()
-            let directory = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-                .appendingPathComponent("ImportedIPAs", isDirectory: true)
-            managedBytes = importedApps.compactMap { app -> Int64? in
-                guard let fileName = app.fileName,
-                      let values = try? directory.appendingPathComponent(fileName).resourceValues(forKeys: [.fileSizeKey]),
-                      let size = values.fileSize else { return nil }
-                return Int64(size)
-            }.reduce(0, +)
             storageUsage = await SideKickStorageUsage.measure()
         } catch {
             errorMessage = error.localizedDescription
@@ -329,6 +342,7 @@ struct SettingsStorageView: View {
             for app in importedApps where app.fileName != nil {
                 try await environment.ipaImportStore.delete(app)
             }
+            try await environment.ipaImportStore.cleanupOrphanedManagedIPAs()
             await reload()
         } catch {
             errorMessage = error.localizedDescription
@@ -341,10 +355,49 @@ struct SettingsStorageView: View {
         isCleaning = true
         defer { isCleaning = false }
         do {
+            URLCache.shared.removeAllCachedResponses()
             await environment.ipaImportStore.cleanupAbandonedTemporaryIPAImports()
             try await environment.ipaImportStore.cleanupOrphanedManagedIPAs()
             await SideStoreOperationService.pruneUnusedCaches()
             await reload()
         } catch { errorMessage = error.localizedDescription }
+    }
+}
+
+struct StorageDirectoryDetailView: View {
+    let directory: StorageDirectoryUsage
+    @State private var entries: [StorageDirectoryUsage] = []
+    @State private var isLoading = true
+
+    var body: some View {
+        List {
+            if isLoading {
+                HStack { Spacer(); ProgressView("Measuring…"); Spacer() }
+            } else if entries.isEmpty {
+                ContentUnavailableView("No Files", systemImage: "folder")
+            } else {
+                ForEach(entries) { entry in
+                    if (try? entry.url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true {
+                        NavigationLink { StorageDirectoryDetailView(directory: entry) } label: {
+                            LabeledContent(entry.name, value: ByteCountFormatter.string(fromByteCount: entry.bytes, countStyle: .file))
+                        }
+                        .fullWidthListSeparators()
+                    } else {
+                        LabeledContent(entry.name, value: ByteCountFormatter.string(fromByteCount: entry.bytes, countStyle: .file))
+                            .fullWidthListSeparators()
+                    }
+                }
+            }
+        }
+        .navigationTitle(directory.name)
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await reload() }
+        .refreshable { await reload() }
+    }
+
+    private func reload() async {
+        isLoading = true
+        entries = await SideKickStorageUsage.children(of: directory.url)
+        isLoading = false
     }
 }

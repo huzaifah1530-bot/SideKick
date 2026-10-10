@@ -180,6 +180,7 @@ actor IPAImportStore {
     }
 
     func importManagedIPA(from sourceURL: URL, expectedBundleIdentifiers: Set<String>, updateKey: String? = nil, repositoryURL: String? = nil) throws -> ImportedIPA {
+        try Task.checkCancellation()
         let metadata = try readMetadata(from: sourceURL)
         let expected = expectedBundleIdentifiers.map { $0.lowercased() }
         guard expected.contains(metadata.bundleIdentifier.lowercased()) else {
@@ -202,6 +203,7 @@ actor IPAImportStore {
                 githubUpdateKey: updateKey,
                 githubRepositoryURL: repositoryURL
             )
+            try Task.checkCancellation()
             try saveImportedIPA(app)
             return app
         } catch {

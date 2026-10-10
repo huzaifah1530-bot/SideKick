@@ -228,8 +228,7 @@ actor GitHubUpdateService {
         request.setValue(candidate.source == .latestRelease ? "application/octet-stream" : "application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("SideKick iOS app", forHTTPHeaderField: "User-Agent")
         if let token, !token.isEmpty { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
-        let delegate = GitHubDownloadProgressDelegate(onProgress: onProgress)
-        let (downloadURL, response) = try await URLSession.shared.download(for: request, delegate: delegate)
+        let (downloadURL, response) = try await ProgressFileDownload(onProgress: onProgress).download(request)
         guard let response = response as? HTTPURLResponse else {
             try? FileManager.default.removeItem(at: downloadURL)
             throw GitHubUpdateError.downloadFailed
@@ -328,41 +327,6 @@ actor GitHubUpdateService {
         return (pieces[0], name)
     }
 
-}
-
-private final class GitHubDownloadProgressDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
-    private let onProgress: @Sendable (GitHubDownloadProgress) -> Void
-
-    init(onProgress: @escaping @Sendable (GitHubDownloadProgress) -> Void) {
-        self.onProgress = onProgress
-    }
-
-    func urlSession(_ session: URLSession, task: URLSessionTask,
-                    willPerformHTTPRedirection response: HTTPURLResponse,
-                    newRequest request: URLRequest,
-                    completionHandler: @escaping (URLRequest?) -> Void) {
-        guard request.url?.scheme == "https" else { completionHandler(nil); return }
-        var redirected = request
-        if request.url?.host != "api.github.com" {
-            redirected.setValue(nil, forHTTPHeaderField: "Authorization")
-        }
-        completionHandler(redirected)
-    }
-
-    func urlSession(
-        _ session: URLSession,
-        downloadTask: URLSessionDownloadTask,
-        didWriteData bytesWritten: Int64,
-        totalBytesWritten: Int64,
-        totalBytesExpectedToWrite: Int64
-    ) {
-        onProgress(GitHubDownloadProgress(
-            bytesWritten: totalBytesWritten,
-            totalBytesExpected: totalBytesExpectedToWrite > 0 ? totalBytesExpectedToWrite : nil
-        ))
-    }
-
-    func urlSession(_ session: URLSession, downloadTask: URLSessionDownloadTask, didFinishDownloadingTo location: URL) { }
 }
 
 struct GitHubDownloadProgress: Sendable {

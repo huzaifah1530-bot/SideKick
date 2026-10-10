@@ -10,6 +10,13 @@ struct AccountsView: View {
     var body: some View {
         NavigationStack {
             List {
+                if let loadError = accountStore.loadError {
+                    Section {
+                        Label(loadError, systemImage: "exclamationmark.triangle")
+                            .foregroundStyle(.secondary)
+                        SwiftUI.Button("Try Again") { Task { await accountStore.reload() } }
+                    }
+                }
                 if accountStore.accounts.isEmpty {
                     ContentUnavailableView(
                         "No Apple IDs",
@@ -70,6 +77,10 @@ struct AccountsView: View {
                 Text(account.teamName.isEmpty ? account.teamType : account.teamName)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
+                if !account.hasSavedSession || account.rawTeamType == nil {
+                    Label("Sign in required", systemImage: "person.crop.circle.badge.exclamationmark")
+                        .font(.subheadline).foregroundStyle(.orange)
+                }
             }
             Spacer()
         }
@@ -101,6 +112,8 @@ private struct SigningAccountDetailView: View {
     @State private var inventory: AppleDeveloperInventory?
     @State private var inventoryError: String?
     @State private var isLoadingInventory = false
+    @State private var isShowingReconnect = false
+    @State private var reconnectCredentials: (appleID: String, password: String)?
 
     private var currentAccount: SigningAccountSummary {
         accountStore.accounts.first(where: { $0.id == account.id }) ?? account
@@ -115,7 +128,11 @@ private struct SigningAccountDetailView: View {
             }
 
             Section {
-                if !currentAccount.hasSavedSession {
+                if !currentAccount.hasSavedSession || currentAccount.rawTeamType == nil {
+                    SwiftUI.Button { isShowingReconnect = true } label: {
+                        Label("Sign In Again", systemImage: "person.crop.circle.badge.checkmark")
+                    }
+                    .disabled(accountStore.isWorking)
                     Text("Sign in again to use this account on this device.")
                         .font(.footnote)
                         .foregroundStyle(.secondary)
@@ -189,6 +206,9 @@ private struct SigningAccountDetailView: View {
         .background(Color(uiColor: .systemGroupedBackground))
         .navigationTitle("Apple ID")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $isShowingReconnect, onDismiss: reconnect) {
+            AppleIDSignInSheet { appleID, password in reconnectCredentials = (appleID, password) }
+        }
         .task { await loadInventory() }
         .refreshable { await loadInventory() }
         .confirmationDialog("Remove this Apple ID?", isPresented: $isConfirmingRemoval, titleVisibility: .visible) {
@@ -206,7 +226,7 @@ private struct SigningAccountDetailView: View {
         } message: {
             Text("Its saved signing session will also be removed from this device.")
         }
-        .alert("Couldn’t remove Apple ID", isPresented: Binding(
+        .alert("Apple Account", isPresented: Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
         )) {
@@ -216,8 +236,23 @@ private struct SigningAccountDetailView: View {
         }
     }
 
+    private func reconnect() {
+        guard let credentials = reconnectCredentials else { return }
+        reconnectCredentials = nil
+        Task {
+            do {
+                guard credentials.appleID.caseInsensitiveCompare(account.email) == .orderedSame else {
+                    errorMessage = "Sign in with \(account.email) to reconnect this account. Use Add Apple ID for another account."
+                    return
+                }
+                try await accountStore.addAccount(appleID: credentials.appleID, password: credentials.password)
+                await loadInventory()
+            } catch { errorMessage = error.localizedDescription }
+        }
+    }
+
     private func loadInventory() async {
-        guard currentAccount.hasSavedSession else { return }
+        guard currentAccount.hasSavedSession, currentAccount.rawTeamType != nil else { return }
         isLoadingInventory = true
         inventoryError = nil
         defer { isLoadingInventory = false }
