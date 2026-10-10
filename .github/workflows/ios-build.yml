@@ -11,6 +11,10 @@ on:
       - ".github/workflows/ios-build.yml"
   workflow_dispatch: {}
 
+concurrency:
+  group: ios-build-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   build-ipa:
     name: Build unsigned SideKick IPA
@@ -53,6 +57,12 @@ jobs:
       - name: Isolate upstream SwiftUI settings expression
         run: git -C Vendor/SideStore apply ../../patches/sidestore-view-body-compile.patch
 
+      - name: Cache Swift package checkouts
+        uses: actions/cache@v4
+        with:
+          path: ${{ runner.temp }}/SourcePackages
+          key: spm-${{ hashFiles('Vendor/SideStore/**/Package.resolved') }}
+
       - name: Build integrated SideKick app for iOS
         run: |
           # Each CI run stamps a higher build number so SideKick can test update detection.
@@ -62,6 +72,8 @@ jobs:
             -sdk iphoneos \
             -destination "generic/platform=iOS" \
             -derivedDataPath build \
+            -clonedSourcePackagesDirPath "$RUNNER_TEMP/SourcePackages" \
+            COMPILER_INDEX_STORE_ENABLE=NO \
             CODE_SIGNING_ALLOWED=NO \
             CODE_SIGNING_REQUIRED=NO \
             CODE_SIGN_IDENTITY="" \
