@@ -110,11 +110,11 @@ struct InstallSigningSettingsView: View {
                 Toggle("Prefer the resigned IPA", isOn: $preferResignedIPA)
                 Toggle("Save a copy of resigned apps", isOn: $exportResignedApp)
                 Toggle("Disable SideStore app limit", isOn: $disableAppLimit)
-                    .disabled(!isMacDirtyCowSupported && ProcessInfo().sparseRestorePatched)
+                    .disabled(!UserDefaults.standard.isCowExploitSupported && ProcessInfo().sparseRestorePatched)
             } header: {
                 Text("Signing")
             } footer: {
-                Text(!isMacDirtyCowSupported && ProcessInfo().sparseRestorePatched
+                Text(!UserDefaults.standard.isCowExploitSupported && ProcessInfo().sparseRestorePatched
                     ? "The app limit bypass is unavailable on this iOS version. Saving resigned apps keeps an extra IPA in Files → SideKick → ResignedApps."
                     : "The app limit option depends on iOS and account type. Saving resigned apps keeps an extra IPA in Files → SideKick → ResignedApps.")
             }

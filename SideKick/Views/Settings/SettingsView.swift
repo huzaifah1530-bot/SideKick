@@ -59,7 +59,7 @@ struct SettingsView: View {
                     NavigationLink {
                         GitHubAccountSettingsView()
                     } label: {
-                        Label("GitHub Account", systemImage: "chevron.left.forwardslash.chevron.right")
+                        Label("GitHub Tokens", systemImage: "chevron.left.forwardslash.chevron.right")
                     }
                     .fullWidthListSeparators()
                 }

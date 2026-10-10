@@ -103,6 +103,16 @@ final class SideStoreOperationService {
                 }
             }
         }
+        if let origin = ipa.githubImportConfiguration {
+            let installed = await installedApps()
+            let bundleID = installed.first { $0.updateMatchingBundleIdentifiers.contains(ipa.bundleIdentifier.lowercased()) }?.bundleIdentifier ?? ipa.bundleIdentifier
+            let configuration = GitHubUpdateConfiguration(bundleIdentifier: bundleID,
+                repositoryURL: origin.repositoryURL, source: origin.source,
+                workflowFile: origin.workflowFile, branch: origin.branch, assetName: origin.assetName,
+                baselineUpdateKey: origin.baselineUpdateKey, lastInstalledUpdateKey: origin.lastInstalledUpdateKey,
+                tokenID: origin.tokenID)
+            try await GitHubUpdateConfigurationStore().save(configuration)
+        }
         await Self.pruneUnusedCaches()
         await ExpirationNotificationScheduler.update()
     }

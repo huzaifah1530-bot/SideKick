@@ -373,7 +373,6 @@ struct HomeView: View {
         }
         let configurationStore = GitHubUpdateConfigurationStore()
         let service = GitHubUpdateService()
-        let token = try? GitHubCredentialStore().load()
         var candidates: [GitHubUpdateCandidate] = []
         var didFailCheck = false
         for app in filteredInstalledApps {
@@ -382,6 +381,7 @@ struct HomeView: View {
             catch { didFailCheck = true; continue }
             guard let configuration else { continue }
             do {
+                let token = try GitHubCredentialStore().load(id: configuration.tokenID)
                 if let candidate = try await service.candidate(for: app, configuration: configuration, token: token) {
                     candidates.append(candidate)
                 }

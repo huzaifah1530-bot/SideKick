@@ -70,6 +70,8 @@ struct GitHubUpdateDetailView: View {
     @State private var account: SigningAccountSummary?
     @State private var eligibleAccounts: [SigningAccountSummary] = []
     @State private var isConfirmingInstalledBuild = false
+    @State private var tokenID: String?
+    @State private var isLoadingToken = true
     @State private var isConfirmingSkip = false
 
     private let configurationStore = GitHubUpdateConfigurationStore()
@@ -82,6 +84,7 @@ struct GitHubUpdateDetailView: View {
 
     var body: some View {
         List {
+            Section { GitHubTokenSelectionLink(selection: $tokenID).disabled(downloadJob?.isDownloading == true) }
             if let errorMessage {
                 Section {
                     Label(errorMessage, systemImage: "exclamationmark.triangle")
@@ -250,7 +253,13 @@ struct GitHubUpdateDetailView: View {
                 $0.accountIdentifier == app.accountIdentifier
             } ?? eligibleAccounts.first
         }
-        .onAppear { Task { await validateDownload() } }
+        .task {
+            do {
+                tokenID = try await configurationStore.configuration(for: app.bundleIdentifier)?.tokenID
+            } catch { errorMessage = error.localizedDescription }
+            isLoadingToken = false
+            await validateDownload()
+        }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await validateDownload() } }
         }
@@ -273,13 +282,16 @@ struct GitHubUpdateDetailView: View {
 
     @MainActor
     private func startDownload() {
-        let token = try? GitHubCredentialStore().load()
-        environment.githubUpdateDownloads.start(
-            candidate: candidate,
-            expectedBundleIdentifiers: expectedUpdateBundleIdentifiers,
-            ipaImportStore: environment.ipaImportStore,
-            token: token
-        )
+        guard !isLoadingToken else { return }
+        do {
+            let token = try GitHubCredentialStore().load(id: tokenID)
+            environment.githubUpdateDownloads.start(
+                candidate: candidate,
+                expectedBundleIdentifiers: expectedUpdateBundleIdentifiers,
+                ipaImportStore: environment.ipaImportStore,
+                token: token
+            )
+        } catch { errorMessage = error.localizedDescription }
     }
 
     @MainActor

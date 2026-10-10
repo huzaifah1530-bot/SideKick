@@ -8,7 +8,7 @@ enum GitHubUpdateSource: String, Codable, CaseIterable, Identifiable, Sendable {
     var title: String { self == .latestRelease ? "Latest release" : "Actions artifact" }
 }
 
-struct GitHubUpdateConfiguration: Codable, Identifiable, Equatable, Sendable {
+struct GitHubUpdateConfiguration: Codable, Identifiable, Hashable, Sendable {
     var id: String { bundleIdentifier }
     let bundleIdentifier: String
     var repositoryURL: String
@@ -19,6 +19,7 @@ struct GitHubUpdateConfiguration: Codable, Identifiable, Equatable, Sendable {
     var baselineUpdateKey: String? = nil
     var lastInstalledUpdateKey: String?
     var dismissedUpdateKey: String? = nil
+    var tokenID: String? = nil
 }
 
 struct GitHubUpdateHistoryEntry: Identifiable, Hashable, Sendable {

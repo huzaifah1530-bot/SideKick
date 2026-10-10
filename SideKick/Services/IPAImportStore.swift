@@ -162,6 +162,23 @@ actor IPAImportStore {
         return app
     }
 
+    func importRepositoryIPA(from sourceURL: URL, choice: GitHubImportChoice, tokenID: String?) throws -> ImportedIPA {
+        let metadata = try readMetadata(from: sourceURL)
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        let fileName = "repository-import-\(UUID().uuidString).ipa"
+        let destination = directory.appendingPathComponent(fileName)
+        do {
+            try fileManager.copyItem(at: sourceURL, to: destination)
+            return ImportedIPA(bundleIdentifier: metadata.bundleIdentifier, name: metadata.name,
+                version: metadata.version, fileName: fileName, sourceBookmarkData: nil,
+                sourceURLString: nil, importedAt: .now, iconData: metadata.iconData,
+                githubImportConfiguration: choice.configuration(bundleIdentifier: metadata.bundleIdentifier, tokenID: tokenID))
+        } catch {
+            try? fileManager.removeItem(at: destination)
+            throw error
+        }
+    }
+
     func importManagedIPA(from sourceURL: URL, expectedBundleIdentifiers: Set<String>, updateKey: String? = nil, repositoryURL: String? = nil) throws -> ImportedIPA {
         let metadata = try readMetadata(from: sourceURL)
         let expected = expectedBundleIdentifiers.map { $0.lowercased() }

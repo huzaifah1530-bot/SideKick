@@ -5,6 +5,7 @@ struct GitHubUpdateSettingsView: View {
 
     @Environment(\.dismiss) private var dismiss
     @Environment(AppEnvironment.self) private var environment
+    @State private var tokenID: String?
     @State private var repositoryURL = ""
     @State private var source: GitHubUpdateSource = .latestRelease
     @State private var workflowFile = "build.yml"
@@ -35,11 +36,12 @@ struct GitHubUpdateSettingsView: View {
                     .keyboardType(.URL)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
+                GitHubTokenSelectionLink(selection: $tokenID)
                 Picker("Update source", selection: $source) {
                     ForEach(GitHubUpdateSource.allCases) { option in Text(option.title).tag(option) }
                 }
                 if source == .actionsArtifact {
-                    TextField("Workflow file", text: $workflowFile)
+                    TextField("Workflow file or ID", text: $workflowFile)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                     TextField("Branch", text: $branch)
@@ -52,7 +54,7 @@ struct GitHubUpdateSettingsView: View {
             } header: {
                 Text("Update source")
             } footer: {
-                Text("SideKick checks this public GitHub repository for a newer IPA. A matching update is shown for your approval; it is never downloaded in the background. For Actions, the selected workflow must publish the IPA as a downloadable artifact.")
+                Text("SideKick checks this GitHub repository for a newer IPA. A matching update is shown for your approval; it is never downloaded in the background. For Actions, the selected workflow must publish the IPA as a downloadable artifact. Use * in the asset name for changing version numbers.")
             }
 
             if !repositoryURL.isEmpty {
@@ -128,6 +130,7 @@ struct GitHubUpdateSettingsView: View {
     @MainActor
     private func load() async {
         guard let config = try? await store.configuration(for: app.bundleIdentifier) else { return }
+        tokenID = config.tokenID
         repositoryURL = config.repositoryURL
         source = config.source
         workflowFile = config.workflowFile
@@ -157,7 +160,8 @@ struct GitHubUpdateSettingsView: View {
                 branch: branch,
                 assetName: assetName,
                 baselineUpdateKey: selectedBaselineKey,
-                lastInstalledUpdateKey: sameBaseline ? previous?.lastInstalledUpdateKey : nil
+                lastInstalledUpdateKey: sameBaseline ? previous?.lastInstalledUpdateKey : nil,
+                tokenID: tokenID
             ))
             dismiss()
         } catch { message = error.localizedDescription; showingMessage = true }
@@ -179,7 +183,7 @@ struct GitHubUpdateSettingsView: View {
             lastInstalledUpdateKey: nil
         )
         do {
-            let token = try? GitHubCredentialStore().load()
+            let token = try GitHubCredentialStore().load(id: tokenID)
             history = try await GitHubUpdateService().history(for: configuration, token: token)
             if selectedBaselineKey == nil {
                 let storedKey = configuration.lastInstalledUpdateKey ?? configuration.baselineUpdateKey

@@ -102,6 +102,8 @@ struct URLImportView: View {
     @State private var importedApp: ImportedIPA?
     @State private var importedAsUpdate = false
     @State private var ipaAwaitingUpdateChoice: ImportedIPA?
+    @State private var githubRepositoryURL: URL?
+    @State private var showingGitHubRepository = false
     @State private var didStartIncomingImport = false
 
     var body: some View {
@@ -113,7 +115,7 @@ struct URLImportView: View {
                     .keyboardType(.URL)
                     .textContentType(.URL)
 
-                Text("Paste a direct HTTPS link to an IPA, or open a SideKick share link. Some file hosts provide a web page rather than a direct download; SideKick will tell you if the response isn’t an IPA.")
+                Text("Paste a GitHub repository URL, a direct HTTPS link to an IPA, or a SideKick share link. Some file hosts provide a web page rather than a direct download; SideKick will tell you if the response isn’t an IPA.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             } header: {
@@ -160,7 +162,7 @@ struct URLImportView: View {
                     SwiftUI.Button {
                         Task { await download() }
                     } label: {
-                        Label("Download IPA", systemImage: "arrow.down.circle")
+                        Label("Continue", systemImage: "arrow.down.circle")
                             .fontWeight(.semibold)
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
@@ -182,6 +184,14 @@ struct URLImportView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .navigationDestination(isPresented: $showingGitHubRepository) {
+            if let githubRepositoryURL {
+                GitHubRepositoryImportView(repositoryURL: githubRepositoryURL) { app in
+                    showingGitHubRepository = false
+                    try await acceptPreparedIPA(app)
+                }
+            }
+        }
         .navigationTitle("Import from URL")
         .navigationBarTitleDisplayMode(.inline)
         .alert(
@@ -192,7 +202,12 @@ struct URLImportView: View {
             )
         ) {
             SwiftUI.Button("Queue for Update") { Task { await queuePendingUpdate() } }
-            SwiftUI.Button("Cancel", role: .cancel) { ipaAwaitingUpdateChoice = nil }
+            SwiftUI.Button("Cancel", role: .cancel) {
+                if let app = ipaAwaitingUpdateChoice, app.githubImportConfiguration != nil {
+                    Task { try? await environment.ipaImportStore.delete(app) }
+                }
+                ipaAwaitingUpdateChoice = nil
+            }
         } message: {
             Text("Queue this IPA as the update for the installed app?")
         }
@@ -213,7 +228,9 @@ struct URLImportView: View {
         defer { isDownloading = false }
 
         do {
-            guard let pastedURL = URL(string: linkText.trimmingCharacters(in: .whitespacesAndNewlines)) else {
+            let input = linkText.trimmingCharacters(in: .whitespacesAndNewlines)
+            let normalized = input.lowercased().hasPrefix("github.com/") || input.lowercased().hasPrefix("www.github.com/") ? "https://" + input : input
+            guard let pastedURL = URL(string: normalized) else {
                 throw AppSharingError.invalidShareLink
             }
             let sourceURL: URL
@@ -228,6 +245,13 @@ struct URLImportView: View {
                 }
                 sourceURL = pastedURL
             }
+            if ["github.com", "www.github.com"].contains(sourceURL.host?.lowercased() ?? ""),
+               sourceURL.path.split(separator: "/").count >= 2,
+               !sourceURL.path.lowercased().hasSuffix(".ipa") {
+                githubRepositoryURL = sourceURL
+                showingGitHubRepository = true
+                return
+            }
             let (downloadedURL, response) = try await BuzzheavierClient().download(from: sourceURL) { progress in
                 Task { @MainActor in downloadProgress = progress }
             }
@@ -237,16 +261,7 @@ struct URLImportView: View {
             }
 
             let app = try await environment.ipaImportStore.prepareIPA(from: downloadedURL, remoteSourceURL: sourceURL)
-            let installedApps = await SideStoreOperationService(
-                accountStore: SigningAccountStore(),
-                ipaStore: environment.ipaImportStore
-            ).installedApps()
-            let installedIDs = Set(installedApps.flatMap(\.updateMatchingBundleIdentifiers))
-            if installedIDs.contains(app.bundleIdentifier.lowercased()) {
-                ipaAwaitingUpdateChoice = app
-            } else {
-                try await savePreparedIPA(app, asUpdate: false)
-            }
+            try await acceptPreparedIPA(app)
         } catch let error as IPAImportError {
             switch error {
             case .invalidArchive, .missingAppBundle, .missingBundleIdentifier, .notAnIPA:
@@ -256,6 +271,17 @@ struct URLImportView: View {
             }
         } catch {
             errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
+    private func acceptPreparedIPA(_ app: ImportedIPA) async throws {
+        let installedApps = await SideStoreOperationService(accountStore: SigningAccountStore(), ipaStore: environment.ipaImportStore).installedApps()
+        let installedIDs = Set(installedApps.flatMap(\.updateMatchingBundleIdentifiers))
+        if installedIDs.contains(app.bundleIdentifier.lowercased()) {
+            ipaAwaitingUpdateChoice = app
+        } else {
+            try await savePreparedIPA(app, asUpdate: false)
         }
     }
 
