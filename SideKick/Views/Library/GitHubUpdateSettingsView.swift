@@ -69,12 +69,21 @@ struct GitHubUpdateSettingsView: View {
                         }
                         .disabled(isLoadingHistory)
                     } else {
-                        Picker("Version currently installed", selection: $selectedBaselineKey) {
-                            Text("Choose a version").tag(String?.none)
-                            ForEach(history) { item in
-                                Text(historyLabel(item)).tag(Optional(item.key))
-                            }
+                        NavigationLink {
+                            GitHubBaselineSelectionView(
+                                history: history,
+                                selectedKey: $selectedBaselineKey,
+                                recommendedKey: recommendedBaselineKey
+                            )
+                        } label: {
+                            LabeledContent(
+                                "Version currently installed",
+                                value: selectedBaselineKey.flatMap { selectedKey in
+                                    history.first(where: { $0.key == selectedKey }).map(historyLabel)
+                                } ?? "Choose a version"
+                            )
                         }
+                        .fullWidthListSeparators()
                         if let recommendedBaselineKey,
                            let recommendation = history.first(where: { $0.key == recommendedBaselineKey }) {
                             Label("Suggested from the original IPA date: \(recommendation.title)", systemImage: "sparkles")
@@ -217,5 +226,91 @@ struct GitHubUpdateSettingsView: View {
         let parts = currentKey.split(separator: ":", omittingEmptySubsequences: false)
         guard parts.count == 4, parts[0] == "release" else { return nil }
         return "release:\(parts[2]):\(parts[3])"
+    }
+}
+
+private struct GitHubBaselineSelectionView: View {
+    let history: [GitHubUpdateHistoryEntry]
+    @Binding var selectedKey: String?
+    let recommendedKey: String?
+
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        List {
+            Section {
+                if let recommendedKey,
+                   let recommendation = history.first(where: { $0.key == recommendedKey }) {
+                    Button {
+                        select(recommendation)
+                    } label: {
+                        HStack(spacing: 12) {
+                            Image(systemName: "sparkles")
+                                .foregroundStyle(.tint)
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text("Suggested version")
+                                    .font(.body.weight(.medium))
+                                Text(historyLabel(recommendation))
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            if selectedKey == recommendation.key {
+                                Image(systemName: "checkmark")
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(.tint)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .fullWidthListSeparators()
+                }
+
+                ForEach(history) { item in
+                    Button {
+                        select(item)
+                    } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(item.title)
+                                    .font(.body.weight(.medium))
+                                if let date = item.date {
+                                    Text(date.formatted(date: .abbreviated, time: .omitted))
+                                        .font(.subheadline)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                            Spacer()
+                            if selectedKey == item.key {
+                                Image(systemName: "checkmark")
+                                    .fontWeight(.semibold)
+                                    .foregroundStyle(.tint)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .fullWidthListSeparators()
+                }
+            } header: {
+                Text("Available versions")
+            } footer: {
+                Text("Select the release or build that is currently installed. SideKick will only offer newer entries as updates.")
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Installed Version")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func select(_ item: GitHubUpdateHistoryEntry) {
+        selectedKey = item.key
+        dismiss()
+    }
+
+    private func historyLabel(_ item: GitHubUpdateHistoryEntry) -> String {
+        guard let date = item.date else { return item.title }
+        return "\(item.title) · \(date.formatted(date: .abbreviated, time: .omitted))"
     }
 }

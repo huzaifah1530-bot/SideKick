@@ -150,9 +150,13 @@ actor GitHubUpdateService {
         if let token, !token.isEmpty { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
         let delegate = GitHubDownloadProgressDelegate(onProgress: onProgress)
         let (downloadURL, response) = try await URLSession.shared.download(for: request, delegate: delegate)
-        guard let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else {
+        guard let response = response as? HTTPURLResponse else {
             try? FileManager.default.removeItem(at: downloadURL)
             throw GitHubUpdateError.downloadFailed
+        }
+        guard (200..<300).contains(response.statusCode) else {
+            try? FileManager.default.removeItem(at: downloadURL)
+            throw error(for: response)
         }
         if candidate.source == .latestRelease {
             return downloadURL
@@ -196,13 +200,27 @@ actor GitHubUpdateService {
         let (data, response) = try await URLSession.shared.data(for: request)
         guard let response = response as? HTTPURLResponse else { throw GitHubUpdateError.unavailable }
         guard (200..<300).contains(response.statusCode) else {
-            if response.statusCode == 401 { throw GitHubUpdateError.invalidToken }
-            if response.statusCode == 404 { throw GitHubUpdateError.notFound }
-            if response.statusCode == 403 { throw GitHubUpdateError.rateLimited }
-            throw GitHubUpdateError.unavailable
+            throw error(for: response)
         }
         do { return try JSONDecoder().decode(T.self, from: data) }
         catch { throw GitHubUpdateError.invalidResponse }
+    }
+
+    private func error(for response: HTTPURLResponse) -> GitHubUpdateError {
+        switch response.statusCode {
+        case 401:
+            return .invalidToken
+        case 403:
+            if response.value(forHTTPHeaderField: "X-RateLimit-Remaining") == "0"
+                || response.value(forHTTPHeaderField: "Retry-After") != nil {
+                return .rateLimited
+            }
+            return .insufficientPermissions(response.value(forHTTPHeaderField: "X-Accepted-GitHub-Permissions"))
+        case 404:
+            return .notFound
+        default:
+            return .unavailable
+        }
     }
 
     private func parseRepository(_ value: String) throws -> (owner: String, name: String) {
@@ -249,14 +267,16 @@ struct GitHubDownloadProgress: Sendable {
 }
 
 enum GitHubUpdateError: LocalizedError {
-    case invalidRepository, invalidToken, notFound, rateLimited, unavailable, invalidResponse, downloadFailed, invalidArtifact, noIPAInArtifact
+    case invalidRepository, invalidToken, notFound, insufficientPermissions(String?), rateLimited, unavailable, invalidResponse, downloadFailed, invalidArtifact, noIPAInArtifact
     var errorDescription: String? {
         switch self {
-        case .invalidRepository: "Enter a public GitHub repository URL, such as https://github.com/owner/repository."
+        case .invalidRepository: "Enter a GitHub repository URL, such as https://github.com/owner/repository."
         case .invalidToken: "GitHub rejected this token. Check that it’s valid and has the required read-only repository and Actions access."
-        case .notFound: "GitHub could not find that public repository, release, workflow, or artifact. Check the app’s GitHub settings."
+        case .notFound: "GitHub couldn’t find that repository, release, workflow, or artifact. For a private repository, check that this token was created for its owner, includes this repository, and has been approved by the organization."
+        case .insufficientPermissions(let permissions):
+            "GitHub denied access to this resource. Grant the token the required read permission\(permissions.map { ": \($0)" } ?? " for the selected repository")."
         case .rateLimited: "GitHub temporarily limited update checks. Try again later."
-        case .unavailable: "GitHub is temporarily unavailable or the repository is private."
+        case .unavailable: "GitHub is temporarily unavailable. Try again later."
         case .invalidResponse: "GitHub returned update information SideKick couldn’t read."
         case .downloadFailed: "SideKick couldn’t download the GitHub update."
         case .invalidArtifact: "The GitHub Actions artifact is damaged or isn’t a valid ZIP archive."

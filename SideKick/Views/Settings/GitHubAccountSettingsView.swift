@@ -38,7 +38,7 @@ struct GitHubAccountSettingsView: View {
             } header: {
                 Text("GitHub account")
             } footer: {
-                Text("Optional for public repositories; needed for private repositories and to avoid low anonymous API limits. Create a fine-grained token with read-only access to repository contents and Actions. SideKick stores it in iOS Keychain and sends it only to api.github.com.")
+                Text("Optional for public repositories. For a private repository, create the token for the repository’s owner, include that repository, and grant Contents: read. Actions: read is also required for Actions builds. Organization tokens may need approval. SideKick stores the token in iOS Keychain and sends it only to api.github.com.")
             }
 
             Section {
