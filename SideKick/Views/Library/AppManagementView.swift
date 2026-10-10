@@ -10,6 +10,7 @@ struct AppManagementView: View {
     @State private var shareIPA: ImportedIPA?
     @State private var pendingUpdateIPA: ImportedIPA?
     @State private var errorMessage: String?
+    @State private var isConfirmingQueuedUpdateRemoval = false
 
     private let importedApp: ImportedIPA?
     private let installedApp: InstalledAppSummary?
@@ -158,6 +159,17 @@ struct AppManagementView: View {
                                 .font(.footnote)
                                 .foregroundStyle(.secondary)
                         }
+                        SwiftUI.Button("Remove Queued IPA", role: .destructive) {
+                            isConfirmingQueuedUpdateRemoval = true
+                        }
+                        .alert("Remove queued update?", isPresented: $isConfirmingQueuedUpdateRemoval) {
+                            SwiftUI.Button("Remove IPA", role: .destructive) {
+                                Task { await removeQueuedUpdate() }
+                            }
+                            SwiftUI.Button("Cancel", role: .cancel) { }
+                        } message: {
+                            Text("This removes the queued IPA from SideKick. The installed app will remain on your device.")
+                        }
                     } else {
                         SwiftUI.Button {
                             UIApplication.shared.open(InstalledApp.openAppURL(targetBundleIdentifier: installedApp.resignedBundleIdentifier))
@@ -227,11 +239,25 @@ struct AppManagementView: View {
 
     @MainActor
     private func reloadManagementState() async {
+        if let installedApp {
+            let matchingBundleIDs = installedApp.updateMatchingBundleIdentifiers
+            let imports = (try? await environment.ipaImportStore.importedApps()) ?? []
+            pendingUpdateIPA = imports.first {
+                $0.isUpdateQueued && matchingBundleIDs.contains($0.bundleIdentifier.lowercased())
+            }
+        }
         await accountStore.reload()
-        guard let installedApp else { return }
-        let matchingBundleIDs = installedApp.updateMatchingBundleIdentifiers
-        pendingUpdateIPA = (try? await environment.ipaImportStore.importedApps())?
-            .first { matchingBundleIDs.contains($0.bundleIdentifier.lowercased()) }
+    }
+
+    @MainActor
+    private func removeQueuedUpdate() async {
+        guard let pendingUpdateIPA else { return }
+        do {
+            try await environment.ipaImportStore.delete(pendingUpdateIPA)
+            self.pendingUpdateIPA = nil
+        } catch {
+            errorMessage = error.localizedDescription
+        }
     }
 
     @MainActor

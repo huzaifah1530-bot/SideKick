@@ -11,6 +11,11 @@ struct ImportedIPA: Codable, Identifiable, Hashable, Sendable {
     let importedAt: Date
     let iconData: Data?
     var sourceCreatedAt: Date? = nil
+    var isQueuedForUpdate: Bool? = nil
+
+    // Before queue state was persisted, every retained IPA matching an installed app
+    // came from the explicit "Queue for Update" choice.
+    var isUpdateQueued: Bool { isQueuedForUpdate ?? true }
 
     var formattedImportDate: String {
         importedAt.formatted(date: .abbreviated, time: .omitted)

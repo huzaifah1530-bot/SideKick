@@ -1,6 +1,10 @@
 import Foundation
 import ZIPFoundation
 
+extension Notification.Name {
+    static let sideKickImportedIPAsDidChange = Notification.Name("SideKick.ImportedIPAsDidChange")
+}
+
 actor IPAImportStore {
     private let fileManager: FileManager
     private let directory: URL
@@ -185,6 +189,7 @@ actor IPAImportStore {
         }
         entries.insert(app, at: 0)
         try save(entries)
+        NotificationCenter.default.post(name: .sideKickImportedIPAsDidChange, object: nil)
     }
 
     func fileURL(for app: ImportedIPA) async throws -> URL {
@@ -241,6 +246,7 @@ actor IPAImportStore {
         entries.removeAll { $0.bundleIdentifier == app.bundleIdentifier }
         try save(entries)
         removeLegacyStoredIPA(app)
+        NotificationCenter.default.post(name: .sideKickImportedIPAsDidChange, object: nil)
     }
 
     private func sourceURLCreationDate(_ url: URL) -> Date? {

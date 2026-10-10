@@ -241,7 +241,7 @@ struct URLImportView: View {
                 accountStore: SigningAccountStore(),
                 ipaStore: environment.ipaImportStore
             ).installedApps()
-            let installedIDs = Set(installedApps.flatMap { [$0.bundleIdentifier, $0.resignedBundleIdentifier] }.map { $0.lowercased() })
+            let installedIDs = Set(installedApps.flatMap(\.updateMatchingBundleIdentifiers))
             if installedIDs.contains(app.bundleIdentifier.lowercased()) {
                 ipaAwaitingUpdateChoice = app
             } else {
@@ -269,10 +269,12 @@ struct URLImportView: View {
 
     @MainActor
     private func savePreparedIPA(_ app: ImportedIPA, asUpdate: Bool) async throws {
-        try await environment.ipaImportStore.saveImportedIPA(app)
-        importedApp = app
+        var savedApp = app
+        savedApp.isQueuedForUpdate = asUpdate
+        try await environment.ipaImportStore.saveImportedIPA(savedApp)
+        importedApp = savedApp
         importedAsUpdate = asUpdate
-        await onImported(app)
+        await onImported(savedApp)
     }
 
 }

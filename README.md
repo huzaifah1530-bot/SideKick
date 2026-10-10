@@ -7,8 +7,11 @@ SideKick is a native SwiftUI iOS sideloading app. The existing SwiftUI screens a
 - The SideStore source is pinned as a recursive Git submodule at `Vendor/SideStore`.
 - The build uses SideStore's Xcode project and runtime bootstrap, while the app scene presents SideKick's SwiftUI UI.
 - The IPA library imports IPA files from Files, validates their bundle metadata, stores them locally, supports search, and removes imported files.
+- When an imported IPA matches an installed app, choosing **Queue for Update** marks it as a pending update. It appears in the Home screen’s **Updates** section, and the installed app’s detail page offers **Update** instead of **Open** until the queued IPA is installed or removed. URL imports use the same flow.
+- GitHub update sources use release or workflow-artifact history to track new builds. During setup, choose the version already installed; SideKick can suggest one from the original IPA’s file date, so connecting a repository does not require reinstalling the app.
 - Apple ID sign-in is connected to SideStore's native authentication flow. SideKick stores each account/team session and its signing certificate separately in the iOS Keychain and can switch the active SideStore identity.
 - IPA install and account-scoped refresh are routed through the integrated signing engine; these still need physical-device validation. SideKick now exposes pairing-file import and connection validation in Settings.
+- Settings includes dedicated pages for app refresh, install/signing behavior, connection and pairing, Anisette, and imported-IPA storage. Developer Portal App IDs, profiles, and certificates are managed from each Apple ID in Accounts.
 - A pairing file must first be created on a computer paired with the iPhone. SideKick does not create that trust record on-device. SideStore's app is not required.
 - Install and refresh currently require Wi-Fi and the separate LocalDevVPN App Store app. This SideKick build has neither the Network Extension entitlement nor a tunnel extension, so it cannot enable that VPN itself. Settings links to LocalDevVPN and explains the setup.
 

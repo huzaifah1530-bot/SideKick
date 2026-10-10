@@ -2,6 +2,48 @@ import SwiftUI
 import UniformTypeIdentifiers
 import UIKit
 
+private struct QueuedManualUpdate: Identifiable {
+    let ipa: ImportedIPA
+    let installedApp: InstalledAppSummary
+
+    var id: String { ipa.bundleIdentifier }
+}
+
+private struct QueuedManualUpdateRow: View {
+    let update: QueuedManualUpdate
+
+    var body: some View {
+        HStack(spacing: 12) {
+            if let data = update.installedApp.iconData, let icon = UIImage(data: data) {
+                Image(uiImage: icon)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 50, height: 50)
+                    .clipShape(.rect(cornerRadius: 11))
+            } else {
+                Image(systemName: "arrow.down.app.fill")
+                    .font(.system(size: 24))
+                    .foregroundStyle(.white)
+                    .frame(width: 50, height: 50)
+                    .background(.blue.gradient, in: .rect(cornerRadius: 11))
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(update.installedApp.name)
+                    .font(.body.weight(.semibold))
+                Text("Manual IPA · Version \(update.ipa.version)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+            }
+            Spacer(minLength: 8)
+            Text("QUEUED")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.blue)
+        }
+        .padding(.vertical, 5)
+    }
+}
+
 struct HomeView: View {
     @State var viewModel: HomeViewModel
     @State private var showingImporter = false
@@ -27,6 +69,16 @@ struct HomeView: View {
         viewModel.importedApps.filter { !installedBundleIdentifiers.contains($0.bundleIdentifier.lowercased()) }
     }
 
+    private var queuedManualUpdates: [QueuedManualUpdate] {
+        viewModel.importedApps.compactMap { ipa in
+            guard ipa.isUpdateQueued,
+                  let installedApp = installedApps.first(where: {
+                      $0.updateMatchingBundleIdentifiers.contains(ipa.bundleIdentifier.lowercased())
+                  }) else { return nil }
+            return QueuedManualUpdate(ipa: ipa, installedApp: installedApp)
+        }
+    }
+
     private var filteredInstalledApps: [InstalledAppSummary] {
         var seenBundleIDs = Set<String>()
         return installedApps.filter { app in
@@ -40,8 +92,17 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             List {
-                if !githubUpdates.isEmpty {
+                if !githubUpdates.isEmpty || !queuedManualUpdates.isEmpty {
                     SwiftUI.Section("Updates") {
+                        ForEach(queuedManualUpdates) { queuedUpdate in
+                            NavigationLink {
+                                AppManagementView(installedApp: queuedUpdate.installedApp)
+                            } label: {
+                                QueuedManualUpdateRow(update: queuedUpdate)
+                                    .fullWidthListSeparators()
+                            }
+                            .navigationLinkIndicatorVisibility(.hidden)
+                        }
                         ForEach(filteredGitHubUpdates) { update in
                             if let app = installedApps.first(where: { $0.bundleIdentifier == update.bundleIdentifier }) {
                                 NavigationLink {
@@ -202,6 +263,9 @@ struct HomeView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: SideKickIncomingIPA.importNotification)) { _ in
                 Task { await importPendingIPA() }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: .sideKickImportedIPAsDidChange)) { _ in
+                Task { await viewModel.load() }
             }
             .refreshable {
                 await load()
@@ -407,7 +471,9 @@ struct HomeView: View {
 
     private func savePreparedIPA(_ app: ImportedIPA, update: Bool) async {
         do {
-            try await environment.ipaImportStore.saveImportedIPA(app)
+            var savedApp = app
+            savedApp.isQueuedForUpdate = update
+            try await environment.ipaImportStore.saveImportedIPA(savedApp)
             viewModel.importedApps = try await environment.ipaImportStore.importedApps()
             viewModel.noticeMessage = update ? "\(app.name) is queued as an update." : "\(app.name) is ready to install."
         } catch {
