@@ -443,7 +443,7 @@ struct RequiredSetupView: View {
             title: "Add the refresh shortcut",
             message: "Add the shortcut, then create a daily automation in Shortcuts using Run Immediately. Each run checks GitHub for new versions and refreshes your apps. iOS controls whether background work can run.") {
             VStack(spacing: 12) {
-                Link("Get Shortcut", destination: URL(string: "https://www.icloud.com/shortcuts/41b951c189ec4ca78188604524f868e2")!)
+                Link("Get Shortcut", destination: URL(string: "https://www.icloud.com/shortcuts/2af57f665d434568a589f1e9b7d7f4d1")!)
                 .buttonStyle(.borderedProminent)
 
                 SwiftUI.Button {

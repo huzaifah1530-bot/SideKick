@@ -35,9 +35,11 @@ enum GitHubUpdateNotificationScheduler {
 
             let content = UNMutableNotificationContent()
             content.title = "\(candidate.appName) update available"
-            content.body = "Version \(candidate.newVersion) is ready to install in SideKick."
+            content.body = candidate.targetKind == .liveContainer
+                ? "\(candidate.newVersion) is available. Review this guest update in SideKick, then install it in LiveContainer."
+                : "Version \(candidate.newVersion) is ready to install in SideKick."
             content.sound = .default
-            content.userInfo = ["bundleIdentifier": candidate.bundleIdentifier, "updateKey": candidate.updateKey]
+            content.userInfo = ["bundleIdentifier": candidate.bundleIdentifier, "updateKey": candidate.updateKey, "targetKind": candidate.targetKind.rawValue]
             do {
                 try await center.add(UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
                 UserDefaults.standard.set(candidate.updateKey, forKey: historyKey)

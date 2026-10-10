@@ -1,7 +1,10 @@
 import Foundation
 
 struct ImportedIPA: Codable, Identifiable, Hashable, Sendable {
-    var id: String { bundleIdentifier }
+    var id: String {
+        guard let target = queuedForInstalledAppID else { return bundleIdentifier }
+        return "queue:" + Data(bundleIdentifier.utf8).base64EncodedString() + ":" + Data(target.utf8).base64EncodedString()
+    }
     let bundleIdentifier: String
     let name: String
     let version: String
@@ -12,6 +15,7 @@ struct ImportedIPA: Codable, Identifiable, Hashable, Sendable {
     let iconData: Data?
     var sourceCreatedAt: Date? = nil
     var isQueuedForUpdate: Bool? = nil
+    var queuedForInstalledAppID: String? = nil
     var githubUpdateKey: String? = nil
     var githubRepositoryURL: String? = nil
     var githubImportConfiguration: GitHubUpdateConfiguration? = nil
@@ -45,6 +49,15 @@ enum IPAImportError: LocalizedError {
         case .sourceFileMissing: "The original IPA can’t be found. It may have been moved or deleted. Choose the file again to use this app."
         case .sourceBookmarkUnavailable: "SideKick couldn’t save access to the original file. Choose it again from Files."
         case .bundleIdentifierMismatch(let expected, let actual): "This IPA is for \(actual), not \(expected). It wasn’t queued as an update."
+        }
+    }
+}
+
+// Metadata edits move the same import; distinct installations retain distinct queues.
+enum IPAImportIndex {
+    static func replacing(_ app: ImportedIPA, in entries: [ImportedIPA]) -> [ImportedIPA] {
+        [app] + entries.filter {
+            $0.id != app.id && !($0.bundleIdentifier == app.bundleIdentifier && $0.importedAt == app.importedAt)
         }
     }
 }

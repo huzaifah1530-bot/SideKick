@@ -103,7 +103,7 @@ struct AccountsView: View {
     }
 }
 
-private struct SigningAccountDetailView: View {
+struct SigningAccountDetailView: View {
     let account: SigningAccountSummary
     let accountStore: SigningAccountStore
     @Environment(\.dismiss) private var dismiss

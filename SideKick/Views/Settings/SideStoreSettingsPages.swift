@@ -292,6 +292,9 @@ struct SettingsStorageView: View {
                 LabeledContent("App signing cache", value: storageUsage.formatted(storageUsage.signingCache))
                 LabeledContent("Temporary install files", value: storageUsage.formatted(storageUsage.temporaryFiles))
                 LabeledContent("Saved resigned IPAs", value: storageUsage.formatted(storageUsage.exportedIPAs))
+                NavigationLink { StorageFilesView() } label: {
+                    Label("Manage Cached & Temporary Files", systemImage: "folder.badge.gearshape")
+                }
                 SwiftUI.Button { Task { await cleanUnusedFiles() } } label: {
                     HStack {
                         Label("Clean Unused Files", systemImage: "trash")
@@ -312,6 +315,7 @@ struct SettingsStorageView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task { await reload() }
         .refreshable { await reload() }
+        .onReceive(NotificationCenter.default.publisher(for: .sideKickStorageDidChange)) { _ in Task { await reload() } }
         .alert("Remove downloaded IPA copies?", isPresented: $isConfirmingClear) {
             SwiftUI.Button("Remove", role: .destructive) { Task { await clearManagedIPAs() } }
             SwiftUI.Button("Cancel", role: .cancel) { }
@@ -356,10 +360,10 @@ struct SettingsStorageView: View {
         defer { isCleaning = false }
         do {
             URLCache.shared.removeAllCachedResponses()
-            await environment.ipaImportStore.cleanupAbandonedTemporaryIPAImports()
+            let report = try await SideKickStorageCleanup.cleanUnused(downloads: environment.githubUpdateDownloads)
             try await environment.ipaImportStore.cleanupOrphanedManagedIPAs()
-            await SideStoreOperationService.pruneUnusedCaches()
             await reload()
+            errorMessage = report
         } catch { errorMessage = error.localizedDescription }
     }
 }
@@ -368,6 +372,7 @@ struct StorageDirectoryDetailView: View {
     let directory: StorageDirectoryUsage
     @State private var entries: [StorageDirectoryUsage] = []
     @State private var isLoading = true
+    @State private var removable: [RemovableStorageItem] = []
 
     var body: some View {
         List {
@@ -386,6 +391,11 @@ struct StorageDirectoryDetailView: View {
                         LabeledContent(entry.name, value: ByteCountFormatter.string(fromByteCount: entry.bytes, countStyle: .file))
                             .fullWidthListSeparators()
                     }
+                    if let item = removable.first(where: { $0.id == entry.id }) {
+                        if let owner = item.policy.owner { Text("Retained signing source · \(owner)").font(.footnote).foregroundStyle(.secondary) }
+                        if let reason = item.protectedReason { Text(reason).font(.footnote).foregroundStyle(.secondary) }
+                        else { StorageRemovalAction(item: item) }
+                    }
                 }
             }
         }
@@ -393,11 +403,13 @@ struct StorageDirectoryDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task { await reload() }
         .refreshable { await reload() }
+        .onReceive(NotificationCenter.default.publisher(for: .sideKickStorageDidChange)) { _ in Task { await reload() } }
     }
 
     private func reload() async {
         isLoading = true
         entries = await SideKickStorageUsage.children(of: directory.url)
+        removable = (try? await SideKickStorageCleanup.items()) ?? []
         isLoading = false
     }
 }

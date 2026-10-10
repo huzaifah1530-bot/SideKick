@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 struct AppManagementView: View {
     @Environment(AppEnvironment.self) private var environment
@@ -53,11 +54,11 @@ struct AppManagementView: View {
 
             if let importedApp {
                 Section("Install") {
-                    if accountStore.accounts.contains(where: \.hasSavedSession) {
+                    if !accountStore.accounts.isEmpty {
                         NavigationLink {
                             InstallAccountSelectionView(
                                 app: importedApp,
-                                accounts: accountStore.accounts.filter(\.hasSavedSession),
+                                accounts: accountStore.accounts,
                                 accountStore: accountStore,
                                 ipaStore: environment.ipaImportStore,
                                 isUpdate: false,
@@ -230,31 +231,35 @@ struct AppManagementView: View {
 
     @ViewBuilder
     private func queuedUpdateActions(ipa: ImportedIPA, installedApp: InstalledAppSummary) -> some View {
-        let updateAccounts = accountStore.accounts.filter {
-            $0.teamIdentifier == installedApp.teamIdentifier && $0.hasSavedSession
-        }
-        if let account = updateAccounts.first(where: {
+        let updateAccounts = accountStore.accounts
+        if let account = updateAccounts.filter(\.hasSavedSession).first(where: {
             $0.accountIdentifier == installedApp.accountIdentifier
-        }) ?? updateAccounts.first {
+        }) ?? updateAccounts.first(where: \.hasSavedSession) {
             NavigationLink {
-                InstallConsoleView(
-                    app: ipa,
-                    account: account,
-                    accountStore: accountStore,
-                    ipaStore: environment.ipaImportStore,
-                    isUpdate: true,
-                    onInstalled: { await finishQueuedUpdate(ipa) }
-                )
+                if account.teamIdentifier != installedApp.teamIdentifier {
+                    SeparateInstallReviewView(source: ipa, account: account, accountStore: accountStore, originalName: installedApp.name)
+                } else {
+                    InstallConsoleView(
+                        app: ipa,
+                        account: account,
+                        accountStore: accountStore,
+                        ipaStore: environment.ipaImportStore,
+                        isUpdate: true,
+                        onInstalled: { await finishQueuedUpdate(ipa) }
+                    )
+                }
             } label: {
-                Text("Update")
+                Label("Update", systemImage: "arrow.down.app")
                     .font(.body.weight(.semibold))
-                    .frame(maxWidth: .infinity)
+                    .frame(maxWidth: .infinity, alignment: .leading)
             }
-            .buttonStyle(.borderedProminent)
-            .buttonBorderShape(.capsule)
+            .buttonStyle(.plain)
             .fullWidthListSeparators()
 
-            if updateAccounts.count > 1 {
+        } else {
+            Text("Add the Apple account that installed this app (\(installedApp.accountEmail)) in Accounts to update it.")
+                .foregroundStyle(.secondary)
+        }
                 NavigationLink {
                     InstallAccountSelectionView(
                         app: ipa,
@@ -262,7 +267,8 @@ struct AppManagementView: View {
                         accountStore: accountStore,
                         ipaStore: environment.ipaImportStore,
                         isUpdate: true,
-                        onInstalled: { await finishQueuedUpdate(ipa) }
+                        onInstalled: { await finishQueuedUpdate(ipa) },
+                        currentTeamIdentifier: installedApp.teamIdentifier
                     )
                 } label: {
                     Label("Options", systemImage: "slider.horizontal.3")
@@ -270,11 +276,6 @@ struct AppManagementView: View {
                         .frame(maxWidth: .infinity, alignment: .leading)
                 }
                 .fullWidthListSeparators()
-            }
-        } else {
-            Text("Add the Apple account that installed this app (\(installedApp.accountEmail)) in Accounts to update it.")
-                .foregroundStyle(.secondary)
-        }
         SwiftUI.Button(role: .destructive) {
             isConfirmingQueuedUpdateRemoval = true
         } label: {
@@ -294,8 +295,8 @@ struct AppManagementView: View {
         do {
             if let updateKey = ipa.githubUpdateKey,
                let repositoryURL = ipa.githubRepositoryURL {
-                let store = GitHubUpdateConfigurationStore()
-                if var configuration = try await store.configuration(for: bundleIdentifier),
+                let store = GitHubUpdateConfigurationStore.shared
+                if var configuration = try await store.configuration(for: installedApp?.id ?? bundleIdentifier),
                    configuration.repositoryURL == repositoryURL {
                     configuration.lastInstalledUpdateKey = updateKey
                     configuration.dismissedUpdateKey = nil
@@ -326,18 +327,20 @@ struct AppManagementView: View {
     @MainActor
     private func reloadManagementState() async {
         expirationClock = .now
+        var availableInstallations: [InstalledAppSummary] = []
         if let current = installedApp {
             let service = SideStoreOperationService(accountStore: accountStore, ipaStore: environment.ipaImportStore)
             let apps = await service.installedApps()
-            if let latest = apps.first(where: { $0.bundleIdentifier == current.bundleIdentifier }) {
+            availableInstallations = apps
+            if let latest = apps.first(where: { $0.id == current.id }) {
                 installedApp = latest
             }
         }
         if let installedApp {
             let matchingBundleIDs = installedApp.updateMatchingBundleIdentifiers
             let imports = (try? await environment.ipaImportStore.importedApps()) ?? []
-            pendingUpdateIPA = imports.first {
-                $0.isUpdateQueued && matchingBundleIDs.contains($0.bundleIdentifier.lowercased())
+            pendingUpdateIPA = imports.first { ipa in
+                ipa.isUpdateQueued && (ipa.queuedForInstalledAppID == installedApp.id || (ipa.queuedForInstalledAppID == nil && matchingBundleIDs.contains(ipa.bundleIdentifier.lowercased()) && availableInstallations.filter { app in app.updateMatchingBundleIdentifiers.contains(ipa.bundleIdentifier.lowercased()) }.count == 1))
             }
         }
         await accountStore.reload()
@@ -475,11 +478,11 @@ private struct RefreshConsoleView: View {
                 guard let selectedAccount else {
                     throw AppSigningError.accountRequired
                 }
-                try await service.resign(bundleIdentifier: app.bundleIdentifier, using: selectedAccount) { value in
+                try await service.resign(bundleIdentifier: app.id, using: selectedAccount) { value in
                     updateProgress(value)
                 }
             } else {
-                try await service.refresh(bundleIdentifier: app.bundleIdentifier, using: selectedAccount) { value in
+                try await service.refresh(bundleIdentifier: app.id, using: selectedAccount) { value in
                     updateProgress(value)
                 }
             }
@@ -516,9 +519,7 @@ private struct ResignOptionsView: View {
     let accountStore: SigningAccountStore
 
     private var eligibleAccounts: [SigningAccountSummary] {
-        accountStore.accounts.filter {
-            $0.teamIdentifier == app.teamIdentifier && $0.hasSavedSession
-        }
+        accountStore.accounts
     }
 
     var body: some View {
@@ -536,17 +537,23 @@ private struct ResignOptionsView: View {
                 Section {
                     ForEach(eligibleAccounts) { account in
                         NavigationLink {
-                            RefreshConsoleView(
-                                app: app,
-                                accountStore: accountStore,
-                                selectedAccount: account,
-                                operation: .resign
-                            )
+                            if !account.hasSavedSession {
+                                SigningAccountDetailView(account: account, accountStore: accountStore)
+                            } else if account.teamIdentifier != app.teamIdentifier {
+                                OtherTeamSourceView(app: app, account: account, accountStore: accountStore)
+                            } else {
+                                RefreshConsoleView(
+                                    app: app,
+                                    accountStore: accountStore,
+                                    selectedAccount: account,
+                                    operation: .resign
+                                )
+                            }
                         } label: {
                             VStack(alignment: .leading, spacing: 5) {
                                 Text(account.email)
                                     .font(.body.weight(.medium))
-                                Text("\(account.teamName) · \(account.teamType)")
+                                Text(account.hasSavedSession ? "\(account.teamName) · \(account.teamType)" : "Reconnect this account")
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
                             }
@@ -557,7 +564,7 @@ private struct ResignOptionsView: View {
                 } header: {
                     Text("Signing Account")
                 } footer: {
-                    Text("Choose the Apple ID SideKick should use to re-sign and reinstall this app. Its current signing team must stay the same.")
+                    Text("Choose any saved Apple ID. Accounts on this signing team can re-sign the current app. Another team requires a separate installation from an IPA, with separate app data.")
                 }
             }
         }
@@ -573,16 +580,14 @@ private struct RefreshOptionsView: View {
     let accountStore: SigningAccountStore
 
     private var eligibleAccounts: [SigningAccountSummary] {
-        accountStore.accounts.filter {
-            $0.teamIdentifier == app.teamIdentifier && $0.hasSavedSession
-        }
+        accountStore.accounts
     }
 
     var body: some View {
         List {
             if eligibleAccounts.isEmpty {
                 Section {
-                    Text("Add the Apple ID that signed this app in Accounts to refresh it.")
+                    Text("Add or reconnect an Apple ID in Accounts to continue.")
                         .foregroundStyle(.secondary)
                 } header: {
                     Text("Signing Account")
@@ -593,16 +598,22 @@ private struct RefreshOptionsView: View {
                 Section {
                     ForEach(eligibleAccounts) { account in
                         NavigationLink {
-                            RefreshConsoleView(
-                                app: app,
-                                accountStore: accountStore,
-                                selectedAccount: account
-                            )
+                            if !account.hasSavedSession {
+                                SigningAccountDetailView(account: account, accountStore: accountStore)
+                            } else if account.teamIdentifier != app.teamIdentifier {
+                                OtherTeamSourceView(app: app, account: account, accountStore: accountStore)
+                            } else {
+                                RefreshConsoleView(
+                                    app: app,
+                                    accountStore: accountStore,
+                                    selectedAccount: account
+                                )
+                            }
                         } label: {
                             VStack(alignment: .leading, spacing: 5) {
                                 Text(account.email)
                                     .font(.body.weight(.medium))
-                                Text("\(account.teamName) · \(account.teamType)")
+                                Text(account.hasSavedSession ? "\(account.teamName) · \(account.teamType)" : "Reconnect this account")
                                     .font(.subheadline)
                                     .foregroundStyle(.secondary)
                             }
@@ -700,7 +711,7 @@ private struct JITEnableView: View {
         defer { isWorking = false }
         do {
             try await SideStoreOperationService(accountStore: accountStore, ipaStore: environment.ipaImportStore)
-                .enableJIT(bundleIdentifier: app.bundleIdentifier)
+                .enableJIT(bundleIdentifier: app.id)
             statusMessage = "JIT was enabled for \(app.name)."
         } catch {
             errorMessage = error.localizedDescription
@@ -716,17 +727,28 @@ struct InstallAccountSelectionView: View {
     let isUpdate: Bool
     let onInstalled: (() async -> Void)?
     var onSourceMissing: (() async -> Void)? = nil
+    var currentTeamIdentifier: String? = nil
 
     var body: some View {
         List {
             Section {
+                if accounts.isEmpty {
+                    Text("Add an Apple ID in Accounts to continue.").foregroundStyle(.secondary)
+                    NavigationLink("Accounts") { AccountsView() }
+                }
                 ForEach(accounts) { account in
                     NavigationLink {
-                        InstallConsoleView(app: app, account: account, accountStore: accountStore, ipaStore: ipaStore, isUpdate: isUpdate, onInstalled: onInstalled, onSourceMissing: onSourceMissing)
+                        if !account.hasSavedSession {
+                            SigningAccountDetailView(account: account, accountStore: accountStore)
+                        } else if let currentTeamIdentifier, currentTeamIdentifier != account.teamIdentifier {
+                            SeparateInstallReviewView(source: app, account: account, accountStore: accountStore, originalName: app.name)
+                        } else {
+                            InstallConsoleView(app: app, account: account, accountStore: accountStore, ipaStore: ipaStore, isUpdate: isUpdate, onInstalled: onInstalled, onSourceMissing: onSourceMissing)
+                        }
                     } label: {
                         VStack(alignment: .leading, spacing: 5) {
                             Text(account.email).font(.body.weight(.medium))
-                            Text("\(account.teamName) · \(account.teamType)")
+                            Text(account.hasSavedSession ? "\(account.teamName) · \(account.teamType)" : "Reconnect this account")
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
@@ -736,7 +758,7 @@ struct InstallAccountSelectionView: View {
             } header: {
                 Text("Apple Account")
             } footer: {
-                Text("Choose the account that will sign and \(isUpdate ? "update" : "install") \(app.name).")
+                Text("Choose the account that will sign \(app.name). Updating the existing app keeps its team. A different team offers a separate installation with separate data.")
             }
         }
         .listStyle(.insetGrouped)

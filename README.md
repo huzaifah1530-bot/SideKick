@@ -16,6 +16,10 @@ SideKick uses code from [LocalDevVPN by seomin0610](https://github.com/seomin061
 
 ## Integration status
 
+- **LiveContainer:** My Apps has a separate guest library with bookmarked read-only directory scanning, version/build metadata, connection recovery, launch requests, and existing GitHub source/token/update notifications. Link an actual Applications directory exposed in Files. Private App Group access is not assumed; snapshots are labelled and excluded from automatic checks/guest launches. Guest IPAs never enter SideKick's signing/install queue. See [integration behavior and validation limits](docs/livecontainer-integration.md).
+- Storage offers **Manage Cached & Temporary Files** with ownership explanations and explicit retained-source removal. Deleting a current extracted source can require reimporting an IPA before refresh. Recent/current-process temporary files are protected. Update options show all saved accounts: another team requires a separate source-based installation with separate data/credentials.
+- GitHub installed-build selection preserves manual overrides and saved baselines absent from the current history page; suggestions are optional. The root `swift test` suite verifies the production scanner, stores, build comparison, and filesystem boundaries before the integrated CI build.
+
 - The SideStore source is pinned as a recursive Git submodule at `Vendor/SideStore`.
 - The build uses SideStore's Xcode project and runtime bootstrap, while the app scene presents SideKick's SwiftUI UI.
 - The IPA library validates bundle metadata, keeps links to originals selected from Files, and stores downloaded GitHub IPA copies locally. Removing a linked library entry keeps the original in Files.

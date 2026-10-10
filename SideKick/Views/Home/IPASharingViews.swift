@@ -101,6 +101,7 @@ struct URLImportView: View {
     @State private var errorMessage: String?
     @State private var importedApp: ImportedIPA?
     @State private var importedAsUpdate = false
+    @State private var matchingInstallations: [InstalledAppSummary] = []
     @State private var ipaAwaitingUpdateChoice: ImportedIPA?
     @State private var githubRepositoryURL: URL?
     @State private var showingGitHubRepository = false
@@ -194,14 +195,18 @@ struct URLImportView: View {
         }
         .navigationTitle("Import from URL")
         .navigationBarTitleDisplayMode(.inline)
-        .alert(
+        .confirmationDialog(
             "\(ipaAwaitingUpdateChoice?.name ?? "This app") is already installed",
             isPresented: Binding(
                 get: { ipaAwaitingUpdateChoice != nil },
                 set: { if !$0 { ipaAwaitingUpdateChoice = nil } }
             )
         ) {
-            SwiftUI.Button("Queue for Update") { Task { await queuePendingUpdate() } }
+            ForEach(matchingInstallations) { installation in
+                SwiftUI.Button("Queue for \(installation.name) \(installation.accountEmail) (\(installation.teamIdentifier))") {
+                    Task { await queuePendingUpdate(for: installation.id) }
+                }
+            }
             SwiftUI.Button("Cancel", role: .cancel) {
                 if let app = ipaAwaitingUpdateChoice, app.githubImportConfiguration != nil {
                     Task { try? await environment.ipaImportStore.delete(app) }
@@ -279,6 +284,7 @@ struct URLImportView: View {
         let installedApps = await SideStoreOperationService(accountStore: SigningAccountStore(), ipaStore: environment.ipaImportStore).installedApps()
         let installedIDs = Set(installedApps.flatMap(\.updateMatchingBundleIdentifiers))
         if installedIDs.contains(app.bundleIdentifier.lowercased()) {
+            matchingInstallations = installedApps.filter { $0.updateMatchingBundleIdentifiers.contains(app.bundleIdentifier.lowercased()) }
             ipaAwaitingUpdateChoice = app
         } else {
             try await savePreparedIPA(app, asUpdate: false)
@@ -286,17 +292,18 @@ struct URLImportView: View {
     }
 
     @MainActor
-    private func queuePendingUpdate() async {
+    private func queuePendingUpdate(for targetID: String) async {
         guard let app = ipaAwaitingUpdateChoice else { return }
         ipaAwaitingUpdateChoice = nil
-        do { try await savePreparedIPA(app, asUpdate: true) }
+        do { try await savePreparedIPA(app, asUpdate: true, targetID: targetID) }
         catch { errorMessage = error.localizedDescription }
     }
 
     @MainActor
-    private func savePreparedIPA(_ app: ImportedIPA, asUpdate: Bool) async throws {
+    private func savePreparedIPA(_ app: ImportedIPA, asUpdate: Bool, targetID: String? = nil) async throws {
         var savedApp = app
         savedApp.isQueuedForUpdate = asUpdate
+        savedApp.queuedForInstalledAppID = targetID
         try await environment.ipaImportStore.saveImportedIPA(savedApp)
         importedApp = savedApp
         importedAsUpdate = asUpdate

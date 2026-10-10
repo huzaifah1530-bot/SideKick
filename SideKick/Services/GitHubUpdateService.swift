@@ -90,7 +90,7 @@ actor GitHubUpdateService {
         return GitHubImportPage(choices: choices, hasMore: runs.workflow_runs.count == 10)
     }
 
-    func candidate(for app: InstalledAppSummary, configuration: GitHubUpdateConfiguration, token: String? = nil) async throws -> GitHubUpdateCandidate? {
+    func candidate(for app: GitHubUpdateTarget, configuration: GitHubUpdateConfiguration, token: String? = nil) async throws -> GitHubUpdateCandidate? {
         let repository = try parseRepository(configuration.repositoryURL)
         switch configuration.source {
         case .latestRelease:
@@ -102,14 +102,14 @@ actor GitHubUpdateService {
         }
     }
 
-    func history(for configuration: GitHubUpdateConfiguration, token: String? = nil) async throws -> [GitHubUpdateHistoryEntry] {
+    func history(for configuration: GitHubUpdateConfiguration, token: String? = nil, page: Int = 1) async throws -> [GitHubUpdateHistoryEntry] {
         let repository = try parseRepository(configuration.repositoryURL)
         switch configuration.source {
         case .latestRelease:
-            return try await releaseHistory(owner: repository.owner, name: repository.name, assetName: configuration.assetName, token: token)
+            return try await releaseHistory(owner: repository.owner, name: repository.name, assetName: configuration.assetName, token: token, page: page)
                 .map(\.entry)
         case .actionsArtifact:
-            return try await actionsHistory(owner: repository.owner, name: repository.name, configuration: configuration, token: token)
+            return try await actionsHistory(owner: repository.owner, name: repository.name, configuration: configuration, token: token, page: page)
                 .map(\.entry)
         }
     }
@@ -129,8 +129,8 @@ actor GitHubUpdateService {
         return name.range(of: pattern, options: [.regularExpression, .caseInsensitive]) != nil
     }
 
-    private func releaseHistory(owner: String, name: String, assetName: String, token: String?) async throws -> [UpdateItem] {
-        var request = apiRequest(path: "/repos/\(owner)/\(name)/releases?per_page=100", token: token)
+    private func releaseHistory(owner: String, name: String, assetName: String, token: String?, page: Int = 1) async throws -> [UpdateItem] {
+        var request = apiRequest(path: "/repos/\(owner)/\(name)/releases?per_page=100&page=\(page)", token: token)
         request.httpMethod = "GET"
         let releases: [Release] = try await fetch(request)
         return releases.compactMap { release in
@@ -146,11 +146,11 @@ actor GitHubUpdateService {
         }
     }
 
-    private func actionsHistory(owner: String, name: String, configuration: GitHubUpdateConfiguration, token: String?) async throws -> [UpdateItem] {
+    private func actionsHistory(owner: String, name: String, configuration: GitHubUpdateConfiguration, token: String?, page: Int = 1) async throws -> [UpdateItem] {
         let componentCharacters = CharacterSet.alphanumerics.union(CharacterSet(charactersIn: "-._~"))
         let workflow = configuration.workflowFile.addingPercentEncoding(withAllowedCharacters: componentCharacters) ?? configuration.workflowFile
         let branch = configuration.branch.addingPercentEncoding(withAllowedCharacters: componentCharacters) ?? configuration.branch
-        var request = apiRequest(path: "/repos/\(owner)/\(name)/actions/workflows/\(workflow)/runs?branch=\(branch)&status=success&per_page=10", token: token)
+        var request = apiRequest(path: "/repos/\(owner)/\(name)/actions/workflows/\(workflow)/runs?branch=\(branch)&status=success&per_page=10&page=\(page)", token: token)
         request.httpMethod = "GET"
         let runs: WorkflowRuns = try await fetch(request)
         var items: [UpdateItem] = []
@@ -171,29 +171,16 @@ actor GitHubUpdateService {
         return items
     }
 
-    private func candidate(from history: [UpdateItem], for app: InstalledAppSummary, configuration: GitHubUpdateConfiguration) -> GitHubUpdateCandidate? {
-        let baselineKey = configuration.lastInstalledUpdateKey ?? configuration.baselineUpdateKey
-        guard let baselineKey, let item = history.first else { return nil }
-        if let index = history.firstIndex(where: {
-            $0.entry.key == baselineKey || legacyReleaseKey(for: $0.entry.key) == baselineKey
-        }) {
-            guard index > 0 else { return nil }
-        } else {
-            // Actions artifacts can expire and an old baseline can leave the
-            // returned history. GitHub IDs preserve the ordering of these runs.
-            let baseline = baselineKey.split(separator: ":")
-            let latest = item.entry.key.split(separator: ":")
-            guard baseline.count >= 3, latest.count >= 3,
-                  baseline[0] == latest[0], let previousID = Int64(baseline[1]),
-                  let latestID = Int64(latest[1]), latestID > previousID else { return nil }
-        }
+    private func candidate(from history: [UpdateItem], for app: GitHubUpdateTarget, configuration: GitHubUpdateConfiguration) -> GitHubUpdateCandidate? {
+        guard let baselineKey = configuration.effectiveBaselineKey, let item = history.first,
+              GitHubBuildComparison.isNewer(item.entry.key, than: baselineKey, historyKeys: history.map { $0.entry.key }) else { return nil }
         guard item.entry.key != configuration.dismissedUpdateKey else { return nil }
         guard item.entry.key != baselineKey else { return nil }
         return GitHubUpdateCandidate(
-            bundleIdentifier: app.bundleIdentifier, appName: app.name, currentVersion: app.version,
+            bundleIdentifier: app.id, appName: app.name, currentVersion: app.version,
             newVersion: item.version, title: item.title, assetName: item.assetName,
             downloadURL: item.url, updateKey: item.entry.key, source: configuration.source,
-            repositoryURL: configuration.repositoryURL
+            repositoryURL: configuration.repositoryURL, targetKind: app.kind, sourceIdentity: configuration.sourceIdentity
         )
     }
 

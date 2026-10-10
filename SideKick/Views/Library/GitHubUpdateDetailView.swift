@@ -74,7 +74,7 @@ struct GitHubUpdateDetailView: View {
     @State private var isLoadingToken = true
     @State private var isConfirmingSkip = false
 
-    private let configurationStore = GitHubUpdateConfigurationStore()
+    private let configurationStore = GitHubUpdateConfigurationStore.shared
 
     private var expectedUpdateBundleIdentifiers: Set<String> {
         app.updateMatchingBundleIdentifiers
@@ -170,23 +170,31 @@ struct GitHubUpdateDetailView: View {
                 } else if let queuedIPA = downloadJob?.queuedIPA {
                     if let account {
                         NavigationLink {
-                            InstallConsoleView(
-                                app: queuedIPA,
-                                account: account,
-                                accountStore: accountStore,
-                                ipaStore: environment.ipaImportStore,
-                                isUpdate: true,
-                                onInstalled: { await finishUpdate(queuedIPA) },
-                                onSourceMissing: { await validateDownload() }
-                            )
+                            if account.teamIdentifier != app.teamIdentifier {
+                                SeparateInstallReviewView(source: queuedIPA, account: account, accountStore: accountStore, originalName: app.name)
+                            } else {
+                                InstallConsoleView(
+                                    app: queuedIPA,
+                                    account: account,
+                                    accountStore: accountStore,
+                                    ipaStore: environment.ipaImportStore,
+                                    isUpdate: true,
+                                    onInstalled: { await finishUpdate(queuedIPA) },
+                                    onSourceMissing: { await validateDownload() }
+                                )
+                            }
                         } label: {
                             Label("Update App", systemImage: "arrow.down.app.fill")
                                 .fontWeight(.semibold)
                         }
-                        .buttonStyle(.borderedProminent)
-                        .buttonBorderShape(.capsule)
+                        .buttonStyle(.plain)
                         .fullWidthListSeparators()
-                        if eligibleAccounts.count > 1 {
+                    } else {
+                        Text(eligibleAccounts.isEmpty
+                            ? "Add the Apple account that originally installed this app in Accounts to update it."
+                            : "Choose a saved Apple account on the app’s signing team to update it.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
                             NavigationLink {
                                 InstallAccountSelectionView(
                                     app: queuedIPA,
@@ -195,7 +203,8 @@ struct GitHubUpdateDetailView: View {
                                     ipaStore: environment.ipaImportStore,
                                     isUpdate: true,
                                     onInstalled: { await finishUpdate(queuedIPA) },
-                                    onSourceMissing: { await validateDownload() }
+                                    onSourceMissing: { await validateDownload() },
+                                    currentTeamIdentifier: app.teamIdentifier
                                 )
                             } label: {
                                 Label("Options", systemImage: "slider.horizontal.3")
@@ -204,13 +213,6 @@ struct GitHubUpdateDetailView: View {
                             }
                             .buttonStyle(.plain)
                             .fullWidthListSeparators()
-                        }
-                    } else {
-                        Text(eligibleAccounts.isEmpty
-                            ? "Add the Apple account that originally installed this app in Accounts to update it."
-                            : "Choose a saved Apple account on the app’s signing team to update it.")
-                            .font(.footnote).foregroundStyle(.secondary)
-                    }
                 } else {
                     downloadButton(title: "Install New IPA") { startDownload() }
                 }
@@ -246,16 +248,14 @@ struct GitHubUpdateDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await accountStore.reload()
-            eligibleAccounts = accountStore.accounts.filter {
-                $0.teamIdentifier == app.teamIdentifier && $0.hasSavedSession
-            }
-            account = eligibleAccounts.first {
+            eligibleAccounts = accountStore.accounts
+            account = eligibleAccounts.filter(\.hasSavedSession).first {
                 $0.accountIdentifier == app.accountIdentifier
-            } ?? eligibleAccounts.first
+            } ?? eligibleAccounts.first(where: \.hasSavedSession)
         }
         .task {
             do {
-                tokenID = try await configurationStore.configuration(for: app.bundleIdentifier)?.tokenID
+                tokenID = try await configurationStore.configuration(for: app.id)?.tokenID
             } catch { errorMessage = error.localizedDescription }
             isLoadingToken = false
             await validateDownload()
@@ -302,15 +302,15 @@ struct GitHubUpdateDetailView: View {
     @MainActor
     private func resolveUpdate(markInstalled: Bool) async {
         do {
-            guard var configuration = try await configurationStore.configuration(for: app.bundleIdentifier) else { return }
-            guard configuration.repositoryURL == candidate.repositoryURL, configuration.source == candidate.source else {
+            guard var configuration = try await configurationStore.configuration(for: app.id) else { return }
+            guard configuration.sourceIdentity == candidate.sourceIdentity else {
                 environment.githubUpdateDownloads.removeJob(for: candidate)
                 dismiss()
                 return
             }
             let imports = try await environment.ipaImportStore.importedApps()
             if let ipa = downloadJob?.queuedIPA ?? imports.first(where: {
-                $0.githubUpdateKey == candidate.updateKey && $0.githubRepositoryURL == candidate.repositoryURL
+                $0.queuedForInstalledAppID == candidate.bundleIdentifier && $0.githubUpdateKey == candidate.updateKey && $0.githubRepositoryURL == candidate.repositoryURL
             }) {
                 try await environment.ipaImportStore.delete(ipa)
             }
@@ -343,8 +343,8 @@ struct GitHubUpdateDetailView: View {
     @MainActor
     private func finishUpdate(_ ipa: ImportedIPA) async {
         do {
-            var configuration = try await configurationStore.configuration(for: app.bundleIdentifier)
-            if configuration?.repositoryURL == candidate.repositoryURL {
+            var configuration = try await configurationStore.configuration(for: app.id)
+            if configuration?.sourceIdentity == candidate.sourceIdentity {
                 configuration?.lastInstalledUpdateKey = candidate.updateKey
                 configuration?.dismissedUpdateKey = nil
             }

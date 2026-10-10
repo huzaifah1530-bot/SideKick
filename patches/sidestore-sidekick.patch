@@ -98,6 +98,23 @@ index 868efe81..a5a9a77c 100644
  			<array>
 +				<string>sidekick</string>
  				<string>sidestore</string>
+@@ -78,8 +81,10 @@
+ 	</array>
+-	<key>LSApplicationQueriesSchemes</key>
+-	<array>
+-		<string>sidestore-com.SideStore.SideStore</string>
+-		<string>sidestore-com.SideStore.SideStore.Beta</string>
+-		<string>localdevvpn</string>
+-	</array>
++	<key>LSApplicationQueriesSchemes</key>
++	<array>
++		<string>livecontainer</string>
++		<string>livecontainer2</string>
++		<string>sidestore-com.SideStore.SideStore</string>
++		<string>sidestore-com.SideStore.SideStore.Beta</string>
++		<string>localdevvpn</string>
++	</array>
+ 	<key>LSRequiresIPhoneOS</key>
 diff --git a/AltStore/SceneDelegate.swift b/AltStore/SceneDelegate.swift
 index b3b01cfd..c937fe85 100644
 --- a/AltStore/SceneDelegate.swift

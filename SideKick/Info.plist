@@ -35,6 +35,8 @@
 	</array>
 	<key>LSApplicationQueriesSchemes</key>
 	<array>
+		<string>livecontainer</string>
+		<string>livecontainer2</string>
 		<string>localdevvpn</string>
 	</array>
 	<key>UIBackgroundModes</key>

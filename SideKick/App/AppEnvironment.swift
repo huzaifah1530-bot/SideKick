@@ -12,6 +12,7 @@ enum DatabaseStartupState: Equatable {
 final class AppEnvironment {
     let ipaImportStore: IPAImportStore
     let githubUpdateDownloads = GitHubUpdateDownloadStore()
+    let liveContainerStore = LiveContainerStore.shared
     private(set) var databaseState: DatabaseStartupState = .starting
 
     init(ipaImportStore: IPAImportStore = IPAImportStore()) {

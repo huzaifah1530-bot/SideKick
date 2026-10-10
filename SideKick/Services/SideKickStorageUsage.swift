@@ -62,7 +62,7 @@ struct SideKickStorageUsage: Sendable {
         }.value
     }
 
-    private static func size(of url: URL) -> Int64 {
+    static func size(of url: URL) -> Int64 {
         let keys: Set<URLResourceKey> = [.isRegularFileKey, .isSymbolicLinkKey,
             .fileSizeKey, .totalFileAllocatedSizeKey, .fileAllocatedSizeKey]
         func bytes(_ file: URL) -> Int64 {

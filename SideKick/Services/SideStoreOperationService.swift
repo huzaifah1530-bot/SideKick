@@ -67,6 +67,9 @@ final class SideStoreOperationService {
                 expirationDate: record.9
             ))
         }
+        let identities = Dictionary(grouping: summaries, by: \.bundleIdentifier).mapValues { $0.map(\.id) }
+        try? await GitHubUpdateConfigurationStore.shared.migrateInstalledIdentifiers(identities)
+        try? await ipaStore.migrateQueuedInstallations(identities)
         return summaries.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
@@ -81,6 +84,7 @@ final class SideStoreOperationService {
         }
         let url = try await ipaStore.fileURL(for: ipa)
         defer { try? FileManager.default.removeItem(at: url) }
+        try SideKickStorageCleanup.ensureOperationAllowed()
         let vpnLease = try await LocalVPNService.shared.acquire()
         defer { LocalVPNService.shared.release(vpnLease) }
         try await retryAfterClearingRevokedAssignedProfile(
@@ -92,6 +96,10 @@ final class SideStoreOperationService {
                 teamIdentifier: account.teamIdentifier
             ) {
                 try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                    guard !SideKickStorageCleanup.isRemovingFiles else {
+                        continuation.resume(throwing: StorageCleanupError.operationRunning)
+                        return
+                    }
                     let observationBox = ProgressObservationBox()
                     let group = AppManager.shared.install(.url(url), presentingViewController: presenter) { result in
                         observationBox.finish()
@@ -107,13 +115,13 @@ final class SideStoreOperationService {
         }
         if let origin = ipa.githubImportConfiguration {
             let installed = await installedApps()
-            let bundleID = installed.first { $0.updateMatchingBundleIdentifiers.contains(ipa.bundleIdentifier.lowercased()) }?.bundleIdentifier ?? ipa.bundleIdentifier
+            let bundleID = installed.first { $0.teamIdentifier == account.teamIdentifier && $0.updateMatchingBundleIdentifiers.contains(ipa.bundleIdentifier.lowercased()) }?.id ?? ipa.bundleIdentifier
             let configuration = GitHubUpdateConfiguration(bundleIdentifier: bundleID,
                 repositoryURL: origin.repositoryURL, source: origin.source,
                 workflowFile: origin.workflowFile, branch: origin.branch, assetName: origin.assetName,
                 baselineUpdateKey: origin.baselineUpdateKey, lastInstalledUpdateKey: origin.lastInstalledUpdateKey,
                 tokenID: origin.tokenID)
-            try await GitHubUpdateConfigurationStore().save(configuration)
+            try await GitHubUpdateConfigurationStore.shared.save(configuration)
         }
         await Self.pruneUnusedCaches()
         await ExpirationNotificationScheduler.update()
@@ -132,8 +140,8 @@ final class SideStoreOperationService {
         }
         let context = DatabaseManager.shared.viewContext
         guard let installedApp = try await context.perform({
-            (try? context.fetch(InstalledApp.fetchRequest()))?.first { $0.bundleIdentifier == bundleIdentifier }
-                ?? InstalledApp.fetchAltStore(in: context).flatMap { $0.bundleIdentifier == bundleIdentifier ? $0 : nil }
+            (try? context.fetch(InstalledApp.fetchRequest()))?.first { $0.resignedBundleIdentifier == bundleIdentifier }
+                ?? InstalledApp.fetchAltStore(in: context).flatMap { $0.resignedBundleIdentifier == bundleIdentifier ? $0 : nil }
         }), let team = installedApp.team, let account = team.account else {
             throw SideStoreOperationError.installedAppUnavailable
         }
@@ -142,13 +150,18 @@ final class SideStoreOperationService {
         }
         let accountID = selectedAccount?.accountIdentifier ?? account.identifier
         let teamID = selectedAccount?.teamIdentifier ?? team.identifier
+        try SideKickStorageCleanup.ensureOperationAllowed()
 
         let vpnLease = try await LocalVPNService.shared.acquire()
         defer { LocalVPNService.shared.release(vpnLease) }
-        try await retryAfterClearingRevokedAssignedProfile(for: bundleIdentifier) {
+        try await retryAfterClearingRevokedAssignedProfile(for: installedApp.bundleIdentifier) {
             try await accountStore.withAccount(accountIdentifier: accountID, teamIdentifier: teamID) {
                 try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                     let group = RefreshGroup(dbContext: DatabaseManager.shared.persistentContainer.newBackgroundContext())
+                    guard !SideKickStorageCleanup.isRemovingFiles else {
+                        continuation.resume(throwing: StorageCleanupError.operationRunning)
+                        return
+                    }
                     let observationBox = ProgressObservationBox()
                     let observation = group.progress.observe(\.fractionCompleted, options: [.initial, .new]) { progress, _ in
                         let fraction = progress.fractionCompleted
@@ -157,7 +170,7 @@ final class SideStoreOperationService {
                     observationBox.retain(observation)
                     group.completionHandler = { results in
                         observationBox.finish()
-                        guard let result = results[bundleIdentifier] else {
+                        guard let result = results[installedApp.bundleIdentifier] else {
                             continuation.resume(throwing: SideStoreOperationError.noRefreshResult)
                             return
                         }
@@ -183,8 +196,8 @@ final class SideStoreOperationService {
         }
         let context = DatabaseManager.shared.viewContext
         guard let installedApp = try await context.perform({
-            (try? context.fetch(InstalledApp.fetchRequest()))?.first { $0.bundleIdentifier == bundleIdentifier }
-                ?? InstalledApp.fetchAltStore(in: context).flatMap { $0.bundleIdentifier == bundleIdentifier ? $0 : nil }
+            (try? context.fetch(InstalledApp.fetchRequest()))?.first { $0.resignedBundleIdentifier == bundleIdentifier }
+                ?? InstalledApp.fetchAltStore(in: context).flatMap { $0.resignedBundleIdentifier == bundleIdentifier ? $0 : nil }
         }), let team = installedApp.team, team.account != nil else {
             throw SideStoreOperationError.installedAppUnavailable
         }
@@ -192,15 +205,21 @@ final class SideStoreOperationService {
             throw SideStoreOperationError.incompatibleRefreshAccount
         }
 
+        try SideKickStorageCleanup.ensureOperationAllowed()
+
         let vpnLease = try await LocalVPNService.shared.acquire()
         defer { LocalVPNService.shared.release(vpnLease) }
-        try await retryAfterClearingRevokedAssignedProfile(for: bundleIdentifier) {
+        try await retryAfterClearingRevokedAssignedProfile(for: installedApp.bundleIdentifier) {
             try await accountStore.withAccount(
                 accountIdentifier: selectedAccount.accountIdentifier,
                 teamIdentifier: selectedAccount.teamIdentifier,
                 forceRefreshCertificate: true
             ) {
                 try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                    guard !SideKickStorageCleanup.isRemovingFiles else {
+                        continuation.resume(throwing: StorageCleanupError.operationRunning)
+                        return
+                    }
                     let observationBox = ProgressObservationBox()
                     let group = AppManager.shared.resign(installedApp, presentingViewController: presenter) { result in
                         observationBox.finish()
@@ -239,7 +258,7 @@ final class SideStoreOperationService {
     }
 
     static func pruneUnusedCaches() async {
-        guard DatabaseManager.shared.isStarted, !AppManager.shared.isActivelyManagingAnyApp else { return }
+        guard DatabaseManager.shared.isStarted, !AppManager.shared.isActivelyManagingAnyApp, !SideKickStorageCleanup.isRemovingFiles else { return }
 
         let context = DatabaseManager.shared.viewContext
         let references = await context.perform { () -> (bundleIdentifiers: Set<String>, signatures: Set<String>)? in
@@ -255,6 +274,7 @@ final class SideStoreOperationService {
             return
         }
 
+        guard !SideKickStorageCleanup.isRemovingFiles else { return }
         CacheAppOperation.pruneUnusedCaches(
             activeSignatures: references.signatures,
             activeBundleIDs: references.bundleIdentifiers
@@ -266,8 +286,8 @@ final class SideStoreOperationService {
     func enableJIT(bundleIdentifier: String) async throws {
         let context = DatabaseManager.shared.viewContext
         guard let installedApp = try await context.perform({
-            (try? context.fetch(InstalledApp.fetchRequest()))?.first { $0.bundleIdentifier == bundleIdentifier }
-                ?? InstalledApp.fetchAltStore(in: context).flatMap { $0.bundleIdentifier == bundleIdentifier ? $0 : nil }
+            (try? context.fetch(InstalledApp.fetchRequest()))?.first { $0.resignedBundleIdentifier == bundleIdentifier }
+                ?? InstalledApp.fetchAltStore(in: context).flatMap { $0.resignedBundleIdentifier == bundleIdentifier ? $0 : nil }
         }) else {
             throw SideStoreOperationError.installedAppUnavailable
         }
@@ -303,7 +323,7 @@ final class SideStoreOperationService {
         for (index, app) in apps.enumerated() {
             do {
                 try await refresh(
-                    bundleIdentifier: app.bundleIdentifier,
+                    bundleIdentifier: app.id,
                     requiresPresenter: false,
                     updatesExpiryNotifications: false
                 )
@@ -344,6 +364,7 @@ private final class ProgressObservationBox: @unchecked Sendable {
 
 struct InstalledAppSummary: Identifiable, Sendable {
     let bundleIdentifier: String
+    var updateTarget: GitHubUpdateTarget { GitHubUpdateTarget(id: id, name: name, version: version) }
     let resignedBundleIdentifier: String
     let name: String
     let version: String
@@ -354,7 +375,7 @@ struct InstalledAppSummary: Identifiable, Sendable {
     let iconData: Data?
     let expirationDate: Date
 
-    var id: String { bundleIdentifier }
+    var id: String { resignedBundleIdentifier }
 
     /// SideStore adds the signing team's identifier to this app's installed bundle ID.
     /// GitHub builds retain the stable, unsuffixed product identifier.

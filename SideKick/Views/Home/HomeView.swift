@@ -6,7 +6,7 @@ private struct QueuedManualUpdate: Identifiable {
     let ipa: ImportedIPA
     let installedApp: InstalledAppSummary
 
-    var id: String { ipa.bundleIdentifier }
+    var id: String { installedApp.id }
 }
 
 private struct QueuedManualUpdateRow: View {
@@ -76,7 +76,8 @@ struct HomeView: View {
             guard ipa.isUpdateQueued, ipa.githubUpdateKey == nil,
                   ipa.fileName?.hasPrefix("github-update-") != true,
                   let installedApp = installedApps.first(where: {
-                      $0.updateMatchingBundleIdentifiers.contains(ipa.bundleIdentifier.lowercased())
+                      if let targetID = ipa.queuedForInstalledAppID { return $0.id == targetID }
+                      return $0.updateMatchingBundleIdentifiers.contains(ipa.bundleIdentifier.lowercased()) && installedApps.filter { $0.updateMatchingBundleIdentifiers.contains(ipa.bundleIdentifier.lowercased()) }.count == 1
                   }) else { return nil }
             return QueuedManualUpdate(ipa: ipa, installedApp: installedApp)
         }
@@ -85,9 +86,7 @@ struct HomeView: View {
     private var filteredInstalledApps: [InstalledAppSummary] {
         var seenBundleIDs = Set<String>()
         return installedApps.filter { app in
-            let identifiers = [app.bundleIdentifier, app.resignedBundleIdentifier].map { $0.lowercased() }
-            guard !identifiers.contains(where: seenBundleIDs.contains) else { return false }
-            identifiers.forEach { seenBundleIDs.insert($0) }
+            guard seenBundleIDs.insert(app.id.lowercased()).inserted else { return false }
             return true
         }
     }
@@ -95,6 +94,7 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             List {
+                LiveContainerLibrarySection()
                 if !githubUpdates.isEmpty || !queuedManualUpdates.isEmpty {
                     SwiftUI.Section("Updates") {
                         ForEach(queuedManualUpdates) { queuedUpdate in
@@ -107,7 +107,7 @@ struct HomeView: View {
                             .navigationLinkIndicatorVisibility(.hidden)
                         }
                         ForEach(filteredGitHubUpdates) { update in
-                            if let app = installedApps.first(where: { $0.bundleIdentifier == update.bundleIdentifier }) {
+                            if let app = installedApps.first(where: { $0.id == update.bundleIdentifier }) {
                                 NavigationLink {
                                     GitHubUpdateDetailView(candidate: update, app: app)
                                 } label: {
@@ -282,14 +282,20 @@ struct HomeView: View {
                 await load()
                 await loadAppIDCapacity()
             }
-            .alert(
+            .confirmationDialog(
                 "\(ipaAwaitingUpdateChoice?.name ?? "This app") is already installed",
                 isPresented: Binding(
                     get: { ipaAwaitingUpdateChoice != nil },
                     set: { if !$0 { ipaAwaitingUpdateChoice = nil } }
                 )
             ) {
-                SwiftUI.Button("Queue for Update") { Task { await queuePendingUpdate() } }
+                ForEach(installedApps.filter { app in
+                    ipaAwaitingUpdateChoice.map { app.updateMatchingBundleIdentifiers.contains($0.bundleIdentifier.lowercased()) } ?? false
+                }) { installation in
+                    SwiftUI.Button("Queue for \(installation.name) · \(installation.accountEmail) (\(installation.teamIdentifier))") {
+                        Task { await queuePendingUpdate(for: installation.id) }
+                    }
+                }
                 SwiftUI.Button("Cancel", role: .cancel) { ipaAwaitingUpdateChoice = nil }
             } message: {
                 Text("Queue this IPA as the update for the installed app?")
@@ -365,6 +371,7 @@ struct HomeView: View {
     }
 
     private func scanGitHubUpdates() async {
+        NotificationCenter.default.post(name: .sideKickLiveContainerCheckRequested, object: nil)
         let generation = UUID()
         githubScanGeneration = generation
         isCheckingGitHubUpdates = true
@@ -469,16 +476,17 @@ struct HomeView: View {
         ipaAwaitingUpdateChoice = app
     }
 
-    private func queuePendingUpdate() async {
+    private func queuePendingUpdate(for targetID: String) async {
         guard let app = ipaAwaitingUpdateChoice else { return }
         ipaAwaitingUpdateChoice = nil
-        await savePreparedIPA(app, update: true)
+        await savePreparedIPA(app, update: true, targetID: targetID)
     }
 
-    private func savePreparedIPA(_ app: ImportedIPA, update: Bool) async {
+    private func savePreparedIPA(_ app: ImportedIPA, update: Bool, targetID: String? = nil) async {
         do {
             var savedApp = app
             savedApp.isQueuedForUpdate = update
+            savedApp.queuedForInstalledAppID = targetID
             try await environment.ipaImportStore.saveImportedIPA(savedApp)
             viewModel.importedApps = try await environment.ipaImportStore.importedApps()
             viewModel.noticeMessage = update ? "\(app.name) is queued as an update." : "\(app.name) is ready to install."

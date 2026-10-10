@@ -2,9 +2,11 @@ name: SideKick iOS Build
 
 on:
   push:
-    branches: [main]
+    branches: [main, "codex/**"]
     paths:
       - "SideKick/**"
+      - "Tests/**"
+      - "Package.swift"
       - "SideKickVPN/**"
       - "scripts/**"
       - "Vendor/SideStore"
@@ -43,6 +45,9 @@ jobs:
         run: |
           xcodebuild -version
           xcodebuild -showsdks | grep -i "iphoneos" || true
+
+      - name: Test SideKick scanner, persistence, baseline, and storage boundaries
+        run: swift test
 
       - name: Apply SideKick integration patch to SideStore
         run: git -C Vendor/SideStore apply ../../patches/sidestore-sidekick.patch

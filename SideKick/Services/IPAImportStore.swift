@@ -179,7 +179,15 @@ actor IPAImportStore {
         }
     }
 
-    func importManagedIPA(from sourceURL: URL, expectedBundleIdentifiers: Set<String>, updateKey: String? = nil, repositoryURL: String? = nil) throws -> ImportedIPA {
+    func migrateQueuedInstallations(_ installations: [String: [String]]) throws {
+        for var ipa in try importedApps() where ipa.isUpdateQueued && ipa.queuedForInstalledAppID == nil {
+            guard let copies = installations[ipa.bundleIdentifier], Set(copies).count == 1 else { continue }
+            ipa.queuedForInstalledAppID = copies.first
+            try saveImportedIPA(ipa)
+        }
+    }
+
+    func importManagedIPA(from sourceURL: URL, expectedBundleIdentifiers: Set<String>, updateKey: String? = nil, repositoryURL: String? = nil, targetID: String? = nil) throws -> ImportedIPA {
         try Task.checkCancellation()
         let metadata = try readMetadata(from: sourceURL)
         let expected = expectedBundleIdentifiers.map { $0.lowercased() }
@@ -200,6 +208,7 @@ actor IPAImportStore {
                 sourceURLString: nil,
                 importedAt: .now,
                 iconData: metadata.iconData,
+                queuedForInstalledAppID: targetID,
                 githubUpdateKey: updateKey,
                 githubRepositoryURL: repositoryURL
             )
@@ -220,13 +229,14 @@ actor IPAImportStore {
 
     func saveImportedIPA(_ app: ImportedIPA) throws {
         var entries = try importedApps()
-        let previous = entries.first(where: { $0.bundleIdentifier == app.bundleIdentifier })
-        entries.removeAll { $0.bundleIdentifier == app.bundleIdentifier }
-        entries.insert(app, at: 0)
+        let previous = entries.filter { $0.id == app.id || ($0.bundleIdentifier == app.bundleIdentifier && $0.importedAt == app.importedAt) }
+        entries = IPAImportIndex.replacing(app, in: entries)
         try save(entries)
         // Updating queue metadata must not delete the IPA it still references.
-        if let previous, previous.fileName != app.fileName {
-            removeLegacyStoredIPA(previous)
+        for old in previous where old.fileName != app.fileName {
+            if !entries.contains(where: { $0.fileName != nil && $0.fileName == old.fileName }) {
+                removeLegacyStoredIPA(old)
+            }
         }
         NotificationCenter.default.post(name: .sideKickImportedIPAsDidChange, object: nil)
     }
@@ -296,7 +306,7 @@ actor IPAImportStore {
 
     func delete(_ app: ImportedIPA) throws {
         var entries = try importedApps()
-        entries.removeAll { $0.bundleIdentifier == app.bundleIdentifier && $0.importedAt == app.importedAt }
+        entries.removeAll { $0.id == app.id && $0.importedAt == app.importedAt }
         try save(entries)
         if !entries.contains(where: { $0.fileName != nil && $0.fileName == app.fileName }) {
             removeLegacyStoredIPA(app)
