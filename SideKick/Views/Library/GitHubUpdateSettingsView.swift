@@ -241,9 +241,9 @@ private struct GitHubBaselineSelectionView: View {
             Section {
                 if let recommendedKey,
                    let recommendation = history.first(where: { $0.key == recommendedKey }) {
-                    Button {
+                    Button(action: {
                         select(recommendation)
-                    } label: {
+                    }) {
                         HStack(spacing: 12) {
                             Image(systemName: "sparkles")
                                 .foregroundStyle(.tint)
@@ -268,9 +268,9 @@ private struct GitHubBaselineSelectionView: View {
                 }
 
                 ForEach(history) { item in
-                    Button {
+                    Button(action: {
                         select(item)
-                    } label: {
+                    }) {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(item.title)
