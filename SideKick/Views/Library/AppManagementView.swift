@@ -5,7 +5,7 @@ struct AppManagementView: View {
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
     @State private var accountStore = SigningAccountStore()
-    @State private var isWorking = false
+    @State private var isShowingRefreshConsole = false
     @State private var isFindingShareIPA = false
     @State private var shareIPA: ImportedIPA?
     @State private var pendingUpdateIPA: ImportedIPA?
@@ -171,17 +171,14 @@ struct AppManagementView: View {
                     }
 
                     SwiftUI.Button {
-                        Task { await refresh(installedApp) }
+                        isShowingRefreshConsole = true
                     } label: {
-                            HStack {
-                                if isWorking { ProgressView() }
-                                else { Text("Refresh").fontWeight(.semibold) }
-                            }
+                        Text("Refresh")
+                            .fontWeight(.semibold)
                             .frame(maxWidth: .infinity)
                         }
                         .buttonStyle(.borderedProminent)
                         .buttonBorderShape(.capsule)
-                        .disabled(isWorking)
 
                     NavigationLink {
                         JITEnableView(app: installedApp)
@@ -202,6 +199,11 @@ struct AppManagementView: View {
         .navigationDestination(item: $shareIPA) { ipa in
             ShareIPAView(app: ipa)
         }
+        .navigationDestination(isPresented: $isShowingRefreshConsole) {
+            if let installedApp {
+                RefreshConsoleView(app: installedApp, accountStore: accountStore)
+            }
+        }
         .onAppear { Task { await reloadManagementState() } }
         .alert("App action failed", isPresented: Binding(
             get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } }
@@ -220,19 +222,6 @@ struct AppManagementView: View {
                 .foregroundStyle(.white)
                 .frame(maxWidth: .infinity, maxHeight: .infinity)
                 .background(.blue.gradient)
-        }
-    }
-
-    private func refresh(_ app: InstalledAppSummary) async {
-        isWorking = true
-        defer { isWorking = false }
-        do {
-            try await SideStoreOperationService(
-                accountStore: accountStore,
-                ipaStore: environment.ipaImportStore
-            ).refresh(bundleIdentifier: app.bundleIdentifier)
-        } catch {
-            errorMessage = error.localizedDescription
         }
     }
 
@@ -259,6 +248,112 @@ struct AppManagementView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+}
+
+private struct RefreshConsoleView: View {
+    let app: InstalledAppSummary
+    let accountStore: SigningAccountStore
+
+    @Environment(AppEnvironment.self) private var environment
+    @State private var progress = 0.0
+    @Environment(\.dismiss) private var dismiss
+    @State private var lines: [String] = []
+    @State private var isRunning = true
+    @State private var didStart = false
+    @State private var failure: String?
+    @State private var lastLoggedPercent = -5
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(isRunning ? "Refreshing" : (failure == nil ? "Refresh Complete" : "Refresh Failed"))
+                    .font(.largeTitle.bold())
+                Text(app.name)
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                ProgressView(value: progress)
+                    .tint(failure == nil ? .accentColor : .red)
+                Text(isRunning ? "\(Int(progress * 100))%" : (failure == nil ? "Complete" : "Needs attention"))
+                    .font(.caption.monospacedDigit())
+                    .foregroundStyle(.secondary)
+            }
+
+            ScrollViewReader { proxy in
+                ScrollView {
+                    LazyVStack(alignment: .leading, spacing: 9) {
+                        ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
+                            Text(line)
+                                .font(.system(.footnote, design: .monospaced))
+                                .foregroundStyle(line.contains("ERROR") ? .red : .primary)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .id(index)
+                        }
+                    }
+                    .padding(14)
+                }
+                .background(Color(uiColor: .secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
+                .onChange(of: lines.count) { _, count in
+                    if count > 0 { proxy.scrollTo(count - 1, anchor: .bottom) }
+                }
+            }
+
+            if let failure {
+                Text(failure)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+
+            if !isRunning {
+                SwiftUI.Button(failure == nil ? "Done" : "Close") { dismiss() }
+                    .fontWeight(.semibold)
+                    .frame(maxWidth: .infinity)
+                    .buttonStyle(.borderedProminent)
+                    .buttonBorderShape(.capsule)
+            }
+        }
+        .padding()
+        .navigationTitle("Refresh Activity")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(isRunning ? .hidden : .visible, for: .navigationBar)
+        .interactiveDismissDisabled(isRunning)
+        .task {
+            guard !didStart else { return }
+            didStart = true
+            await runRefresh()
+        }
+    }
+
+    @MainActor
+    private func runRefresh() async {
+        append("Starting refresh · \(Date.now.formatted(date: .omitted, time: .standard))")
+        append("Account selected · \(app.accountEmail)")
+        append("Preparing signing refresh")
+        do {
+            try await SideStoreOperationService(accountStore: accountStore, ipaStore: environment.ipaImportStore)
+                .refresh(bundleIdentifier: app.bundleIdentifier) { value in
+                    progress = min(max(value, 0), 1)
+                    if value > 0 {
+                        let percent = Int(value * 100)
+                        if percent >= lastLoggedPercent + 5 || percent == 100 {
+                            lastLoggedPercent = percent
+                            append("Refresh pipeline progress · \(percent)%")
+                        }
+                    }
+                }
+            progress = 1
+            append("Refresh completed successfully")
+            await ExpirationNotificationScheduler.update()
+        } catch {
+            failure = error.localizedDescription
+            append("ERROR · \(error.localizedDescription)")
+        }
+        isRunning = false
+    }
+
+    @MainActor
+    private func append(_ message: String) {
+        lines.append("[\(Date.now.formatted(date: .omitted, time: .standard))] \(message)")
     }
 }
 

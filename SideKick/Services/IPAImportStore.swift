@@ -93,7 +93,8 @@ actor IPAImportStore {
             sourceBookmarkData: bookmarkData,
             sourceURLString: remoteSourceURL?.absoluteString,
             importedAt: .now,
-            iconData: metadata.iconData
+            iconData: metadata.iconData,
+            sourceCreatedAt: remoteSourceURL == nil ? sourceURLCreationDate(sourceURL) : nil
         )
         return app
     }
@@ -129,7 +130,8 @@ actor IPAImportStore {
             sourceBookmarkData: bookmarkData,
             sourceURLString: nil,
             importedAt: .now,
-            iconData: metadata.iconData
+            iconData: metadata.iconData,
+            sourceCreatedAt: sourceURLCreationDate(sourceURL)
         )
         return app
     }
@@ -239,6 +241,11 @@ actor IPAImportStore {
         entries.removeAll { $0.bundleIdentifier == app.bundleIdentifier }
         try save(entries)
         removeLegacyStoredIPA(app)
+    }
+
+    private func sourceURLCreationDate(_ url: URL) -> Date? {
+        let values = try? url.resourceValues(forKeys: [.creationDateKey, .contentModificationDateKey])
+        return values?.creationDate ?? values?.contentModificationDate
     }
 
     private func removeLegacyStoredIPA(_ app: ImportedIPA) {

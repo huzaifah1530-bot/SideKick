@@ -10,6 +10,7 @@ struct ImportedIPA: Codable, Identifiable, Hashable, Sendable {
     let sourceURLString: String?
     let importedAt: Date
     let iconData: Data?
+    var sourceCreatedAt: Date? = nil
 
     var formattedImportDate: String {
         importedAt.formatted(date: .abbreviated, time: .omitted)

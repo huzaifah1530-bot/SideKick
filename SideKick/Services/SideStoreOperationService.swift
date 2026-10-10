@@ -107,7 +107,8 @@ final class SideStoreOperationService {
     func refresh(
         bundleIdentifier: String,
         requiresPresenter: Bool = true,
-        updatesExpiryNotifications: Bool = true
+        updatesExpiryNotifications: Bool = true,
+        progressHandler: @escaping @MainActor @Sendable (Double) -> Void = { _ in }
     ) async throws {
         let presenter = UIApplication.shared.topViewController()
         guard !requiresPresenter || presenter != nil else {
@@ -127,7 +128,14 @@ final class SideStoreOperationService {
             try await accountStore.withAccount(accountIdentifier: accountID, teamIdentifier: teamID) {
                 try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                     let group = RefreshGroup(dbContext: DatabaseManager.shared.persistentContainer.newBackgroundContext())
+                    let observationBox = ProgressObservationBox()
+                    let observation = group.progress.observe(\.fractionCompleted, options: [.initial, .new]) { progress, _ in
+                        let fraction = progress.fractionCompleted
+                        Task { @MainActor in progressHandler(fraction) }
+                    }
+                    observationBox.retain(observation)
                     group.completionHandler = { results in
+                        observationBox.finish()
                         guard let result = results[bundleIdentifier] else {
                             continuation.resume(throwing: SideStoreOperationError.noRefreshResult)
                             return

@@ -4,6 +4,7 @@ struct GitHubUpdateSettingsView: View {
     let app: InstalledAppSummary
 
     @Environment(\.dismiss) private var dismiss
+    @Environment(AppEnvironment.self) private var environment
     @State private var repositoryURL = ""
     @State private var source: GitHubUpdateSource = .latestRelease
     @State private var workflowFile = "build.yml"
@@ -11,6 +12,10 @@ struct GitHubUpdateSettingsView: View {
     @State private var assetName = ""
     @State private var message: String?
     @State private var showingMessage = false
+    @State private var history: [GitHubUpdateHistoryEntry] = []
+    @State private var selectedBaselineKey: String?
+    @State private var recommendedBaselineKey: String?
+    @State private var isLoadingHistory = false
 
     private let store = GitHubUpdateConfigurationStore()
 
@@ -52,7 +57,48 @@ struct GitHubUpdateSettingsView: View {
 
             if !repositoryURL.isEmpty {
                 Section {
+                    if history.isEmpty {
+                        SwiftUI.Button {
+                            Task { await loadHistory() }
+                        } label: {
+                            HStack {
+                                Text("Find installed version")
+                                Spacer()
+                                if isLoadingHistory { ProgressView() }
+                            }
+                        }
+                        .disabled(isLoadingHistory)
+                    } else {
+                        Picker("Version currently installed", selection: $selectedBaselineKey) {
+                            Text("Choose a version").tag(String?.none)
+                            ForEach(history) { item in
+                                Text(historyLabel(item)).tag(Optional(item.key))
+                            }
+                        }
+                        if let recommendedBaselineKey,
+                           let recommendation = history.first(where: { $0.key == recommendedBaselineKey }) {
+                            Label("Suggested from the original IPA date: \(recommendation.title)", systemImage: "sparkles")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                            SwiftUI.Button("Use Suggested Version") { selectedBaselineKey = recommendedBaselineKey }
+                        } else {
+                            Text("Choose the version you already have installed. SideKick uses this as the starting point and won’t ask you to reinstall it.")
+                                .font(.footnote)
+                                .foregroundStyle(.secondary)
+                        }
+                        SwiftUI.Button("Reload versions") { Task { await loadHistory() } }
+                    }
+                } header: {
+                    Text("Installed Version")
+                } footer: {
+                    Text("SideKick compares release or build history from this source. The version label in the IPA doesn’t need to match GitHub’s tag or build number.")
+                }
+            }
+
+            if !repositoryURL.isEmpty {
+                Section {
                     SwiftUI.Button("Save GitHub Update Settings") { Task { await save() } }
+                        .disabled(selectedBaselineKey == nil)
                     SwiftUI.Button("Remove GitHub Update Settings", role: .destructive) {
                         Task {
                             do { try await store.remove(bundleIdentifier: app.bundleIdentifier); dismiss() }
@@ -78,6 +124,8 @@ struct GitHubUpdateSettingsView: View {
         workflowFile = config.workflowFile
         branch = config.branch
         assetName = config.assetName
+        selectedBaselineKey = config.lastInstalledUpdateKey ?? config.baselineUpdateKey
+        await loadHistory(configuration: config)
     }
 
     @MainActor
@@ -90,6 +138,8 @@ struct GitHubUpdateSettingsView: View {
         }
         do {
             let previous = try await store.configuration(for: app.bundleIdentifier)
+            let sameBaseline = previous?.repositoryURL == repositoryURL
+                && (previous?.baselineUpdateKey ?? previous?.lastInstalledUpdateKey) == selectedBaselineKey
             try await store.save(GitHubUpdateConfiguration(
                 bundleIdentifier: app.bundleIdentifier,
                 repositoryURL: repositoryURL,
@@ -97,9 +147,75 @@ struct GitHubUpdateSettingsView: View {
                 workflowFile: workflowFile,
                 branch: branch,
                 assetName: assetName,
-                lastInstalledUpdateKey: previous?.repositoryURL == repositoryURL ? previous?.lastInstalledUpdateKey : nil
+                baselineUpdateKey: selectedBaselineKey,
+                lastInstalledUpdateKey: sameBaseline ? previous?.lastInstalledUpdateKey : nil
             ))
             dismiss()
         } catch { message = error.localizedDescription; showingMessage = true }
+    }
+
+    @MainActor
+    private func loadHistory(configuration existing: GitHubUpdateConfiguration? = nil) async {
+        guard !isLoadingHistory else { return }
+        isLoadingHistory = true
+        defer { isLoadingHistory = false }
+        let configuration = existing ?? GitHubUpdateConfiguration(
+            bundleIdentifier: app.bundleIdentifier,
+            repositoryURL: repositoryURL,
+            source: source,
+            workflowFile: workflowFile,
+            branch: branch,
+            assetName: assetName,
+            baselineUpdateKey: nil,
+            lastInstalledUpdateKey: nil
+        )
+        do {
+            let token = try? GitHubCredentialStore().load()
+            history = try await GitHubUpdateService().history(for: configuration, token: token)
+            if selectedBaselineKey == nil {
+                let storedKey = configuration.lastInstalledUpdateKey ?? configuration.baselineUpdateKey
+                if let storedKey, let migrated = history.first(where: { legacyKey(for: $0.key) == storedKey }) {
+                    selectedBaselineKey = migrated.key
+                }
+            }
+            if let selectedBaselineKey, history.contains(where: { $0.key == selectedBaselineKey }) == false {
+                self.selectedBaselineKey = nil
+            }
+            let importedApps = (try? await environment.ipaImportStore.importedApps()) ?? []
+            let importedIPA = importedApps.first {
+                $0.bundleIdentifier.lowercased() == app.bundleIdentifier.lowercased()
+            }
+            let ipaDate = importedIPA?.sourceCreatedAt
+            if let ipaDate {
+                recommendedBaselineKey = history
+                    .filter { ($0.date ?? .distantFuture) <= ipaDate }
+                    .max(by: { ($0.date ?? .distantPast) < ($1.date ?? .distantPast) })?.key
+            }
+            if recommendedBaselineKey == nil,
+               let versionMatch = history.first(where: { $0.title.localizedCaseInsensitiveContains(app.version) || $0.key.localizedCaseInsensitiveContains(app.version) }) {
+                recommendedBaselineKey = versionMatch.key
+            }
+            if selectedBaselineKey == nil { selectedBaselineKey = recommendedBaselineKey }
+            if history.isEmpty { message = "No matching releases or downloadable build artifacts were found. Check the source settings and asset name."; showingMessage = true }
+        } catch {
+            message = error.localizedDescription
+            showingMessage = true
+        }
+    }
+
+    @MainActor
+    private func loadHistory() async {
+        await loadHistory(configuration: nil)
+    }
+
+    private func historyLabel(_ item: GitHubUpdateHistoryEntry) -> String {
+        guard let date = item.date else { return item.title }
+        return "\(item.title) · \(date.formatted(date: .abbreviated, time: .omitted))"
+    }
+
+    private func legacyKey(for currentKey: String) -> String? {
+        let parts = currentKey.split(separator: ":", omittingEmptySubsequences: false)
+        guard parts.count == 4, parts[0] == "release" else { return nil }
+        return "release:\(parts[2]):\(parts[3])"
     }
 }

@@ -24,6 +24,7 @@ struct AccountsView: View {
                                 SigningAccountDetailView(account: account, accountStore: accountStore)
                             } label: {
                                 accountRow(account)
+                                    .fullWidthListSeparators()
                             }
                         }
                     }

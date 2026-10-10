@@ -150,12 +150,36 @@ struct BuzzheavierClient {
         return nil
     }
 
-    func download(from shareURL: URL) async throws -> (URL, URLResponse) {
+    func download(
+        from shareURL: URL,
+        onProgress: @escaping @Sendable (GitHubDownloadProgress) -> Void = { _ in }
+    ) async throws -> (URL, URLResponse) {
         let downloadURL = try await resolveDownloadURL(from: shareURL)
         var request = URLRequest(url: downloadURL)
         request.setValue("SideKick", forHTTPHeaderField: "User-Agent")
         request.setValue(shareURL.absoluteString, forHTTPHeaderField: "Referer")
-        return try await URLSession.shared.download(for: request)
+        return try await URLSession.shared.download(for: request, delegate: AppDownloadProgressDelegate(onProgress: onProgress))
+    }
+}
+
+private final class AppDownloadProgressDelegate: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
+    private let onProgress: @Sendable (GitHubDownloadProgress) -> Void
+
+    init(onProgress: @escaping @Sendable (GitHubDownloadProgress) -> Void) {
+        self.onProgress = onProgress
+    }
+
+    func urlSession(
+        _ session: URLSession,
+        downloadTask: URLSessionDownloadTask,
+        didWriteData bytesWritten: Int64,
+        totalBytesWritten: Int64,
+        totalBytesExpectedToWrite: Int64
+    ) {
+        onProgress(GitHubDownloadProgress(
+            bytesWritten: totalBytesWritten,
+            totalBytesExpected: totalBytesExpectedToWrite > 0 ? totalBytesExpectedToWrite : nil
+        ))
     }
 }
 

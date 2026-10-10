@@ -16,7 +16,16 @@ struct GitHubUpdateConfiguration: Codable, Identifiable, Equatable, Sendable {
     var workflowFile: String
     var branch: String
     var assetName: String
+    var baselineUpdateKey: String? = nil
     var lastInstalledUpdateKey: String?
+}
+
+struct GitHubUpdateHistoryEntry: Identifiable, Hashable, Sendable {
+    let key: String
+    let title: String
+    let date: Date?
+
+    var id: String { key }
 }
 
 struct GitHubUpdateCandidate: Identifiable, Equatable, Sendable {

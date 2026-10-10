@@ -97,6 +97,7 @@ struct URLImportView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var linkText = ""
     @State private var isDownloading = false
+    @State private var downloadProgress: GitHubDownloadProgress?
     @State private var errorMessage: String?
     @State private var importedApp: ImportedIPA?
     @State private var importedAsUpdate = false
@@ -121,9 +122,28 @@ struct URLImportView: View {
 
             Section {
                 if isDownloading {
-                    HStack {
-                        ProgressView()
-                        Text("Downloading and checking IPA…")
+                    VStack(alignment: .leading, spacing: 10) {
+                        HStack {
+                            Text("Downloading IPA…")
+                            Spacer()
+                            if let fraction = downloadProgress?.fractionCompleted {
+                                Text(fraction > 0 && fraction < 0.01 ? "<1%" : "\(Int(fraction * 100))%")
+                                    .monospacedDigit()
+                            } else {
+                                ProgressView().controlSize(.small)
+                            }
+                        }
+                        if let downloadProgress {
+                            ProgressView(value: downloadProgress.fractionCompleted)
+                            if downloadProgress.bytesWritten > 0 {
+                                Text("Downloaded \(ByteCountFormatter.string(fromByteCount: downloadProgress.bytesWritten, countStyle: .file))")
+                                    .font(.footnote).foregroundStyle(.secondary)
+                            }
+                        } else {
+                            ProgressView()
+                        }
+                        Text("Checking the downloaded IPA after transfer…")
+                            .font(.footnote).foregroundStyle(.secondary)
                     }
                 } else if let importedApp {
                     Label(
@@ -164,13 +184,12 @@ struct URLImportView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Import from URL")
         .navigationBarTitleDisplayMode(.inline)
-        .confirmationDialog(
+        .alert(
             "\(ipaAwaitingUpdateChoice?.name ?? "This app") is already installed",
             isPresented: Binding(
                 get: { ipaAwaitingUpdateChoice != nil },
                 set: { if !$0 { ipaAwaitingUpdateChoice = nil } }
-            ),
-            titleVisibility: .visible
+            )
         ) {
             SwiftUI.Button("Queue for Update") { Task { await queuePendingUpdate() } }
             SwiftUI.Button("Cancel", role: .cancel) { ipaAwaitingUpdateChoice = nil }
@@ -189,6 +208,7 @@ struct URLImportView: View {
     @MainActor
     private func download() async {
         isDownloading = true
+        downloadProgress = nil
         errorMessage = nil
         defer { isDownloading = false }
 
@@ -208,7 +228,9 @@ struct URLImportView: View {
                 }
                 sourceURL = pastedURL
             }
-            let (downloadedURL, response) = try await BuzzheavierClient().download(from: sourceURL)
+            let (downloadedURL, response) = try await BuzzheavierClient().download(from: sourceURL) { progress in
+                Task { @MainActor in downloadProgress = progress }
+            }
             defer { try? FileManager.default.removeItem(at: downloadedURL) }
             if let response = response as? HTTPURLResponse, !(200..<300).contains(response.statusCode) {
                 throw AppSharingError.downloadFailed(response.statusCode)

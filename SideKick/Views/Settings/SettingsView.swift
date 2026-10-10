@@ -1,12 +1,6 @@
 import SwiftUI
-import UniformTypeIdentifiers
-import UIKit
 
 struct SettingsView: View {
-    @State private var isChoosingPairingFile = false
-    @State private var pairingStatus: String?
-    @State private var isShowingPairingStatus = false
-
     var body: some View {
         NavigationStack {
             List {
@@ -17,16 +11,19 @@ struct SettingsView: View {
                     }
                 }
 
-                Section("Device pairing") {
-                    LabeledContent("Pairing file", value: PairingFileManager.shared.hasPairingFile() ? "Added" : "Not set up")
-                    SwiftUI.Button("Import pairing file…") { isChoosingPairingFile = true }
-                    Link("How to get a pairing file", destination: AppConstants.URLs.pairingDocumentation)
-                    Text("This file is a trust record for this iPhone, created once using a computer and iLoader. Import it here. SideStore itself is not required.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-
                 Section("Install and refresh") {
+                    NavigationLink {
+                        RefreshSettingsView()
+                    } label: {
+                        Label("App Refresh", systemImage: "arrow.clockwise")
+                            .fullWidthListSeparators()
+                    }
+                    NavigationLink {
+                        InstallSigningSettingsView()
+                    } label: {
+                        Label("Install & Signing", systemImage: "signature")
+                            .fullWidthListSeparators()
+                    }
                     Link(destination: URL(string: "https://apps.apple.com/app/id6755608044")!) {
                         Label("Get LocalDevVPN", systemImage: "arrow.up.right")
                     }
@@ -35,11 +32,33 @@ struct SettingsView: View {
                         .foregroundStyle(.secondary)
                 }
 
+                Section("Device & Services") {
+                    NavigationLink {
+                        ConnectionSettingsView()
+                    } label: {
+                        Label("Connection & Pairing", systemImage: "network")
+                            .fullWidthListSeparators()
+                    }
+                    NavigationLink {
+                        AnisetteSettingsView()
+                    } label: {
+                        Label("Anisette", systemImage: "lock.shield")
+                            .fullWidthListSeparators()
+                    }
+                    NavigationLink {
+                        SettingsStorageView()
+                    } label: {
+                        Label("Storage", systemImage: "internaldrive")
+                            .fullWidthListSeparators()
+                    }
+                }
+
                 Section("App updates") {
                     NavigationLink {
                         GitHubAccountSettingsView()
                     } label: {
                         Label("GitHub Account", systemImage: "chevron.left.forwardslash.chevron.right")
+                            .fullWidthListSeparators()
                     }
                 }
 
@@ -53,47 +72,6 @@ struct SettingsView: View {
             }
             .listStyle(.insetGrouped)
             .navigationTitle("Settings")
-            .fileImporter(
-                isPresented: $isChoosingPairingFile,
-                allowedContentTypes: PairingFileManager.supportedContentTypes,
-                allowsMultipleSelection: false
-            ) { result in
-                Task { await importPairingFile(result) }
-            }
-            .alert("Device pairing", isPresented: $isShowingPairingStatus) {
-                SwiftUI.Button("OK", role: .cancel) { pairingStatus = nil }
-            } message: {
-                Text(pairingStatus ?? "")
-            }
         }
     }
-
-    @MainActor
-    private func importPairingFile(_ result: Result<[URL], Error>) async {
-        do {
-            guard let url = try result.get().first else { return }
-            UserDefaults.standard.set(false, forKey: "sidekick.setup.pairing-verified")
-            try PairingSetupImporter.importFile(from: url)
-            guard let pairingContent = PairingFileManager.shared.fetchPairingFile() else {
-                throw PairingSetupError.unreadableFile
-            }
-            try await AppBootManager.shared.startMinimuxer(pairingFile: pairingContent)
-            do {
-                try await ensureMinimuxerReady()
-                _ = try await fetchUDID(forceLive: true)
-                UserDefaults.standard.set(true, forKey: "sidekick.setup.pairing-verified")
-                pairingStatus = "Pairing is set up and SideKick can reach this iPhone. Install and refresh are ready."
-            } catch {
-                pairingStatus = "Pairing file imported. SideKick couldn’t reach the iPhone yet. Connect to Wi-Fi, open LocalDevVPN, tap Connect, then retry an install or refresh.\n\n\(error.localizedDescription)"
-            }
-        } catch {
-            pairingStatus = "SideKick couldn’t import that pairing file. Make sure it was created for this iPhone and try again.\n\n\(error.localizedDescription)"
-        }
-        isShowingPairingStatus = true
-    }
-}
-
-private enum PairingSetupError: LocalizedError {
-    case unreadableFile
-    var errorDescription: String? { "The pairing file was imported but could not be read." }
 }

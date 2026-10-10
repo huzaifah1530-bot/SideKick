@@ -16,6 +16,7 @@ struct HomeView: View {
     @State private var githubUpdates: [GitHubUpdateCandidate] = []
     @State private var isCheckingGitHubUpdates = false
     @State private var githubUpdateCheckFailed = false
+    @State private var expirationClock = Date.now
     @Environment(AppEnvironment.self) private var environment
 
     private var installedBundleIdentifiers: Set<String> {
@@ -47,6 +48,7 @@ struct HomeView: View {
                                     GitHubUpdateDetailView(candidate: update, app: app)
                                 } label: {
                                     GitHubUpdateRow(candidate: update, app: app)
+                                        .fullWidthListSeparators()
                                 }
                             }
                         }
@@ -90,6 +92,7 @@ struct HomeView: View {
                                 AppManagementView(installedApp: app)
                             } label: {
                                 installedAppRow(app)
+                                    .fullWidthListSeparators()
                             }
                             .navigationLinkIndicatorVisibility(.hidden)
                         }
@@ -129,6 +132,7 @@ struct HomeView: View {
                                 }
                             } label: {
                                 ImportedIPARow(app: app)
+                                    .fullWidthListSeparators()
                             }
                             .navigationLinkIndicatorVisibility(.hidden)
                         }
@@ -138,6 +142,12 @@ struct HomeView: View {
             .listStyle(.insetGrouped)
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("My Apps")
+            .task {
+                while !Task.isCancelled {
+                    try? await Task.sleep(for: .seconds(60))
+                    expirationClock = .now
+                }
+            }
             .toolbar {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
@@ -197,13 +207,12 @@ struct HomeView: View {
                 await load()
                 await loadAppIDCapacity()
             }
-            .confirmationDialog(
+            .alert(
                 "\(ipaAwaitingUpdateChoice?.name ?? "This app") is already installed",
                 isPresented: Binding(
                     get: { ipaAwaitingUpdateChoice != nil },
                     set: { if !$0 { ipaAwaitingUpdateChoice = nil } }
-                ),
-                titleVisibility: .visible
+                )
             ) {
                 SwiftUI.Button("Queue for Update") { Task { await queuePendingUpdate() } }
                 SwiftUI.Button("Cancel", role: .cancel) { ipaAwaitingUpdateChoice = nil }
@@ -251,11 +260,11 @@ struct HomeView: View {
                     .font(.caption2)
                     .foregroundStyle(.secondary)
                     .frame(width: 82, alignment: .center)
-                Text("\(daysRemaining(for: app.expirationDate)) DAYS")
+                Text("\(daysRemaining(for: app.expirationDate, now: expirationClock)) DAYS")
                     .font(.subheadline.weight(.semibold))
                     .foregroundStyle(.white)
                     .frame(width: 82, height: 34)
-                    .background(expirationColor(for: app.expirationDate).opacity(0.84), in: .capsule)
+                    .background(expirationColor(for: app.expirationDate, now: expirationClock).opacity(0.84), in: .capsule)
             }
         }
         .padding(.vertical, 8)
@@ -341,12 +350,12 @@ struct HomeView: View {
         await scanGitHubUpdates()
     }
 
-    private func daysRemaining(for date: Date) -> Int {
-        max(Int(ceil(date.timeIntervalSinceNow / 86_400)), 0)
+    private func daysRemaining(for date: Date, now: Date) -> Int {
+        max(Int(ceil(date.timeIntervalSince(now) / 86_400)), 0)
     }
 
-    private func expirationColor(for date: Date) -> Color {
-        let days = min(max(daysRemaining(for: date), 1), 7)
+    private func expirationColor(for date: Date, now: Date) -> Color {
+        let days = min(max(daysRemaining(for: date, now: now), 1), 7)
         let greenToRed = Double(days - 1) / 6
         return Color(hue: greenToRed * 0.33, saturation: 0.82, brightness: 0.86)
     }
