@@ -205,6 +205,7 @@ final class SigningAccountStore {
         accountIdentifier: String,
         teamIdentifier: String,
         prepareForSigning: Bool = true,
+        forceRefreshCertificate: Bool = false,
         operation: () async throws -> T
     ) async throws -> T {
         guard !isWorking else { throw SigningAccountError.engineBusy }
@@ -245,7 +246,7 @@ final class SigningAccountStore {
 
         do {
             if prepareForSigning {
-                try await ensureSigningReady(for: target)
+                try await ensureSigningReady(for: target, forceRefreshCertificate: forceRefreshCertificate)
             }
             let result = try await operation()
             if (previous?.id != target.id || !sessionMatchesTarget), let previousCredentials {
@@ -373,16 +374,24 @@ final class SigningAccountStore {
 
     /// Completes the device registration and certificate setup deferred by the
     /// account sign-in screen before a real signing operation begins.
-    private func ensureSigningReady(for target: SigningAccountSummary) async throws {
+    private func ensureSigningReady(for target: SigningAccountSummary, forceRefreshCertificate: Bool = false) async throws {
         let key = SigningSessionVault.key(
             accountIdentifier: target.accountIdentifier,
             teamIdentifier: target.teamIdentifier
         )
         let savedCredentials = try vault.load(key: key)
 
-        if CertificateManager.shared.activeCertificate != nil,
+        if let activeCertificate = CertificateManager.shared.activeCertificate,
            UserDefaults.standard.isDeviceRegistered {
-            return
+            guard forceRefreshCertificate else { return }
+            let team = try await developerTeam(for: target)
+            let portalCertificates = try await DeveloperPortalProxy.shared.fetchCertificates(team: team)
+            if portalCertificates.contains(where: { $0.serialNumber.caseInsensitiveCompare(activeCertificate.serialNumber) == .orderedSame }) {
+                return
+            }
+
+            debugLog("[SideKick] Active certificate is missing from the Apple Developer Portal; renewing it before the re-sign operation.")
+            CertificateManager.shared.clearActiveCertificate()
         }
 
         guard let presenter = UIApplication.shared.topViewController() else {

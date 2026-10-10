@@ -241,6 +241,17 @@ struct AppManagementView: View {
                     .fullWidthListSeparators()
 
                     NavigationLink {
+                        ResignOptionsView(app: installedApp, accountStore: accountStore)
+                    } label: {
+                        Label("Re-sign", systemImage: "arrow.clockwise")
+                            .fontWeight(.semibold)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }
+                    .buttonStyle(.bordered)
+                    .buttonBorderShape(.capsule)
+                    .fullWidthListSeparators()
+
+                    NavigationLink {
                         JITEnableView(app: installedApp)
                     } label: {
                         Label("Enable JIT", systemImage: "bolt.fill")
@@ -326,10 +337,29 @@ struct AppManagementView: View {
     }
 }
 
+private enum AppSigningOperation: Equatable {
+    case refresh
+    case resign
+
+    var progressTitle: String { self == .refresh ? "Refreshing" : "Re-signing" }
+    var completedTitle: String { self == .refresh ? "Refresh Complete" : "Re-sign Complete" }
+    var failedTitle: String { self == .refresh ? "Refresh Failed" : "Re-sign Failed" }
+    var activityTitle: String { self == .refresh ? "Refresh Activity" : "Re-sign Activity" }
+}
+
+private enum AppSigningError: LocalizedError {
+    case accountRequired
+
+    var errorDescription: String? {
+        "Choose a saved Apple ID before re-signing this app."
+    }
+}
+
 private struct RefreshConsoleView: View {
     let app: InstalledAppSummary
     let accountStore: SigningAccountStore
     var selectedAccount: SigningAccountSummary? = nil
+    var operation: AppSigningOperation = .refresh
 
     @Environment(AppEnvironment.self) private var environment
     @State private var progress = 0.0
@@ -343,7 +373,7 @@ private struct RefreshConsoleView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 8) {
-                Text(isRunning ? "Refreshing" : (failure == nil ? "Refresh Complete" : "Refresh Failed"))
+                Text(isRunning ? operation.progressTitle : (failure == nil ? operation.completedTitle : operation.failedTitle))
                     .font(.largeTitle.bold())
                 Text(app.name)
                     .font(.title3)
@@ -389,7 +419,7 @@ private struct RefreshConsoleView: View {
             }
         }
         .padding()
-        .navigationTitle("Refresh Activity")
+        .navigationTitle(operation.activityTitle)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(isRunning ? .hidden : .visible, for: .navigationBar)
         .interactiveDismissDisabled(isRunning)
@@ -402,23 +432,25 @@ private struct RefreshConsoleView: View {
 
     @MainActor
     private func runRefresh() async {
-        append("Starting refresh · \(Date.now.formatted(date: .omitted, time: .standard))")
+        append("Starting \(operation == .refresh ? "refresh" : "re-sign") · \(Date.now.formatted(date: .omitted, time: .standard))")
         append("Account selected · \(selectedAccount?.email ?? app.accountEmail)")
-        append("Preparing signing refresh")
+        append(operation == .refresh ? "Preparing signing refresh" : "Preparing app re-sign")
         do {
-            try await SideStoreOperationService(accountStore: accountStore, ipaStore: environment.ipaImportStore)
-                .refresh(bundleIdentifier: app.bundleIdentifier, using: selectedAccount) { value in
-                    progress = min(max(value, 0), 1)
-                    if value > 0 {
-                        let percent = Int(value * 100)
-                        if percent >= lastLoggedPercent + 5 || percent == 100 {
-                            lastLoggedPercent = percent
-                            append("Refresh pipeline progress · \(percent)%")
-                        }
-                    }
+            let service = SideStoreOperationService(accountStore: accountStore, ipaStore: environment.ipaImportStore)
+            if operation == .resign {
+                guard let selectedAccount else {
+                    throw AppSigningError.accountRequired
                 }
+                try await service.resign(bundleIdentifier: app.bundleIdentifier, using: selectedAccount) { value in
+                    updateProgress(value)
+                }
+            } else {
+                try await service.refresh(bundleIdentifier: app.bundleIdentifier, using: selectedAccount) { value in
+                    updateProgress(value)
+                }
+            }
             progress = 1
-            append("Refresh completed successfully")
+            append(operation == .refresh ? "Refresh completed successfully" : "Re-sign completed successfully")
             await ExpirationNotificationScheduler.update()
         } catch {
             failure = error.localizedDescription
@@ -428,8 +460,77 @@ private struct RefreshConsoleView: View {
     }
 
     @MainActor
+    private func updateProgress(_ value: Double) {
+        progress = min(max(value, 0), 1)
+        if value > 0 {
+            let percent = Int(value * 100)
+            if percent >= lastLoggedPercent + 5 || percent == 100 {
+                lastLoggedPercent = percent
+                append("\(operation == .refresh ? "Refresh" : "Re-sign") pipeline progress · \(percent)%")
+            }
+        }
+    }
+
+    @MainActor
     private func append(_ message: String) {
         lines.append("[\(Date.now.formatted(date: .omitted, time: .standard))] \(message)")
+    }
+}
+
+private struct ResignOptionsView: View {
+    let app: InstalledAppSummary
+    let accountStore: SigningAccountStore
+
+    private var eligibleAccounts: [SigningAccountSummary] {
+        accountStore.accounts.filter {
+            $0.teamIdentifier == app.teamIdentifier && $0.hasSavedSession
+        }
+    }
+
+    var body: some View {
+        List {
+            if eligibleAccounts.isEmpty {
+                Section {
+                    Text("Add a saved Apple ID on this app’s signing team in Accounts to re-sign it.")
+                        .foregroundStyle(.secondary)
+                } header: {
+                    Text("Signing Account")
+                } footer: {
+                    Text("Re-signing keeps the app on its current team and replaces its signing certificate. A different team requires installing the app again.")
+                }
+            } else {
+                Section {
+                    ForEach(eligibleAccounts) { account in
+                        NavigationLink {
+                            RefreshConsoleView(
+                                app: app,
+                                accountStore: accountStore,
+                                selectedAccount: account,
+                                operation: .resign
+                            )
+                        } label: {
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(account.email)
+                                    .font(.body.weight(.medium))
+                                Text("\(account.teamName) · \(account.teamType)")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.vertical, 5)
+                        }
+                        .fullWidthListSeparators()
+                    }
+                } header: {
+                    Text("Signing Account")
+                } footer: {
+                    Text("Choose the Apple ID SideKick should use to re-sign and reinstall this app. Its current signing team must stay the same.")
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Re-sign App")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await accountStore.reload() }
     }
 }
 
@@ -473,6 +574,7 @@ private struct RefreshOptionsView: View {
                             }
                             .padding(.vertical, 5)
                         }
+                        .fullWidthListSeparators()
                     }
                 } header: {
                     Text("Signing Account")

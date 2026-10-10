@@ -156,6 +156,49 @@ final class SideStoreOperationService {
         }
     }
 
+    func resign(
+        bundleIdentifier: String,
+        using selectedAccount: SigningAccountSummary,
+        progressHandler: @escaping @MainActor @Sendable (Double) -> Void = { _ in }
+    ) async throws {
+        guard let presenter = UIApplication.shared.topViewController() else {
+            throw SideStoreOperationError.presentationUnavailable
+        }
+        let context = DatabaseManager.shared.viewContext
+        guard let installedApp = try await context.perform({
+            (try? context.fetch(InstalledApp.fetchRequest()))?.first { $0.bundleIdentifier == bundleIdentifier }
+                ?? InstalledApp.fetchAltStore(in: context).flatMap { $0.bundleIdentifier == bundleIdentifier ? $0 : nil }
+        }), let team = installedApp.team, team.account != nil else {
+            throw SideStoreOperationError.installedAppUnavailable
+        }
+        guard selectedAccount.teamIdentifier == team.identifier else {
+            throw SideStoreOperationError.incompatibleRefreshAccount
+        }
+
+        try await retryAfterClearingRevokedAssignedProfile(for: bundleIdentifier) {
+            try await accountStore.withAccount(
+                accountIdentifier: selectedAccount.accountIdentifier,
+                teamIdentifier: selectedAccount.teamIdentifier,
+                forceRefreshCertificate: true
+            ) {
+                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                    let observationBox = ProgressObservationBox()
+                    let group = AppManager.shared.resign(installedApp, presentingViewController: presenter) { result in
+                        observationBox.finish()
+                        continuation.resume(with: result.map { _ in () })
+                    }
+                    let observation = group.progress.observe(\.fractionCompleted, options: [.initial, .new]) { progress, _ in
+                        let fraction = progress.fractionCompleted
+                        Task { @MainActor in progressHandler(fraction) }
+                    }
+                    observationBox.retain(observation)
+                }
+            }
+        }
+        await Self.pruneUnusedCaches()
+        await ExpirationNotificationScheduler.update()
+    }
+
     private func retryAfterClearingRevokedAssignedProfile<T>(
         for bundleIdentifier: String,
         recoveryHandler: @escaping @MainActor @Sendable () -> Void = {},
