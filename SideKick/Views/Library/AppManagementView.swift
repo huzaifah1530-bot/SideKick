@@ -126,15 +126,16 @@ struct AppManagementView: View {
                     .disabled(isFindingShareIPA)
 
                     if let pendingUpdateIPA {
-                        if let originalAccount = accountStore.accounts.first(where: {
+                        let updateAccounts = accountStore.accounts.filter {
+                            $0.teamIdentifier == installedApp.teamIdentifier && $0.hasSavedSession
+                        }
+                        if let updateAccount = updateAccounts.first(where: {
                             $0.accountIdentifier == installedApp.accountIdentifier
-                                && $0.teamIdentifier == installedApp.teamIdentifier
-                                && $0.hasSavedSession
-                        }) {
+                        }) ?? updateAccounts.first {
                             NavigationLink {
                                 InstallConsoleView(
                                     app: pendingUpdateIPA,
-                                    account: originalAccount,
+                                    account: updateAccount,
                                     accountStore: accountStore,
                                     ipaStore: environment.ipaImportStore,
                                     isUpdate: true,
@@ -154,6 +155,30 @@ struct AppManagementView: View {
                             }
                             .buttonStyle(.borderedProminent)
                             .buttonBorderShape(.capsule)
+                            if updateAccounts.count > 1 {
+                                NavigationLink {
+                                    InstallAccountSelectionView(
+                                        app: pendingUpdateIPA,
+                                        accounts: updateAccounts,
+                                        accountStore: accountStore,
+                                        ipaStore: environment.ipaImportStore,
+                                        isUpdate: true,
+                                        onInstalled: {
+                                            do {
+                                                try await environment.ipaImportStore.delete(pendingUpdateIPA)
+                                                self.pendingUpdateIPA = nil
+                                            } catch {
+                                                self.errorMessage = error.localizedDescription
+                                            }
+                                        }
+                                    )
+                                } label: {
+                                    Text("Options")
+                                        .font(.footnote)
+                                        .frame(maxWidth: .infinity)
+                                }
+                                .buttonStyle(.plain)
+                            }
                         } else {
                             Text("Updates must be signed with the account that installed this app (\(installedApp.accountEmail)). Add that account back in Accounts to continue.")
                                 .font(.footnote)
@@ -191,6 +216,18 @@ struct AppManagementView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .buttonBorderShape(.capsule)
+
+                    NavigationLink {
+                        RefreshOptionsView(
+                            app: installedApp,
+                            accountStore: accountStore
+                        )
+                    } label: {
+                        Text("Options")
+                            .font(.footnote)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.plain)
 
                     NavigationLink {
                         JITEnableView(app: installedApp)
@@ -280,6 +317,7 @@ struct AppManagementView: View {
 private struct RefreshConsoleView: View {
     let app: InstalledAppSummary
     let accountStore: SigningAccountStore
+    var selectedAccount: SigningAccountSummary? = nil
 
     @Environment(AppEnvironment.self) private var environment
     @State private var progress = 0.0
@@ -353,11 +391,11 @@ private struct RefreshConsoleView: View {
     @MainActor
     private func runRefresh() async {
         append("Starting refresh · \(Date.now.formatted(date: .omitted, time: .standard))")
-        append("Account selected · \(app.accountEmail)")
+        append("Account selected · \(selectedAccount?.email ?? app.accountEmail)")
         append("Preparing signing refresh")
         do {
             try await SideStoreOperationService(accountStore: accountStore, ipaStore: environment.ipaImportStore)
-                .refresh(bundleIdentifier: app.bundleIdentifier) { value in
+                .refresh(bundleIdentifier: app.bundleIdentifier, using: selectedAccount) { value in
                     progress = min(max(value, 0), 1)
                     if value > 0 {
                         let percent = Int(value * 100)
@@ -380,6 +418,61 @@ private struct RefreshConsoleView: View {
     @MainActor
     private func append(_ message: String) {
         lines.append("[\(Date.now.formatted(date: .omitted, time: .standard))] \(message)")
+    }
+}
+
+private struct RefreshOptionsView: View {
+    let app: InstalledAppSummary
+    let accountStore: SigningAccountStore
+
+    private var eligibleAccounts: [SigningAccountSummary] {
+        accountStore.accounts.filter {
+            $0.teamIdentifier == app.teamIdentifier && $0.hasSavedSession
+        }
+    }
+
+    var body: some View {
+        List {
+            if eligibleAccounts.isEmpty {
+                Section {
+                    Text("Add the Apple ID that signed this app in Accounts to refresh it.")
+                        .foregroundStyle(.secondary)
+                } header: {
+                    Text("Signing Account")
+                } footer: {
+                    Text("Refreshing keeps the app on its current signing team. To change teams, install or update from an IPA using the other account.")
+                }
+            } else {
+                Section {
+                    ForEach(eligibleAccounts) { account in
+                        NavigationLink {
+                            RefreshConsoleView(
+                                app: app,
+                                accountStore: accountStore,
+                                selectedAccount: account
+                            )
+                        } label: {
+                            VStack(alignment: .leading, spacing: 5) {
+                                Text(account.email)
+                                    .font(.body.weight(.medium))
+                                Text("\(account.teamName) · \(account.teamType)")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                            }
+                            .padding(.vertical, 5)
+                        }
+                    }
+                } header: {
+                    Text("Signing Account")
+                } footer: {
+                    Text("Choose the saved Apple ID session SideKick should use for this refresh. The installed app’s signing team must stay the same.")
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Refresh Options")
+        .navigationBarTitleDisplayMode(.inline)
+        .task { await accountStore.reload() }
     }
 }
 
@@ -467,7 +560,7 @@ private struct JITEnableView: View {
     }
 }
 
-private struct InstallAccountSelectionView: View {
+struct InstallAccountSelectionView: View {
     let app: ImportedIPA
     let accounts: [SigningAccountSummary]
     let accountStore: SigningAccountStore

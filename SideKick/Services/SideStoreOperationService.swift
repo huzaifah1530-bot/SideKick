@@ -108,6 +108,7 @@ final class SideStoreOperationService {
         bundleIdentifier: String,
         requiresPresenter: Bool = true,
         updatesExpiryNotifications: Bool = true,
+        using selectedAccount: SigningAccountSummary? = nil,
         progressHandler: @escaping @MainActor @Sendable (Double) -> Void = { _ in }
     ) async throws {
         let presenter = UIApplication.shared.topViewController()
@@ -121,8 +122,11 @@ final class SideStoreOperationService {
         }), let team = installedApp.team, let account = team.account else {
             throw SideStoreOperationError.installedAppUnavailable
         }
-        let accountID = account.identifier
-        let teamID = team.identifier
+        if let selectedAccount, selectedAccount.teamIdentifier != team.identifier {
+            throw SideStoreOperationError.incompatibleRefreshAccount
+        }
+        let accountID = selectedAccount?.accountIdentifier ?? account.identifier
+        let teamID = selectedAccount?.teamIdentifier ?? team.identifier
 
         try await retryAfterClearingRevokedAssignedProfile(for: bundleIdentifier) {
             try await accountStore.withAccount(accountIdentifier: accountID, teamIdentifier: teamID) {
@@ -296,12 +300,14 @@ struct InstalledAppSummary: Identifiable, Sendable {
 private enum SideStoreOperationError: LocalizedError {
     case presentationUnavailable
     case installedAppUnavailable
+    case incompatibleRefreshAccount
     case noRefreshResult
 
     var errorDescription: String? {
         switch self {
         case .presentationUnavailable: "SideKick couldn’t open the signing operation. Try again."
         case .installedAppUnavailable: "This installed app or its signing account is no longer available."
+        case .incompatibleRefreshAccount: "Refreshing must keep the app on its current signing team. Choose an account on the same team."
         case .noRefreshResult: "The refresh operation finished without returning a result."
         }
     }

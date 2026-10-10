@@ -67,6 +67,7 @@ struct GitHubUpdateDetailView: View {
     @State private var accountStore = SigningAccountStore()
     @State private var errorMessage: String?
     @State private var account: SigningAccountSummary?
+    @State private var eligibleAccounts: [SigningAccountSummary] = []
 
     private let configurationStore = GitHubUpdateConfigurationStore()
 
@@ -170,8 +171,27 @@ struct GitHubUpdateDetailView: View {
                         }
                         .buttonStyle(.borderedProminent)
                         .buttonBorderShape(.capsule)
+                        if eligibleAccounts.count > 1 {
+                            NavigationLink {
+                                InstallAccountSelectionView(
+                                    app: queuedIPA,
+                                    accounts: eligibleAccounts,
+                                    accountStore: accountStore,
+                                    ipaStore: environment.ipaImportStore,
+                                    isUpdate: true,
+                                    onInstalled: { await finishUpdate(queuedIPA) }
+                                )
+                            } label: {
+                                Text("Options")
+                                    .font(.footnote)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                            }
+                            .buttonStyle(.plain)
+                        }
                     } else {
-                        Text("Add back the Apple account that originally installed this app to update it.")
+                        Text(eligibleAccounts.isEmpty
+                            ? "Add the Apple account that originally installed this app in Accounts to update it."
+                            : "Choose a saved Apple account on the app’s signing team to update it.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
                 } else {
@@ -184,11 +204,12 @@ struct GitHubUpdateDetailView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             await accountStore.reload()
-            account = accountStore.accounts.first {
-                $0.accountIdentifier == app.accountIdentifier
-                    && $0.teamIdentifier == app.teamIdentifier
-                    && $0.hasSavedSession
+            eligibleAccounts = accountStore.accounts.filter {
+                $0.teamIdentifier == app.teamIdentifier && $0.hasSavedSession
             }
+            account = eligibleAccounts.first {
+                $0.accountIdentifier == app.accountIdentifier
+            } ?? eligibleAccounts.first
         }
     }
 
