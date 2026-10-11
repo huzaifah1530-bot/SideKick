@@ -102,6 +102,7 @@ struct URLImportView: View {
     @State private var importedApp: ImportedIPA?
     @State private var importedAsUpdate = false
     @State private var pendingPreparedIPA: ImportedIPA?
+    @State private var isQueueingSelectedIPA = false
     @State private var directDownloadTask: Task<Void, Never>?
     @State private var directDownloadID: UUID?
     @State private var matchingInstallations: [InstalledAppSummary] = []
@@ -213,12 +214,21 @@ struct URLImportView: View {
             "\(ipaAwaitingUpdateChoice?.name ?? "This app") is already installed",
             isPresented: Binding(
                 get: { ipaAwaitingUpdateChoice != nil },
-                set: { if !$0 { ipaAwaitingUpdateChoice = nil } }
+                set: {
+                    if !$0 {
+                        if !isQueueingSelectedIPA, let app = ipaAwaitingUpdateChoice {
+                            discardPendingPreparedIPA(app)
+                        }
+                        ipaAwaitingUpdateChoice = nil
+                    }
+                }
             )
         ) {
             ForEach(matchingInstallations) { installation in
                 SwiftUI.Button("Queue for \(installation.name) \(installation.accountEmail) (\(installation.teamIdentifier))") {
-                    Task { await queuePendingUpdate(for: installation.id) }
+                    guard let app = ipaAwaitingUpdateChoice else { return }
+                    isQueueingSelectedIPA = true
+                    Task { await queuePendingUpdate(app, for: installation.id) }
                 }
             }
             SwiftUI.Button("Cancel", role: .cancel) {
@@ -360,9 +370,9 @@ struct URLImportView: View {
     }
 
     @MainActor
-    private func queuePendingUpdate(for targetID: String) async {
-        guard let app = ipaAwaitingUpdateChoice else { return }
-        ipaAwaitingUpdateChoice = nil
+    private func queuePendingUpdate(_ app: ImportedIPA, for targetID: String) async {
+        defer { isQueueingSelectedIPA = false }
+        if ipaAwaitingUpdateChoice == app { ipaAwaitingUpdateChoice = nil }
         do { try await savePreparedIPA(app, asUpdate: true, targetID: targetID) }
         catch {
             discardPendingPreparedIPA(app)
