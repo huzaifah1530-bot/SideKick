@@ -238,6 +238,10 @@ struct HomeView: View {
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("My Apps")
             .task {
+                environment.rescanLiveContainerApps()
+                await environment.reloadLocalCatalogues()
+            }
+            .task {
                 while !Task.isCancelled {
                     do { try await Task.sleep(for: .seconds(60)) }
                     catch { return }

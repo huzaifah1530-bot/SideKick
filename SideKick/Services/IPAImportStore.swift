@@ -39,6 +39,7 @@ actor IPAImportStore {
 
         guard fileManager.isReadableFile(atPath: sourceURL.path) else { throw IPAImportError.inaccessibleFile }
         let metadata = try readMetadata(from: sourceURL)
+        var managedFileName: String?
         let bookmarkData: Data?
         if remoteSourceURL == nil {
             do {
@@ -52,12 +53,13 @@ actor IPAImportStore {
             }
         } else {
             bookmarkData = nil
+            managedFileName = try retainManagedCopy(of: sourceURL, prefix: "url-import-")
         }
         let app = ImportedIPA(
             bundleIdentifier: metadata.bundleIdentifier,
             name: metadata.name,
             version: metadata.version,
-            fileName: nil,
+            fileName: managedFileName,
             sourceBookmarkData: bookmarkData,
             sourceURLString: remoteSourceURL?.absoluteString,
             importedAt: .now,
@@ -185,6 +187,10 @@ actor IPAImportStore {
     }
 
     func saveImportedIPA(_ app: ImportedIPA) throws {
+        if let fileName = app.fileName,
+           !fileManager.isReadableFile(atPath: directory.appendingPathComponent(fileName).path) {
+            throw IPAImportError.sourceFileMissing
+        }
         var entries = try importedApps()
         let previous = entries.filter { $0.id == app.id || ($0.bundleIdentifier == app.bundleIdentifier && $0.importedAt == app.importedAt) }
         entries = IPAImportIndex.replacing(app, in: entries)
@@ -209,7 +215,7 @@ actor IPAImportStore {
         guard fileManager.fileExists(atPath: directory.path) else { return }
         for url in try fileManager.contentsOfDirectory(at: directory, includingPropertiesForKeys: nil) {
             let name = url.deletingPathExtension().lastPathComponent
-            let prefix = ["repository-import-", "github-update-"].first { name.hasPrefix($0) }
+            let prefix = ["repository-import-", "github-update-", "url-import-"].first { name.hasPrefix($0) }
             // A repository import can be awaiting the user's final save. Keep
             // recent files even before the library index references them.
             guard url.pathExtension.lowercased() == "ipa", !retainedNames.contains(url.lastPathComponent),
@@ -222,7 +228,13 @@ actor IPAImportStore {
         }
     }
 
-    func fileURL(for app: ImportedIPA) async throws -> URL {
+    func fileURL(for requestedApp: ImportedIPA) async throws -> URL {
+        // A caller may still hold a pre-migration value after another access has
+        // already retained this URL source. Resolve the latest row by stable import
+        // identity so later accesses immediately use the managed file.
+        let app = try importedApps().first(where: {
+            $0.bundleIdentifier == requestedApp.bundleIdentifier && $0.importedAt == requestedApp.importedAt
+        }) ?? requestedApp
         let sourceURL: URL
         var securityScoped = false
         if let fileName = app.fileName {
@@ -240,45 +252,141 @@ actor IPAImportStore {
                 throw IPAImportError.sourceFileMissing
             }
             securityScoped = sourceURL.startAccessingSecurityScopedResource()
+            do {
+                guard fileManager.isReadableFile(atPath: sourceURL.path) else {
+                    throw IPAImportError.sourceFileMissing
+                }
+                let metadata = try readMetadata(from: sourceURL)
+                guard metadataMatches(metadata, reviewed: app) else {
+                    throw IPAImportError.sourceChanged
+                }
+            } catch {
+                if securityScoped { sourceURL.stopAccessingSecurityScopedResource() }
+                securityScoped = false
+                throw error
+            }
         } else if let sourceURLString = app.sourceURLString,
                   let url = URL(string: sourceURLString), url.scheme?.lowercased() == "https" {
             let (downloadURL, response) = try await BuzzheavierClient().download(from: url)
+            defer { try? fileManager.removeItem(at: downloadURL) }
             guard let response = response as? HTTPURLResponse, (200..<300).contains(response.statusCode) else {
-                try? fileManager.removeItem(at: downloadURL)
                 throw IPAImportError.sourceFileMissing
             }
             guard fileManager.isReadableFile(atPath: downloadURL.path) else {
-                try? fileManager.removeItem(at: downloadURL)
                 throw IPAImportError.sourceFileMissing
             }
-            // URLSession has already materialized this temporary download.
-            // Return it directly; callers own and remove this temporary file.
-            return downloadURL
+            try Task.checkCancellation()
+            // Another caller may have completed migration during this network
+            // request. Prefer its retained copy and avoid creating a second file.
+            if let latest = try importedApps().first(where: {
+                $0.bundleIdentifier == app.bundleIdentifier && $0.importedAt == app.importedAt
+            }), let latestFileName = latest.fileName {
+                let retainedURL = directory.appendingPathComponent(latestFileName)
+                guard fileManager.isReadableFile(atPath: retainedURL.path) else {
+                    throw IPAImportError.sourceFileMissing
+                }
+                let temporaryURL = temporaryIPAURL()
+                do {
+                    try fileManager.copyItem(at: retainedURL, to: temporaryURL)
+                    try Task.checkCancellation()
+                    let copiedMetadata = try readMetadata(from: temporaryURL)
+                    guard metadataMatches(copiedMetadata, reviewed: app) else { throw IPAImportError.sourceChanged }
+                    return temporaryURL
+                } catch {
+                    try? fileManager.removeItem(at: temporaryURL)
+                    if error is IPAImportError { throw error }
+                    if error is CancellationError { throw error }
+                    throw IPAImportError.sourceFileMissing
+                }
+            }
+            let metadata = try readMetadata(from: downloadURL)
+            guard metadataMatches(metadata, reviewed: app) else { throw IPAImportError.sourceChanged }
+
+            // Older library entries stored only the URL. Save a managed copy only
+            // after its reviewed identity matches, then update the latest index row
+            // so queue edits made while the download was suspended are preserved.
+            let fileName = try retainManagedCopy(of: downloadURL, prefix: "url-import-")
+            let managedURL = directory.appendingPathComponent(fileName)
+            do {
+                try Task.checkCancellation()
+
+                var entries = try importedApps()
+                guard let index = entries.firstIndex(where: {
+                    $0.bundleIdentifier == app.bundleIdentifier && $0.importedAt == app.importedAt
+                }) else {
+                    pendingManagedFiles.remove(fileName)
+                    try? fileManager.removeItem(at: managedURL)
+                    throw IPAImportError.sourceFileMissing
+                }
+                entries[index].fileName = fileName
+                do {
+                    try save(entries)
+                    pendingManagedFiles.remove(fileName)
+                    NotificationCenter.default.post(name: .sideKickImportedIPAsDidChange, object: nil)
+                } catch {
+                    pendingManagedFiles.remove(fileName)
+                    try? fileManager.removeItem(at: managedURL)
+                    throw error
+                }
+            } catch {
+                try? fileManager.removeItem(at: managedURL)
+                pendingManagedFiles.remove(fileName)
+                throw error
+            }
+
+            let temporaryURL = temporaryIPAURL()
+            do {
+                try Task.checkCancellation()
+                try fileManager.copyItem(at: managedURL, to: temporaryURL)
+                try Task.checkCancellation()
+                let copiedMetadata = try readMetadata(from: temporaryURL)
+                guard metadataMatches(copiedMetadata, reviewed: app) else { throw IPAImportError.sourceChanged }
+                return temporaryURL
+            } catch {
+                try? fileManager.removeItem(at: temporaryURL)
+                if error is IPAImportError { throw error }
+                if error is CancellationError { throw error }
+                throw IPAImportError.sourceFileMissing
+            }
         } else {
             throw IPAImportError.sourceFileMissing
         }
         defer { if securityScoped { sourceURL.stopAccessingSecurityScopedResource() } }
         guard fileManager.isReadableFile(atPath: sourceURL.path) else { throw IPAImportError.sourceFileMissing }
-        let temporaryURL = fileManager.temporaryDirectory
-            .appendingPathComponent("sidekick-import-\(ProcessInfo.processInfo.processIdentifier)-\(UUID().uuidString)")
-            .appendingPathExtension("ipa")
+        let temporaryURL = temporaryIPAURL()
         do {
             try fileManager.copyItem(at: sourceURL, to: temporaryURL)
-            return temporaryURL
         } catch {
             try? fileManager.removeItem(at: temporaryURL)
             throw IPAImportError.sourceFileMissing
+        }
+        do {
+            let copiedMetadata = try readMetadata(from: temporaryURL)
+            guard metadataMatches(copiedMetadata, reviewed: app) else { throw IPAImportError.sourceChanged }
+            return temporaryURL
+        } catch {
+            try? fileManager.removeItem(at: temporaryURL)
+            throw error
         }
     }
 
     func delete(_ app: ImportedIPA) throws {
         var entries = try importedApps()
+        let removed = entries.filter { $0.id == app.id && $0.importedAt == app.importedAt }
         entries.removeAll { $0.id == app.id && $0.importedAt == app.importedAt }
         try save(entries)
-        if !entries.contains(where: { $0.fileName != nil && $0.fileName == app.fileName }) {
-            removeLegacyStoredIPA(app)
+        for old in removed where !entries.contains(where: { $0.fileName != nil && $0.fileName == old.fileName }) {
+            removeLegacyStoredIPA(old)
         }
+        discardPreparedIPA(app)
         NotificationCenter.default.post(name: .sideKickImportedIPAsDidChange, object: nil)
+    }
+
+    func discardPreparedIPA(_ app: ImportedIPA) {
+        guard let fileName = app.fileName else { return }
+        guard let entries = try? importedApps(), !entries.contains(where: { $0.fileName == fileName }) else { return }
+        pendingManagedFiles.remove(fileName)
+        try? fileManager.removeItem(at: directory.appendingPathComponent(fileName))
     }
 
     private func sourceURLCreationDate(_ url: URL) -> Date? {
@@ -307,11 +415,15 @@ actor IPAImportStore {
             throw IPAImportError.invalidArchive
         }
 
-        guard let entry = archive.first(where: { item in
-            item.path.hasPrefix("Payload/") &&
-            item.path.contains(".app/") &&
-            item.path.hasSuffix(".app/Info.plist")
-        }) else {
+        let appRoots = Set(archive.compactMap { item -> String? in
+            let components = item.path.split(separator: "/", omittingEmptySubsequences: false)
+            guard components.count >= 3, components[0] == "Payload",
+                  components[1].hasSuffix(".app"), components[1].count > 4 else { return nil }
+            return String(components[1])
+        })
+        guard appRoots.count <= 1 else { throw IPAImportError.ambiguousAppBundles }
+        guard let appRoot = appRoots.first,
+              let entry = archive.first(where: { $0.path == "Payload/\(appRoot)/Info.plist" }) else {
             throw IPAImportError.missingAppBundle
         }
 
@@ -337,11 +449,20 @@ actor IPAImportStore {
             ?? (plist["CFBundleVersion"] as? String)
             ?? "Unknown"
 
-        let appPath = URL(fileURLWithPath: entry.path).deletingLastPathComponent().path
+        let appPath = "Payload/\(appRoot)"
         let iconNames = (plist["CFBundleIcons"] as? [String: Any])
             .flatMap { $0["CFBundlePrimaryIcon"] as? [String: Any] }?["CFBundleIconFiles"] as? [String] ?? []
-        let iconEntry = iconNames.reversed().lazy.compactMap { iconName in
-            archive.first { $0.path == "\(appPath)/\(iconName).png" || $0.path == "\(appPath)/\(iconName)@2x.png" || $0.path == "\(appPath)/\(iconName)@3x.png" }
+        let iconEntry = iconNames.reversed().lazy.compactMap { iconName -> Archive.Entry? in
+            let path = iconName.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+            guard !path.isEmpty, !path.split(separator: "/").contains("..") else { return nil }
+            let nsPath = path as NSString
+            let ext = nsPath.pathExtension
+            let stem = ext.isEmpty ? path : nsPath.deletingPathExtension
+            let extensions = ext.isEmpty ? ["", ".png", ".jpg", ".jpeg"] : [".\(ext)"]
+            let names = [stem, "\(stem)@2x", "\(stem)@3x"].flatMap { base in extensions.map { base + $0 } }
+            return names.lazy.compactMap { candidate in
+                archive.first { $0.path == "\(appPath)/\(candidate)" }
+            }.first
         }.first
         var iconData: Data?
         if let iconEntry {
@@ -358,5 +479,37 @@ actor IPAImportStore {
             executableIdentity = GitHubExecutableIdentity.read(data)
         }
         return (bundleIdentifier, name, version, iconData, plist["CFBundleVersion"] as? String, executableIdentity)
+    }
+
+    private func retainManagedCopy(of sourceURL: URL, prefix: String) throws -> String {
+        try Task.checkCancellation()
+        try fileManager.createDirectory(at: directory, withIntermediateDirectories: true)
+        let fileName = "\(prefix)\(UUID().uuidString).ipa"
+        let destination = directory.appendingPathComponent(fileName)
+        do {
+            try fileManager.copyItem(at: sourceURL, to: destination)
+            try Task.checkCancellation()
+            pendingManagedFiles.insert(fileName)
+            return fileName
+        } catch {
+            try? fileManager.removeItem(at: destination)
+            throw error
+        }
+    }
+
+    private func temporaryIPAURL() -> URL {
+        fileManager.temporaryDirectory.appendingPathComponent(
+            "sidekick-import-\(ProcessInfo.processInfo.processIdentifier)-\(UUID().uuidString).ipa"
+        )
+    }
+
+    private func metadataMatches(
+        _ metadata: (bundleIdentifier: String, name: String, version: String, iconData: Data?, buildVersion: String?, executableIdentity: String?),
+        reviewed app: ImportedIPA
+    ) -> Bool {
+        metadata.bundleIdentifier.caseInsensitiveCompare(app.bundleIdentifier) == .orderedSame
+            && metadata.version == app.version
+            && (app.buildVersion == nil || metadata.buildVersion == app.buildVersion)
+            && (app.executableIdentity == nil || metadata.executableIdentity == app.executableIdentity)
     }
 }

@@ -51,6 +51,11 @@ struct ContentView: View {
             }
             Task { await setupStatus.refresh() }
         }
+        .onChange(of: selectedTab) { _, tab in
+            guard tab == 0, case .ready = environment.databaseState else { return }
+            environment.rescanLiveContainerApps()
+            Task { await environment.reloadLocalCatalogues() }
+        }
         .onReceive(NotificationCenter.default.publisher(for: .sideKickGitHubSettingsDidChange)
             .debounce(for: .milliseconds(150), scheduler: RunLoop.main)) { _ in
                 Task { await environment.gitHubSettingsChanged() }

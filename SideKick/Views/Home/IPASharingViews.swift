@@ -101,6 +101,9 @@ struct URLImportView: View {
     @State private var errorMessage: String?
     @State private var importedApp: ImportedIPA?
     @State private var importedAsUpdate = false
+    @State private var pendingPreparedIPA: ImportedIPA?
+    @State private var directDownloadTask: Task<Void, Never>?
+    @State private var directDownloadID: UUID?
     @State private var matchingInstallations: [InstalledAppSummary] = []
     @State private var ipaAwaitingUpdateChoice: ImportedIPA?
     @State private var githubRepositoryURL: URL?
@@ -161,7 +164,7 @@ struct URLImportView: View {
                     }
                 } else {
                     SwiftUI.Button {
-                        Task { await download() }
+                        startDirectDownload()
                     } label: {
                         Label("Continue", systemImage: "arrow.down.circle")
                             .fontWeight(.semibold)
@@ -179,7 +182,7 @@ struct URLImportView: View {
             }
 
             Section {
-                Text("Only download apps you trust. SideKick points to the original file or download link. If it’s moved, deleted, or expires, choose it again.")
+                Text("Only download apps you trust. IPA links are saved in SideKick after import. Files imports use the bookmarked file, so SideKick needs continued access to it.")
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
@@ -189,7 +192,13 @@ struct URLImportView: View {
             if let githubRepositoryURL {
                 GitHubRepositoryImportView(repositoryURL: githubRepositoryURL) { app in
                     showingGitHubRepository = false
-                    try await acceptPreparedIPA(app)
+                    replacePendingPreparedIPA(with: app)
+                    do {
+                        try await acceptPreparedIPA(app)
+                    } catch {
+                        discardPendingPreparedIPA(app)
+                        throw error
+                    }
                 }
             }
         }
@@ -208,9 +217,7 @@ struct URLImportView: View {
                 }
             }
             SwiftUI.Button("Cancel", role: .cancel) {
-                if let app = ipaAwaitingUpdateChoice, app.githubImportConfiguration != nil {
-                    Task { try? await environment.ipaImportStore.delete(app) }
-                }
+                if let app = ipaAwaitingUpdateChoice { discardPendingPreparedIPA(app) }
                 ipaAwaitingUpdateChoice = nil
             }
         } message: {
@@ -221,16 +228,41 @@ struct URLImportView: View {
             if linkText.isEmpty { linkText = initialURL.absoluteString }
             guard !didStartIncomingImport else { return }
             didStartIncomingImport = true
-            Task { await download() }
+            startDirectDownload()
+        }
+        .onDisappear {
+            directDownloadID = nil
+            directDownloadTask?.cancel()
+            directDownloadTask = nil
+            isDownloading = false
+            guard let app = pendingPreparedIPA else { return }
+            pendingPreparedIPA = nil
+            Task { await environment.ipaImportStore.discardPreparedIPA(app) }
         }
     }
 
     @MainActor
-    private func download() async {
+    private func startDirectDownload() {
+        guard directDownloadTask == nil else { return }
+        let id = UUID()
+        directDownloadID = id
+        directDownloadTask = Task { await download(generation: id) }
+    }
+
+    @MainActor
+    private func download(generation: UUID) async {
+        guard isCurrentDirectDownload(generation) else { return }
         isDownloading = true
         downloadProgress = nil
         errorMessage = nil
-        defer { isDownloading = false }
+        var preparedIPA: ImportedIPA?
+        defer {
+            if directDownloadID == generation {
+                isDownloading = false
+                directDownloadID = nil
+                directDownloadTask = nil
+            }
+        }
 
         do {
             let input = linkText.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -258,30 +290,60 @@ struct URLImportView: View {
                 return
             }
             let (downloadedURL, response) = try await BuzzheavierClient().download(from: sourceURL) { progress in
-                Task { @MainActor in downloadProgress = progress }
+                Task { @MainActor in
+                    guard directDownloadID == generation else { return }
+                    downloadProgress = progress
+                }
             }
             defer { try? FileManager.default.removeItem(at: downloadedURL) }
+            guard isCurrentDirectDownload(generation) else { return }
             if let response = response as? HTTPURLResponse, !(200..<300).contains(response.statusCode) {
                 throw AppSharingError.downloadFailed(response.statusCode)
             }
 
             let app = try await environment.ipaImportStore.prepareIPA(from: downloadedURL, remoteSourceURL: sourceURL)
+            preparedIPA = app
+            guard isCurrentDirectDownload(generation) else {
+                await environment.ipaImportStore.discardPreparedIPA(app)
+                return
+            }
+            replacePendingPreparedIPA(with: app)
             try await acceptPreparedIPA(app)
         } catch let error as IPAImportError {
+            await discardFailedPreparedIPA(preparedIPA)
+            guard isCurrentDirectDownload(generation) else { return }
             switch error {
-            case .invalidArchive, .missingAppBundle, .missingBundleIdentifier, .notAnIPA:
+            case .invalidArchive, .missingAppBundle, .ambiguousAppBundles, .missingBundleIdentifier, .notAnIPA:
                 errorMessage = "That link returned a web page or a file that isn’t a valid IPA. Use a direct IPA download link."
-            case .inaccessibleFile, .sourceFileMissing, .sourceBookmarkUnavailable, .bundleIdentifierMismatch:
+            case .inaccessibleFile, .sourceFileMissing, .sourceBookmarkUnavailable, .bundleIdentifierMismatch, .sourceChanged:
                 errorMessage = error.localizedDescription
             }
         } catch {
+            await discardFailedPreparedIPA(preparedIPA)
+            guard isCurrentDirectDownload(generation) else { return }
             errorMessage = error.localizedDescription
         }
     }
 
     @MainActor
+    private func isCurrentDirectDownload(_ generation: UUID) -> Bool {
+        directDownloadID == generation && !Task.isCancelled
+    }
+
+    @MainActor
+    private func discardFailedPreparedIPA(_ app: ImportedIPA?) async {
+        guard let app else { return }
+        if pendingPreparedIPA == app { pendingPreparedIPA = nil }
+        await environment.ipaImportStore.discardPreparedIPA(app)
+    }
+
+    @MainActor
     private func acceptPreparedIPA(_ app: ImportedIPA) async throws {
         let installedApps = await SideStoreOperationService(accountStore: SigningAccountStore(), ipaStore: environment.ipaImportStore).installedApps()
+        guard pendingPreparedIPA == app else {
+            await environment.ipaImportStore.discardPreparedIPA(app)
+            return
+        }
         let installedIDs = Set(installedApps.flatMap(\.updateMatchingBundleIdentifiers))
         if installedIDs.contains(app.bundleIdentifier.lowercased()) {
             matchingInstallations = installedApps.filter { $0.updateMatchingBundleIdentifiers.contains(app.bundleIdentifier.lowercased()) }
@@ -296,7 +358,10 @@ struct URLImportView: View {
         guard let app = ipaAwaitingUpdateChoice else { return }
         ipaAwaitingUpdateChoice = nil
         do { try await savePreparedIPA(app, asUpdate: true, targetID: targetID) }
-        catch { errorMessage = error.localizedDescription }
+        catch {
+            discardPendingPreparedIPA(app)
+            errorMessage = error.localizedDescription
+        }
     }
 
     @MainActor
@@ -305,9 +370,25 @@ struct URLImportView: View {
         savedApp.isQueuedForUpdate = asUpdate
         savedApp.queuedForInstalledAppID = targetID
         try await environment.ipaImportStore.saveImportedIPA(savedApp)
+        if pendingPreparedIPA == app { pendingPreparedIPA = nil }
         importedApp = savedApp
         importedAsUpdate = asUpdate
         await onImported(savedApp)
+    }
+
+    @MainActor
+    private func discardPendingPreparedIPA(_ app: ImportedIPA) {
+        if pendingPreparedIPA == app { pendingPreparedIPA = nil }
+        Task { await environment.ipaImportStore.discardPreparedIPA(app) }
+    }
+
+    @MainActor
+    private func replacePendingPreparedIPA(with app: ImportedIPA) {
+        let previous = pendingPreparedIPA
+        pendingPreparedIPA = app
+        guard let previous, previous != app else { return }
+        if ipaAwaitingUpdateChoice == previous { ipaAwaitingUpdateChoice = nil }
+        Task { await environment.ipaImportStore.discardPreparedIPA(previous) }
     }
 
 }

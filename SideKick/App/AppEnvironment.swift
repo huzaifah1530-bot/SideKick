@@ -17,6 +17,8 @@ final class AppEnvironment {
     private(set) var installedApps: [InstalledAppSummary] = []
     private(set) var liveContainerState = LiveContainerState()
     private(set) var liveContainerLoadError: String?
+    private(set) var hasLoadedLiveContainerCatalogue = false
+    private(set) var isLoadingLiveContainerCatalogue = false
     private(set) var hasLoadedLocalApps = false
     private(set) var isLoadingLocalApps = false
     private(set) var localLoadError: String?
@@ -27,6 +29,8 @@ final class AppEnvironment {
     @ObservationIgnored private var databaseStartupTask: Task<Void, Never>?
     @ObservationIgnored private var maintenanceTask: Task<Void, Never>?
     @ObservationIgnored private var localLoadTask: Task<Void, Never>?
+    @ObservationIgnored private var liveContainerLoadTask: Task<Void, Never>?
+    @ObservationIgnored private var liveContainerReloadRequested = false
     @ObservationIgnored private var localReloadRequested = false
     @ObservationIgnored private var iconTask: Task<Void, Never>?
     @ObservationIgnored private var liveContainerScanTask: Task<Void, Never>?
@@ -104,14 +108,33 @@ final class AppEnvironment {
     }
 
     func reloadLiveContainerCatalogue() async {
-        do {
-            liveContainerState = try await liveContainerStore.snapshot()
-            liveContainerLoadError = nil
-            debugLog("[SideKick] Published \(liveContainerState.apps.count) cached LiveContainer apps.")
-        } catch {
-            liveContainerLoadError = error.localizedDescription
+        guard DatabaseManager.shared.isStarted else { return }
+        liveContainerReloadRequested = true
+        if let liveContainerLoadTask {
+            await liveContainerLoadTask.value
+            return
         }
-        if !isLoadingLocalApps { requestGitHubUpdateCheck() }
+        isLoadingLiveContainerCatalogue = true
+        let task = Task { @MainActor in
+            defer {
+                isLoadingLiveContainerCatalogue = false
+                liveContainerLoadTask = nil
+            }
+            repeat {
+                liveContainerReloadRequested = false
+                do {
+                    liveContainerState = try await liveContainerStore.snapshot()
+                    hasLoadedLiveContainerCatalogue = true
+                    liveContainerLoadError = nil
+                    debugLog("[SideKick] Published \(liveContainerState.apps.count) cached LiveContainer apps.")
+                } catch {
+                    liveContainerLoadError = error.localizedDescription
+                }
+            } while liveContainerReloadRequested
+            if !isLoadingLocalApps { requestGitHubUpdateCheck() }
+        }
+        liveContainerLoadTask = task
+        await task.value
     }
 
     func rescanLiveContainerApps() {

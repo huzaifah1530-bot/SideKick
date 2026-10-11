@@ -15,7 +15,7 @@ enum ExpirationNotificationScheduler {
                !installedApps.contains(where: { $0.bundleIdentifier == sideKickApp.bundleIdentifier }) {
                 installedApps.append(sideKickApp)
             }
-            return installedApps.map { ($0.bundleIdentifier, $0.name, $0.expirationDate) }
+            return installedApps.map { ($0.resignedBundleIdentifier, $0.name, $0.expirationDate) }
         }
 
         let center = UNUserNotificationCenter.current()

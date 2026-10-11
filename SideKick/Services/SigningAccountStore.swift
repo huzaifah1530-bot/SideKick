@@ -108,7 +108,10 @@ final class SigningAccountStore {
     }
 
     func addAccount(appleID: String, password: String) async throws {
-        guard !isWorking else { return }
+        guard !isWorking, SigningAccountOperationCoordinator.acquire() else {
+            throw SigningAccountError.engineBusy
+        }
+        defer { SigningAccountOperationCoordinator.release() }
         guard DatabaseManager.shared.isStarted else {
             throw SigningAccountError.databaseUnavailable
         }
@@ -124,8 +127,16 @@ final class SigningAccountStore {
 
         setSignInCheckpoint("Starting Apple ID authentication")
         let previousAccount = await activeAccountSummary()
-        if let previousAccount,
-           let previousCredentials = try? currentSessionCredentials(for: previousAccount) {
+        let previousCredentials: SigningSessionCredentials?
+        if let previousAccount {
+            previousCredentials = (try? currentSessionCredentials(for: previousAccount)) ?? (try? vault.load(key: SigningSessionVault.key(
+                accountIdentifier: previousAccount.accountIdentifier,
+                teamIdentifier: previousAccount.teamIdentifier
+            )))
+        } else {
+            previousCredentials = nil
+        }
+        if let previousAccount, let previousCredentials {
             try? vault.save(
                 previousCredentials,
                 key: SigningSessionVault.key(
@@ -154,49 +165,60 @@ final class SigningAccountStore {
             )
         } catch {
             setSignInCheckpoint("Sign-in failed before the account could be saved")
+            if let previousCredentials {
+                do { try await restoreSession(previousCredentials) }
+                catch { debugLog("[SideKick] Could not restore the previous signing session after sign-in failed: \(error.localizedDescription)") }
+            }
             throw error
         }
 
-        setSignInCheckpoint("Apple ID authenticated; saving its signing session")
-        let accountIdentifier = result.team.account?.identifier ?? result.team.identifier
-        let sessionKey = SigningSessionVault.key(
-            accountIdentifier: accountIdentifier,
-            teamIdentifier: result.team.identifier
-        )
-        let existingCredentials = try? vault.load(key: sessionKey)
-        let certificateData = existingCredentials?.certificateData
-        let certificatePassword = existingCredentials?.certificatePassword
-        if let certificateData {
-            let certificate = try CertificateManager.parse(certificateData, password: certificatePassword)
-            try CertificateManager.shared.setActiveCertificate(certificate)
-        } else {
-            CertificateManager.shared.clearActiveCertificate()
-        }
-        guard let email = AuthManager.shared.currentAppleID,
-              let password = AuthManager.shared.password,
-              let adsid = AuthManager.shared.adsid,
-              let xcodeToken = AuthManager.shared.xcodeToken else {
-            throw SigningAccountError.sessionNotAvailable
-        }
+        do {
+            setSignInCheckpoint("Apple ID authenticated; saving its signing session")
+            let accountIdentifier = result.team.account?.identifier ?? result.team.identifier
+            let sessionKey = SigningSessionVault.key(
+                accountIdentifier: accountIdentifier,
+                teamIdentifier: result.team.identifier
+            )
+            let existingCredentials = try? vault.load(key: sessionKey)
+            let certificateData = existingCredentials?.certificateData
+            let certificatePassword = existingCredentials?.certificatePassword
+            if let certificateData {
+                let certificate = try CertificateManager.parse(certificateData, password: certificatePassword)
+                try CertificateManager.shared.setActiveCertificate(certificate)
+            } else {
+                CertificateManager.shared.clearActiveCertificate()
+            }
+            guard let email = AuthManager.shared.currentAppleID,
+                  let password = AuthManager.shared.password,
+                  let adsid = AuthManager.shared.adsid,
+                  let xcodeToken = AuthManager.shared.xcodeToken else {
+                throw SigningAccountError.sessionNotAvailable
+            }
 
-        let certificate = CertificateManager.shared.activeCertificate
-        let credentials = SigningSessionCredentials(
-            appleID: email,
-            password: password,
-            adsid: adsid,
-            xcodeToken: xcodeToken,
-            accountIdentifier: accountIdentifier,
-            teamIdentifier: result.team.identifier,
-            certificateData: certificateData,
-            certificatePassword: certificatePassword
-        )
-        try vault.save(credentials, key: sessionKey)
-        var archive = try SigningAccountArchive.load()
-        archive.removedAccountIdentifiers.remove(accountIdentifier)
-        try archive.save()
-        setSignInCheckpoint("Session saved; refreshing the account list")
-        await reload()
-        setSignInCheckpoint("Account saved successfully")
+            let credentials = SigningSessionCredentials(
+                appleID: email,
+                password: password,
+                adsid: adsid,
+                xcodeToken: xcodeToken,
+                accountIdentifier: accountIdentifier,
+                teamIdentifier: result.team.identifier,
+                certificateData: certificateData,
+                certificatePassword: certificatePassword
+            )
+            try vault.save(credentials, key: sessionKey)
+            var archive = try SigningAccountArchive.load()
+            archive.removedAccountIdentifiers.remove(accountIdentifier)
+            try archive.save()
+            setSignInCheckpoint("Session saved; refreshing the account list")
+            await reload()
+            setSignInCheckpoint("Account saved successfully")
+        } catch {
+            if let previousCredentials {
+                do { try await restoreSession(previousCredentials) }
+                catch { debugLog("[SideKick] Could not restore the previous signing session after account setup failed: \(error.localizedDescription)") }
+            }
+            throw error
+        }
     }
 
     private func setSignInCheckpoint(_ value: String) {
@@ -205,7 +227,8 @@ final class SigningAccountStore {
     }
 
     func remove(_ account: SigningAccountSummary) async throws {
-        guard !isWorking else { throw SigningAccountError.engineBusy }
+        guard !isWorking, SigningAccountOperationCoordinator.acquire() else { throw SigningAccountError.engineBusy }
+        defer { SigningAccountOperationCoordinator.release() }
         guard !AppManager.shared.isActivelyManagingAnyApp else {
             throw SigningAccountError.engineBusy
         }
@@ -254,7 +277,8 @@ final class SigningAccountStore {
         forceRefreshCertificate: Bool = false,
         operation: () async throws -> T
     ) async throws -> T {
-        guard !isWorking else { throw SigningAccountError.engineBusy }
+        guard !isWorking, SigningAccountOperationCoordinator.acquire() else { throw SigningAccountError.engineBusy }
+        defer { SigningAccountOperationCoordinator.release() }
         guard !AppManager.shared.isActivelyManagingAnyApp else {
             throw SigningAccountError.engineBusy
         }
@@ -286,23 +310,26 @@ final class SigningAccountStore {
         }
 
         let sessionMatchesTarget = AuthManager.shared.currentAppleID?.caseInsensitiveCompare(target.email) == .orderedSame
-        if previous?.id != target.id || !sessionMatchesTarget {
-            try await restoreAccountSession(target, activateTeam: prepareForSigning)
-        }
-
+        var operationStarted = false
         do {
+            if previous?.id != target.id || !sessionMatchesTarget {
+                try await restoreAccountSession(target, activateTeam: prepareForSigning)
+            }
             if prepareForSigning {
                 try await ensureSigningReady(for: target, forceRefreshCertificate: forceRefreshCertificate)
             }
+            operationStarted = true
             let result = try await operation()
             if (previous?.id != target.id || !sessionMatchesTarget), let previousCredentials {
-                try await restoreSession(previousCredentials)
+                do { try await restoreSession(previousCredentials) }
+                catch { debugLog("[SideKick] Operation succeeded, but the previous signing session could not be restored: \(error.localizedDescription)") }
             }
             await reload()
             return result
         } catch {
-            if (previous?.id != target.id || !sessionMatchesTarget), let previousCredentials {
-                try? await restoreSession(previousCredentials)
+            if (!operationStarted || previous?.id != target.id || !sessionMatchesTarget), let previousCredentials {
+                do { try await restoreSession(previousCredentials) }
+                catch { debugLog("[SideKick] Could not restore the previous signing session after an operation failed: \(error.localizedDescription)") }
             }
             await reload()
             throw error
@@ -384,9 +411,11 @@ final class SigningAccountStore {
         }
     }
 
-    /// Restore the certificate associated with LiveContainer before the SideStore
-    /// deep-link exporter reads its process-global active certificate.
-    func prepareCertificateForLiveContainerExport() async throws {
+    /// Capture the LiveContainer certificate from its saved session without
+    /// changing SideStore's process-global active signing certificate.
+    func liveContainerCertificateForExport() async throws -> (encodedBase64Certificate: String, password: String) {
+        guard SigningAccountOperationCoordinator.acquire() else { throw SigningAccountError.engineBusy }
+        defer { SigningAccountOperationCoordinator.release() }
         guard DatabaseManager.shared.isStarted else {
             throw SigningAccountError.databaseUnavailable
         }
@@ -414,8 +443,17 @@ final class SigningAccountStore {
         guard let certificateData = credentials.certificateData else {
             throw SigningAccountError.certificateUnavailable
         }
-        let certificate = try CertificateManager.parse(certificateData, password: credentials.certificatePassword)
-        try CertificateManager.shared.setActiveCertificate(certificate)
+        guard let password = credentials.certificatePassword else {
+            throw SigningAccountError.certificateUnavailable
+        }
+        _ = try CertificateManager.parse(certificateData, password: password)
+        let base64Certificate = certificateData.base64EncodedString()
+        var allowed = CharacterSet.urlQueryAllowed
+        allowed.remove(charactersIn: ";/?:@&=+$, ")
+        guard let encodedCertificate = base64Certificate.addingPercentEncoding(withAllowedCharacters: allowed) else {
+            throw SigningAccountError.certificateUnavailable
+        }
+        return (encodedCertificate, password)
     }
 
     /// Completes the device registration and certificate setup deferred by the
@@ -587,6 +625,24 @@ final class SigningAccountStore {
             certificateData: certificate?.p12Data,
             certificatePassword: certificate?.password
         )
+    }
+}
+
+/// AuthManager and CertificateManager hold process-global mutable state. This
+/// MainActor gate coordinates separate SigningAccountStore instances and rejects
+/// overlapping account/session scopes without suspending while waiting.
+@MainActor
+enum SigningAccountOperationCoordinator {
+    private static var isOccupied = false
+
+    static func acquire() -> Bool {
+        guard !isOccupied else { return false }
+        isOccupied = true
+        return true
+    }
+
+    static func release() {
+        isOccupied = false
     }
 }
 

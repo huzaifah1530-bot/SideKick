@@ -8,9 +8,7 @@ struct LiveContainerLibrarySection: View {
     private var message: String? { environment.liveContainerLoadError }
 
     var body: some View {
-        Group {
-            if !state.apps.isEmpty {
-                Section {
+        Section {
             ForEach(state.apps) { app in
                 NavigationLink {
                     LiveContainerGuestDetailView(guestID: app.id)
@@ -35,15 +33,25 @@ struct LiveContainerLibrarySection: View {
                 }
                 .fullWidthListSeparators()
             }
-            if let message { Text(message).font(.footnote).foregroundStyle(.secondary) }
-                } header: { Text("LiveContainer") }
-            } else if let message {
-                Section("LiveContainer") {
-                    Label("Couldn’t Load LiveContainer Apps", systemImage: "exclamationmark.circle")
-                    Text(message).font(.footnote).foregroundStyle(.secondary)
+            if let message {
+                Label(state.apps.isEmpty ? "Couldn’t Load LiveContainer Apps" : "Some LiveContainer Apps May Be Outdated", systemImage: "exclamationmark.circle")
+                    .foregroundStyle(.orange)
+                Text(message).font(.footnote).foregroundStyle(.secondary)
+                SwiftUI.Button("Try Again") { Task { await environment.reloadLiveContainerCatalogue() } }
+                    .disabled(environment.isLoadingLiveContainerCatalogue)
+            } else if !environment.hasLoadedLiveContainerCatalogue {
+                HStack {
+                    ProgressView("Loading LiveContainer apps…")
+                    Spacer()
+                }
+            } else if state.apps.isEmpty {
+                Text("No cached guest apps were found.")
+                    .foregroundStyle(.secondary)
+                NavigationLink { LiveContainerConnectionsView() } label: {
+                    Label("Manage Connections", systemImage: "folder")
                 }
             }
-        }
+        } header: { Text("LiveContainer") }
     }
 }
 

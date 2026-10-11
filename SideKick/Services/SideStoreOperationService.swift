@@ -169,10 +169,16 @@ final class SideStoreOperationService {
         if selfBinaryMatches, let target = await installedApps().first(where: { $0.id == installedID })?.updateTarget,
            let key = ipa.githubUpdateKey ?? ipa.githubImportConfiguration?.effectiveBaselineKey {
             let store = GitHubUpdateConfigurationStore.shared
-            if let origin = ipa.githubImportConfiguration {
-                _ = try await store.recordSuccessfulImport(origin, key: key, for: target)
-            } else if let expectedSource = ipa.githubSourceIdentity, ipa.queuedForInstalledAppID == target.id {
-                _ = try await store.recordInstalled(key: key, for: target, expectedSource: expectedSource)
+            do {
+                if let origin = ipa.githubImportConfiguration {
+                    _ = try await store.recordSuccessfulImport(origin, key: key, for: target)
+                } else if let expectedSource = ipa.githubSourceIdentity, ipa.queuedForInstalledAppID == target.id {
+                    _ = try await store.recordInstalled(key: key, for: target, expectedSource: expectedSource)
+                }
+            } catch {
+                // Installation already succeeded. Keep any pending self-update
+                // receipt for next-launch recovery and report persistence separately.
+                debugLog("[SideKick] Installation succeeded, but its GitHub update receipt could not be saved: \(error.localizedDescription)")
             }
         }
         await ExpirationNotificationScheduler.update()
