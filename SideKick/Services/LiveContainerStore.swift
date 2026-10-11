@@ -219,6 +219,20 @@ actor LiveContainerStore {
         accessRevisions[id] = UUID()
     }
 
+    /// Removes cached metadata for the guest selected in the confirmed UI.
+    /// LiveContainer's directory and files are never touched.
+    func removeUnavailableGuest(_ guestID: String) throws {
+        var state = try snapshot()
+        guard let index = state.apps.firstIndex(where: { $0.id == guestID }) else { return }
+        let guest = state.apps[index]
+        state.apps.remove(at: index)
+        // Prevent a scan that began before this deletion from restoring the
+        // stale row when its file-provider read returns.
+        scans[guest.connectionID] = nil
+        try save(state)
+        accessRevisions[guest.connectionID] = UUID()
+    }
+
     @discardableResult
     func forget(_ id: UUID) throws -> [String] {
         var state = try snapshot()

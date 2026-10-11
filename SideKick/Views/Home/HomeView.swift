@@ -97,6 +97,12 @@ struct HomeView: View {
     @State private var isRefreshingAll = false
     @State private var refreshAllProgress: (completed: Int, total: Int)?
     @State private var refreshAllResultMessage: String?
+    @State private var appRefreshErrorMessage: String?
+    @State private var refreshingAppID: String?
+    @State private var managementApp: InstalledAppSummary?
+    @State private var showingManagementApp = false
+    @State private var managementImportedApp: ImportedIPA?
+    @State private var showingImportedManagement = false
     @State private var appIDCapacityTask: Task<Void, Never>?
     @State private var capacityGeneration = UUID()
     @State private var expirationClock = Date.now
@@ -306,6 +312,26 @@ struct HomeView: View {
                             }
                             .fullWidthListSeparators()
                             .sideKickNavigationLinkIndicator()
+                            .contextMenu {
+                                SwiftUI.Button {
+                                    UIApplication.shared.open(InstalledApp.openAppURL(targetBundleIdentifier: app.resignedBundleIdentifier))
+                                } label: {
+                                    Label("Launch", systemImage: "arrow.up.forward.app")
+                                }
+                                SwiftUI.Button {
+                                    Task { await refreshInstalledApp(app) }
+                                } label: {
+                                    Label("Refresh", systemImage: "arrow.clockwise")
+                                }
+                                .disabled(isRefreshingAll || refreshingAppID != nil)
+                                Divider()
+                                SwiftUI.Button {
+                                    managementApp = app
+                                    showingManagementApp = true
+                                } label: {
+                                    Label("More Options", systemImage: "ellipsis.circle")
+                                }
+                            }
                         }
                     } header: {
                         HStack {
@@ -323,7 +349,7 @@ struct HomeView: View {
                                 }
                             }
                             .font(.caption.weight(.medium))
-                            .disabled(isRefreshingAll || filteredInstalledApps.isEmpty)
+                            .disabled(isRefreshingAll || refreshingAppID != nil || filteredInstalledApps.isEmpty)
                         }
                     } footer: {
                         if let remainingAppIDs {
@@ -348,6 +374,19 @@ struct HomeView: View {
                             }
                             .fullWidthListSeparators()
                             .sideKickNavigationLinkIndicator()
+                            .contextMenu {
+                                SwiftUI.Button {
+                                    managementImportedApp = app
+                                    showingImportedManagement = true
+                                } label: {
+                                    Label("More Options", systemImage: "ellipsis.circle")
+                                }
+                                SwiftUI.Button(role: .destructive) {
+                                    Task { await viewModel.delete(app) }
+                                } label: {
+                                    Label("Remove Imported IPA", systemImage: "trash")
+                                }
+                            }
                         }
                     }
                 }
@@ -389,6 +428,22 @@ struct HomeView: View {
             .navigationDestination(isPresented: $showingURLImport) {
                 URLImportView(initialURL: incomingShareURL) { _ in
                     await load()
+                }
+            }
+            .navigationDestination(isPresented: $showingManagementApp) {
+                if let managementApp {
+                    AppManagementView(installedApp: managementApp)
+                } else {
+                    EmptyView()
+                }
+            }
+            .navigationDestination(isPresented: $showingImportedManagement) {
+                if let managementImportedApp {
+                    AppManagementView(importedApp: managementImportedApp) {
+                        await viewModel.delete(managementImportedApp)
+                    }
+                } else {
+                    EmptyView()
                 }
             }
             .fileImporter(isPresented: $showingImporter, allowedContentTypes: [.data], allowsMultipleSelection: false) { result in
@@ -466,12 +521,13 @@ struct HomeView: View {
             } message: {
                 Text("Queue this IPA as the update for the installed app?")
             }
-            .alert(refreshAllResultMessage == nil
+            .alert(appRefreshErrorMessage != nil ? "Couldn’t refresh app" : refreshAllResultMessage == nil
                 ? (viewModel.errorMessage == nil ? "IPA imported" : "Couldn’t import IPA")
                 : "Refresh All", isPresented: Binding(
-                get: { refreshAllResultMessage != nil || viewModel.errorMessage != nil || viewModel.noticeMessage != nil },
+                get: { appRefreshErrorMessage != nil || refreshAllResultMessage != nil || viewModel.errorMessage != nil || viewModel.noticeMessage != nil },
                 set: {
                     if !$0 {
+                        appRefreshErrorMessage = nil
                         refreshAllResultMessage = nil
                         viewModel.errorMessage = nil
                         viewModel.noticeMessage = nil
@@ -480,7 +536,7 @@ struct HomeView: View {
             )) {
                 SwiftUI.Button("OK", role: .cancel) { }
             } message: {
-                Text(refreshAllResultMessage ?? viewModel.errorMessage ?? viewModel.noticeMessage ?? "")
+                Text(appRefreshErrorMessage ?? refreshAllResultMessage ?? viewModel.errorMessage ?? viewModel.noticeMessage ?? "")
             }
         }
     }
@@ -616,7 +672,7 @@ struct HomeView: View {
     }
 
     private func refreshAllApps() async {
-        guard !isRefreshingAll else { return }
+        guard !isRefreshingAll, refreshingAppID == nil else { return }
         refreshAllResultMessage = nil
         viewModel.errorMessage = nil
         viewModel.noticeMessage = nil
@@ -641,6 +697,20 @@ struct HomeView: View {
             let failed = result.attempted - result.succeeded
             refreshAllResultMessage = "Refresh All succeeded for \(result.succeeded) of \(result.attempted) apps; \(failed) failed."
         }
+    }
+
+    private func refreshInstalledApp(_ app: InstalledAppSummary) async {
+        guard !isRefreshingAll, refreshingAppID == nil else { return }
+        appRefreshErrorMessage = nil
+        refreshingAppID = app.id
+        defer { refreshingAppID = nil }
+        do {
+            try await SideStoreOperationService(accountStore: accountStore, ipaStore: environment.ipaImportStore)
+                .refresh(bundleIdentifier: app.id)
+        } catch {
+            appRefreshErrorMessage = "Couldn’t refresh \(app.name). \(error.localizedDescription)"
+        }
+        await load()
     }
 
     private func daysRemaining(for date: Date, now: Date) -> Int {

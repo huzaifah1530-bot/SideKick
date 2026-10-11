@@ -4,6 +4,10 @@ import UniformTypeIdentifiers
 
 struct LiveContainerLibrarySection: View {
     @Environment(AppEnvironment.self) private var environment
+    @State private var selectedGuestID: String?
+    @State private var isShowingGuestDetail = false
+    @State private var workingGuestID: String?
+    @State private var actionError: String?
     private var state: LiveContainerState { environment.liveContainerState }
     private var message: String? { environment.liveContainerLoadError }
 
@@ -31,6 +35,26 @@ struct LiveContainerLibrarySection: View {
                     }
                     .padding(.vertical, 4)
                 }
+                .contextMenu {
+                    SwiftUI.Button {
+                        selectedGuestID = app.id
+                        isShowingGuestDetail = true
+                    } label: {
+                        Label("More Options", systemImage: "ellipsis.circle")
+                    }
+                    SwiftUI.Button {
+                        Task { await launch(app) }
+                    } label: {
+                        Label("Launch", systemImage: "play.circle")
+                    }
+                    .disabled(workingGuestID != nil || !canLaunch(app))
+                    SwiftUI.Button {
+                        Task { await refresh(app) }
+                    } label: {
+                        Label("Refresh", systemImage: "arrow.clockwise")
+                    }
+                    .disabled(workingGuestID != nil || connection(for: app)?.isConnected != true)
+                }
                 .fullWidthListSeparators()
             }
             if let message {
@@ -52,6 +76,59 @@ struct LiveContainerLibrarySection: View {
                 }
             }
         } header: { Text("LiveContainer") }
+        .navigationDestination(isPresented: $isShowingGuestDetail) {
+            if let selectedGuestID {
+                LiveContainerGuestDetailView(guestID: selectedGuestID)
+            }
+        }
+        .alert("LiveContainer", isPresented: Binding(get: { actionError != nil }, set: { if !$0 { actionError = nil } })) {
+            SwiftUI.Button("OK", role: .cancel) { actionError = nil }
+        } message: { Text(actionError ?? "") }
+    }
+
+    private func connection(for app: LiveContainerGuest) -> LiveContainerConnection? {
+        state.connections.first(where: { $0.id == app.connectionID })
+    }
+
+    private func canLaunch(_ app: LiveContainerGuest) -> Bool {
+        guard let connection = connection(for: app) else { return false }
+        return app.isAvailable && app.warning == nil && connection.isConnected
+            && connection.error == nil && connection.storageKind != .snapshot
+    }
+
+    @MainActor private func launch(_ app: LiveContainerGuest) async {
+        guard workingGuestID == nil else { return }
+        guard canLaunch(app) else {
+            actionError = "Reconnect this LiveContainer directory and make sure the guest is available before launching it."
+            return
+        }
+        workingGuestID = app.id
+        defer { workingGuestID = nil }
+        do {
+            let url = try await environment.liveContainerStore.launchURL(for: app.id)
+            guard await UIApplication.shared.open(url) else {
+                actionError = "LiveContainer did not accept the launch request. Check its installation and URL scheme."
+                return
+            }
+        } catch {
+            actionError = error.localizedDescription
+        }
+    }
+
+    @MainActor private func refresh(_ app: LiveContainerGuest) async {
+        guard workingGuestID == nil else { return }
+        guard let connection = connection(for: app), connection.isConnected else {
+            actionError = "Reconnect this LiveContainer directory before refreshing the guest."
+            return
+        }
+        workingGuestID = app.id
+        defer { workingGuestID = nil }
+        do {
+            try await environment.liveContainerStore.rescan(connection.id)
+            await environment.reloadLiveContainerCatalogue()
+        } catch {
+            actionError = error.localizedDescription
+        }
     }
 }
 
@@ -157,6 +234,7 @@ struct LiveContainerConnectionsView: View {
 struct LiveContainerGuestDetailView: View {
     let guestID: String
     @Environment(AppEnvironment.self) private var environment
+    @Environment(\.dismiss) private var dismiss
     @State private var guest: LiveContainerGuest?
     @State private var connection: LiveContainerConnection?
     @State private var hasChecked = false
@@ -169,6 +247,7 @@ struct LiveContainerGuestDetailView: View {
     @State private var updateCheckRequested = false
     @State private var message: String?
     @State private var markingInstalled = false
+    @State private var confirmingGuestRemoval = false
     @State private var checkState: GitHubCheckState = .notConfigured
     @State private var awaitingHandoff: String?
     @State private var sharedIPA: LiveContainerSharedIPA?
@@ -261,6 +340,12 @@ struct LiveContainerGuestDetailView: View {
                     if let warning = guest.warning { Text(warning).foregroundStyle(.orange) }
                     if let error = connection?.error { Text(error).foregroundStyle(.orange) }
                     NavigationLink { LiveContainerConnectionsView() } label: { Label("Connection & Rescan", systemImage: "folder") }
+                    if !guest.isAvailable {
+                        SwiftUI.Button("Remove Cached Guest", role: .destructive) {
+                            confirmingGuestRemoval = true
+                        }
+                        .disabled(working || isCheckingUpdates)
+                    }
                 }
             } else { ContentUnavailableView("Guest Not Found", systemImage: "app.dashed") }
         }
@@ -291,6 +376,11 @@ struct LiveContainerGuestDetailView: View {
             SwiftUI.Button("Mark as Installed") { Task { await resolve(markInstalled: true) } }
             SwiftUI.Button("Cancel", role: .cancel) { }
         } message: { Text("Confirm only after installing this exact GitHub release or workflow build in LiveContainer. A matching version label alone is insufficient.") }
+        .confirmationDialog("Remove cached guest?", isPresented: $confirmingGuestRemoval, titleVisibility: .visible) {
+            SwiftUI.Button("Remove Guest", role: .destructive) { Task { await removeUnavailableGuest() } }
+        } message: {
+            Text("This removes the unavailable guest’s cached metadata and GitHub update settings from SideKick. Its LiveContainer files are not changed.")
+        }
     }
 
     @discardableResult
@@ -484,6 +574,23 @@ struct LiveContainerGuestDetailView: View {
         } catch { message = error.localizedDescription }
         await reload()
     }
+
+    @MainActor private func removeUnavailableGuest() async {
+        guard !working, let guest, !guest.isAvailable else { return }
+        working = true
+        defer { working = false }
+        do {
+            // Clear the source first so a failed catalogue write leaves a
+            // visible guest that the user can retry removing.
+            try await GitHubUpdateConfigurationStore.shared.remove(bundleIdentifier: guestID)
+            try await environment.liveContainerStore.removeUnavailableGuest(guestID)
+        } catch {
+            message = error.localizedDescription
+            return
+        }
+        dismiss()
+    }
+
     @MainActor private func openContainer(_ connection: LiveContainerConnection) async {
         do {
             let url = try LiveContainerLaunch.url(scheme: connection.scheme)
