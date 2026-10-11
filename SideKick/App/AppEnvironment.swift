@@ -176,6 +176,8 @@ final class AppEnvironment {
         return (installedApps.map(\.updateTarget) + guests).filter { seen.insert($0.id).inserted }
     }
 
+    var hasGitHubUpdateTargets: Bool { !updateTargets.isEmpty }
+
     private func signatures(_ targets: [GitHubUpdateTarget]) -> [String] {
         targets.map { [$0.id, $0.version, $0.kind.rawValue, $0.observation ?? ""].joined(separator: "\n") }.sorted()
     }
@@ -197,13 +199,16 @@ final class AppEnvironment {
         githubUpdates.removeAll { !targetIDs.contains($0.bundleIdentifier) }
         githubChecks.removeAll { !targetIDs.contains($0.targetID) }
         githubScanTask = Task { @MainActor in
-            _ = await GitHubUpdateScanner.scanTargets(targets) { [weak self] check in
+            let scanResult = await GitHubUpdateScanner.scanTargets(targets) { [weak self] check in
                 guard let self else { return }
                 await self.publishGitHubCheck(check, generation: generation, targets: targets)
             }
             guard githubGeneration == generation else { return }
             isCheckingGitHubUpdates = false
             githubScanTask = nil
+            if !Task.isCancelled, scanResult.checks.count < targets.count {
+                githubCheckRequested = true
+            }
             // Updated guest observations and explicit refresh requests get a
             // follow-up scan after this one has published its partial results.
             requestGitHubUpdateCheck()

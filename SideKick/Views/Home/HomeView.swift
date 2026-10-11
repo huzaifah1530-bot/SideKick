@@ -574,9 +574,9 @@ struct HomeView: View {
         if githubChecks.contains(where: { $0.state == .current }) { return "Confirmed GitHub builds are current." }
         if githubChecks.contains(where: { $0.state == .installedAhead }) { return "Installed builds are ahead of GitHub releases." }
         if githubChecks.isEmpty {
-            return installedApps.isEmpty && guestApps.isEmpty
-                ? "No apps are available for GitHub update checks."
-                : "Waiting for GitHub update check results."
+            return environment.hasGitHubUpdateTargets
+                ? "Waiting for GitHub update check results."
+                : "No eligible apps are available for GitHub update checks."
         }
         return "No confirmed GitHub updates are available."
     }
