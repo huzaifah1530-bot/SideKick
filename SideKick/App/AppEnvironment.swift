@@ -90,6 +90,19 @@ final class AppEnvironment {
                     hasLoadedLocalApps = true
                     localLoadError = nil
                     debugLog("[SideKick] Published \(apps.count) installed app records before network checks.")
+                    if let runningBundleID = Bundle(url: Bundle.Info.activeBundleURL)?.bundleIdentifier,
+                       runningBundleID == Bundle.main.bundleIdentifier,
+                       apps.contains(where: { $0.id == runningBundleID }) {
+                        do {
+                            _ = try await GitHubUpdateConfigurationStore.shared.ensureSelfUpdateConfiguration(
+                                for: runningBundleID
+                            )
+                        } catch {
+                            // Self-update configuration is ancillary to the
+                            // installed-app catalogue and must not hide it.
+                            debugLog("[SideKick] Could not prepare the self-update source: \(error.localizedDescription)")
+                        }
+                    }
                 } catch {
                     localLoadError = error.localizedDescription
                     debugLog("[SideKick] Local catalogue read failed: \(error.localizedDescription)")
@@ -194,6 +207,19 @@ final class AppEnvironment {
             // Updated guest observations and explicit refresh requests get a
             // follow-up scan after this one has published its partial results.
             requestGitHubUpdateCheck()
+        }
+    }
+
+    /// Wait for the app-owned update scan that a foreground refresh requested,
+    /// including a coalesced follow-up queued while the current scan was active.
+    /// Ordinary catalogue reloads do not call this, so startup stays local-first.
+    func awaitPendingGitHubChecks() async {
+        guard DatabaseManager.shared.isStarted, !githubChecksSuspended else { return }
+        requestGitHubUpdateCheck()
+        while !Task.isCancelled, !githubChecksSuspended {
+            guard let scan = githubScanTask else { return }
+            await scan.value
+            // The owning scan requests any queued follow-up before it completes.
         }
     }
 

@@ -112,6 +112,16 @@ struct HomeView: View {
     private var isLoadingLocalApps: Bool { environment.isLoadingLocalApps }
     private var localLoadError: String? { environment.localLoadError }
 
+    private var runningSideKickApp: InstalledAppSummary? {
+        guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return nil }
+        return installedApps.first { $0.id == bundleIdentifier }
+    }
+
+    private var runningSideKickGitHubCheckIsUnconfigured: Bool {
+        guard let app = runningSideKickApp else { return false }
+        return githubChecks.contains { $0.targetID == app.id && $0.state == .notConfigured }
+    }
+
     private var installedBundleIdentifiers: Set<String> {
         Set(installedApps.flatMap(\.updateMatchingBundleIdentifiers))
     }
@@ -222,30 +232,42 @@ struct HomeView: View {
                                 .fullWidthListSeparators()
                             }
                         }
-                        if let attention = githubChecks.first(where: { $0.state.needsAttention }) {
-                            Text(attention.detail ?? attention.state.message).font(.footnote).foregroundStyle(.secondary)
-                        }
                     }
-                } else {
-                    Section {
-                        HStack(spacing: 9) {
-                            if isCheckingGitHubUpdates { ProgressView() }
-                            else if githubUpdateCheckFailed {
-                                Image(systemName: "exclamationmark.circle").foregroundStyle(.orange)
-                            } else {
-                                Image(systemName: "arrow.down.circle").foregroundStyle(Color.sideKickAccentGradient)
-                            }
-                            Text(updateCheckStatus)
-                                .font(.subheadline.weight(.medium))
-                            Spacer()
+                }
+
+                SwiftUI.Section("GitHub Updates") {
+                    HStack(spacing: 9) {
+                        if isCheckingGitHubUpdates { ProgressView() }
+                        else if githubUpdateCheckFailed {
+                            Image(systemName: "exclamationmark.circle").foregroundStyle(.orange)
+                        } else if githubChecks.contains(where: { $0.state == .notConfigured }) {
+                            Image(systemName: "gearshape.2").foregroundStyle(.secondary)
+                        } else {
+                            Image(systemName: "arrow.down.circle").foregroundStyle(Color.sideKickAccentGradient)
                         }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 13)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color(uiColor: .secondarySystemGroupedBackground), in: .rect(cornerRadius: 18))
-                        .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
+                        Text(updateCheckStatus)
+                            .font(.subheadline.weight(.medium))
+                        Spacer()
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 13)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .background(Color(uiColor: .secondarySystemGroupedBackground), in: .rect(cornerRadius: 18))
+                    .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                    .listRowBackground(Color.clear)
+                    .listRowSeparator(.hidden)
+                    if runningSideKickGitHubCheckIsUnconfigured, let runningSideKickApp {
+                        NavigationLink {
+                            GitHubUpdateSettingsView(app: runningSideKickApp)
+                        } label: {
+                            Label("Set up GitHub updates for SideKick", systemImage: "chevron.left.forwardslash.chevron.right")
+                        }
+                        .fullWidthListSeparators()
+                    }
+                    if let attention = githubChecks.first(where: { $0.state.needsAttention }) {
+                        Text(attention.detail ?? attention.state.message)
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
                     }
                 }
 
@@ -409,6 +431,7 @@ struct HomeView: View {
             }
             .refreshable {
                 await load()
+                await environment.awaitPendingGitHubChecks()
             }
             .confirmationDialog(
                 "\(ipaAwaitingUpdateChoice?.name ?? "This app") is already installed",
@@ -514,11 +537,31 @@ struct HomeView: View {
         if localLoadError != nil { return "Couldn’t Load Your Apps" }
         if !hasLoadedLocalApps { return "Loading Your Apps" }
         if isCheckingGitHubUpdates { return "Checking for Updates" }
-        if githubUpdateCheckFailed { return "Couldn’t Check GitHub Updates" }
-        if githubChecks.contains(where: { $0.state.needsAttention }) { return "Update Tracking Needs Attention" }
-        if githubChecks.contains(where: { $0.state == .skipped }) { return "Latest Builds Were Skipped" }
-        if githubChecks.contains(where: { $0.state == .current }) { return "Confirmed Builds Are Current" }
-        return "No Confirmed Updates"
+        if runningSideKickGitHubCheckIsUnconfigured { return "GitHub updates aren’t configured for SideKick." }
+
+        let availableCount = githubChecks.filter { $0.state == .updateAvailable }.count
+        if availableCount > 0 {
+            return availableCount == 1 ? "A GitHub update is available." : "\(availableCount) GitHub updates are available."
+        }
+        if githubUpdateCheckFailed { return "One or more GitHub update checks failed." }
+        if githubChecks.contains(where: { $0.state.needsAttention }) { return "GitHub update tracking needs attention." }
+
+        let unconfiguredCount = githubChecks.filter { $0.state == .notConfigured }.count
+        if unconfiguredCount > 0 {
+            let configuredCount = githubChecks.count - unconfiguredCount
+            return configuredCount == 0
+                ? "GitHub updates aren’t configured for the checked apps."
+                : "GitHub checks finished; \(unconfiguredCount) app(s) aren’t configured."
+        }
+        if githubChecks.contains(where: { $0.state == .skipped }) { return "The latest GitHub build was skipped." }
+        if githubChecks.contains(where: { $0.state == .current }) { return "Confirmed GitHub builds are current." }
+        if githubChecks.contains(where: { $0.state == .installedAhead }) { return "Installed builds are ahead of GitHub releases." }
+        if githubChecks.isEmpty {
+            return installedApps.isEmpty && guestApps.isEmpty
+                ? "No apps are available for GitHub update checks."
+                : "Waiting for GitHub update check results."
+        }
+        return "No confirmed GitHub updates are available."
     }
 
     private var filteredGitHubUpdates: [GitHubUpdateCandidate] {

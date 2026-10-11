@@ -6,6 +6,8 @@ extension Notification.Name {
 
 actor GitHubUpdateConfigurationStore {
     static let shared = GitHubUpdateConfigurationStore()
+    private static let selfUpdateOptOutKey = "sidekick.github-update.self-update-opted-out"
+    private static let selfUpdateRepositoryURL = "https://github.com/huzaifah1530-bot/SideKick"
     private let fileManager = FileManager.default
     private let fileURL: URL
     private let legacyFileURLs: [URL]
@@ -52,6 +54,32 @@ actor GitHubUpdateConfigurationStore {
 
     func configuration(for bundleIdentifier: String) throws -> GitHubUpdateConfiguration? {
         try all().first { $0.bundleIdentifier == bundleIdentifier }
+    }
+
+    /// Creates SideKick's default Actions source when none exists. Older installs
+    /// have no opt-out marker, so the default is added on their first automatic scan.
+    func ensureSelfUpdateConfiguration(for targetID: String) throws -> GitHubUpdateConfiguration? {
+        guard targetID == Bundle.main.bundleIdentifier else { return nil }
+        if let existing = try configuration(for: targetID) { return existing }
+        guard !UserDefaults.standard.bool(forKey: Self.selfUpdateOptOutKey) else { return nil }
+        let vpnExtension = Bundle.main.bundleURL.appendingPathComponent("PlugIns/SideKickVPN.appex", isDirectory: true)
+        let assetName = fileManager.fileExists(atPath: vpnExtension.path)
+            ? "SideKick-vpn-unsigned-ipa"
+            : "SideKick-unsigned-ipa"
+
+        let configuration = GitHubUpdateConfiguration(
+            bundleIdentifier: targetID,
+            repositoryURL: Self.selfUpdateRepositoryURL,
+            source: .actionsArtifact,
+            workflowFile: "ios-build.yml",
+            branch: "main",
+            assetName: assetName,
+            baselineUpdateKey: nil,
+            lastInstalledUpdateKey: nil,
+            tokenID: nil
+        )
+        try save(configuration)
+        return configuration
     }
 
     func save(_ configuration: GitHubUpdateConfiguration) throws {
@@ -124,6 +152,9 @@ actor GitHubUpdateConfigurationStore {
         }
         if baselineWasEdited { result.setInstalledBaseline(baselineKey, observation: observation) }
         try save(result)
+        if settings.bundleIdentifier == Bundle.main.bundleIdentifier {
+            UserDefaults.standard.removeObject(forKey: Self.selfUpdateOptOutKey)
+        }
     }
 
     @discardableResult
@@ -195,6 +226,9 @@ actor GitHubUpdateConfigurationStore {
     func remove(bundleIdentifier: String) throws {
         let values = try all().filter { $0.bundleIdentifier != bundleIdentifier }
         try persist(values)
+        if bundleIdentifier == Bundle.main.bundleIdentifier {
+            UserDefaults.standard.set(true, forKey: Self.selfUpdateOptOutKey)
+        }
     }
 
     private func persist(_ values: [GitHubUpdateConfiguration]) throws {

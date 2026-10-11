@@ -86,13 +86,17 @@ actor GitHubUpdateService {
         token: String? = nil,
         onProgress: @escaping @Sendable (GitHubDownloadProgress) -> Void = { _ in }
     ) async throws -> URL {
+        let usableToken = token?.trimmingCharacters(in: .whitespacesAndNewlines)
+        if candidate.source == .actionsArtifact, usableToken?.isEmpty != false {
+            throw GitHubUpdateError.actionsTokenRequired
+        }
         guard candidate.downloadURL.scheme == "https", candidate.downloadURL.host == "api.github.com" else {
             throw GitHubUpdateError.invalidRepository
         }
         var request = URLRequest(url: candidate.downloadURL)
         request.setValue(candidate.source == .latestRelease ? "application/octet-stream" : "application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("SideKick iOS app", forHTTPHeaderField: "User-Agent")
-        if let token, !token.isEmpty { request.setValue("Bearer \(token)", forHTTPHeaderField: "Authorization") }
+        if let usableToken, !usableToken.isEmpty { request.setValue("Bearer \(usableToken)", forHTTPHeaderField: "Authorization") }
         let (downloadURL, response) = try await ProgressFileDownload(onProgress: onProgress).download(request)
         guard let response = response as? HTTPURLResponse else {
             try? FileManager.default.removeItem(at: downloadURL)
@@ -205,11 +209,12 @@ struct GitHubDownloadProgress: Sendable {
 }
 
 enum GitHubUpdateError: LocalizedError {
-    case invalidRepository, invalidToken, notFound, insufficientPermissions(String?), rateLimited, unavailable, invalidResponse, downloadFailed, invalidArtifact, noIPAInArtifact, multipleIPAsInArtifact
+    case invalidRepository, invalidToken, actionsTokenRequired, notFound, insufficientPermissions(String?), rateLimited, unavailable, invalidResponse, downloadFailed, invalidArtifact, noIPAInArtifact, multipleIPAsInArtifact
     var errorDescription: String? {
         switch self {
         case .invalidRepository: "Enter a GitHub repository URL, such as https://github.com/owner/repository."
         case .invalidToken: "GitHub rejected this token. Check that it’s valid and has the required read-only repository and Actions access."
+        case .actionsTokenRequired: "Choose or add a GitHub token with Actions read access to download this workflow artifact."
         case .notFound: "GitHub couldn’t find that repository, release, workflow, or artifact. For a private repository, check that this token was created for its owner, includes this repository, and has been approved by the organization."
         case .insufficientPermissions(let permissions):
             "GitHub denied access to this resource. Grant the token the required read permission\(permissions.map { ": \($0)" } ?? " for the selected repository")."
