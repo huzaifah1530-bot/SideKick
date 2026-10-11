@@ -19,6 +19,10 @@ struct GitHubUpdateSettingsView: View {
     @State private var installedNeedsConfirmation = false
     @State private var isLoadingHistory = false
     @State private var didLoad = false
+    @State private var didFinishInitialLoad = false
+    @State private var tokenChangedDuringInitialLoad = false
+    @State private var historyTokenID: String?
+    @State private var hasHistoryTokenIdentity = false
     @State private var loadedSource = ""
     @State private var queryGeneration = UUID()
     @State private var historyPage = 1
@@ -101,7 +105,7 @@ struct GitHubUpdateSettingsView: View {
                     }
                     SwiftUI.Button("I Don’t Know the Installed Build") { selectedBaselineKey = nil; baselineWasEdited = true }
                     SwiftUI.Button("Load older versions") { Task { await loadHistory(append: true) } }
-                        .disabled(isLoadingHistory)
+                        .disabled(isLoadingHistory || history.isEmpty)
                 } header: {
                     Text("Installed Version")
                 } footer: {
@@ -134,6 +138,19 @@ struct GitHubUpdateSettingsView: View {
             selectedBaselineKey = nil
             isLoadingHistory = false
         }
+        .onChange(of: tokenID) { _, value in
+            guard didLoad else { return }
+            guard didFinishInitialLoad else {
+                tokenChangedDuringInitialLoad = true
+                return
+            }
+            guard !hasHistoryTokenIdentity || value != historyTokenID else { return }
+            historyTokenID = value
+            queryGeneration = UUID()
+            history = []
+            historyPage = 1
+            isLoadingHistory = false
+        }
         .alert("GitHub Updates", isPresented: $showingMessage) {
             SwiftUI.Button("OK", role: .cancel) { }
         } message: { Text(message ?? "") }
@@ -146,9 +163,12 @@ struct GitHubUpdateSettingsView: View {
         do {
             guard let config = try await store.configuration(for: target.id) else {
                 loadedSource = sourceIdentity
+                didFinishInitialLoad = true
+                historyTokenID = tokenID
+                hasHistoryTokenIdentity = true
                 return
             }
-            tokenID = config.tokenID
+            if !tokenChangedDuringInitialLoad { tokenID = config.tokenID }
             repositoryURL = config.repositoryURL
             source = config.source
             workflowFile = config.workflowFile
@@ -158,8 +178,17 @@ struct GitHubUpdateSettingsView: View {
             installedNeedsConfirmation = config.installedBuild == nil || config.installedBuild?.observation != target.observation
             baselineWasEdited = false
             loadedSource = sourceIdentity
+            didFinishInitialLoad = true
+            historyTokenID = tokenID
+            hasHistoryTokenIdentity = true
             await loadHistory(configuration: config)
-        } catch { message = error.localizedDescription; showingMessage = true }
+        } catch {
+            didFinishInitialLoad = true
+            historyTokenID = tokenID
+            hasHistoryTokenIdentity = true
+            message = error.localizedDescription
+            showingMessage = true
+        }
 
     }
 
@@ -187,6 +216,7 @@ struct GitHubUpdateSettingsView: View {
         isLoadingHistory = true
         let generation = queryGeneration
         let identity = sourceIdentity
+        let credentialID = tokenID
         let page = append ? historyPage + 1 : 1
         defer { if queryGeneration == generation { isLoadingHistory = false } }
         let configuration = existing ?? GitHubUpdateConfiguration(
@@ -200,9 +230,10 @@ struct GitHubUpdateSettingsView: View {
             lastInstalledUpdateKey: nil
         )
         do {
-            let token = try GitHubCredentialStore().load(id: tokenID)
+            let token = try GitHubCredentialStore().load(id: credentialID)
             let entries = try await GitHubUpdateService().history(for: configuration, token: token, page: page)
-            guard queryGeneration == generation, sourceIdentity == identity, !Task.isCancelled else { return }
+            guard queryGeneration == generation, sourceIdentity == identity,
+                  tokenID == credentialID, !Task.isCancelled else { return }
             historyPage = page
             if append {
                 let known = Set(history.map(\.key))
@@ -210,7 +241,14 @@ struct GitHubUpdateSettingsView: View {
             } else { history = entries }
             if history.isEmpty { message = "No matching releases or downloadable build artifacts were found. Check the source settings and asset name."; showingMessage = true }
         } catch {
-            guard queryGeneration == generation else { return }
+            guard queryGeneration == generation, sourceIdentity == identity,
+                  tokenID == credentialID else { return }
+            let urlCancellation = (error as? URLError)?.code == .cancelled
+            if Task.isCancelled || error is CancellationError || urlCancellation {
+                message = "The history request was cancelled. Reload versions to try again."
+                showingMessage = true
+                return
+            }
             message = error.localizedDescription
             showingMessage = true
         }

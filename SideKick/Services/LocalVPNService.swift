@@ -32,6 +32,8 @@ final class LocalVPNService {
     static let externalStoreURL = URL(string: "https://apps.apple.com/app/id6755608044")!
     private var manager: NETunnelProviderManager?
     private var leases: Set<UUID> = []
+    private var isMutatingConfiguration = false
+    private var configurationRevision: UInt64 = 0
     private var connectionTask: Task<Void, Error>?
     private var heartbeatTask: Task<Void, Never>?
     private var statusObserver: NSObjectProtocol?
@@ -84,7 +86,7 @@ final class LocalVPNService {
         }
     }
 
-    var isBusy: Bool { !leases.isEmpty }
+    var isBusy: Bool { !leases.isEmpty || isMutatingConfiguration }
     var extensionURL: URL {
         Bundle.Info.activeBundleURL.appendingPathComponent("PlugIns/SideKickVPN.appex")
     }
@@ -123,20 +125,31 @@ final class LocalVPNService {
     func selectMode(_ mode: LocalConnectionMode) async throws {
         guard !isBusy else { throw LocalVPNError.inUse }
         if mode == .builtIn && !hasSupportedProfiles { throw LocalVPNError.unsupportedSignature }
+        isMutatingConfiguration = true
+        configurationRevision &+= 1
+        defer { isMutatingConfiguration = false }
         manager?.connection.stopVPNTunnel()
         preferredMode = mode
         UserDefaults.standard.set(mode.rawValue, forKey: "sidekick.connection.mode")
         UserDefaults.standard.set(false, forKey: "sidekick.setup.pairing-verified")
         lastError = nil
-        await refreshStatus()
+        await refreshStatus(allowDuringConfigurationMutation: true)
     }
 
     func refreshStatus() async {
+        await refreshStatus(allowDuringConfigurationMutation: false)
+    }
+
+    private func refreshStatus(allowDuringConfigurationMutation: Bool) async {
+        guard allowDuringConfigurationMutation || !isMutatingConfiguration else { return }
+        let revision = configurationRevision
         externalTunnelConnected = externalConnected
         guard hasSupportedProfiles else { isConfigured = false; status = .invalid; return }
         do {
             guard let identifier = extensionBundleIdentifier else { throw LocalVPNError.missingExtension }
             let configurations = try await NETunnelProviderManager.loadAllFromPreferences()
+            guard revision == configurationRevision,
+                  allowDuringConfigurationMutation || !isMutatingConfiguration else { return }
             manager = configurations.first { ($0.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier == identifier }
             isConfigured = manager?.isEnabled == true
             status = manager?.connection.status ?? .invalid
@@ -144,7 +157,11 @@ final class LocalVPNService {
             if leases.isEmpty, status == .connected || status == .connecting || status == .reasserting {
                 manager?.connection.stopVPNTunnel()
             }
-        } catch { lastError = readable(error) }
+        } catch {
+            guard revision == configurationRevision,
+                  allowDuringConfigurationMutation || !isMutatingConfiguration else { return }
+            lastError = readable(error)
+        }
     }
 
     func authorize() async throws {
@@ -152,6 +169,9 @@ final class LocalVPNService {
         guard extensionBundleIdentifier != nil else { throw LocalVPNError.missingExtension }
         guard hasSupportedProfiles else { throw LocalVPNError.unsupportedSignature }
         guard let identifier = extensionBundleIdentifier else { throw LocalVPNError.missingExtension }
+        isMutatingConfiguration = true
+        configurationRevision &+= 1
+        defer { isMutatingConfiguration = false }
         let configurations = try await NETunnelProviderManager.loadAllFromPreferences()
         let configuration = configurations.first { ($0.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier == identifier } ?? NETunnelProviderManager()
         let tunnel = NETunnelProviderProtocol()
@@ -176,6 +196,7 @@ final class LocalVPNService {
     }
 
     func acquire() async throws -> UUID {
+        guard !isMutatingConfiguration else { throw LocalVPNError.inUse }
         let lease = UUID()
         leases.insert(lease)
         do {
@@ -270,6 +291,9 @@ final class LocalVPNService {
 
     func removeConfiguration() async throws {
         guard !isBusy else { throw LocalVPNError.inUse }
+        isMutatingConfiguration = true
+        configurationRevision &+= 1
+        defer { isMutatingConfiguration = false }
         manager?.connection.stopVPNTunnel()
         if let manager { try await manager.removeFromPreferences() }
         manager = nil; isConfigured = false; status = .invalid

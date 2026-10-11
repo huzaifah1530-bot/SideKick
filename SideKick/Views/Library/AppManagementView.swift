@@ -17,6 +17,8 @@ struct AppManagementView: View {
     @State private var isResolvingQueuedTarget: Bool
     @State private var isQueuedTargetUnavailable = false
     @State private var queuedTargetLoadError: String?
+    @State private var isResolvingQueuedIPA = false
+    @State private var queuedIPAReadError: String?
 
     private let importedApp: ImportedIPA?
     private let requiredQueuedIPA: ImportedIPA?
@@ -28,6 +30,7 @@ struct AppManagementView: View {
         self.requiredQueuedIPA = nil
         _installedApp = State(initialValue: nil)
         _isResolvingQueuedTarget = State(initialValue: false)
+        _isResolvingQueuedIPA = State(initialValue: false)
         self.onDelete = onDelete
     }
 
@@ -36,6 +39,7 @@ struct AppManagementView: View {
         self.requiredQueuedIPA = nil
         _installedApp = State(initialValue: installedApp)
         _isResolvingQueuedTarget = State(initialValue: false)
+        _isResolvingQueuedIPA = State(initialValue: true)
         self.onDelete = nil
     }
 
@@ -44,11 +48,16 @@ struct AppManagementView: View {
         self.requiredQueuedIPA = queuedUpdate
         _installedApp = State(initialValue: nil)
         _isResolvingQueuedTarget = State(initialValue: true)
+        _isResolvingQueuedIPA = State(initialValue: true)
         self.onDelete = nil
     }
 
     private var appName: String { importedApp?.name ?? installedApp?.name ?? requiredQueuedIPA?.name ?? "App" }
     private var bundleIdentifier: String { importedApp?.bundleIdentifier ?? installedApp?.bundleIdentifier ?? requiredQueuedIPA?.bundleIdentifier ?? "" }
+    private var isQueueStateUnresolved: Bool {
+        isResolvingQueuedIPA || queuedIPAReadError != nil ||
+            (requiredQueuedIPA != nil && (isResolvingQueuedTarget || queuedTargetLoadError != nil))
+    }
 
     var body: some View {
         List {
@@ -80,6 +89,19 @@ struct AppManagementView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                     SwiftUI.Button("Retry") { retryQueuedTargetResolution() }
+                }
+            } else if let queuedIPAReadError {
+                Section("Queued Update") {
+                    Text("SideKick couldn’t check whether an update is still queued. The last known state is preserved, and update actions are disabled until the library can be checked.")
+                        .foregroundStyle(.secondary)
+                    Text(queuedIPAReadError)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    SwiftUI.Button("Retry") { retryQueuedTargetResolution() }
+                }
+            } else if isResolvingQueuedIPA {
+                Section("Queued Update") {
+                    ProgressView("Checking saved IPA queue…")
                 }
             } else if let requiredQueuedIPA, isQueuedTargetUnavailable {
                 Section("Queued Update") {
@@ -120,8 +142,12 @@ struct AppManagementView: View {
                     }
                 }
             } else if let installedApp, !isQueuedTargetUnavailable {
-                Section(pendingUpdateIPA == nil ? "Open" : "Update") {
-                    if let pendingUpdateIPA {
+                Section(isQueueStateUnresolved ? "Queued Update" : pendingUpdateIPA == nil ? "Open" : "Update") {
+                    if isQueueStateUnresolved {
+                        Text("The queued update status is still being checked. You can open the app; update actions stay unavailable until the library can be checked.")
+                            .foregroundStyle(.secondary)
+                        openInstalledAppButton(installedApp)
+                    } else if let pendingUpdateIPA {
                         if requiredQueuedIPA == nil || (!isResolvingQueuedTarget && queuedTargetLoadError == nil && !isQueuedTargetUnavailable) {
                             queuedUpdateActions(ipa: pendingUpdateIPA, installedApp: installedApp)
                         } else {
@@ -129,16 +155,7 @@ struct AppManagementView: View {
                                 .foregroundStyle(.secondary)
                         }
                     } else {
-                        SwiftUI.Button {
-                            UIApplication.shared.open(InstalledApp.openAppURL(targetBundleIdentifier: installedApp.resignedBundleIdentifier))
-                        } label: {
-                            Text("Open")
-                                .font(.body.weight(.semibold))
-                                .frame(maxWidth: .infinity)
-                        }
-                        .buttonStyle(.bordered)
-                        .buttonBorderShape(.capsule)
-                        .fullWidthListSeparators()
+                        openInstalledAppButton(installedApp)
                     }
                 }
 
@@ -381,6 +398,10 @@ struct AppManagementView: View {
     @MainActor
     private func reloadManagementState() async {
         expirationClock = .now
+        if importedApp == nil && (requiredQueuedIPA != nil || installedApp != nil) {
+            isResolvingQueuedIPA = true
+            queuedIPAReadError = nil
+        }
         var availableInstallations: [InstalledAppSummary] = []
         if requiredQueuedIPA != nil || installedApp != nil {
             let service = SideStoreOperationService(accountStore: accountStore, ipaStore: environment.ipaImportStore)
@@ -391,6 +412,7 @@ struct AppManagementView: View {
                     queuedTargetLoadError = nil
                 } catch {
                     isResolvingQueuedTarget = false
+                    isResolvingQueuedIPA = false
                     queuedTargetLoadError = error.localizedDescription
                     await accountStore.reload()
                     return
@@ -410,11 +432,18 @@ struct AppManagementView: View {
                 isResolvingQueuedTarget = false
                 guard let target else {
                     installedApp = nil
-                    let imports = (try? await environment.ipaImportStore.importedApps()) ?? []
-                    pendingUpdateIPA = imports.first(where: {
-                        $0.id == requiredQueuedIPA.id && $0.importedAt == requiredQueuedIPA.importedAt
-                    })
-                    isQueuedTargetUnavailable = true
+                    isQueuedTargetUnavailable = false
+                    do {
+                        let imports = try await environment.ipaImportStore.importedApps()
+                        pendingUpdateIPA = imports.first(where: {
+                            $0.id == requiredQueuedIPA.id && $0.importedAt == requiredQueuedIPA.importedAt
+                        })
+                        queuedIPAReadError = nil
+                        isQueuedTargetUnavailable = true
+                    } catch {
+                        queuedIPAReadError = error.localizedDescription
+                    }
+                    isResolvingQueuedIPA = false
                     await accountStore.reload()
                     return
                 }
@@ -429,19 +458,45 @@ struct AppManagementView: View {
         }
         if let installedApp {
             let matchingBundleIDs = installedApp.updateMatchingBundleIdentifiers
-            let imports = (try? await environment.ipaImportStore.importedApps()) ?? []
-            pendingUpdateIPA = imports.first { ipa in
-                ipa.isUpdateQueued && (ipa.queuedForInstalledAppID == installedApp.id || (ipa.queuedForInstalledAppID == nil && matchingBundleIDs.contains(ipa.bundleIdentifier.lowercased()) && availableInstallations.filter { app in app.updateMatchingBundleIdentifiers.contains(ipa.bundleIdentifier.lowercased()) }.count == 1))
+            do {
+                let imports = try await environment.ipaImportStore.importedApps()
+                pendingUpdateIPA = imports.first { ipa in
+                    ipa.isUpdateQueued && (ipa.queuedForInstalledAppID == installedApp.id || (ipa.queuedForInstalledAppID == nil && matchingBundleIDs.contains(ipa.bundleIdentifier.lowercased()) && availableInstallations.filter { app in app.updateMatchingBundleIdentifiers.contains(ipa.bundleIdentifier.lowercased()) }.count == 1))
+                }
+                queuedIPAReadError = nil
+            } catch {
+                queuedIPAReadError = error.localizedDescription
             }
+            isResolvingQueuedIPA = false
+        } else if importedApp == nil && requiredQueuedIPA == nil {
+            isResolvingQueuedIPA = false
         }
         await accountStore.reload()
     }
 
     @MainActor
     private func retryQueuedTargetResolution() {
-        isResolvingQueuedTarget = true
-        queuedTargetLoadError = nil
+        isResolvingQueuedIPA = true
+        queuedIPAReadError = nil
+        if requiredQueuedIPA != nil {
+            isResolvingQueuedTarget = true
+            isQueuedTargetUnavailable = false
+            queuedTargetLoadError = nil
+        }
         Task { await reloadManagementState() }
+    }
+
+    private func openInstalledAppButton(_ app: InstalledAppSummary) -> some View {
+        SwiftUI.Button {
+            UIApplication.shared.open(InstalledApp.openAppURL(targetBundleIdentifier: app.resignedBundleIdentifier))
+        } label: {
+            Text("Open")
+                .font(.body.weight(.semibold))
+                .frame(maxWidth: .infinity)
+        }
+        .buttonStyle(.bordered)
+        .buttonBorderShape(.capsule)
+        .fullWidthListSeparators()
     }
 
     @MainActor

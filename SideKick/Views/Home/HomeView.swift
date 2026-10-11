@@ -44,16 +44,58 @@ private struct QueuedManualUpdateRow: View {
     }
 }
 
+private struct UnresolvedQueuedManualUpdateRow: View {
+    let ipa: ImportedIPA
+    let detail: String
+
+    var body: some View {
+        HStack(spacing: 12) {
+            if let data = ipa.iconData, let icon = UIImage(data: data) {
+                Image(uiImage: icon)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 50, height: 50)
+                    .clipShape(.rect(cornerRadius: 11))
+            } else {
+                Image(systemName: "app.fill")
+                    .font(.system(size: 24))
+                    .foregroundStyle(.white)
+                    .frame(width: 50, height: 50)
+                    .background(.orange.gradient, in: .rect(cornerRadius: 11))
+            }
+            VStack(alignment: .leading, spacing: 4) {
+                Text(ipa.name)
+                    .font(.body.weight(.semibold))
+                Text("Manual IPA · Version \(ipa.version)")
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(1)
+                Text(detail)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+            Spacer(minLength: 8)
+            Text("REVIEW")
+                .font(.caption.weight(.semibold))
+                .foregroundStyle(.orange)
+        }
+        .padding(.vertical, 5)
+    }
+}
+
 struct HomeView: View {
     @State var viewModel: HomeViewModel
     @State private var showingImporter = false
     @State private var showingURLImport = false
     @State private var incomingShareURL: URL?
     @State private var ipaAwaitingUpdateChoice: ImportedIPA?
+    @State private var matchingInstallationsForUpdateChoice: [InstalledAppSummary] = []
     @State private var accountStore = SigningAccountStore()
     @State private var remainingAppIDs: Int?
     @State private var isRefreshingAll = false
     @State private var refreshAllProgress: (completed: Int, total: Int)?
+    @State private var refreshAllResultMessage: String?
     @State private var appIDCapacityTask: Task<Void, Never>?
     @State private var capacityGeneration = UUID()
     @State private var expirationClock = Date.now
@@ -75,19 +117,63 @@ struct HomeView: View {
     }
 
     private var filteredImportedApps: [ImportedIPA] {
-        viewModel.importedApps.filter { $0.queuedForInstalledAppID?.hasPrefix("livecontainer:") != true && !installedBundleIdentifiers.contains($0.bundleIdentifier.lowercased()) }
+        let queuedManualIPAIDs = Set(queuedManualUpdates.map(\.ipa.id) + unresolvedQueuedManualUpdates.map(\.id))
+        return viewModel.importedApps.filter {
+            !queuedManualIPAIDs.contains($0.id) &&
+            $0.queuedForInstalledAppID?.hasPrefix("livecontainer:") != true &&
+            !installedBundleIdentifiers.contains($0.bundleIdentifier.lowercased())
+        }
+    }
+
+    private var manualQueuedIPAs: [ImportedIPA] {
+        viewModel.importedApps.filter { ipa in
+            ipa.isUpdateQueued && ipa.githubUpdateKey == nil &&
+            ipa.fileName?.hasPrefix("github-update-") != true &&
+            ipa.queuedForInstalledAppID?.hasPrefix("livecontainer:") != true
+        }
     }
 
     private var queuedManualUpdates: [QueuedManualUpdate] {
-        viewModel.importedApps.compactMap { ipa in
-            guard ipa.isUpdateQueued, ipa.githubUpdateKey == nil,
-                  ipa.fileName?.hasPrefix("github-update-") != true,
-                  let installedApp = installedApps.first(where: {
+        manualQueuedIPAs.compactMap { ipa in
+            guard let installedApp = installedApps.first(where: {
                       if let targetID = ipa.queuedForInstalledAppID { return $0.id == targetID }
                       return $0.updateMatchingBundleIdentifiers.contains(ipa.bundleIdentifier.lowercased()) && installedApps.filter { $0.updateMatchingBundleIdentifiers.contains(ipa.bundleIdentifier.lowercased()) }.count == 1
                   }) else { return nil }
             return QueuedManualUpdate(ipa: ipa, installedApp: installedApp)
         }
+    }
+
+    private var unresolvedQueuedManualUpdates: [ImportedIPA] {
+        manualQueuedIPAs.filter { ipa in
+            if let targetID = ipa.queuedForInstalledAppID {
+                return !installedApps.contains(where: { $0.id == targetID })
+            }
+            let matchingCount = installedApps.filter {
+                $0.updateMatchingBundleIdentifiers.contains(ipa.bundleIdentifier.lowercased())
+            }.count
+            if matchingCount > 1 { return true }
+            // Old records without persisted queue state remain ordinary imports when
+            // no installed app matches; an explicit queue must stay visible.
+            return matchingCount == 0 && ipa.isQueuedForUpdate == true
+        }
+    }
+
+    private func unresolvedQueueDetail(for ipa: ImportedIPA) -> String {
+        if ipa.queuedForInstalledAppID != nil {
+            let hasBundleMatch = installedApps.contains {
+                $0.updateMatchingBundleIdentifiers.contains(ipa.bundleIdentifier.lowercased())
+            }
+            return hasBundleMatch
+                ? "The exact target is unavailable; a different installed copy with this bundle ID remains. SideKick won’t assume it is the queued target."
+                : "The installed app this IPA targeted is no longer available."
+        }
+        let matchingCount = installedApps.filter {
+            $0.updateMatchingBundleIdentifiers.contains(ipa.bundleIdentifier.lowercased())
+        }.count
+        if matchingCount == 0 {
+            return "No installed app matches this queued IPA, so SideKick can’t resolve its target."
+        }
+        return "Multiple installed apps match this older queue entry, so its target is ambiguous."
     }
 
     private var filteredInstalledApps: [InstalledAppSummary] {
@@ -101,13 +187,22 @@ struct HomeView: View {
     var body: some View {
         NavigationStack {
             List {
-                if !githubUpdates.isEmpty || !queuedManualUpdates.isEmpty {
+                if !githubUpdates.isEmpty || !queuedManualUpdates.isEmpty || !unresolvedQueuedManualUpdates.isEmpty {
                     SwiftUI.Section("Updates") {
                         ForEach(queuedManualUpdates) { queuedUpdate in
                             NavigationLink {
                                 AppManagementView(installedApp: queuedUpdate.installedApp)
                             } label: {
                                 QueuedManualUpdateRow(update: queuedUpdate)
+                            }
+                            .fullWidthListSeparators()
+                            .sideKickNavigationLinkIndicator()
+                        }
+                        ForEach(unresolvedQueuedManualUpdates) { ipa in
+                            NavigationLink {
+                                AppManagementView(queuedUpdate: ipa)
+                            } label: {
+                                UnresolvedQueuedManualUpdateRow(ipa: ipa, detail: unresolvedQueueDetail(for: ipa))
                             }
                             .fullWidthListSeparators()
                             .sideKickNavigationLinkIndicator()
@@ -169,7 +264,7 @@ struct HomeView: View {
                     }
                     .padding(.vertical, 24)
                     .listRowBackground(Color.clear)
-                } else if filteredInstalledApps.isEmpty && filteredImportedApps.isEmpty && guestApps.isEmpty {
+                } else if filteredInstalledApps.isEmpty && filteredImportedApps.isEmpty && guestApps.isEmpty && queuedManualUpdates.isEmpty && unresolvedQueuedManualUpdates.isEmpty {
                     ContentUnavailableView(
                         "Your apps appear here",
                         systemImage: "square.stack.3d.up",
@@ -322,9 +417,7 @@ struct HomeView: View {
                     set: { if !$0 { ipaAwaitingUpdateChoice = nil } }
                 )
             ) {
-                ForEach(installedApps.filter { app in
-                    ipaAwaitingUpdateChoice.map { app.updateMatchingBundleIdentifiers.contains($0.bundleIdentifier.lowercased()) } ?? false
-                }) { installation in
+                ForEach(matchingInstallationsForUpdateChoice) { installation in
                     SwiftUI.Button("Queue for \(installation.name) · \(installation.accountEmail) (\(installation.teamIdentifier))") {
                         Task { await queuePendingUpdate(for: installation.id) }
                     }
@@ -333,13 +426,21 @@ struct HomeView: View {
             } message: {
                 Text("Queue this IPA as the update for the installed app?")
             }
-            .alert(viewModel.errorMessage == nil ? "IPA imported" : "Couldn’t import IPA", isPresented: Binding(
-                get: { viewModel.errorMessage != nil || viewModel.noticeMessage != nil },
-                set: { if !$0 { viewModel.errorMessage = nil; viewModel.noticeMessage = nil } }
+            .alert(refreshAllResultMessage == nil
+                ? (viewModel.errorMessage == nil ? "IPA imported" : "Couldn’t import IPA")
+                : "Refresh All", isPresented: Binding(
+                get: { refreshAllResultMessage != nil || viewModel.errorMessage != nil || viewModel.noticeMessage != nil },
+                set: {
+                    if !$0 {
+                        refreshAllResultMessage = nil
+                        viewModel.errorMessage = nil
+                        viewModel.noticeMessage = nil
+                    }
+                }
             )) {
                 SwiftUI.Button("OK", role: .cancel) { }
             } message: {
-                Text(viewModel.errorMessage ?? viewModel.noticeMessage ?? "")
+                Text(refreshAllResultMessage ?? viewModel.errorMessage ?? viewModel.noticeMessage ?? "")
             }
         }
     }
@@ -456,6 +557,9 @@ struct HomeView: View {
 
     private func refreshAllApps() async {
         guard !isRefreshingAll else { return }
+        refreshAllResultMessage = nil
+        viewModel.errorMessage = nil
+        viewModel.noticeMessage = nil
         isRefreshingAll = true
         refreshAllProgress = nil
         defer {
@@ -463,10 +567,20 @@ struct HomeView: View {
             refreshAllProgress = nil
         }
         let service = SideStoreOperationService(accountStore: accountStore, ipaStore: environment.ipaImportStore)
-        _ = await service.refreshAllManagedAppsQuietly { completed, total in
+        let result = await service.refreshAllManagedAppsQuietly { completed, total in
             refreshAllProgress = (completed, total)
         }
         await load()
+        if result.attempted == 0 {
+            refreshAllResultMessage = "No apps were attempted. The app list may be empty or unavailable; refresh your apps and try again."
+        } else if result.succeeded == result.attempted {
+            refreshAllResultMessage = "Refresh All succeeded for all \(result.attempted) apps."
+        } else if result.succeeded == 0 {
+            refreshAllResultMessage = "Refresh All failed for all \(result.attempted) apps."
+        } else {
+            let failed = result.attempted - result.succeeded
+            refreshAllResultMessage = "Refresh All succeeded for \(result.succeeded) of \(result.attempted) apps; \(failed) failed."
+        }
     }
 
     private func daysRemaining(for date: Date, now: Date) -> Int {
@@ -506,18 +620,33 @@ struct HomeView: View {
     }
 
     private func handlePreparedIPA(_ app: ImportedIPA) async {
-        await environment.reloadLocalCatalogues()
-        let installedIDs = Set(installedApps.flatMap(\.updateMatchingBundleIdentifiers))
-        guard installedIDs.contains(app.bundleIdentifier.lowercased()) else {
+        let service = SideStoreOperationService(accountStore: accountStore, ipaStore: environment.ipaImportStore)
+        let currentInstallations: [InstalledAppSummary]
+        do {
+            currentInstallations = try await service.loadInstalledApps(loadIcons: false)
+        } catch {
+            matchingInstallationsForUpdateChoice = []
+            await environment.ipaImportStore.discardPreparedIPA(app)
+            viewModel.errorMessage = "SideKick couldn’t check installed apps before importing this IPA. Try again. \(error.localizedDescription)"
+            return
+        }
+
+        let matchingInstallations = currentInstallations.filter {
+            $0.updateMatchingBundleIdentifiers.contains(app.bundleIdentifier.lowercased())
+        }
+        guard !matchingInstallations.isEmpty else {
+            matchingInstallationsForUpdateChoice = []
             await savePreparedIPA(app, update: false)
             return
         }
+        matchingInstallationsForUpdateChoice = matchingInstallations
         ipaAwaitingUpdateChoice = app
     }
 
     private func queuePendingUpdate(for targetID: String) async {
         guard let app = ipaAwaitingUpdateChoice else { return }
         ipaAwaitingUpdateChoice = nil
+        matchingInstallationsForUpdateChoice = []
         await savePreparedIPA(app, update: true, targetID: targetID)
     }
 
@@ -530,6 +659,7 @@ struct HomeView: View {
             await viewModel.load()
             viewModel.noticeMessage = update ? "\(app.name) is queued as an update." : "\(app.name) is ready to install."
         } catch {
+            await environment.ipaImportStore.discardPreparedIPA(app)
             viewModel.errorMessage = error.localizedDescription
         }
     }

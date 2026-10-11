@@ -452,7 +452,7 @@ actor IPAImportStore {
         let appPath = "Payload/\(appRoot)"
         let iconNames = (plist["CFBundleIcons"] as? [String: Any])
             .flatMap { $0["CFBundlePrimaryIcon"] as? [String: Any] }?["CFBundleIconFiles"] as? [String] ?? []
-        let iconEntry = iconNames.reversed().lazy.compactMap { iconName -> Archive.Entry? in
+        let iconEntry = iconNames.reversed().lazy.compactMap { iconName -> ZIPFoundation.Entry? in
             let path = iconName.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
             guard !path.isEmpty, !path.split(separator: "/").contains("..") else { return nil }
             let nsPath = path as NSString
