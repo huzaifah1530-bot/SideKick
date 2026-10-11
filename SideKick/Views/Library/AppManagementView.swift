@@ -14,25 +14,41 @@ struct AppManagementView: View {
     @State private var pendingUpdateIPA: ImportedIPA?
     @State private var errorMessage: String?
     @State private var isConfirmingQueuedUpdateRemoval = false
+    @State private var isResolvingQueuedTarget: Bool
+    @State private var isQueuedTargetUnavailable = false
+    @State private var queuedTargetLoadError: String?
 
     private let importedApp: ImportedIPA?
+    private let requiredQueuedIPA: ImportedIPA?
     @State private var installedApp: InstalledAppSummary?
     private let onDelete: (() async -> Void)?
 
     init(importedApp: ImportedIPA, onDelete: (() async -> Void)? = nil) {
         self.importedApp = importedApp
+        self.requiredQueuedIPA = nil
         _installedApp = State(initialValue: nil)
+        _isResolvingQueuedTarget = State(initialValue: false)
         self.onDelete = onDelete
     }
 
     init(installedApp: InstalledAppSummary) {
         self.importedApp = nil
+        self.requiredQueuedIPA = nil
         _installedApp = State(initialValue: installedApp)
+        _isResolvingQueuedTarget = State(initialValue: false)
         self.onDelete = nil
     }
 
-    private var appName: String { importedApp?.name ?? installedApp?.name ?? "App" }
-    private var bundleIdentifier: String { importedApp?.bundleIdentifier ?? installedApp?.bundleIdentifier ?? "" }
+    init(queuedUpdate: ImportedIPA) {
+        self.importedApp = nil
+        self.requiredQueuedIPA = queuedUpdate
+        _installedApp = State(initialValue: nil)
+        _isResolvingQueuedTarget = State(initialValue: true)
+        self.onDelete = nil
+    }
+
+    private var appName: String { importedApp?.name ?? installedApp?.name ?? requiredQueuedIPA?.name ?? "App" }
+    private var bundleIdentifier: String { importedApp?.bundleIdentifier ?? installedApp?.bundleIdentifier ?? requiredQueuedIPA?.bundleIdentifier ?? "" }
 
     var body: some View {
         List {
@@ -44,12 +60,39 @@ struct AppManagementView: View {
                     VStack(alignment: .leading, spacing: 5) {
                         Text(appName)
                             .font(.title3.weight(.bold))
-                        Text(importedApp.map { "Version \($0.version)" } ?? installedApp.map { "Version \($0.version)" } ?? "Installed")
+                        Text(importedApp.map { "Version \($0.version)" } ?? installedApp.map { "Version \($0.version)" } ?? requiredQueuedIPA.map { "Version \($0.version)" } ?? "Installed")
                             .font(.subheadline)
                             .foregroundStyle(.secondary)
                     }
                 }
                 .padding(.vertical, 8)
+            }
+
+            if requiredQueuedIPA != nil && isResolvingQueuedTarget {
+                Section("Queued Update") {
+                    ProgressView("Finding the installed app this update targets…")
+                }
+            } else if requiredQueuedIPA != nil, let queuedTargetLoadError {
+                Section("Queued Update") {
+                    Text("SideKick couldn’t check which installed app this update targets. The queued IPA was kept.")
+                        .foregroundStyle(.secondary)
+                    Text(queuedTargetLoadError)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                    SwiftUI.Button("Retry") { retryQueuedTargetResolution() }
+                }
+            } else if let requiredQueuedIPA, isQueuedTargetUnavailable {
+                Section("Queued Update") {
+                    Text(pendingUpdateIPA == nil
+                         ? "The installed app this IPA targeted is no longer available, and the IPA is no longer queued."
+                         : "The installed app this IPA was queued for is no longer available. SideKick kept the queued IPA and won’t install it as a new app.")
+                    .foregroundStyle(.secondary)
+                    if pendingUpdateIPA != nil {
+                        SwiftUI.Button("Remove Queued IPA", role: .destructive) {
+                            Task { await removeQueuedUpdate(requiredQueuedIPA) }
+                        }
+                    }
+                }
             }
 
             if let importedApp {
@@ -76,10 +119,15 @@ struct AppManagementView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-            } else if let installedApp {
+            } else if let installedApp, !isQueuedTargetUnavailable {
                 Section(pendingUpdateIPA == nil ? "Open" : "Update") {
                     if let pendingUpdateIPA {
-                        queuedUpdateActions(ipa: pendingUpdateIPA, installedApp: installedApp)
+                        if requiredQueuedIPA == nil || (!isResolvingQueuedTarget && queuedTargetLoadError == nil && !isQueuedTargetUnavailable) {
+                            queuedUpdateActions(ipa: pendingUpdateIPA, installedApp: installedApp)
+                        } else {
+                            Text("Retry the installed-app lookup before updating.")
+                                .foregroundStyle(.secondary)
+                        }
                     } else {
                         SwiftUI.Button {
                             UIApplication.shared.open(InstalledApp.openAppURL(targetBundleIdentifier: installedApp.resignedBundleIdentifier))
@@ -124,7 +172,7 @@ struct AppManagementView: View {
                 if let importedApp {
                     LabeledContent("Imported", value: importedApp.formattedImportDate)
                 }
-                if let installedApp {
+                if let installedApp, !isQueuedTargetUnavailable {
                     LabeledContent("Signing account", value: installedApp.accountEmail)
                     LabeledContent("Team", value: installedApp.teamIdentifier)
                     LabeledContent(
@@ -137,66 +185,68 @@ struct AppManagementView: View {
                 }
             }
 
-            Section("App Settings") {
-                if let installedApp {
-                    NavigationLink {
-                        GitHubUpdateSettingsView(app: installedApp)
-                    } label: {
-                        Label("GitHub Update Source", systemImage: "chevron.left.forwardslash.chevron.right")
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .fullWidthListSeparators()
-
-                    SwiftUI.Button {
-                        Task { await findIPAForSharing(installedApp) }
-                    } label: {
-                        HStack {
-                            Label("Share IPA", systemImage: "square.and.arrow.up")
-                            Spacer()
-                            if isFindingShareIPA { ProgressView() }
-                        }
-                    }
-                    .disabled(isFindingShareIPA)
-                    .fullWidthListSeparators()
-
-                    NavigationLink {
-                        ResignOptionsView(app: installedApp, accountStore: accountStore)
-                    } label: {
-                        Label("Re-sign", systemImage: "arrow.clockwise")
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .fullWidthListSeparators()
-
-                    NavigationLink {
-                        JITEnableView(app: installedApp)
-                    } label: {
-                        Label("Enable JIT", systemImage: "bolt.fill")
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .fullWidthListSeparators()
-                } else if let importedApp {
-                    NavigationLink {
-                        ShareIPAView(app: importedApp)
-                    } label: {
-                        Label("Share IPA", systemImage: "square.and.arrow.up")
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .fullWidthListSeparators()
-
-                    if onDelete != nil {
-                        SwiftUI.Button(role: .destructive) {
-                            Task {
-                                await onDelete?()
-                                dismiss()
-                            }
+            if !isQueuedTargetUnavailable && (importedApp != nil || installedApp != nil) {
+                Section("App Settings") {
+                    if let installedApp, !isQueuedTargetUnavailable {
+                        NavigationLink {
+                            GitHubUpdateSettingsView(app: installedApp)
                         } label: {
-                            Label("Remove Imported IPA", systemImage: "trash")
+                            Label("GitHub Update Source", systemImage: "chevron.left.forwardslash.chevron.right")
+                                .frame(maxWidth: .infinity, alignment: .leading)
                         }
                         .fullWidthListSeparators()
+
+                        SwiftUI.Button {
+                            Task { await findIPAForSharing(installedApp) }
+                        } label: {
+                            HStack {
+                                Label("Share IPA", systemImage: "square.and.arrow.up")
+                                Spacer()
+                                if isFindingShareIPA { ProgressView() }
+                            }
+                        }
+                        .disabled(isFindingShareIPA)
+                        .fullWidthListSeparators()
+
+                        NavigationLink {
+                            ResignOptionsView(app: installedApp, accountStore: accountStore)
+                        } label: {
+                            Label("Re-sign", systemImage: "arrow.clockwise")
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .fullWidthListSeparators()
+
+                        NavigationLink {
+                            JITEnableView(app: installedApp)
+                        } label: {
+                            Label("Enable JIT", systemImage: "bolt.fill")
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .fullWidthListSeparators()
+                    } else if let importedApp {
+                        NavigationLink {
+                            ShareIPAView(app: importedApp)
+                        } label: {
+                            Label("Share IPA", systemImage: "square.and.arrow.up")
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .fullWidthListSeparators()
+
+                        if onDelete != nil {
+                            SwiftUI.Button(role: .destructive) {
+                                Task {
+                                    await onDelete?()
+                                    dismiss()
+                                }
+                            } label: {
+                                Label("Remove Imported IPA", systemImage: "trash")
+                            }
+                            .fullWidthListSeparators()
+                        }
                     }
                 }
+                .font(.body)
             }
-            .font(.body)
         }
         .listStyle(.insetGrouped)
         .background(Color(uiColor: .systemGroupedBackground))
@@ -232,22 +282,20 @@ struct AppManagementView: View {
     @ViewBuilder
     private func queuedUpdateActions(ipa: ImportedIPA, installedApp: InstalledAppSummary) -> some View {
         let updateAccounts = accountStore.accounts
-        if let account = updateAccounts.filter(\.hasSavedSession).first(where: {
-            $0.accountIdentifier == installedApp.accountIdentifier
-        }) ?? updateAccounts.first(where: \.hasSavedSession) {
+        let installedTeamAccount = updateAccounts.first(where: {
+            $0.accountIdentifier == installedApp.accountIdentifier &&
+            $0.teamIdentifier == installedApp.teamIdentifier
+        })
+        if let account = installedTeamAccount, account.hasSavedSession {
             NavigationLink {
-                if account.teamIdentifier != installedApp.teamIdentifier {
-                    SeparateInstallReviewView(source: ipa, account: account, accountStore: accountStore, originalName: installedApp.name)
-                } else {
-                    InstallConsoleView(
-                        app: ipa,
-                        account: account,
-                        accountStore: accountStore,
-                        ipaStore: environment.ipaImportStore,
-                        isUpdate: true,
-                        onInstalled: { await finishQueuedUpdate(ipa) }
-                    )
-                }
+                InstallConsoleView(
+                    app: ipa,
+                    account: account,
+                    accountStore: accountStore,
+                    ipaStore: environment.ipaImportStore,
+                    isUpdate: true,
+                    onInstalled: { await finishQueuedUpdate(ipa) }
+                )
             } label: {
                 Label("Update", systemImage: "arrow.down.app")
                     .font(.body.weight(.semibold))
@@ -257,8 +305,24 @@ struct AppManagementView: View {
             .fullWidthListSeparators()
 
         } else {
-            Text("Add the Apple account that installed this app (\(installedApp.accountEmail)) in Accounts to update it.")
-                .foregroundStyle(.secondary)
+            VStack(alignment: .leading, spacing: 8) {
+                if let installedTeamAccount {
+                    NavigationLink {
+                        SigningAccountDetailView(account: installedTeamAccount, accountStore: accountStore)
+                    } label: {
+                        Label("Reconnect the Apple account for this installed team", systemImage: "person.crop.circle.badge.exclamationmark")
+                    }
+                } else {
+                    NavigationLink {
+                        AccountsView()
+                    } label: {
+                        Label("Add the Apple account for the installed team", systemImage: "person.crop.circle.badge.plus")
+                    }
+                }
+                Text("The installed app uses team \(installedApp.teamIdentifier). Use Options to choose another team for a separate installation.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
         }
                 NavigationLink {
                     InstallAccountSelectionView(
@@ -303,7 +367,7 @@ struct AppManagementView: View {
 
     @ViewBuilder
     private var appIcon: some View {
-        if let data = importedApp?.iconData ?? installedApp?.iconData, let icon = UIImage(data: data) {
+        if let data = importedApp?.iconData ?? installedApp?.iconData ?? requiredQueuedIPA?.iconData, let icon = UIImage(data: data) {
             Image(uiImage: icon).resizable().scaledToFit()
         } else {
             Image(systemName: "app.fill")
@@ -318,12 +382,49 @@ struct AppManagementView: View {
     private func reloadManagementState() async {
         expirationClock = .now
         var availableInstallations: [InstalledAppSummary] = []
-        if let current = installedApp {
+        if requiredQueuedIPA != nil || installedApp != nil {
             let service = SideStoreOperationService(accountStore: accountStore, ipaStore: environment.ipaImportStore)
-            let apps = await service.installedApps()
+            let apps: [InstalledAppSummary]
+            if requiredQueuedIPA != nil {
+                do {
+                    apps = try await service.loadInstalledApps()
+                    queuedTargetLoadError = nil
+                } catch {
+                    isResolvingQueuedTarget = false
+                    queuedTargetLoadError = error.localizedDescription
+                    await accountStore.reload()
+                    return
+                }
+            } else {
+                apps = await service.installedApps()
+            }
             availableInstallations = apps
-            if let latest = apps.first(where: { $0.id == current.id }) {
-                installedApp = latest
+            if let requiredQueuedIPA {
+                let target: InstalledAppSummary?
+                if let targetID = requiredQueuedIPA.queuedForInstalledAppID {
+                    target = apps.first(where: { $0.id == targetID })
+                } else {
+                    let matching = apps.filter { $0.updateMatchingBundleIdentifiers.contains(requiredQueuedIPA.bundleIdentifier.lowercased()) }
+                    target = matching.count == 1 ? matching.first : nil
+                }
+                isResolvingQueuedTarget = false
+                guard let target else {
+                    installedApp = nil
+                    let imports = (try? await environment.ipaImportStore.importedApps()) ?? []
+                    pendingUpdateIPA = imports.first(where: {
+                        $0.id == requiredQueuedIPA.id && $0.importedAt == requiredQueuedIPA.importedAt
+                    })
+                    isQueuedTargetUnavailable = true
+                    await accountStore.reload()
+                    return
+                }
+                installedApp = target
+                isQueuedTargetUnavailable = false
+            } else if let current = installedApp {
+                if let latest = apps.first(where: { $0.id == current.id }) {
+                    installedApp = latest
+                    isQueuedTargetUnavailable = false
+                }
             }
         }
         if let installedApp {
@@ -337,11 +438,22 @@ struct AppManagementView: View {
     }
 
     @MainActor
-    private func removeQueuedUpdate() async {
-        guard let pendingUpdateIPA else { return }
+    private func retryQueuedTargetResolution() {
+        isResolvingQueuedTarget = true
+        queuedTargetLoadError = nil
+        Task { await reloadManagementState() }
+    }
+
+    @MainActor
+    private func removeQueuedUpdate(_ requestedIPA: ImportedIPA? = nil) async {
+        guard let pendingUpdateIPA = requestedIPA ?? pendingUpdateIPA else { return }
         do {
             try await environment.ipaImportStore.delete(pendingUpdateIPA)
             self.pendingUpdateIPA = nil
+            if requiredQueuedIPA != nil {
+                dismiss()
+                return
+            }
         } catch {
             errorMessage = error.localizedDescription
         }

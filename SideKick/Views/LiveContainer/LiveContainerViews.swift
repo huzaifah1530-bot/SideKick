@@ -165,6 +165,8 @@ struct LiveContainerGuestDetailView: View {
     @State private var configuration: GitHubUpdateConfiguration?
     @State private var working = false
     @State private var isCheckingUpdates = false
+    @State private var updateCheckGeneration = UUID()
+    @State private var updateCheckRequested = false
     @State private var message: String?
     @State private var markingInstalled = false
     @State private var checkState: GitHubCheckState = .notConfigured
@@ -174,6 +176,26 @@ struct LiveContainerGuestDetailView: View {
 
     private var downloadJob: GitHubUpdateDownloadJob? {
         candidate.flatMap { environment.githubUpdateDownloads.jobs[$0.id] }
+    }
+
+    private var canCheckUpdates: Bool {
+        guard let guest = self.guest else { return false }
+        return connection?.isConnected == true && connection?.error == nil
+            && connection?.storageKind != .snapshot && guest.isAvailable && guest.warning == nil
+    }
+
+    private var updateEligibilityMessage: String {
+        guard let connection else { return "Reconnect LiveContainer before updating this guest." }
+        if !connection.isConnected || connection.error != nil {
+            return "Reconnect the LiveContainer Applications folder and rescan before updating this guest."
+        }
+        if connection.storageKind == .snapshot {
+            return "Link a live LiveContainer Applications folder in Files before updating a guest."
+        }
+        if guest?.isAvailable != true || guest?.warning != nil {
+            return "Rescan the LiveContainer Applications folder and resolve the guest warning before updating."
+        }
+        return "This guest is unavailable for update handoff. Check its LiveContainer connection."
     }
 
     var body: some View {
@@ -209,7 +231,12 @@ struct LiveContainerGuestDetailView: View {
                         SwiftUI.Button { Task { await updateInLiveContainer(candidate) } } label: {
                             Label(downloadJob?.isDownloading == true ? "Downloading IPA…" : "Update in LiveContainer", systemImage: "arrow.down.app")
                         }
-                        .disabled(working || isCheckingUpdates || downloadJob?.isDownloading == true)
+                        .disabled(working || isCheckingUpdates || !canCheckUpdates || downloadJob?.isDownloading == true)
+                        if !canCheckUpdates {
+                            Label(updateEligibilityMessage, systemImage: "exclamationmark.triangle")
+                                .font(.footnote)
+                                .foregroundStyle(.orange)
+                        }
                         if let progress = downloadJob?.progress, downloadJob?.isDownloading == true { ProgressView(value: progress) }
                         if let error = downloadJob?.errorMessage { Text(error).foregroundStyle(.orange) }
                         LabeledContent("Available", value: candidate.newVersion)
@@ -240,8 +267,13 @@ struct LiveContainerGuestDetailView: View {
         .navigationTitle(guest?.name ?? "LiveContainer Guest")
         .navigationBarTitleDisplayMode(.inline)
         .task { await reload(); await checkUpdates() }
-        .onReceive(NotificationCenter.default.publisher(for: .sideKickLiveContainerDidChange)) { _ in Task { await reload() } }
-        .onReceive(NotificationCenter.default.publisher(for: .sideKickGitHubSettingsDidChange)) { _ in Task { await reload(); await checkUpdates() } }
+        .onReceive(NotificationCenter.default.publisher(for: .sideKickLiveContainerDidChange)) { _ in
+            Task { await reloadAfterCatalogueChange() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .sideKickGitHubSettingsDidChange)) { _ in
+            invalidateUpdateCheck()
+            Task { await reload(); await checkUpdates(force: true) }
+        }
         .onChange(of: downloadJob?.queuedIPA) { _, ipa in
             if let ipa, let candidate, awaitingHandoff == candidate.id {
                 awaitingHandoff = nil
@@ -261,7 +293,8 @@ struct LiveContainerGuestDetailView: View {
         } message: { Text("Confirm only after installing this exact GitHub release or workflow build in LiveContainer. A matching version label alone is insufficient.") }
     }
 
-    @MainActor private func reload() async {
+    @discardableResult
+    @MainActor private func reload() async -> Bool {
         do {
             let state = try await environment.liveContainerStore.snapshot()
             guest = state.apps.first { $0.id == guestID }
@@ -273,24 +306,173 @@ struct LiveContainerGuestDetailView: View {
                 checkFailed = false
             }
             configuration = currentConfiguration
-        } catch { message = error.localizedDescription }
+            return true
+        } catch {
+            message = error.localizedDescription
+            return false
+        }
     }
-    @MainActor private func checkUpdates() async {
-        guard !working, !isCheckingUpdates, let guest, connection?.isConnected == true, connection?.error == nil,
-              connection?.storageKind != .snapshot, guest.isAvailable, guest.warning == nil else { return }
-        // Repository requests do not own the local launch/mutation gate.
+
+    private func updateCheckIdentity(guest: LiveContainerGuest?, connection: LiveContainerConnection?) -> String? {
+        guard let guest else { return nil }
+        let target = guest.updateTarget
+        return [target.id, target.name, target.version, target.observation ?? "",
+            connection?.id.uuidString ?? "", connection?.isConnected == true ? "connected" : "disconnected",
+            connection?.storageKind.rawValue ?? "", connection?.error ?? "",
+            guest.isAvailable ? "available" : "unavailable", guest.warning ?? ""].joined(separator: "\n")
+    }
+
+    private func candidateMatchesCurrentGuest(_ candidate: GitHubUpdateCandidate) -> Bool {
+        guard let guest, let configuration else { return false }
+        return candidate == self.candidate
+            && candidate.targetKind == .liveContainer
+            && candidate.bundleIdentifier == guestID
+            && candidate.currentVersion == guest.version
+            && candidate.sourceIdentity == configuration.sourceIdentity
+    }
+
+    @MainActor private func revalidateUpdateHandoff(
+        _ candidate: GitHubUpdateCandidate,
+        identity: String,
+        expectedConfiguration: GitHubUpdateConfiguration
+    ) async -> Bool {
+        guard await reload() else {
+            message = "Could not verify the LiveContainer guest. Reconnect its folder and try again."
+            return false
+        }
+        guard canCheckUpdates else {
+            message = updateEligibilityMessage
+            return false
+        }
+        guard updateCheckIdentity(guest: self.guest, connection: self.connection) == identity,
+              configuration == expectedConfiguration,
+              candidateMatchesCurrentGuest(candidate) else {
+            message = "The guest or update source changed. Check for updates again before handing off this IPA."
+            return false
+        }
+        return true
+    }
+
+    @MainActor private func invalidateUpdateCheck() {
+        updateCheckGeneration = UUID()
+        if isCheckingUpdates { updateCheckRequested = true }
+    }
+
+    @MainActor private func reloadAfterCatalogueChange() async {
+        let previousIdentity = updateCheckIdentity(guest: guest, connection: connection)
+        let previousConfiguration = configuration
+        guard await reload() else { return }
+        let guestChanged = previousIdentity != updateCheckIdentity(guest: guest, connection: connection)
+        let configurationChanged = previousConfiguration != configuration
+        guard guestChanged || configurationChanged else { return }
+        if guestChanged {
+            candidate = nil
+            hasChecked = false
+            checkFailed = false
+        }
+        invalidateUpdateCheck()
+        await checkUpdates(force: true)
+    }
+
+    @MainActor private func updateCheckIsCurrent(
+        generation: UUID,
+        identity: String?,
+        checkedConfiguration: GitHubUpdateConfiguration?,
+        check: GitHubCheckResult?,
+        candidates: [GitHubUpdateCandidate]
+    ) async -> Bool {
+        guard await reload() else { return false }
+        let checkConfigurationMatches = check == nil
+            || check?.checkedConfiguration == checkedConfiguration
+            || (check?.state == .failed && check?.checkedConfiguration == nil)
+        let candidateConfigurationMatches = candidates.first.map {
+            $0.sourceIdentity == checkedConfiguration?.sourceIdentity
+        } ?? true
+        return generation == updateCheckGeneration
+            && identity == updateCheckIdentity(guest: self.guest, connection: self.connection)
+            && checkedConfiguration == configuration
+            && checkConfigurationMatches
+            && candidateConfigurationMatches
+    }
+
+    @MainActor private func checkUpdates(force: Bool = false) async {
+        guard !working else { return }
+        if isCheckingUpdates {
+            if force { updateCheckRequested = true }
+            return
+        }
+        guard canCheckUpdates else { return }
+
         isCheckingUpdates = true
         defer { isCheckingUpdates = false }
-        let result = await GitHubUpdateScanner.scanTargets([guest.updateTarget])
-        guard let current = try? await GitHubUpdateConfigurationStore.shared.configuration(for: guestID),
-              result.candidates.first?.sourceIdentity == nil || result.candidates.first?.sourceIdentity == current.sourceIdentity else { return }
-        hasChecked = true
-        checkFailed = result.didFail
-        candidate = result.candidates.first
-        checkState = result.checks.first?.state ?? .failed
-        await environment.githubUpdateDownloads.restoreQueuedFiles(for: result.candidates, ipaImportStore: environment.ipaImportStore)
-        if result.didFail { message = "GitHub could not check this source. Verify repository, workflow, and token settings." }
-        await GitHubUpdateNotificationScheduler.notify(result.candidates)
+        var followUpsRemaining = 1
+        var isFirstCheck = true
+        repeat {
+            if !isFirstCheck { followUpsRemaining -= 1 }
+            isFirstCheck = false
+            updateCheckRequested = false
+            guard canCheckUpdates, let checkedGuest = self.guest else { break }
+
+            let generation = updateCheckGeneration
+            let target = checkedGuest.updateTarget
+            let identity = updateCheckIdentity(guest: checkedGuest, connection: self.connection)
+            let checkedConfiguration: GitHubUpdateConfiguration?
+            do {
+                checkedConfiguration = try await GitHubUpdateConfigurationStore.shared.configuration(for: guestID)
+            } catch {
+                hasChecked = true
+                checkFailed = true
+                checkState = .failed
+                candidate = nil
+                message = error.localizedDescription
+                break
+            }
+
+            let result = await GitHubUpdateScanner.scanTargets([target])
+            let check = result.checks.first
+            if !(await updateCheckIsCurrent(generation: generation, identity: identity,
+                checkedConfiguration: checkedConfiguration, check: check, candidates: result.candidates)) {
+                candidate = nil
+                hasChecked = true
+                checkFailed = true
+                checkState = .failed
+                message = "The guest or update settings changed during the check. Check again for current results."
+                if followUpsRemaining > 0 {
+                    updateCheckRequested = true
+                    continue
+                }
+                updateCheckRequested = false
+                break
+            }
+
+            hasChecked = true
+            checkFailed = result.didFail || result.checks.isEmpty
+            candidate = result.candidates.first
+            checkState = check?.state ?? .failed
+            if message == "The guest or update settings changed during the check. Check again for current results." {
+                message = nil
+            }
+            await environment.githubUpdateDownloads.restoreQueuedFiles(for: result.candidates, ipaImportStore: environment.ipaImportStore)
+            guard await updateCheckIsCurrent(generation: generation, identity: identity,
+                checkedConfiguration: checkedConfiguration, check: check, candidates: result.candidates) else {
+                candidate = nil
+                hasChecked = true
+                checkFailed = true
+                checkState = .failed
+                message = "The guest or update settings changed during the check. Check again for current results."
+                if followUpsRemaining > 0 {
+                    updateCheckRequested = true
+                    continue
+                }
+                updateCheckRequested = false
+                break
+            }
+            if checkFailed {
+                message = "GitHub could not check this source. Verify repository, workflow, and token settings."
+            }
+            await GitHubUpdateNotificationScheduler.notify(result.candidates)
+        } while updateCheckRequested && followUpsRemaining > 0
+        if followUpsRemaining == 0 { updateCheckRequested = false }
     }
     @MainActor private func launch() async {
         guard !working else { return }
@@ -310,11 +492,21 @@ struct LiveContainerGuestDetailView: View {
     }
     @MainActor private func updateInLiveContainer(_ candidate: GitHubUpdateCandidate) async {
         guard !working, !isCheckingUpdates else { return }
+        guard await reload() else {
+            message = "Could not verify the LiveContainer guest. Reconnect its folder and try again."
+            return
+        }
+        guard canCheckUpdates else { message = updateEligibilityMessage; return }
+        guard candidateMatchesCurrentGuest(candidate), let expectedConfiguration = configuration,
+              let identity = updateCheckIdentity(guest: self.guest, connection: self.connection) else {
+            message = "The guest or update source changed. Check for updates again before handing off this IPA."
+            return
+        }
         if let ipa = downloadJob?.queuedIPA { await handoff(ipa, candidate: candidate); return }
         do {
-            guard let configuration = try await GitHubUpdateConfigurationStore.shared.configuration(for: guestID),
-                  configuration.sourceIdentity == candidate.sourceIdentity, let guest else { return }
-            let token = try GitHubCredentialStore().load(id: configuration.tokenID)
+            let token = try GitHubCredentialStore().load(id: expectedConfiguration.tokenID)
+            guard await revalidateUpdateHandoff(candidate, identity: identity, expectedConfiguration: expectedConfiguration) else { return }
+            guard let guest = self.guest else { return }
             awaitingHandoff = candidate.id
             environment.githubUpdateDownloads.start(candidate: candidate,
                 expectedBundleIdentifiers: [guest.bundleIdentifier.lowercased()],
@@ -323,16 +515,23 @@ struct LiveContainerGuestDetailView: View {
     }
 
     @MainActor private func handoff(_ ipa: ImportedIPA, candidate: GitHubUpdateCandidate) async {
+        guard !working else { return }
         working = true
         defer { working = false }
+        guard await reload() else {
+            message = "Could not verify the LiveContainer guest. Reconnect its folder and try again."
+            return
+        }
+        guard canCheckUpdates else { message = updateEligibilityMessage; return }
+        guard candidateMatchesCurrentGuest(candidate), let expectedConfiguration = configuration,
+              ipa.githubSourceIdentity == configuration?.sourceIdentity,
+              let identity = updateCheckIdentity(guest: self.guest, connection: self.connection) else {
+            message = "The guest or update source changed. Check for updates again before handing off this IPA."
+            return
+        }
         do {
-            guard let current = try await GitHubUpdateConfigurationStore.shared.configuration(for: guestID),
-                  current.sourceIdentity == candidate.sourceIdentity,
-                  ipa.githubSourceIdentity == current.sourceIdentity else {
-                message = "The update source changed. Check for updates again."
-                return
-            }
             let url = try await environment.ipaImportStore.fileURL(for: ipa)
+            guard await revalidateUpdateHandoff(candidate, identity: identity, expectedConfiguration: expectedConfiguration) else { return }
             handoffURL = url
             sharedIPA = LiveContainerSharedIPA(url: url)
         } catch { message = error.localizedDescription }

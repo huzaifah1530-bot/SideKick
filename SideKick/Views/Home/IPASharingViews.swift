@@ -158,7 +158,11 @@ struct URLImportView: View {
                     )
                         .foregroundStyle(.green)
                     NavigationLink {
-                        AppManagementView(importedApp: importedApp)
+                        if importedApp.isUpdateQueued {
+                            AppManagementView(queuedUpdate: importedApp)
+                        } else {
+                            AppManagementView(importedApp: importedApp)
+                        }
                     } label: {
                         Label(importedAsUpdate ? "Review update" : "Review \(importedApp.name)", systemImage: "app")
                     }
@@ -196,7 +200,8 @@ struct URLImportView: View {
                     do {
                         try await acceptPreparedIPA(app)
                     } catch {
-                        discardPendingPreparedIPA(app)
+                        await discardFailedPreparedIPA(app)
+                        errorMessage = error.localizedDescription
                         throw error
                     }
                 }
@@ -339,7 +344,8 @@ struct URLImportView: View {
 
     @MainActor
     private func acceptPreparedIPA(_ app: ImportedIPA) async throws {
-        let installedApps = await SideStoreOperationService(accountStore: SigningAccountStore(), ipaStore: environment.ipaImportStore).installedApps()
+        let service = SideStoreOperationService(accountStore: SigningAccountStore(), ipaStore: environment.ipaImportStore)
+        let installedApps = try await service.loadInstalledApps()
         guard pendingPreparedIPA == app else {
             await environment.ipaImportStore.discardPreparedIPA(app)
             return

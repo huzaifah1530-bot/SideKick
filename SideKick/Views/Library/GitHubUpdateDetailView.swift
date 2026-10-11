@@ -175,19 +175,15 @@ struct GitHubUpdateDetailView: View {
                 } else if let queuedIPA = downloadJob?.queuedIPA {
                     if let account {
                         NavigationLink {
-                            if account.teamIdentifier != app.teamIdentifier {
-                                SeparateInstallReviewView(source: queuedIPA, account: account, accountStore: accountStore, originalName: app.name)
-                            } else {
-                                InstallConsoleView(
-                                    app: queuedIPA,
-                                    account: account,
-                                    accountStore: accountStore,
-                                    ipaStore: environment.ipaImportStore,
-                                    isUpdate: true,
-                                    onInstalled: { await finishUpdate(queuedIPA) },
-                                    onSourceMissing: { await validateDownload() }
-                                )
-                            }
+                            InstallConsoleView(
+                                app: queuedIPA,
+                                account: account,
+                                accountStore: accountStore,
+                                ipaStore: environment.ipaImportStore,
+                                isUpdate: true,
+                                onInstalled: { await finishUpdate(queuedIPA) },
+                                onSourceMissing: { await validateDownload() }
+                            )
                         } label: {
                             Label("Update App", systemImage: "arrow.down.app.fill")
                                 .fontWeight(.semibold)
@@ -195,10 +191,26 @@ struct GitHubUpdateDetailView: View {
                         .buttonStyle(.plain)
                         .fullWidthListSeparators()
                     } else {
-                        Text(eligibleAccounts.isEmpty
-                            ? "Add the Apple account that originally installed this app in Accounts to update it."
-                            : "Choose a saved Apple account on the app’s signing team to update it.")
-                            .font(.footnote).foregroundStyle(.secondary)
+                        VStack(alignment: .leading, spacing: 8) {
+                            if let installedTeamAccount = eligibleAccounts.first(where: {
+                                $0.accountIdentifier == app.accountIdentifier &&
+                                $0.teamIdentifier == app.teamIdentifier
+                            }) {
+                                NavigationLink {
+                                    SigningAccountDetailView(account: installedTeamAccount, accountStore: accountStore)
+                                } label: {
+                                    Label("Reconnect the Apple account for this installed team", systemImage: "person.crop.circle.badge.exclamationmark")
+                                }
+                            } else {
+                                NavigationLink {
+                                    AccountsView()
+                                } label: {
+                                    Label("Add the Apple account for the installed team", systemImage: "person.crop.circle.badge.plus")
+                                }
+                            }
+                            Text("The installed app uses team \(app.teamIdentifier). Use Options to choose another team for a separate installation.")
+                                .font(.footnote).foregroundStyle(.secondary)
+                        }
                     }
                             NavigationLink {
                                 InstallAccountSelectionView(
@@ -254,9 +266,11 @@ struct GitHubUpdateDetailView: View {
         .task {
             await accountStore.reload()
             eligibleAccounts = accountStore.accounts
-            account = eligibleAccounts.filter(\.hasSavedSession).first {
-                $0.accountIdentifier == app.accountIdentifier
-            } ?? eligibleAccounts.first(where: \.hasSavedSession)
+            account = eligibleAccounts.first {
+                $0.hasSavedSession &&
+                $0.accountIdentifier == app.accountIdentifier &&
+                $0.teamIdentifier == app.teamIdentifier
+            }
         }
         .task {
             do {
@@ -306,31 +320,75 @@ struct GitHubUpdateDetailView: View {
 
     @MainActor
     private func resolveUpdate(markInstalled: Bool) async {
+        var resolutionRecorded = false
         do {
-            guard let configuration = try await configurationStore.configuration(for: app.id) else { return }
-            guard configuration.sourceIdentity == candidate.sourceIdentity else {
-                environment.githubUpdateDownloads.removeJob(for: candidate)
-                dismiss()
+            guard let source = candidate.sourceIdentity else {
+                errorMessage = "This update source is unavailable. The downloaded IPA was kept; reload the update and try again."
                 return
             }
-            let imports = try await environment.ipaImportStore.importedApps()
-            if let ipa = downloadJob?.queuedIPA ?? imports.first(where: {
-                $0.queuedForInstalledAppID == candidate.bundleIdentifier && $0.githubUpdateKey == candidate.updateKey && $0.githubRepositoryURL == candidate.repositoryURL
-            }) {
-                try await environment.ipaImportStore.delete(ipa)
+            guard let configuration = try await configurationStore.configuration(for: app.id) else {
+                errorMessage = "This update configuration could not be found. The downloaded IPA was kept. Check the app’s GitHub update settings and try again."
+                return
             }
-            environment.githubUpdateDownloads.removeJob(for: candidate)
-            if let source = candidate.sourceIdentity {
-                if markInstalled {
-                    let apps = await SideStoreOperationService(accountStore: accountStore, ipaStore: environment.ipaImportStore).installedApps()
-                    guard let fresh = apps.first(where: { $0.id == app.id }) else { return }
-                    _ = try await configurationStore.recordInstalled(key: candidate.updateKey, for: fresh.updateTarget, expectedSource: source)
-                } else {
-                    _ = try await configurationStore.skip(key: candidate.updateKey, targetID: app.id, expectedSource: source)
+            guard configuration.sourceIdentity == candidate.sourceIdentity else {
+                errorMessage = "This update source changed. The downloaded IPA was kept; reopen the update from the current source."
+                return
+            }
+
+            if markInstalled {
+                let apps = try await SideStoreOperationService(accountStore: accountStore, ipaStore: environment.ipaImportStore)
+                    .loadInstalledApps(loadIcons: false)
+                guard let fresh = apps.first(where: { $0.id == app.id }) else {
+                    errorMessage = "SideKick couldn’t find this installed app. The downloaded IPA was kept; refresh the app list and try again."
+                    return
                 }
+                let imports = try await environment.ipaImportStore.importedApps()
+                let queuedIPA = matchingQueuedIPA(in: imports)
+                guard try await configurationStore.recordInstalled(
+                    key: candidate.updateKey,
+                    for: fresh.updateTarget,
+                    expectedSource: source
+                ) else {
+                    errorMessage = "The update source changed before this build could be recorded. The downloaded IPA was kept; reopen the current update and try again."
+                    return
+                }
+                resolutionRecorded = true
+                if let queuedIPA { try await environment.ipaImportStore.delete(queuedIPA) }
+            } else {
+                let imports = try await environment.ipaImportStore.importedApps()
+                let queuedIPA = matchingQueuedIPA(in: imports)
+                guard try await configurationStore.skip(
+                    key: candidate.updateKey,
+                    targetID: app.id,
+                    expectedSource: source
+                ) else {
+                    errorMessage = "The update source changed before this update could be skipped. The downloaded IPA was kept; reopen the current update and try again."
+                    return
+                }
+                resolutionRecorded = true
+                if let queuedIPA { try await environment.ipaImportStore.delete(queuedIPA) }
             }
+
+            environment.githubUpdateDownloads.removeJob(for: candidate)
             dismiss()
-        } catch { errorMessage = error.localizedDescription }
+        } catch {
+            if resolutionRecorded {
+                errorMessage = "This update was recorded, but its queued IPA couldn’t be removed. The download is still available. \(error.localizedDescription)"
+            } else {
+                errorMessage = "Could not resolve this update. The queued IPA and download state were preserved. \(error.localizedDescription)"
+            }
+        }
+    }
+
+    private func matchingQueuedIPA(in imports: [ImportedIPA]) -> ImportedIPA? {
+        func matches(_ ipa: ImportedIPA) -> Bool {
+            ipa.queuedForInstalledAppID == candidate.bundleIdentifier &&
+                ipa.githubUpdateKey == candidate.updateKey &&
+                ipa.githubSourceIdentity == candidate.sourceIdentity &&
+                ipa.githubRepositoryURL == candidate.repositoryURL
+        }
+        if let queuedIPA = downloadJob?.queuedIPA, matches(queuedIPA) { return queuedIPA }
+        return imports.first(where: matches)
     }
 
     private func downloadButton(title: String, action: @escaping () -> Void) -> some View {

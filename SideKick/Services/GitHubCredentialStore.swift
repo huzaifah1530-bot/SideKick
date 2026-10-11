@@ -31,10 +31,11 @@ struct GitHubCredentialStore {
 
     func save(label: String, username: String, token: String, id: String? = nil) throws {
         var vault = try readVault()
+        let isFirstCredential = id == nil && vault.credentials.isEmpty
         let credential = Credential(id: id ?? UUID().uuidString, label: label, username: username, token: token)
         vault.credentials.removeAll { $0.id == credential.id }
         vault.credentials.append(credential)
-        if vault.defaultID == nil && vault.credentials.count == 1 { vault.defaultID = credential.id }
+        if isFirstCredential && vault.defaultID == nil { vault.defaultID = credential.id }
         try writeVault(vault)
     }
 

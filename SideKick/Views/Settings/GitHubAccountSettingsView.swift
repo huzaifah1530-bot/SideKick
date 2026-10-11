@@ -35,7 +35,9 @@ struct GitHubAccountSettingsView: View {
             }
             Section {
                 NavigationLink {
-                    GitHubDefaultTokenSettingsView(selection: $defaultID)
+                    GitHubDefaultTokenSettingsView(selection: $defaultID) { value in
+                        try GitHubCredentialStore().setDefault(value)
+                    }
                 } label: {
                     LabeledContent("Default Token", value: credentials.first { $0.id == defaultID }?.label ?? "Public access")
                 }
@@ -50,10 +52,6 @@ struct GitHubAccountSettingsView: View {
         .navigationTitle("GitHub Tokens")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { reload() }
-        .onChange(of: defaultID) { _, value in
-            do { try GitHubCredentialStore().setDefault(value) }
-            catch { errorMessage = error.localizedDescription }
-        }
     }
 
     private func reload() {

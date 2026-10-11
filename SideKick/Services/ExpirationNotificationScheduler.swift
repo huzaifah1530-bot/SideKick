@@ -9,13 +9,19 @@ enum ExpirationNotificationScheduler {
 
     static func update() async {
         let context = DatabaseManager.shared.viewContext
-        let apps = await context.perform {
-            var installedApps = (try? context.fetch(InstalledApp.fetchRequest())) ?? []
-            if let sideKickApp = InstalledApp.fetchAltStore(in: context),
-               !installedApps.contains(where: { $0.bundleIdentifier == sideKickApp.bundleIdentifier }) {
-                installedApps.append(sideKickApp)
+        let apps: [(String, String, Date)]
+        do {
+            apps = try await context.perform {
+                var installedApps = try context.fetch(InstalledApp.fetchRequest())
+                if let sideKickApp = InstalledApp.fetchAltStore(in: context),
+                   !installedApps.contains(where: { $0.bundleIdentifier == sideKickApp.bundleIdentifier }) {
+                    installedApps.append(sideKickApp)
+                }
+                return installedApps.map { ($0.resignedBundleIdentifier, $0.name, $0.expirationDate) }
             }
-            return installedApps.map { ($0.resignedBundleIdentifier, $0.name, $0.expirationDate) }
+        } catch {
+            debugLog("[SideKick] Could not load installed apps for expiry notifications; preserving existing reminders: \(error.localizedDescription)")
+            return
         }
 
         let center = UNUserNotificationCenter.current()

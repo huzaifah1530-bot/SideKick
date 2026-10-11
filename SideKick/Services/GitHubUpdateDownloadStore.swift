@@ -55,7 +55,11 @@ final class GitHubUpdateDownloadStore {
                     targetID: candidate.bundleIdentifier,
                     sourceIdentity: candidate.sourceIdentity
                 )
-                guard self.generations[candidate.id] == generation else { return }
+                guard !Task.isCancelled, self.generations[candidate.id] == generation else {
+                    do { try await ipaImportStore.delete(queuedIPA) }
+                    catch { debugLog("[SideKick] Could not remove a canceled GitHub update download: \(error.localizedDescription)") }
+                    return
+                }
                 self.jobs[candidate.id] = GitHubUpdateDownloadJob(
                     progress: 1,
                     bytesWritten: self.jobs[candidate.id]?.bytesWritten ?? 0,

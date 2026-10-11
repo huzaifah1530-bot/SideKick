@@ -245,8 +245,23 @@ final class SigningAccountStore {
             let request = Account.fetchRequest()
             request.predicate = NSPredicate(format: "%K == %@", #keyPath(Account.identifier), account.accountIdentifier)
             guard let savedAccount = try context.fetch(request).first else { return [account.teamIdentifier] }
-            let teamIdentifiers = savedAccount.teams.map(\.identifier)
-            context.delete(savedAccount)
+            let teams = Array(savedAccount.teams)
+            let teamIdentifiers = teams.map(\.identifier)
+            let teamsWithInstalledApps = teams.filter { !$0.installedApps.isEmpty }
+            for team in teams where team.installedApps.isEmpty {
+                context.delete(team)
+            }
+            if teamsWithInstalledApps.isEmpty {
+                context.delete(savedAccount)
+            } else {
+                // Keep only the nonsecret affiliation needed to reconnect installed
+                // apps when this Apple account is added again. The archive tombstone
+                // hides this Core Data row until successful sign-in clears it.
+                savedAccount.isActiveAccount = false
+                for team in teamsWithInstalledApps {
+                    team.isActiveTeam = false
+                }
+            }
             try context.save()
             return teamIdentifiers
         }

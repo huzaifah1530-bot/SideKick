@@ -2,6 +2,7 @@ import SwiftUI
 
 struct GitHubDefaultTokenSettingsView: View {
     @Binding var selection: String?
+    let persistSelection: (String?) throws -> Void
     @Environment(\.dismiss) private var dismiss
     @State private var credentials: [GitHubCredentialStore.Credential] = []
     @State private var errorMessage: String?
@@ -26,8 +27,13 @@ struct GitHubDefaultTokenSettingsView: View {
 
     private func row(_ title: String, subtitle: String, id: String?, symbol: String) -> some View {
         SwiftUI.Button {
-            selection = id
-            dismiss()
+            do {
+                try persistSelection(id)
+                selection = id
+                dismiss()
+            } catch {
+                errorMessage = error.localizedDescription
+            }
         } label: {
             HStack {
                 Label {
