@@ -482,7 +482,7 @@ struct SettingsStorageView: View {
                 }
                 Spacer()
                 Image(systemName: selectedRemovalKeys.contains(key) ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(selectedRemovalKeys.contains(key) ? .tint : .secondary)
+                    .foregroundStyle(selectedRemovalKeys.contains(key) ? Color.accentColor : Color.secondary)
             }
             .contentShape(Rectangle())
         }
