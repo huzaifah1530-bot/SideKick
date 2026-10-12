@@ -768,7 +768,7 @@ index e9310d0..5934e2a 100644
          }
      }
 diff --git a/DeviceGateway/libimobiledevice/LibimobiledeviceGateway.swift b/DeviceGateway/libimobiledevice/LibimobiledeviceGateway.swift
-index 44de525..c6afefa 100644
+index 44de525..c588a07 100644
 --- a/DeviceGateway/libimobiledevice/LibimobiledeviceGateway.swift
 +++ b/DeviceGateway/libimobiledevice/LibimobiledeviceGateway.swift
 @@ -108,33 +108,50 @@ public final class LibimobiledeviceGateway: BaseDeviceGateway, DeviceGatewayAPI,
@@ -1318,7 +1318,7 @@ index 44de525..c6afefa 100644
 +        }
 +
 +        return try withService(
-+            service: .house_arrest,
++            service: .houseArrest,
 +            create: house_arrest_client_new,
 +            cleanup: house_arrest_client_free
 +        ) { ha in
