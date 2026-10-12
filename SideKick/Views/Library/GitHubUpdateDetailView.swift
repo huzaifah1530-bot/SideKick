@@ -64,6 +64,8 @@ struct GitHubUpdateDetailView: View {
     let candidate: GitHubUpdateCandidate
     let app: InstalledAppSummary
 
+    @State private var selectedCandidate: GitHubUpdateCandidate
+
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
@@ -75,18 +77,35 @@ struct GitHubUpdateDetailView: View {
     @State private var tokenID: String?
     @State private var isLoadingToken = true
     @State private var isConfirmingSkip = false
+    @State private var discoveredBuilds: [GitHubUpdateCandidate]
+    @State private var isLoadingBuilds = false
+    @State private var buildHistoryPage = 0
+    @State private var hasMoreBuilds = true
+    @State private var installedBuildKey: String?
 
     private let configurationStore = GitHubUpdateConfigurationStore.shared
+
+    init(candidate: GitHubUpdateCandidate, app: InstalledAppSummary) {
+        self.candidate = candidate
+        self.app = app
+        _selectedCandidate = State(initialValue: candidate)
+        _discoveredBuilds = State(initialValue: [candidate])
+    }
 
     private var expectedUpdateBundleIdentifiers: Set<String> {
         app.updateMatchingBundleIdentifiers
     }
 
-    private var downloadJob: GitHubUpdateDownloadJob? { environment.githubUpdateDownloads.jobs[candidate.id] }
+    private var downloadJob: GitHubUpdateDownloadJob? { environment.githubUpdateDownloads.jobs[selectedCandidate.id] }
 
     var body: some View {
         List {
-            if !candidate.isKnownNewer {
+            if selectedCandidate.updateKey != candidate.updateKey {
+                Section {
+                    Text("You selected a build from history. Installing it can replace a newer installed version.")
+                        .foregroundStyle(.secondary)
+                }
+            } else if !selectedCandidate.isKnownNewer {
                 Section { Text("The installed GitHub build is unverified. Review this downloadable build or confirm the build you already installed.").foregroundStyle(.secondary) }
             }
             Section { GitHubTokenSelectionLink(selection: $tokenID).disabled(downloadJob?.isDownloading == true) }
@@ -110,10 +129,10 @@ struct GitHubUpdateDetailView: View {
                         Text(app.name).font(.title3.weight(.semibold))
                         Text(app.version == downloadJob?.queuedIPA?.version && app.buildVersion == downloadJob?.queuedIPA?.buildVersion
                             ? "Version \(app.version) · Build \(app.buildVersion)"
-                            : "\(app.version) (\(app.buildVersion))  →  \(downloadJob?.queuedIPA?.version ?? candidate.newVersion) (\(downloadJob?.queuedIPA?.buildVersion ?? "unknown build"))")
+                            : "\(app.version) (\(app.buildVersion))  →  \(downloadJob?.queuedIPA?.version ?? selectedCandidate.newVersion) (\(downloadJob?.queuedIPA?.buildVersion ?? "unknown build"))")
                             .foregroundStyle(.secondary)
-                        if candidate.source == .actionsArtifact {
-                            Text(candidate.newVersion)
+                        if selectedCandidate.source == .actionsArtifact {
+                            Text(selectedCandidate.newVersion)
                                 .font(.subheadline)
                                 .foregroundStyle(.secondary)
                         }
@@ -123,10 +142,50 @@ struct GitHubUpdateDetailView: View {
             }
 
             Section("Update") {
-                LabeledContent("Source", value: candidate.source.title)
-                LabeledContent("GitHub", value: candidate.title).lineLimit(2)
-                LabeledContent("Download", value: candidate.assetName).lineLimit(2)
+                LabeledContent("Source", value: selectedCandidate.source.title)
+                LabeledContent("GitHub", value: selectedCandidate.title).lineLimit(2)
+                LabeledContent("Download", value: selectedCandidate.assetName).lineLimit(2)
                 LabeledContent("Signing account", value: account?.email ?? app.accountEmail)
+            }
+
+            Section {
+                ForEach(discoveredBuilds) { build in
+                    SwiftUI.Button { selectedCandidate = build } label: {
+                        HStack {
+                            VStack(alignment: .leading, spacing: 4) {
+                                Text(build.title).foregroundStyle(.primary).lineLimit(2)
+                                Text(build.assetName + " · " + build.newVersion)
+                                    .font(.footnote).foregroundStyle(.secondary).lineLimit(1)
+                            }
+                            Spacer()
+                            if build.updateKey == selectedCandidate.updateKey {
+                                Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.sideKickAccent)
+                            } else if build.updateKey == installedBuildKey {
+                                Text("INSTALLED").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                            }
+                        }
+                        .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .fullWidthListSeparators()
+                }
+                if hasMoreBuilds {
+                    SwiftUI.Button {
+                        Task { await loadBuilds(append: true) }
+                    } label: {
+                        HStack {
+                            Text(isLoadingBuilds ? "Loading builds…" : "Load older builds")
+                            Spacer()
+                            if isLoadingBuilds { ProgressView() }
+                        }
+                    }
+                    .disabled(isLoadingBuilds)
+                    .fullWidthListSeparators()
+                }
+            } header: {
+                Text("Available Builds")
+            } footer: {
+                Text("Choose any discovered IPA build to install it. SideKick records it as installed only after installation succeeds.")
             }
 
             Section {
@@ -247,10 +306,12 @@ struct GitHubUpdateDetailView: View {
                         Label("Already Installed This Build", systemImage: "checkmark.circle")
                     }
                     .fullWidthListSeparators()
-                    SwiftUI.Button { isConfirmingSkip = true } label: {
-                        Label("Skip This Update", systemImage: "forward.end")
+                    if selectedCandidate.updateKey == candidate.updateKey {
+                        SwiftUI.Button { isConfirmingSkip = true } label: {
+                            Label("Skip This Update", systemImage: "forward.end")
+                        }
+                        .fullWidthListSeparators()
                     }
-                    .fullWidthListSeparators()
                 }
                 NavigationLink {
                     GitHubUpdateSettingsView(app: app)
@@ -274,10 +335,13 @@ struct GitHubUpdateDetailView: View {
         }
         .task {
             do {
-                tokenID = try await configurationStore.configuration(for: app.id)?.tokenID
+                let configuration = try await configurationStore.configuration(for: app.id)
+                tokenID = configuration?.tokenID
+                installedBuildKey = configuration?.effectiveBaselineKey
             } catch { errorMessage = error.localizedDescription }
             isLoadingToken = false
             await validateDownload()
+            await loadBuilds()
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await validateDownload() } }
@@ -300,12 +364,56 @@ struct GitHubUpdateDetailView: View {
     }
 
     @MainActor
+    private func loadBuilds(append: Bool = false) async {
+        guard !isLoadingBuilds, !isLoadingToken else { return }
+        isLoadingBuilds = true
+        defer { isLoadingBuilds = false }
+        do {
+            guard let configuration = try await configurationStore.configuration(for: app.id) else { return }
+            let token = try GitHubCredentialStore().load(id: tokenID)
+            let page = append ? buildHistoryPage + 1 : 1
+            let result = try await GitHubUpdateService().buildHistory(for: configuration, token: token, page: page)
+            let builds = result.builds.map { build in
+                GitHubUpdateCandidate(
+                    bundleIdentifier: app.id,
+                    appName: app.name,
+                    currentVersion: app.version,
+                    newVersion: build.version,
+                    title: build.title,
+                    assetName: build.assetName,
+                    downloadURL: build.downloadURL,
+                    updateKey: build.key,
+                    source: configuration.source,
+                    repositoryURL: configuration.repositoryURL,
+                    sourceIdentity: configuration.sourceIdentity,
+                    isKnownNewer: configuration.effectiveBaselineKey.map {
+                        GitHubTrackingPolicy.compare(build.key, to: $0) == .newer
+                    } ?? false
+                )
+            }
+            buildHistoryPage = page
+            hasMoreBuilds = result.hasMore
+            if append {
+                let known = Set(discoveredBuilds.map(\.updateKey))
+                discoveredBuilds += builds.filter { !known.contains($0.updateKey) }
+            } else {
+                discoveredBuilds = builds
+            }
+            if !discoveredBuilds.contains(where: { $0.updateKey == selectedCandidate.updateKey }) {
+                discoveredBuilds.insert(selectedCandidate, at: 0)
+            }
+        } catch {
+            errorMessage = error.localizedDescription
+        }
+    }
+
+    @MainActor
     private func startDownload() {
         guard !isLoadingToken else { return }
         do {
             let token = try GitHubCredentialStore().load(id: tokenID)
             environment.githubUpdateDownloads.start(
-                candidate: candidate,
+                candidate: selectedCandidate,
                 expectedBundleIdentifiers: expectedUpdateBundleIdentifiers,
                 ipaImportStore: environment.ipaImportStore,
                 token: token
@@ -322,7 +430,7 @@ struct GitHubUpdateDetailView: View {
     private func resolveUpdate(markInstalled: Bool) async {
         var resolutionRecorded = false
         do {
-            guard let source = candidate.sourceIdentity else {
+            guard let source = selectedCandidate.sourceIdentity else {
                 errorMessage = "This update source is unavailable. The downloaded IPA was kept; reload the update and try again."
                 return
             }
@@ -330,7 +438,7 @@ struct GitHubUpdateDetailView: View {
                 errorMessage = "This update configuration could not be found. The downloaded IPA was kept. Check the app’s GitHub update settings and try again."
                 return
             }
-            guard configuration.sourceIdentity == candidate.sourceIdentity else {
+            guard configuration.sourceIdentity == selectedCandidate.sourceIdentity else {
                 errorMessage = "This update source changed. The downloaded IPA was kept; reopen the update from the current source."
                 return
             }
@@ -345,7 +453,7 @@ struct GitHubUpdateDetailView: View {
                 let imports = try await environment.ipaImportStore.importedApps()
                 let queuedIPA = matchingQueuedIPA(in: imports)
                 guard try await configurationStore.recordInstalled(
-                    key: candidate.updateKey,
+                    key: selectedCandidate.updateKey,
                     for: fresh.updateTarget,
                     expectedSource: source
                 ) else {
@@ -358,7 +466,7 @@ struct GitHubUpdateDetailView: View {
                 let imports = try await environment.ipaImportStore.importedApps()
                 let queuedIPA = matchingQueuedIPA(in: imports)
                 guard try await configurationStore.skip(
-                    key: candidate.updateKey,
+                    key: selectedCandidate.updateKey,
                     targetID: app.id,
                     expectedSource: source
                 ) else {
@@ -369,7 +477,7 @@ struct GitHubUpdateDetailView: View {
                 if let queuedIPA { try await environment.ipaImportStore.delete(queuedIPA) }
             }
 
-            environment.githubUpdateDownloads.removeJob(for: candidate)
+            environment.githubUpdateDownloads.removeJob(for: selectedCandidate)
             dismiss()
         } catch {
             if resolutionRecorded {
@@ -382,10 +490,10 @@ struct GitHubUpdateDetailView: View {
 
     private func matchingQueuedIPA(in imports: [ImportedIPA]) -> ImportedIPA? {
         func matches(_ ipa: ImportedIPA) -> Bool {
-            ipa.queuedForInstalledAppID == candidate.bundleIdentifier &&
-                ipa.githubUpdateKey == candidate.updateKey &&
-                ipa.githubSourceIdentity == candidate.sourceIdentity &&
-                ipa.githubRepositoryURL == candidate.repositoryURL
+            ipa.queuedForInstalledAppID == selectedCandidate.bundleIdentifier &&
+                ipa.githubUpdateKey == selectedCandidate.updateKey &&
+                ipa.githubSourceIdentity == selectedCandidate.sourceIdentity &&
+                ipa.githubRepositoryURL == selectedCandidate.repositoryURL
         }
         if let queuedIPA = downloadJob?.queuedIPA, matches(queuedIPA) { return queuedIPA }
         return imports.first(where: matches)
@@ -409,7 +517,7 @@ struct GitHubUpdateDetailView: View {
     private func finishUpdate(_ ipa: ImportedIPA) async {
         do {
             try await environment.ipaImportStore.delete(ipa)
-            environment.githubUpdateDownloads.removeJob(for: candidate)
+            environment.githubUpdateDownloads.removeJob(for: selectedCandidate)
             dismiss()
         } catch {
             errorMessage = error.localizedDescription

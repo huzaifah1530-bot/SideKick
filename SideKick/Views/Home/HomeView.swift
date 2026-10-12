@@ -255,6 +255,12 @@ struct HomeView: View {
                         Text(updateCheckStatus)
                             .font(.subheadline.weight(.medium))
                         Spacer()
+                        if shouldOfferGitHubCheckAction {
+                            SwiftUI.Button(githubUpdateCheckFailed ? "Retry" : "Check Now") {
+                                Task { await checkGitHubUpdatesNow() }
+                            }
+                            .font(.caption.weight(.semibold))
+                        }
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 13)
@@ -263,6 +269,14 @@ struct HomeView: View {
                     .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
                     .listRowBackground(Color.clear)
                     .listRowSeparator(.hidden)
+                    if isCheckingGitHubUpdates {
+                        ProgressView()
+                            .progressViewStyle(.linear)
+                            .padding(.horizontal, 10)
+                            .padding(.bottom, 8)
+                            .listRowBackground(Color.clear)
+                            .listRowSeparator(.hidden)
+                    }
                     if runningSideKickGitHubCheckIsUnconfigured, let runningSideKickApp {
                         NavigationLink {
                             GitHubUpdateSettingsView(app: runningSideKickApp)
@@ -609,14 +623,14 @@ struct HomeView: View {
     private var updateCheckStatus: String {
         if localLoadError != nil { return "Couldn’t Load Your Apps" }
         if !hasLoadedLocalApps { return "Loading Your Apps" }
-        if isCheckingGitHubUpdates { return "Checking for Updates" }
+        if isCheckingGitHubUpdates { return "Checking GitHub for updates…" }
         if runningSideKickGitHubCheckIsUnconfigured { return "GitHub updates aren’t configured for SideKick." }
 
         let availableCount = githubChecks.filter { $0.state == .updateAvailable }.count
         if availableCount > 0 {
             return availableCount == 1 ? "A GitHub update is available." : "\(availableCount) GitHub updates are available."
         }
-        if githubUpdateCheckFailed { return "One or more GitHub update checks failed." }
+        if githubUpdateCheckFailed { return "One or more GitHub update checks failed. Retry the check." }
         if githubChecks.contains(where: { $0.state.needsAttention }) { return "GitHub update tracking needs attention." }
 
         let unconfiguredCount = githubChecks.filter { $0.state == .notConfigured }.count
@@ -631,10 +645,19 @@ struct HomeView: View {
         if githubChecks.contains(where: { $0.state == .installedAhead }) { return "Installed builds are ahead of GitHub releases." }
         if githubChecks.isEmpty {
             return environment.hasGitHubUpdateTargets
-                ? "Waiting for GitHub update check results."
+                ? "No GitHub update check is running."
                 : "No eligible apps are available for GitHub update checks."
         }
         return "No confirmed GitHub updates are available."
+    }
+
+    private var shouldOfferGitHubCheckAction: Bool {
+        !isCheckingGitHubUpdates && environment.hasGitHubUpdateTargets
+    }
+
+    private func checkGitHubUpdatesNow() async {
+        environment.requestGitHubUpdateCheck(force: true)
+        await environment.awaitPendingGitHubChecks()
     }
 
     private var filteredGitHubUpdates: [GitHubUpdateCandidate] {

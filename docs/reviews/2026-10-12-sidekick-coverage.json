@@ -1,0 +1,674 @@
+[
+  {
+    "path": "THIRD_PARTY_NOTICES.md",
+    "bytes": 1538,
+    "sha256": "1eb9102f1b9a174252197f94b5ca76a42ccbde912a2b021ac5a796ff01906ac7",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 13
+  },
+  {
+    "path": "Tests/SideKickCoreTests/StorageCleanupTests.swift",
+    "bytes": 3638,
+    "sha256": "af230945063aea9dc27fd430d711b19f78b521740fb7d84d591713121cd21ef8",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 55
+  },
+  {
+    "path": "Tests/SideKickCoreTests/LiveContainerTests.swift",
+    "bytes": 15855,
+    "sha256": "4e664df7c9009977e01a5debd63fc11c978c874b8808cf5874df7f7d590e3081",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 268
+  },
+  {
+    "path": "Tests/SideKickCoreTests/GitHubTrackingTests.swift",
+    "bytes": 9368,
+    "sha256": "7d0bed95855147c5782e82d34b4a376e15757f33e544d78626edf1c9c9ed1fc4",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 149
+  },
+  {
+    "path": "Tests/SideKickCoreTests/GitHubHistoryClientTests.swift",
+    "bytes": 4444,
+    "sha256": "aa5ee189126b393ace9976914977c39fa50b611f4906a82cb0d6ebcb2b37de1f",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 59
+  },
+  {
+    "path": "Tests/SideKickCoreTests/GitHubBaselineTests.swift",
+    "bytes": 4991,
+    "sha256": "4b469f3533f546247f600c59f8eec2d525d02cd66354a44a06af4981c9100abf",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 72
+  },
+  {
+    "path": "patches/sidestore-view-body-compile.patch",
+    "bytes": 9659,
+    "sha256": "c91f7ed6afa608a83affd885cb83152f6ba44bdf8d2c502aa718a958c027c725",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 203
+  },
+  {
+    "path": "patches/sidestore-use-account-certificate-for-refresh.patch",
+    "bytes": 1506,
+    "sha256": "d834423cdb7709496aaf3cd0601a6f898fba2d3958616b663dad88ce5a9f5f7d",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 16
+  },
+  {
+    "path": "patches/sidestore-sidekick.patch",
+    "bytes": 17345,
+    "sha256": "77355aa232666829047e95e5bf6de8587421e7e26688de194bb264909fa0e541",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 360
+  },
+  {
+    "path": "patches/sidestore-compiler-workarounds.patch",
+    "bytes": 2741,
+    "sha256": "69198bc812a3c5c8af84282c17d5d9c29d841ef083eba4c351bfcac70707843f",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 70
+  },
+  {
+    "path": "patches/sidestore-certificate-error-classification.patch",
+    "bytes": 4600,
+    "sha256": "add051f6c4d4f07aeddcc2ae8dc6a9630e70394fc8811c5b4cabf12caeeeb825",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 56
+  },
+  {
+    "path": "Package.swift",
+    "bytes": 1902,
+    "sha256": "b880cbb1ccb2b854b2e2262c962c63f63b4095ca78e616b3e6b0cc428b3ff1be",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 31
+  },
+  {
+    "path": "SideKickVPN/UPSTREAM.md",
+    "bytes": 680,
+    "sha256": "bdf72e3d8628d36ebc991a16035317fccde18e91bf1f32865af781be3108c372",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 6
+  },
+  {
+    "path": "SideKickVPN/TunnelConstants.swift",
+    "bytes": 463,
+    "sha256": "096341f9638bb343430073f424522b9e715c734cb83e960402f4c56357b93ed9",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 18
+  },
+  {
+    "path": "SideKickVPN/SideKickVPN.entitlements",
+    "bytes": 309,
+    "sha256": "c31df27caa0602c8b0e84748886d804f77b58067dcc73d89c4446c2844e2a387",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 10
+  },
+  {
+    "path": "SideKickVPN/PacketTunnelProvider.swift",
+    "bytes": 5577,
+    "sha256": "404fc06348545772de9136566d0c64fc43de06536088999d3bb054a0a15aa012",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 142
+  },
+  {
+    "path": "SideKickVPN/LICENSE",
+    "bytes": 1684,
+    "sha256": "4cea6b291d532b68cf42460d0832ef1e66d6796336d695968df8b100c726e7e5",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 34
+  },
+  {
+    "path": "SideKickVPN/Info.plist",
+    "bytes": 1237,
+    "sha256": "ed170a5272f34bfaf0625adc84650e0e464472ac1d71c1684af14b7179846564",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 37
+  },
+  {
+    "path": "SideKickVPN/Host.entitlements",
+    "bytes": 408,
+    "sha256": "4ebabcc2e90d148fa930acdf885fabcbf68c84cf4873f523372e96e2434803e3",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 14
+  },
+  {
+    "path": "SideKickVPN/CIDRValidator.swift",
+    "bytes": 14444,
+    "sha256": "b9500fa96f552843827734b3c0f4d20fa1a2e683d264de819103b2cfba15eca8",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 387
+  },
+  {
+    "path": "docs/update-tracking-design.md",
+    "bytes": 2305,
+    "sha256": "20d484a588c566c2514480bfcc2694a791bc75c699708513a1f880cd09a6a521",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 13
+  },
+  {
+    "path": "docs/superpowers/plans/2026-10-11-review-bug-fixes.md",
+    "bytes": 5999,
+    "sha256": "bac1f7741d7457b4d3fb015ec1a116be2d535adcfdc110cc6ad30526ee37f24b",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 49
+  },
+  {
+    "path": "docs/superpowers/plans/2026-10-10-update-tracking.md",
+    "bytes": 2148,
+    "sha256": "2f4ddb6345d1ebff2ed73fe8f605972ce8c6c0c03780ab6a31ab70b58f11e98b",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 19
+  },
+  {
+    "path": "docs/superpowers/plans/2026-10-10-livecontainer.md",
+    "bytes": 7489,
+    "sha256": "48144e6a8d20b7026beaa3a3efa17b1838dc3a573fe9b01a654fec6249e4deb2",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 87
+  },
+  {
+    "path": "docs/settings-functionality.md",
+    "bytes": 8748,
+    "sha256": "1dbcf123711f0cedfe4d7c69f1154e75002f112ef285499c715aa101d1d1d692",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 50
+  },
+  {
+    "path": "docs/reviews/2026-10-11-third-pass.md",
+    "bytes": 4797,
+    "sha256": "0b33f2de1753b4c610c1a3e247ec15f6e70f4be5536ab946d94284bf5deb41d4",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 33
+  },
+  {
+    "path": "SideKick/Views/Settings/StorageFilesView.swift",
+    "bytes": 4437,
+    "sha256": "1853893543dda2b8533d5cfe894f46fafacd00fd4a1fe73afab079071c83ee83",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 82
+  },
+  {
+    "path": "docs/reviews/2026-10-11-second-pass.md",
+    "bytes": 4340,
+    "sha256": "bff2aae093e2a9bdacbe3a1c947d4c2297b58342cd879bc8b4d7e8bb18b638b1",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 25
+  },
+  {
+    "path": "docs/reviews/2026-10-11-pull-refresh-self-updates.md",
+    "bytes": 3760,
+    "sha256": "b9d0fd14e5ee741f86bc2fe94541bb9b2b37d03f92f0120412788f7b69493f17",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 20
+  },
+  {
+    "path": "docs/reviews/.altstore-reader.py",
+    "bytes": 7988,
+    "sha256": "3e12a7d0c9cf50a9cd964294d53eaf4b5430a125947453804e9bd8e0f762ce99",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 79
+  },
+  {
+    "path": "SideKick/Views/Settings/SkippedGitHubUpdatesView.swift",
+    "bytes": 3379,
+    "sha256": "c0e5cd89f84568215c3fd08d9807f1967798469f2331d3dc0b1a7d74624a59a1",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 84
+  },
+  {
+    "path": "SideKick/Views/Settings/SideStoreSettingsPages.swift",
+    "bytes": 21053,
+    "sha256": "64737fe48f2fbf06717de6ae3da9d86bb99ab2804868ef87edaa998763d6697e",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 414
+  },
+  {
+    "path": "SideKick/Views/Settings/SettingsView.swift",
+    "bytes": 3600,
+    "sha256": "875075ddfa4d0d5053bf975211517f09563a83b8334e73a691cc5ce94ddceccb",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 85
+  },
+  {
+    "path": "SideKick/Views/Settings/LocalConnectionSettingsView.swift",
+    "bytes": 11924,
+    "sha256": "29dcd88b7010260fbdfb3020605de6ced05cc766ed489d2197dd6ab3fdec6387",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 195
+  },
+  {
+    "path": "SideKick/Views/Settings/GitHubDefaultTokenSettingsView.swift",
+    "bytes": 2010,
+    "sha256": "6344a668fd094d06bb70f0ee75a243df27c12a9a3a3bb8f0948f4752f9719937",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 51
+  },
+  {
+    "path": "docs/loading-and-ios18.md",
+    "bytes": 3907,
+    "sha256": "f7fd1d481c62d9cc39407e1b662aea8075d32d95dc3f742ae8f554092e497b0b",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 30
+  },
+  {
+    "path": "SideKick/Views/Settings/GitHubAccountSettingsView.swift",
+    "bytes": 7127,
+    "sha256": "1aea1429cfd0322369abc0732dc15fd7e5ff89785c580f331a761f7552724941",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 145
+  },
+  {
+    "path": "docs/livecontainer-investigation.md",
+    "bytes": 19519,
+    "sha256": "5474f6daa3b4bf9a9759a78495b08ee638bc28373434408febc051b8964e7e99",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 131
+  },
+  {
+    "path": "docs/livecontainer-integration.md",
+    "bytes": 9792,
+    "sha256": "d574372bf171792770063683544c306135272191f0e137a34a8a2e40f3980aea",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 62
+  },
+  {
+    "path": ".gitmodules",
+    "bytes": 124,
+    "sha256": "6194af772b4b116f2f9a8523c7f11779e6410f288ed934860a7865e456371721",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 4
+  },
+  {
+    "path": ".gitignore",
+    "bytes": 192,
+    "sha256": "bbbc63d250689c0c1072b3695691d02de6cd7249913751c0b2a6a8529a2abb7b",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 14
+  },
+  {
+    "path": "project.yml",
+    "bytes": 949,
+    "sha256": "62c5a2da6f4a0be32521a54c7889eb405495c82666366550be226262e643dee1",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 38
+  },
+  {
+    "path": "README.md",
+    "bytes": 14804,
+    "sha256": "01b5ac33e8e245e0bdcb4015e60c5c2ea2355b41592bb3138fd0be2a47622704",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 86
+  },
+  {
+    "path": "SideKick/Info.plist",
+    "bytes": 1715,
+    "sha256": "3f1a901a2c8024be0c9cae91a15d6f2614f50626f65ef1cee808478d4f8442eb",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 61
+  },
+  {
+    "path": "SideKick/Views/Root/RequiredSetupView.swift",
+    "bytes": 22971,
+    "sha256": "c3e19cb59a6a5c65fb7db031fcc320eb5e312754396077f2c347cf4714bea538",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 516
+  },
+  {
+    "path": "SideKick/Views/Root/ContentView.swift",
+    "bytes": 6687,
+    "sha256": "4b63c334ad7e01915dc467b5658d420ef1e44130e00e0ebed4c97136ea3929d6",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 146
+  },
+  {
+    "path": "SideKick/DesignSystem/SideKickTheme.swift",
+    "bytes": 1102,
+    "sha256": "509b03666481a68032fe66bcb47bfd7cd9ea47b3615afcd60f7118d4f4566521",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 36
+  },
+  {
+    "path": "SideKick/Views/Home/IPASharingViews.swift",
+    "bytes": 18115,
+    "sha256": "360686079b5301ee094e264e7b2500bef0d4cc4a65c3ec51638dc4ff9acfa1b3",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 410
+  },
+  {
+    "path": "SideKick/Views/Home/HomeView.swift",
+    "bytes": 39296,
+    "sha256": "08d2aec2289c4cb9a7a75dcc91c42d36a3c6bf56588c923bea341af65a79b2c0",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 819
+  },
+  {
+    "path": "SideKick/Views/Accounts/AppleIDSignInSheet.swift",
+    "bytes": 1660,
+    "sha256": "4da73f67cf0d3743ce883e72d1a6846c4ef8dfbd47b44b3b4e8fe227a5de8188",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 43
+  },
+  {
+    "path": "SideKick/Views/Accounts/AccountsView.swift",
+    "bytes": 19899,
+    "sha256": "b8fb1f129c66b36a95c59289d63b32896fa3500a6fee982c9032febd7caa36ae",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 456
+  },
+  {
+    "path": "scripts/embed-local-vpn.py",
+    "bytes": 12533,
+    "sha256": "1058d52d0e72b74f026be31f4f8ff47e588aadd6d8250cdd03d98c2522bbf02b",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 192
+  },
+  {
+    "path": "SideKick/Assets.xcassets/AppIcon.appiconset/Contents.json",
+    "bytes": 183,
+    "sha256": "c169b0ac13040c7113d773cd91d5c62732be196eb1a57397555e2bd58a3d7906",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 6
+  },
+  {
+    "path": "SideKick/Services/AppSharingService.swift",
+    "bytes": 12677,
+    "sha256": "bf1f93dda924380ecd052a7242a22e4861da56f0717f6c1e57e62facced7d1e9",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 267
+  },
+  {
+    "path": "SideKick/Services/DailyRefreshShortcut.swift",
+    "bytes": 2226,
+    "sha256": "ba7c87eb53507c7451b59dd6ebb05fef1bee39c4ace26063202e4b8cfcb545dd",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 47
+  },
+  {
+    "path": "SideKick/Assets.xcassets/AppIcon.appiconset/SideKickIcon-1024.png",
+    "bytes": 67858,
+    "sha256": "6654369125551c89981b6850fb1c8e35a9c6ead5c0533dc528a72069363b64af",
+    "method": "visual image inspection plus metadata",
+    "lines": null
+  },
+  {
+    "path": ".github/workflows/ios-build.yml",
+    "bytes": 8190,
+    "sha256": "f13563f4ad3b6747bae61d5bd7b74b0f25a4c64c9118dba7465b0ca4830187d3",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 203
+  },
+  {
+    "path": "SideKick/Services/GitHubUpdateConfigurationStore.swift",
+    "bytes": 12928,
+    "sha256": "141dca38772c9ce79d861c43bada6d1cb8d9497667fdf5be3009bc3cf340c42e",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 252
+  },
+  {
+    "path": "SideKick/Services/GitHubHistoryClient.swift",
+    "bytes": 10695,
+    "sha256": "8a68e1dceb541f2ce867da18ad0c8daa356cd09849abe9d25925b43ebe344dd9",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 176
+  },
+  {
+    "path": "SideKick/Services/GitHubCredentialStore.swift",
+    "bytes": 4616,
+    "sha256": "af8a66afb694d467cfcd3c49b7512a38f884226bf4f6e7a71440c6d6d695f25f",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 106
+  },
+  {
+    "path": "SideKick/Services/ExpirationNotificationScheduler.swift",
+    "bytes": 3721,
+    "sha256": "ee773efd00e5b9938dbe4b58e14d16a5a68e79e7930f19969119c3bd4de199b2",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 70
+  },
+  {
+    "path": "SideKick/Services/GitHubUpdateNotificationScheduler.swift",
+    "bytes": 5174,
+    "sha256": "b41c3d632aa5cadbfd34283d0e68b721c23734ff54d084fda9d3e5b1cf5f11d8",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 92
+  },
+  {
+    "path": "SideKick/Services/GitHubUpdateDownloadStore.swift",
+    "bytes": 6279,
+    "sha256": "d5da790ce155980a4bf808240568398a2223169847d3a87b47a09f1b164635d1",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 136
+  },
+  {
+    "path": "SideKick/Services/GitHubUpdateService.swift",
+    "bytes": 14059,
+    "sha256": "592a31da50e18b80a68a0460cbbe3e5291da37723fa798153454ef950437fb06",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 263
+  },
+  {
+    "path": "SideKick/Services/GitHubUpdateScanner.swift",
+    "bytes": 6153,
+    "sha256": "106c07020c0c81713941a7e314cf6beb31ba6858422b8ebaf7b5bfc8ae94d056",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 130
+  },
+  {
+    "path": "SideKick/Services/IPAImportStore.swift",
+    "bytes": 25798,
+    "sha256": "a9b295416ab0c0496e178fcac311d8ae82902f470b561c95c2220f99c66bc553",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 515
+  },
+  {
+    "path": "SideKick/Services/LiveContainerScanner.swift",
+    "bytes": 6322,
+    "sha256": "2edf8537b100011e565581ccb733d69d874d273e9017229c25a76ae3d5bbf513",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 97
+  },
+  {
+    "path": "SideKick/ViewModels/HomeViewModel.swift",
+    "bytes": 1347,
+    "sha256": "3285abde59310aefa1927e3162800efdfff2c1a2465d1a291787cdf0a99bbe54",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 48
+  },
+  {
+    "path": "SideKick/Services/LiveContainerStore.swift",
+    "bytes": 14770,
+    "sha256": "9846018594cba0de240bf3d4499c673abc503f11a76fc84c4a1d8826df9155f6",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 292
+  },
+  {
+    "path": "SideKick/Services/LocalVPNService.swift",
+    "bytes": 17332,
+    "sha256": "eefa0ea53078be29a09bac6a761eb67f820151b1bf8cf81704899bbbf303156e",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 324
+  },
+  {
+    "path": "SideKick/Services/ProgressFileDownload.swift",
+    "bytes": 4519,
+    "sha256": "9ede82db8ea3ef3d78f40c6ddbe2a9ed80c14f01fd0ae2c0861d32074379949f",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 96
+  },
+  {
+    "path": "SideKick/Services/PairingSetupImporter.swift",
+    "bytes": 1743,
+    "sha256": "61faa530187e73466879151d7b5ae92da004abed68be3ec26802831b3aaad257",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 48
+  },
+  {
+    "path": "SideKick/Services/SideKickCertificateExport.swift",
+    "bytes": 3059,
+    "sha256": "8579a78104321708de6f794cf7e204e52aad130824563466ac0a561966bf077f",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 52
+  },
+  {
+    "path": "SideKick/Services/SideKickDataDirectory.swift",
+    "bytes": 3318,
+    "sha256": "3e2b448d1673948e0b46bd6e4ba64db6a76eaeb410b2c08b2afa6614aece6999",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 55
+  },
+  {
+    "path": "SideKick/Models/GitHubBuildTracking.swift",
+    "bytes": 6929,
+    "sha256": "dd4683a6f2d177ea60e301f442d858b5d8350eb578ed7632565917ad42b7511e",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 134
+  },
+  {
+    "path": "SideKick/Views/Library/AppManagementView.swift",
+    "bytes": 47957,
+    "sha256": "d4657e0426783e47d279711750d5a74c72ce2839370cae402fc04f40c333ac2a",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 1056
+  },
+  {
+    "path": "SideKick/Services/SideKickLogStorage.swift",
+    "bytes": 1339,
+    "sha256": "f11c62e93fe9d3469ab8bbee27c8df978207bed7db12c9bc1ee71b84464c20ce",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 25
+  },
+  {
+    "path": "SideKick/Components/ImportedIPARow.swift",
+    "bytes": 1168,
+    "sha256": "ffb6d025d5320d69281cc6c72f9c24fc218b8bde413adc3e9236bdbb5369d49f",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 37
+  },
+  {
+    "path": "SideKick/App/SideKickApp.swift",
+    "bytes": 567,
+    "sha256": "40d2d24975519f646c32be6dd3b8890e1991bdba3d06332f4e5a3edb33ca3c55",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 22
+  },
+  {
+    "path": "SideKick/App/AppEnvironment.swift",
+    "bytes": 19049,
+    "sha256": "1c312a6df921ad009e8216e10f56a6f1f3eb6314a826c37073a7652873609426",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 384
+  },
+  {
+    "path": "SideKick/Components/FullWidthListSeparators.swift",
+    "bytes": 330,
+    "sha256": "1c12b878129dcfb074cffcd73a7d9b39f13bdd0377c177b9c119d6f537480446",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 11
+  },
+  {
+    "path": "SideKick/Services/SideStoreOperationService.swift",
+    "bytes": 23671,
+    "sha256": "ee8a19f2706b7baae289b1624e57dd92a6d8dcd5f97ba50ae3652cbeafdc1353",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 459
+  },
+  {
+    "path": "SideKick/Services/SigningAccountStore.swift",
+    "bytes": 38902,
+    "sha256": "830e649b720f5da7565a4d7c095ad7416f669f5291776aac655f48790cde9492",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 836
+  },
+  {
+    "path": "SideKick/Services/SideKickStorageUsage.swift",
+    "bytes": 4358,
+    "sha256": "7fd2ba0a1df052a195d352e613c3bd651b4e9b795b111b6854760accade838b7",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 85
+  },
+  {
+    "path": "SideKick/Services/SideKickStorageCleanup.swift",
+    "bytes": 20835,
+    "sha256": "f24c91ef6e232956d9ade283a1a20ffe01999c70c7181af8b20e34d0bbbce1c9",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 319
+  },
+  {
+    "path": "SideKick/Services/SigningExpiry.swift",
+    "bytes": 551,
+    "sha256": "dd64dd8d637cf11fff373173acfc980ca7f7056e1cac6a5f0d20cf4e84004fe2",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 14
+  },
+  {
+    "path": "SideKick/Models/GitHubUpdateConfiguration.swift",
+    "bytes": 4832,
+    "sha256": "043e4fbf01ee3243f36cd0c1da39b508c03ee1aa44ac00c00d02e567cf51beab",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 116
+  },
+  {
+    "path": "SideKick/Models/ImportedIPA.swift",
+    "bytes": 3170,
+    "sha256": "59113c2666aeebd9880dc0b0aca0d241463f688325fc1986d584d059fd1c234b",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 70
+  },
+  {
+    "path": "SideKick/Brand/SideKickIcon.svg",
+    "bytes": 1141,
+    "sha256": "98c03594368fb332c5121cdd5543b2784f2ca2520e853a2efc6218d222fea6e0",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 12
+  },
+  {
+    "path": "SideKick/Models/LiveContainerModels.swift",
+    "bytes": 4255,
+    "sha256": "aeabb2115e2d8f60854fd9d05456677c30a1f1ebafd87835d4157edf82805e9e",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 98
+  },
+  {
+    "path": "SideKick/Views/Library/GitHubRepositoryImportView.swift",
+    "bytes": 12756,
+    "sha256": "813050a94c56d68645afbf0aff0ce3cdd96e971b794cdd1e2a62eb23edbc42e3",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 240
+  },
+  {
+    "path": "SideKick/Views/LiveContainer/LiveContainerViews.swift",
+    "bytes": 41359,
+    "sha256": "48acdcdf946ce795e018735b84a02de68cb85c317af9738c536ea7a4b22ca856",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 766
+  },
+  {
+    "path": "SideKick/Views/Library/GitHubTokenPickerView.swift",
+    "bytes": 2103,
+    "sha256": "d7ecbe5d50808e9208733373935344f82ef44ca80a65a3e72f841c6ea36c96e3",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 50
+  },
+  {
+    "path": "SideKick/Views/Library/GitHubUpdateDetailView.swift",
+    "bytes": 27909,
+    "sha256": "1ad59e615e149919943fd3db94992bf9d24cc98b39aa98c9e7cd530389c5dfed",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 544
+  },
+  {
+    "path": "SideKick/Views/Library/GitHubUpdateSettingsView.swift",
+    "bytes": 17277,
+    "sha256": "d890343714d9e57fbcbdbd591936dd94adcb429fe98927bdf22c54e1b50f5284",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 366
+  },
+  {
+    "path": "SideKick/Views/Library/OtherTeamInstallationView.swift",
+    "bytes": 5005,
+    "sha256": "19d7e5c5c882d5fc0992ff77df4be5e16f6c5844d54a581b4a72a4f95c09717f",
+    "method": "full text read, including all line ranges; reference searches for findings",
+    "lines": 93
+  }
+]

@@ -1,0 +1,374 @@
+[
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/.github/workflows/build-all.yml",
+    "lines": 402,
+    "bytes": 16590,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/.github/workflows/ci.yml",
+    "lines": 28,
+    "bytes": 470,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/.github/workflows/release-cli.yml",
+    "lines": 37,
+    "bytes": 790,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/.gitignore",
+    "lines": 51,
+    "bytes": 515,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/build.sh",
+    "lines": 18,
+    "bytes": 473,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/CLI/CommandContext.swift",
+    "lines": 395,
+    "bytes": 11729,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/CLI/CommandHandler.swift",
+    "lines": 1822,
+    "bytes": 94303,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/CLI/DeviceDataManager.swift",
+    "lines": 181,
+    "bytes": 6614,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/CLI/main.swift",
+    "lines": 707,
+    "bytes": 26617,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/CLI/PortalCommandsParser.swift",
+    "lines": 618,
+    "bytes": 29368,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/CLI/SecureInput.swift",
+    "lines": 60,
+    "bytes": 1749,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/CLI/SessionManager.swift",
+    "lines": 289,
+    "bytes": 12293,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Package.resolved",
+    "lines": 60,
+    "bytes": 1784,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Package.swift",
+    "lines": 82,
+    "bytes": 2465,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/README.md",
+    "lines": 158,
+    "bytes": 6876,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/sample-usages.sh",
+    "lines": 459,
+    "bytes": 19174,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Anisette/AnisetteDataManager.swift",
+    "lines": 718,
+    "bytes": 31347,
+    "readThrough": 718
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Anisette/RemoteAnisetteDataProvider.swift",
+    "lines": 228,
+    "bytes": 9581,
+    "readThrough": 228
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Archiver/Archive.swift",
+    "lines": 636,
+    "bytes": 26495,
+    "readThrough": 636
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Archiver/FileManagerZip.swift",
+    "lines": 213,
+    "bytes": 9634,
+    "readThrough": 100
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Certificates/CertificateParser.swift",
+    "lines": 29,
+    "bytes": 1001,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Certificates/PKCS12Parser.swift",
+    "lines": 44,
+    "bytes": 1725,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/CodeSigning/CodeSignerAPI.swift",
+    "lines": 223,
+    "bytes": 10416,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Compatibility.swift",
+    "lines": 330,
+    "bytes": 12186,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Constants.swift",
+    "lines": 235,
+    "bytes": 13896,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/DeveloperPortal/AppGroups.swift",
+    "lines": 116,
+    "bytes": 4902,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/DeveloperPortal/AppIDs.swift",
+    "lines": 109,
+    "bytes": 4731,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/DeveloperPortal/AuthDevices.swift",
+    "lines": 147,
+    "bytes": 7716,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/DeveloperPortal/Authentication.swift",
+    "lines": 920,
+    "bytes": 47005,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/DeveloperPortal/AuthModels.swift",
+    "lines": 125,
+    "bytes": 3269,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/DeveloperPortal/Certificates.swift",
+    "lines": 137,
+    "bytes": 6366,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/DeveloperPortal/DeveloperPortalAPI.swift",
+    "lines": 511,
+    "bytes": 25810,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/DeveloperPortal/Devices.swift",
+    "lines": 153,
+    "bytes": 5611,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/DeveloperPortal/Profiles.swift",
+    "lines": 274,
+    "bytes": 13069,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/DeveloperPortal/Teams.swift",
+    "lines": 39,
+    "bytes": 1290,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Logging.swift",
+    "lines": 213,
+    "bytes": 7608,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Models/Account.swift",
+    "lines": 39,
+    "bytes": 1149,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Models/AnisetteData.swift",
+    "lines": 81,
+    "bytes": 2395,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Models/AppBundle.swift",
+    "lines": 238,
+    "bytes": 8056,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Models/AppGroup.swift",
+    "lines": 42,
+    "bytes": 1494,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Models/AppID.swift",
+    "lines": 71,
+    "bytes": 2749,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Models/AuthDevice.swift",
+    "lines": 37,
+    "bytes": 995,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Models/AuthSession.swift",
+    "lines": 19,
+    "bytes": 420,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Models/CertificateRequest.swift",
+    "lines": 37,
+    "bytes": 1020,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Models/CertificateType.swift",
+    "lines": 127,
+    "bytes": 4900,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Models/DeveloperPortalResponses.swift",
+    "lines": 457,
+    "bytes": 16548,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Models/Device.swift",
+    "lines": 191,
+    "bytes": 7683,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Models/DeviceData.swift",
+    "lines": 28,
+    "bytes": 663,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Models/Entitlement.swift",
+    "lines": 333,
+    "bytes": 17305,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Models/Errors.swift",
+    "lines": 132,
+    "bytes": 8184,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Models/Feature.swift",
+    "lines": 106,
+    "bytes": 4518,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Models/InfoPlistParser.swift",
+    "lines": 241,
+    "bytes": 9090,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Models/KeyStore.swift",
+    "lines": 78,
+    "bytes": 2578,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Models/ProfileType.swift",
+    "lines": 205,
+    "bytes": 6682,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Models/ProvisioningProfile.swift",
+    "lines": 224,
+    "bytes": 9237,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Models/Session.swift",
+    "lines": 49,
+    "bytes": 1373,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Models/Team.swift",
+    "lines": 129,
+    "bytes": 3841,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/Models/X509Certificate.swift",
+    "lines": 205,
+    "bytes": 7456,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/SideSign.swift",
+    "lines": 64,
+    "bytes": 2144,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Sources/SideSignHeaders.swift",
+    "lines": 76,
+    "bytes": 2579,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/specs/profile_endpoints_spec.py",
+    "lines": 291,
+    "bytes": 13898,
+    "readThrough": 0
+  },
+  {
+    "path": "Vendor/SideStore/Dependencies/SideSign/Tests/SideSignTests/SideSignTests.swift",
+    "lines": 101,
+    "bytes": 3902,
+    "readThrough": 0
+  }
+]

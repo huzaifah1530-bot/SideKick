@@ -1,0 +1,1360 @@
+[
+  {
+    "path": ".editorconfig",
+    "bytes": 832,
+    "lines": 39,
+    "readThrough": 39,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": ".github/CODEOWNERS",
+    "bytes": 64,
+    "lines": 1,
+    "readThrough": 1,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": ".github/ISSUE_TEMPLATE/bug_report.yml",
+    "bytes": 1700,
+    "lines": 40,
+    "readThrough": 40,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": ".github/ISSUE_TEMPLATE/config.yml",
+    "bytes": 412,
+    "lines": 10,
+    "readThrough": 10,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": ".github/ISSUE_TEMPLATE/feature_request.yml",
+    "bytes": 1324,
+    "lines": 32,
+    "readThrough": 32,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": ".github/labeler.yml",
+    "bytes": 3860,
+    "lines": 168,
+    "readThrough": 168,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": ".github/pull_request_template.md",
+    "bytes": 565,
+    "lines": 11,
+    "readThrough": 11,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": ".github/workflows/alpha.yml",
+    "bytes": 7519,
+    "lines": 227,
+    "readThrough": 227,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": ".github/workflows/attach_build_products.yml",
+    "bytes": 3236,
+    "lines": 77,
+    "readThrough": 77,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": ".github/workflows/nightly.yml",
+    "bytes": 9585,
+    "lines": 267,
+    "readThrough": 267,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": ".github/workflows/pr.yml",
+    "bytes": 3334,
+    "lines": 97,
+    "readThrough": 97,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": ".github/workflows/stable.yml",
+    "bytes": 4222,
+    "lines": 135,
+    "readThrough": 135,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": ".github/workflows/triage.yml",
+    "bytes": 2340,
+    "lines": 56,
+    "readThrough": 56,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": ".gitignore",
+    "bytes": 1417,
+    "lines": 106,
+    "readThrough": 106,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": ".gitmodules",
+    "bytes": 304,
+    "lines": 11,
+    "readThrough": 11,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "AGENTS.md",
+    "bytes": 6794,
+    "lines": 167,
+    "readThrough": 167,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "AltWidget/AltWidgetBundle.swift",
+    "bytes": 426,
+    "lines": 23,
+    "readThrough": 23,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "AltWidget/AltWidgetExtension.entitlements",
+    "bytes": 316,
+    "lines": 10,
+    "readThrough": 10,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "AltWidget/AltWidgetLogging.swift",
+    "bytes": 4554,
+    "lines": 124,
+    "readThrough": 124,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "AltWidget/Assets.xcassets/Badge.imageset/Contents.json",
+    "bytes": 176,
+    "lines": 12,
+    "readThrough": 12,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "AltWidget/Assets.xcassets/Badge.imageset/sidestore-logo.svg",
+    "bytes": 1135,
+    "lines": 17,
+    "readThrough": 17,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "AltWidget/Assets.xcassets/Contents.json",
+    "bytes": 69,
+    "lines": 6,
+    "readThrough": 6,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "AltWidget/Assets.xcassets/SideStore.imageset/Contents.json",
+    "bytes": 387,
+    "lines": 23,
+    "readThrough": 23,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "AltWidget/Assets.xcassets/SmallIcon.imageset/Contents.json",
+    "bytes": 284,
+    "lines": 16,
+    "readThrough": 16,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "AltWidget/Assets.xcassets/SmallIcon.imageset/cir.svg",
+    "bytes": 178,
+    "lines": 3,
+    "readThrough": 3,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "AltWidget/Components/Countdown.swift",
+    "bytes": 2694,
+    "lines": 82,
+    "readThrough": 82,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "AltWidget/Components/UnsupportedWidgetView.swift",
+    "bytes": 1378,
+    "lines": 47,
+    "readThrough": 47,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "AltWidget/Extensions/Date+Widget.swift",
+    "bytes": 540,
+    "lines": 19,
+    "readThrough": 19,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "AltWidget/Extensions/View+AltWidget.swift",
+    "bytes": 3627,
+    "lines": 137,
+    "readThrough": 137,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "AltWidget/Info.plist",
+    "bytes": 988,
+    "lines": 29,
+    "readThrough": 29,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "AltWidget/Intents/PaginationIntent.swift",
+    "bytes": 2718,
+    "lines": 68,
+    "readThrough": 68,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "AltWidget/Intents/SelectAppIntent.swift",
+    "bytes": 2306,
+    "lines": 62,
+    "readThrough": 62,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "AltWidget/Intents/WidgetUpdateIntent.swift",
+    "bytes": 579,
+    "lines": 20,
+    "readThrough": 20,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "AltWidget/Manager/PageInfoManager.swift",
+    "bytes": 1727,
+    "lines": 46,
+    "readThrough": 46,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "AltWidget/Model/AppSnapshot.swift",
+    "bytes": 3478,
+    "lines": 88,
+    "readThrough": 88,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "AltWidget/Providers/ActiveAppsTimelineProvider+Simulator.swift",
+    "bytes": 1097,
+    "lines": 36,
+    "readThrough": 36,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "AltWidget/Providers/ActiveAppsTimelineProvider.swift",
+    "bytes": 5007,
+    "lines": 121,
+    "readThrough": 121,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "AltWidget/Providers/AppsTimelineProvider.swift",
+    "bytes": 9720,
+    "lines": 236,
+    "readThrough": 236,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "AltWidget/Resources/ReleaseEntitlements.plist",
+    "bytes": 533,
+    "lines": 16,
+    "readThrough": 16,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "AltWidget/Widgets/ActiveAppsWidget.swift",
+    "bytes": 10630,
+    "lines": 261,
+    "readThrough": 261,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "AltWidget/Widgets/AppDetailWidget.swift",
+    "bytes": 10354,
+    "lines": 243,
+    "readThrough": 243,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "AltWidget/Widgets/LockScreenWidget.swift",
+    "bytes": 7853,
+    "lines": 214,
+    "readThrough": 214,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Build.xcconfig",
+    "bytes": 1218,
+    "lines": 29,
+    "readThrough": 29,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "CERTIFICATE-OF-ORIGIN.md",
+    "bytes": 1406,
+    "lines": 37,
+    "readThrough": 37,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "CLAUDE.md",
+    "bytes": 12,
+    "lines": 1,
+    "readThrough": 1,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "CONTRIBUTING.md",
+    "bytes": 5828,
+    "lines": 111,
+    "readThrough": 111,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "CodeSigning.xcconfig.sample",
+    "bytes": 2429,
+    "lines": 53,
+    "readThrough": 53,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "GEMINI.md",
+    "bytes": 12,
+    "lines": 1,
+    "readThrough": 1,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "LICENSE",
+    "bytes": 35184,
+    "lines": 661,
+    "readThrough": 661,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Makefile",
+    "bytes": 12857,
+    "lines": 387,
+    "readThrough": 387,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "README.md",
+    "bytes": 3570,
+    "lines": 47,
+    "readThrough": 47,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Shared/Categories/CFNotificationName+AltStore.swift",
+    "bytes": 888,
+    "lines": 18,
+    "readThrough": 18,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Shared/Errors/ALTLocalizedError.swift",
+    "bytes": 6010,
+    "lines": 193,
+    "readThrough": 193,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Shared/Errors/ALTWrappedError.swift",
+    "bytes": 2846,
+    "lines": 77,
+    "readThrough": 77,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Shared/Errors/ProcessError.swift",
+    "bytes": 3727,
+    "lines": 88,
+    "readThrough": 88,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Shared/Errors/UserInfoValue.swift",
+    "bytes": 912,
+    "lines": 38,
+    "readThrough": 38,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Shared/Extensions/ALTApplication+AltStoreApp.swift",
+    "bytes": 461,
+    "lines": 19,
+    "readThrough": 19,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Shared/Extensions/Bundle+AltStore.swift",
+    "bytes": 4321,
+    "lines": 117,
+    "readThrough": 117,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Shared/Extensions/FileManager+SharedDirectories.swift",
+    "bytes": 2025,
+    "lines": 55,
+    "readThrough": 55,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Shared/Extensions/NSError+AltStore.swift",
+    "bytes": 10512,
+    "lines": 260,
+    "readThrough": 260,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Shared/Extensions/OperatingSystemVersion+Comparable.swift",
+    "bytes": 1145,
+    "lines": 38,
+    "readThrough": 38,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Shared/Extensions/ProcessInfo+Platform.swift",
+    "bytes": 823,
+    "lines": 34,
+    "readThrough": 34,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Shared/Extensions/Result+Conveniences.swift",
+    "bytes": 1722,
+    "lines": 76,
+    "readThrough": 76,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Shared/Extensions/UIApplication+AppExtension.swift",
+    "bytes": 1420,
+    "lines": 41,
+    "readThrough": 41,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Shared/Extensions/UIColor+AltStore.swift",
+    "bytes": 3017,
+    "lines": 92,
+    "readThrough": 92,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Shared/Extensions/UIColor+Hex.swift",
+    "bytes": 1610,
+    "lines": 43,
+    "readThrough": 43,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Shared/Extensions/UIImage+Manipulation.swift",
+    "bytes": 5970,
+    "lines": 145,
+    "readThrough": 145,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Shared/Intents/ViewApp.intentdefinition",
+    "bytes": 5135,
+    "lines": 179,
+    "readThrough": 179,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "SideBackup/Assets.xcassets/Background.colorset/Contents.json",
+    "bytes": 716,
+    "lines": 38,
+    "readThrough": 38,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "SideBackup/Assets.xcassets/Contents.json",
+    "bytes": 69,
+    "lines": 6,
+    "readThrough": 6,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "SideBackup/Assets.xcassets/Text.colorset/Contents.json",
+    "bytes": 346,
+    "lines": 20,
+    "readThrough": 20,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "SideBackup/BackupEngine.swift",
+    "bytes": 25727,
+    "lines": 499,
+    "readThrough": 499,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "SideBackup/ConsoleLog.swift",
+    "bytes": 4777,
+    "lines": 125,
+    "readThrough": 125,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "SideBackup/ContentView.swift",
+    "bytes": 3291,
+    "lines": 76,
+    "readThrough": 76,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "SideBackup/Info.plist",
+    "bytes": 1893,
+    "lines": 60,
+    "readThrough": 60,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "SideBackup/SideBackup-Bridging-Header.h",
+    "bytes": 190,
+    "lines": 9,
+    "readThrough": 9,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "SideBackup/SideBackup.entitlements",
+    "bytes": 316,
+    "lines": 10,
+    "readThrough": 10,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "SideBackup/SideBackupApp.swift",
+    "bytes": 13849,
+    "lines": 312,
+    "readThrough": 312,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "SideBackup/SideBackupAppLauncher.h",
+    "bytes": 589,
+    "lines": 22,
+    "readThrough": 22,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "SideBackup/SideBackupAppLauncher.m",
+    "bytes": 1901,
+    "lines": 50,
+    "readThrough": 50,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "SideStore.conf",
+    "bytes": 244,
+    "lines": 9,
+    "readThrough": 9,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "scripts/ci/generate_release_notes.py",
+    "bytes": 8346,
+    "lines": 302,
+    "readThrough": 302,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "scripts/ci/generate_source_metadata.py",
+    "bytes": 5076,
+    "lines": 175,
+    "readThrough": 175,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "scripts/ci/update_source_metadata.py",
+    "bytes": 5060,
+    "lines": 181,
+    "readThrough": 181,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "scripts/ci/workflow.py",
+    "bytes": 20000,
+    "lines": 571,
+    "readThrough": 571,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "scripts/sideconf/decrypt_sideconf.py",
+    "bytes": 2202,
+    "lines": 76,
+    "readThrough": 76,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "trustedapps.json",
+    "bytes": 4978,
+    "lines": 161,
+    "readThrough": 161,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "xcconfigs/AltStore.xcconfig",
+    "bytes": 216,
+    "lines": 8,
+    "readThrough": 8,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "xcconfigs/AltWidgetExtension.xcconfig",
+    "bytes": 198,
+    "lines": 6,
+    "readThrough": 6,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "xcconfigs/SideBackup.xcconfig",
+    "bytes": 194,
+    "lines": 7,
+    "readThrough": 7,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/.gitignore",
+    "bytes": 327,
+    "lines": 24,
+    "readThrough": 24,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/Common/ConcurrencyUtils.swift",
+    "bytes": 823,
+    "lines": 24,
+    "readThrough": 24,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/Common/FFIDispatcher.swift",
+    "bytes": 1395,
+    "lines": 42,
+    "readThrough": 42,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/Common/MinimuxerCommonLogging.swift",
+    "bytes": 1817,
+    "lines": 58,
+    "readThrough": 58,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/Common/MinimuxerConstants.swift",
+    "bytes": 2862,
+    "lines": 60,
+    "readThrough": 60,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/Common/NetworkUtils.swift",
+    "bytes": 4495,
+    "lines": 108,
+    "readThrough": 108,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/Common/Package.swift",
+    "bytes": 827,
+    "lines": 33,
+    "readThrough": 33,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/Common/PairingFile.swift",
+    "bytes": 6468,
+    "lines": 165,
+    "readThrough": 165,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/Common/PairingProtocol.swift",
+    "bytes": 1877,
+    "lines": 58,
+    "readThrough": 58,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/Common/TCPAcceptor.swift",
+    "bytes": 2130,
+    "lines": 66,
+    "readThrough": 66,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/DeviceGateway/BaseDeviceGateway.swift",
+    "bytes": 10550,
+    "lines": 302,
+    "readThrough": 302,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/DeviceGateway/DeviceGatewayAPI.swift",
+    "bytes": 3662,
+    "lines": 95,
+    "readThrough": 95,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/DeviceGateway/DeviceGatewayError.swift",
+    "bytes": 2400,
+    "lines": 61,
+    "readThrough": 61,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/DeviceGateway/DeviceGatewayLogging.swift",
+    "bytes": 1819,
+    "lines": 58,
+    "readThrough": 58,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/DeviceGateway/Package.swift",
+    "bytes": 3519,
+    "lines": 105,
+    "readThrough": 105,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/DeviceGateway/idevice/IdeviceGateway.swift",
+    "bytes": 118722,
+    "lines": 2465,
+    "readThrough": 2465,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/DeviceGateway/libimobiledevice/LibimobiledeviceGateway.swift",
+    "bytes": 71682,
+    "lines": 1551,
+    "readThrough": 1551,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/LICENSE",
+    "bytes": 35184,
+    "lines": 661,
+    "readThrough": 661,
+    "method": "exact SHA256 duplicate of fully read root LICENSE"
+  },
+  {
+    "path": "Dependencies/minimuxer/Package.resolved",
+    "bytes": 612,
+    "lines": 23,
+    "readThrough": 23,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/Package.swift",
+    "bytes": 1801,
+    "lines": 57,
+    "readThrough": 57,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/README.md",
+    "bytes": 5212,
+    "lines": 91,
+    "readThrough": 91,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/Sources/DeviceProvider.swift",
+    "bytes": 664,
+    "lines": 29,
+    "readThrough": 29,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/Sources/EMProxyImpl.swift",
+    "bytes": 9155,
+    "lines": 257,
+    "readThrough": 257,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/Sources/MinimuxerApi.swift",
+    "bytes": 18398,
+    "lines": 495,
+    "readThrough": 495,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/Sources/MinimuxerError.swift",
+    "bytes": 6406,
+    "lines": 154,
+    "readThrough": 154,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/Sources/MinimuxerImpl.swift",
+    "bytes": 22789,
+    "lines": 524,
+    "readThrough": 524,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/Sources/MinimuxerInternalError.swift",
+    "bytes": 653,
+    "lines": 23,
+    "readThrough": 23,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/Sources/MinimuxerLogging.swift",
+    "bytes": 1983,
+    "lines": 64,
+    "readThrough": 64,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/Sources/Services/DeviceConnectionManager.swift",
+    "bytes": 13408,
+    "lines": 284,
+    "readThrough": 284,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/Sources/Services/DeviceEndpoint.swift",
+    "bytes": 1126,
+    "lines": 46,
+    "readThrough": 46,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/Sources/Services/HeartbeatService.swift",
+    "bytes": 4385,
+    "lines": 137,
+    "readThrough": 137,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/Sources/Services/Mounter.swift",
+    "bytes": 8675,
+    "lines": 174,
+    "readThrough": 174,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/Sources/Services/NetworkIfaceScanner.swift",
+    "bytes": 26650,
+    "lines": 713,
+    "readThrough": 713,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/Sources/Services/NetworkObserverService.swift",
+    "bytes": 9569,
+    "lines": 246,
+    "readThrough": 246,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/Sources/Services/UsbmuxdProxyServer.swift",
+    "bytes": 12543,
+    "lines": 297,
+    "readThrough": 297,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/Sources/Services/WirelessPairService.swift",
+    "bytes": 8557,
+    "lines": 209,
+    "readThrough": 209,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/Sources/Types/RawPacket.swift",
+    "bytes": 2181,
+    "lines": 59,
+    "readThrough": 59,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/minimuxer/Tests/EMProxyTests.swift",
+    "bytes": 20900,
+    "lines": 491,
+    "readThrough": 491,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/SideSign/.github/workflows/build-all.yml",
+    "bytes": 16590,
+    "lines": 402,
+    "readThrough": 402,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/SideSign/.github/workflows/ci.yml",
+    "bytes": 470,
+    "lines": 28,
+    "readThrough": 28,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/SideSign/.github/workflows/release-cli.yml",
+    "bytes": 790,
+    "lines": 37,
+    "readThrough": 37,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/SideSign/.gitignore",
+    "bytes": 515,
+    "lines": 51,
+    "readThrough": 51,
+    "method": "full line-numbered text read"
+  },
+  {
+    "path": "Dependencies/SideSign/CLI/CommandContext.swift",
+    "bytes": 11729,
+    "lines": 395,
+    "readThrough": 92,
+    "method": "pending full line-numbered read"
+  },
+  {
+    "path": "Dependencies/SideSign/CLI/CommandHandler.swift",
+    "bytes": 94303,
+    "lines": 1822,
+    "readThrough": 0,
+    "method": "pending full line-numbered read"
+  },
+  {
+    "path": "Dependencies/SideSign/CLI/DeviceDataManager.swift",
+    "bytes": 6614,
+    "lines": 181,
+    "readThrough": 0,
+    "method": "pending full line-numbered read"
+  },
+  {
+    "path": "Dependencies/SideSign/CLI/PortalCommandsParser.swift",
+    "bytes": 29368,
+    "lines": 618,
+    "readThrough": 0,
+    "method": "pending full line-numbered read"
+  },
+  {
+    "path": "Dependencies/SideSign/CLI/SecureInput.swift",
+    "bytes": 1749,
+    "lines": 60,
+    "readThrough": 0,
+    "method": "pending full line-numbered read"
+  },
+  {
+    "path": "Dependencies/SideSign/CLI/SessionManager.swift",
+    "bytes": 12293,
+    "lines": 289,
+    "readThrough": 0,
+    "method": "pending full line-numbered read"
+  },
+  {
+    "path": "Dependencies/SideSign/CLI/main.swift",
+    "bytes": 26617,
+    "lines": 707,
+    "readThrough": 0,
+    "method": "pending full line-numbered read"
+  },
+  {
+    "path": "Dependencies/SideSign/Package.resolved",
+    "bytes": 1784,
+    "lines": 60,
+    "readThrough": 0,
+    "method": "pending full line-numbered read"
+  },
+  {
+    "path": "Dependencies/SideSign/Package.swift",
+    "bytes": 2465,
+    "lines": 82,
+    "readThrough": 0,
+    "method": "pending full line-numbered read"
+  },
+  {
+    "path": "Dependencies/SideSign/README.md",
+    "bytes": 6876,
+    "lines": 158,
+    "readThrough": 0,
+    "method": "pending full line-numbered read"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Anisette/AnisetteDataManager.swift",
+    "bytes": 31347,
+    "lines": 718,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Anisette/RemoteAnisetteDataProvider.swift",
+    "bytes": 9581,
+    "lines": 228,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Archiver/Archive.swift",
+    "bytes": 26495,
+    "lines": 636,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Archiver/FileManagerZip.swift",
+    "bytes": 9634,
+    "lines": 213,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Certificates/CertificateParser.swift",
+    "bytes": 1001,
+    "lines": 29,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Certificates/PKCS12Parser.swift",
+    "bytes": 1725,
+    "lines": 44,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/CodeSigning/CodeSignerAPI.swift",
+    "bytes": 10416,
+    "lines": 223,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Compatibility.swift",
+    "bytes": 12186,
+    "lines": 330,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Constants.swift",
+    "bytes": 13896,
+    "lines": 235,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/DeveloperPortal/AppGroups.swift",
+    "bytes": 4902,
+    "lines": 116,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/DeveloperPortal/AppIDs.swift",
+    "bytes": 4731,
+    "lines": 109,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/DeveloperPortal/AuthDevices.swift",
+    "bytes": 7716,
+    "lines": 147,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/DeveloperPortal/AuthModels.swift",
+    "bytes": 3269,
+    "lines": 125,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/DeveloperPortal/Authentication.swift",
+    "bytes": 47005,
+    "lines": 920,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/DeveloperPortal/Certificates.swift",
+    "bytes": 6366,
+    "lines": 137,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/DeveloperPortal/DeveloperPortalAPI.swift",
+    "bytes": 25810,
+    "lines": 511,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/DeveloperPortal/Devices.swift",
+    "bytes": 5611,
+    "lines": 153,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/DeveloperPortal/Profiles.swift",
+    "bytes": 13069,
+    "lines": 274,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/DeveloperPortal/Teams.swift",
+    "bytes": 1290,
+    "lines": 39,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Logging.swift",
+    "bytes": 7608,
+    "lines": 213,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Models/Account.swift",
+    "bytes": 1149,
+    "lines": 39,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Models/AnisetteData.swift",
+    "bytes": 2395,
+    "lines": 81,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Models/AppBundle.swift",
+    "bytes": 8056,
+    "lines": 238,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Models/AppGroup.swift",
+    "bytes": 1494,
+    "lines": 42,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Models/AppID.swift",
+    "bytes": 2749,
+    "lines": 71,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Models/AuthDevice.swift",
+    "bytes": 995,
+    "lines": 37,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Models/AuthSession.swift",
+    "bytes": 420,
+    "lines": 19,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Models/CertificateRequest.swift",
+    "bytes": 1020,
+    "lines": 37,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Models/CertificateType.swift",
+    "bytes": 4900,
+    "lines": 127,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Models/DeveloperPortalResponses.swift",
+    "bytes": 16548,
+    "lines": 457,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Models/Device.swift",
+    "bytes": 7683,
+    "lines": 191,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Models/DeviceData.swift",
+    "bytes": 663,
+    "lines": 28,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Models/Entitlement.swift",
+    "bytes": 17305,
+    "lines": 333,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Models/Errors.swift",
+    "bytes": 8184,
+    "lines": 132,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Models/Feature.swift",
+    "bytes": 4518,
+    "lines": 106,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Models/InfoPlistParser.swift",
+    "bytes": 9090,
+    "lines": 241,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Models/KeyStore.swift",
+    "bytes": 2578,
+    "lines": 78,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Models/ProfileType.swift",
+    "bytes": 6682,
+    "lines": 205,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Models/ProvisioningProfile.swift",
+    "bytes": 9237,
+    "lines": 224,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Models/Session.swift",
+    "bytes": 1373,
+    "lines": 49,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Models/Team.swift",
+    "bytes": 3841,
+    "lines": 129,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/Models/X509Certificate.swift",
+    "bytes": 7456,
+    "lines": 205,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/SideSign.swift",
+    "bytes": 2144,
+    "lines": 64,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Sources/SideSignHeaders.swift",
+    "bytes": 2579,
+    "lines": 76,
+    "readThrough": 0,
+    "method": "delegated to root; see 2026-10-12-vendor-sidesign-coverage.json"
+  },
+  {
+    "path": "Dependencies/SideSign/Tests/SideSignTests/SideSignTests.swift",
+    "bytes": 3902,
+    "lines": 101,
+    "readThrough": 0,
+    "method": "pending full line-numbered read"
+  },
+  {
+    "path": "Dependencies/SideSign/build.sh",
+    "bytes": 473,
+    "lines": 18,
+    "readThrough": 0,
+    "method": "pending full line-numbered read"
+  },
+  {
+    "path": "Dependencies/SideSign/sample-usages.sh",
+    "bytes": 19174,
+    "lines": 459,
+    "readThrough": 0,
+    "method": "pending full line-numbered read"
+  },
+  {
+    "path": "Dependencies/SideSign/specs/profile_endpoints_spec.py",
+    "bytes": 13898,
+    "lines": 291,
+    "readThrough": 0,
+    "method": "pending full line-numbered read"
+  },
+  {
+    "path": "AltWidget/Assets.xcassets/SideStore.imageset/1024.png",
+    "bytes": 866708,
+    "lines": 0,
+    "readThrough": 0,
+    "method": "PNG signature/IHDR metadata and SHA256: 1024x1024; 2C9E1A1C581EE956FFDA975B5886A2BF0F47781DB7EA8E850412A7F42D6A6746"
+  },
+  {
+    "path": ".git",
+    "bytes": 44,
+    "lines": 1,
+    "readThrough": 1,
+    "method": "full git indirection metadata read"
+  },
+  {
+    "path": "Dependencies/minimuxer/.git",
+    "bytes": 81,
+    "lines": 1,
+    "readThrough": 1,
+    "method": "full git indirection metadata read"
+  },
+  {
+    "path": "Dependencies/SideSign/.git",
+    "bytes": 80,
+    "lines": 1,
+    "readThrough": 1,
+    "method": "full git indirection metadata read"
+  }
+]

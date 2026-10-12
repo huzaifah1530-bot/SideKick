@@ -36,6 +36,7 @@ final class AppEnvironment {
     @ObservationIgnored private var liveContainerScanTask: Task<Void, Never>?
     @ObservationIgnored private var githubScanTask: Task<Void, Never>?
     @ObservationIgnored private var githubGeneration = UUID()
+    @ObservationIgnored private var githubTargetGenerations: [String: UUID] = [:]
     @ObservationIgnored private var lastCheckedTargets: [String] = []
     @ObservationIgnored private var githubCheckRequested = false
     @ObservationIgnored private var githubChecksSuspended = false
@@ -194,6 +195,10 @@ final class AppEnvironment {
         lastCheckedTargets = signature
         let generation = UUID()
         githubGeneration = generation
+        let targetGenerations = Dictionary(uniqueKeysWithValues: targets.map { ($0.id, UUID()) })
+        for (targetID, targetGeneration) in targetGenerations {
+            githubTargetGenerations[targetID] = targetGeneration
+        }
         isCheckingGitHubUpdates = true
         let targetIDs = Set(targets.map(\.id))
         githubUpdates.removeAll { !targetIDs.contains($0.bundleIdentifier) }
@@ -201,7 +206,9 @@ final class AppEnvironment {
         githubScanTask = Task { @MainActor in
             let scanResult = await GitHubUpdateScanner.scanTargets(targets) { [weak self] check in
                 guard let self else { return }
-                await self.publishGitHubCheck(check, generation: generation, targets: targets)
+                guard let targetGeneration = targetGenerations[check.targetID] else { return }
+                _ = await self.publishGitHubCheck(check, generation: generation,
+                    targetGeneration: targetGeneration, targets: targets)
             }
             guard githubGeneration == generation else { return }
             isCheckingGitHubUpdates = false
@@ -228,18 +235,51 @@ final class AppEnvironment {
         }
     }
 
-    private func publishGitHubCheck(_ check: GitHubCheckResult, generation: UUID, targets: [GitHubUpdateTarget]) async {
+    /// Publishes a result obtained by a detail screen after validating its
+    /// source and target against the current app-owned catalogue. A per-target
+    /// generation prevents an older overlapping scan from replacing it.
+    func publishDetailGitHubCheck(_ check: GitHubCheckResult, target: GitHubUpdateTarget) async -> Bool {
+        guard check.targetID == target.id,
+              !(check.state == .failed && check.checkedConfiguration == nil) else { return false }
+        let generation = githubGeneration
+        do {
+            guard try await GitHubUpdateConfigurationStore.shared.configuration(for: target.id)
+                    == check.checkedConfiguration else { return false }
+        } catch { return false }
+        guard githubGeneration == generation,
+              let current = updateTargets.first(where: { $0.id == target.id }),
+              signatures([target]) == signatures([current]) else { return false }
+        if let candidate = check.candidate {
+            guard candidate.bundleIdentifier == target.id,
+                  candidate.targetKind == target.kind,
+                  candidate.sourceIdentity == check.checkedConfiguration?.sourceIdentity else { return false }
+        }
+        let targetGeneration = UUID()
+        githubTargetGenerations[target.id] = targetGeneration
+        return await publishGitHubCheck(check, generation: generation,
+            targetGeneration: targetGeneration, targets: [target])
+    }
+
+    @discardableResult
+    private func publishGitHubCheck(
+        _ check: GitHubCheckResult,
+        generation: UUID,
+        targetGeneration: UUID,
+        targets: [GitHubUpdateTarget]
+    ) async -> Bool {
         do {
             let configuration = try await GitHubUpdateConfigurationStore.shared.configuration(for: check.targetID)
-            guard configuration == check.checkedConfiguration else { return }
+            guard configuration == check.checkedConfiguration else { return false }
         } catch {
-            // A storage read error can be shown, but cannot authorize an update.
-            guard check.state == .failed else { return }
+            // Without a fresh source read, the result cannot be trusted.
+            return false
         }
-        guard githubGeneration == generation, !Task.isCancelled,
+        guard githubGeneration == generation,
+              githubTargetGenerations[check.targetID] == targetGeneration,
+              !Task.isCancelled,
               let checked = targets.first(where: { $0.id == check.targetID }),
               let current = updateTargets.first(where: { $0.id == check.targetID }),
-              signatures([checked]) == signatures([current]) else { return }
+              signatures([checked]) == signatures([current]) else { return false }
         githubChecks.removeAll { $0.targetID == check.targetID }
         githubChecks.append(check)
         if check.state != .failed {
@@ -253,10 +293,12 @@ final class AppEnvironment {
             Task { @MainActor in
                 await githubUpdateDownloads.restoreQueuedFiles(for: [candidate], ipaImportStore: ipaImportStore)
                 guard githubGeneration == generation,
+                      githubTargetGenerations[check.targetID] == targetGeneration,
                       githubUpdates.contains(where: { $0.id == candidate.id }) else { return }
                 await GitHubUpdateNotificationScheduler.notify([candidate])
             }
         }
+        return true
     }
 
     func gitHubSettingsChanged() async {

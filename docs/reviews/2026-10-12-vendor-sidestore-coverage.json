@@ -1,0 +1,1338 @@
+{
+  "scope": "Vendor/SideStore/SideStore",
+  "inventoriedFileCount": 211,
+  "binaryResourceCount": 0,
+  "contextFiles": [
+    "Vendor/SideStore/AGENTS.md",
+    ".github/workflows/ios-build.yml",
+    "patches/sidestore-sidekick.patch"
+  ],
+  "files": [
+    {
+      "path": "Vendor/SideStore/SideStore/AppBootManager.swift",
+      "bytes": 6297,
+      "status": "reviewed",
+      "method": "Full source read; static audit"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/AppConstants.swift",
+      "bytes": 10684,
+      "status": "reviewed",
+      "method": "Full source read; static audit"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Anisette/AnisetteConfigManager.swift",
+      "bytes": 12667,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 274
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Anisette/AnisetteProvider.swift",
+      "bytes": 3189,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 72
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Anisette/AnisetteServersManager.swift",
+      "bytes": 20540,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 460
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Anisette/OnDeviceAnisetteManager.swift",
+      "bytes": 3395,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 84
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Auth/AuthManager.swift",
+      "bytes": 8418,
+      "status": "reviewed",
+      "method": "Full source read; static audit; authentication flow"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Auth/DeveloperPortalProxy.swift",
+      "bytes": 13428,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 270
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Auth/Flows/CertificateProvisioningFlow.swift",
+      "bytes": 9775,
+      "status": "reviewed",
+      "method": "Full source read; static audit; authentication flow"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Auth/Flows/CodeSignValidationFlow.swift",
+      "bytes": 3254,
+      "status": "reviewed",
+      "method": "Full source read; static audit; authentication flow"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Auth/Flows/DeviceRegistrationFlow.swift",
+      "bytes": 3452,
+      "status": "reviewed",
+      "method": "Full source read; static audit; authentication flow"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Auth/SideSignConfigManager.swift",
+      "bytes": 2878,
+      "status": "reviewed",
+      "method": "Full source read; static audit; authentication flow"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/BackgroundServices/BackgroundAudioService.swift",
+      "bytes": 5882,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 147
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/BackgroundServices/BackgroundLocationService.swift",
+      "bytes": 3277,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 102
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/BackgroundServices/BackgroundService.swift",
+      "bytes": 2413,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 94
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Bonjour/BonjourDiscoveryManager.swift",
+      "bytes": 39239,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 895
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Bonjour/BonjourDiscoveryTypes.swift",
+      "bytes": 6207,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 162
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Bonjour/LocalNetworkPermissionChecker.swift",
+      "bytes": 3441,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 94
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Certificates/CertificateASN1Parser.swift",
+      "bytes": 12251,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 319
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Certificates/CertificateManager.swift",
+      "bytes": 19723,
+      "status": "reviewed",
+      "method": "Full source read; static audit; certificate/cache cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Certificates/CertificateStore.swift",
+      "bytes": 1077,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 30
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Certificates/CodeSignValidator.swift",
+      "bytes": 5408,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 115
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Certificates/OCSPValidator.swift",
+      "bytes": 15724,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 360
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/DeviceApi/EMProxyWrapper.swift",
+      "bytes": 2052,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 58
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/DeviceApi/MinimuxerWrapper.swift",
+      "bytes": 23833,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 622
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/JIT/SideJITManager.swift",
+      "bytes": 9117,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 179
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Logging/OperationLogging.swift",
+      "bytes": 3550,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 95
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Logging/SideStoreLogging.swift",
+      "bytes": 5402,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 138
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/AppOperation.swift",
+      "bytes": 3350,
+      "status": "reviewed",
+      "method": "Full source read; static audit; pipeline cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/AsyncOperation.swift",
+      "bytes": 4010,
+      "status": "reviewed",
+      "method": "Full source read; static audit; dependency and version flow traced"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/Errors/OperationError.swift",
+      "bytes": 7556,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 141
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/Errors/SourceError.swift",
+      "bytes": 11010,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 229
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/Errors/VerificationError.swift",
+      "bytes": 11778,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 257
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/OperationContexts.swift",
+      "bytes": 12380,
+      "status": "reviewed",
+      "method": "Full source read; static audit; pipeline identity cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/OperationEntitlements.swift",
+      "bytes": 569,
+      "status": "reviewed",
+      "method": "Full source read; static audit; pipeline identity cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/OperationStep.swift",
+      "bytes": 5695,
+      "status": "reviewed",
+      "method": "Full source read; static audit; pipeline cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/OperationStepDefinition.swift",
+      "bytes": 18503,
+      "status": "reviewed",
+      "method": "Full source read; static audit; pipeline cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineExecutionHandler.swift",
+      "bytes": 3582,
+      "status": "reviewed",
+      "method": "Full source read; static audit; pipeline cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineExecutor.swift",
+      "bytes": 14530,
+      "status": "reviewed",
+      "method": "Full source read; static audit; integration patch checked"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/CacheAppOperation.swift",
+      "bytes": 5101,
+      "status": "reviewed",
+      "method": "Full source read; static audit; certificate/cache cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/CacheResignedMetadataOperation.swift",
+      "bytes": 6881,
+      "status": "reviewed",
+      "method": "Full source read; static audit; pipeline cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/CacheSigningCertOperation.swift",
+      "bytes": 2462,
+      "status": "reviewed",
+      "method": "Full source read; static audit; certificate/cache cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/ChangeAppIconOperation.swift",
+      "bytes": 3160,
+      "status": "reviewed",
+      "method": "Full source read; static audit; signing and customization flow"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/CleanStagedAppOperation.swift",
+      "bytes": 1493,
+      "status": "reviewed",
+      "method": "Full source read; static audit; certificate/cache cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/CreateIpaOperation.swift",
+      "bytes": 1742,
+      "status": "reviewed",
+      "method": "Full source read; static audit; certificate/cache cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/EmbedSigningCertOperation.swift",
+      "bytes": 2583,
+      "status": "reviewed",
+      "method": "Full source read; static audit; certificate/cache cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/ExportResignedIpaOperation.swift",
+      "bytes": 3076,
+      "status": "reviewed",
+      "method": "Full source read; static audit; certificate/cache cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/FetchProvisioningProfilesOperation.swift",
+      "bytes": 27537,
+      "status": "reviewed",
+      "method": "Full source read; static audit; signing and customization flow"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/InstallAppOperation.swift",
+      "bytes": 23193,
+      "status": "reviewed",
+      "method": "Full source read; static audit; pipeline identity cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/MarkAppInactiveOperation.swift",
+      "bytes": 1434,
+      "status": "reviewed",
+      "method": "Full source read; static audit; backup lifecycle cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/PatchInfoPlistOperation.swift",
+      "bytes": 3876,
+      "status": "reviewed",
+      "method": "Full source read; static audit; signing and customization flow"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/PerformBackupRestoreOperation.swift",
+      "bytes": 10498,
+      "status": "reviewed",
+      "method": "Full source read; static audit; backup lifecycle cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/PreflightChecksOperation.swift",
+      "bytes": 5009,
+      "status": "reviewed",
+      "method": "Full source read; static audit; signing and customization flow"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/PrepareAppExtensionBundleIDsOperation.swift",
+      "bytes": 1471,
+      "status": "reviewed",
+      "method": "Full source read; static audit; signing and customization flow"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/RefreshAppOperation.swift",
+      "bytes": 3858,
+      "status": "reviewed",
+      "method": "Full source read; static audit; pipeline cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/RemoveAppExtensionsOperation.swift",
+      "bytes": 7661,
+      "status": "reviewed",
+      "method": "Full source read; static audit; signing and customization flow"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/RemoveAppOperation.swift",
+      "bytes": 1456,
+      "status": "reviewed",
+      "method": "Full source read; static audit; backup lifecycle cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/RemoveBackupDataOperation.swift",
+      "bytes": 3259,
+      "status": "reviewed",
+      "method": "Full source read; static audit; backup lifecycle cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/ResignAppOperation.swift",
+      "bytes": 12931,
+      "status": "reviewed",
+      "method": "Full source read; static audit; pipeline identity cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/SendAppOperation.swift",
+      "bytes": 2238,
+      "status": "reviewed",
+      "method": "Full source read; static audit; certificate/cache cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/StageAppOperation.swift",
+      "bytes": 3341,
+      "status": "reviewed",
+      "method": "Full source read; static audit; certificate/cache cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/StageBackupAppOperation.swift",
+      "bytes": 6302,
+      "status": "reviewed",
+      "method": "Full source read; static audit; backup lifecycle cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/UninstallAppOperation.swift",
+      "bytes": 2240,
+      "status": "reviewed",
+      "method": "Full source read; static audit; backup lifecycle cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/UpdateAppCertificateOperation.swift",
+      "bytes": 1835,
+      "status": "reviewed",
+      "method": "Full source read; static audit; pipeline cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/UserCustomizationOperation.swift",
+      "bytes": 11364,
+      "status": "reviewed",
+      "method": "Full source read; static audit; signing and customization flow"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/VerifyAppOperation.swift",
+      "bytes": 13619,
+      "status": "reviewed",
+      "method": "Full source read; static audit; signing and customization flow"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/VerifyCertificateOperation.swift",
+      "bytes": 11732,
+      "status": "reviewed",
+      "method": "Full source read; static audit; pipeline cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/PipelineRunner.swift",
+      "bytes": 17399,
+      "status": "reviewed",
+      "method": "Full source read; static audit; pipeline cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/RefreshGroup.swift",
+      "bytes": 1850,
+      "status": "reviewed",
+      "method": "Full source read; static audit; pipeline identity cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/StandaloneExecutionHandler.swift",
+      "bytes": 1410,
+      "status": "reviewed",
+      "method": "Full source read; static audit; dependency and version flow traced"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/StandaloneOperations/BackgroundRefreshAppsOperation.swift",
+      "bytes": 11909,
+      "status": "reviewed",
+      "method": "Full source read; static audit; background and developer-service flows"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/StandaloneOperations/ClearAppCacheOperation.swift",
+      "bytes": 8359,
+      "status": "reviewed",
+      "method": "Full source read; static audit; dependency and version flow traced"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/StandaloneOperations/DeactivateAppOperation.swift",
+      "bytes": 3189,
+      "status": "reviewed",
+      "method": "Full source read; static audit; dependency and version flow traced"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/StandaloneOperations/DownloadAppOperation.swift",
+      "bytes": 18093,
+      "status": "reviewed",
+      "method": "Full source read; static audit; dependency and version flow traced"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/StandaloneOperations/EnableJITOperation.swift",
+      "bytes": 7042,
+      "status": "reviewed",
+      "method": "Full source read; static audit; background and developer-service flows"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/StandaloneOperations/FetchSourceOperation.swift",
+      "bytes": 11656,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 266
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/StandaloneOperations/InjectBatchProfilesOperation.swift",
+      "bytes": 2828,
+      "status": "reviewed",
+      "method": "Full source read; static audit; pipeline cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/StandaloneOperations/ScheduleExpirationWarningNotificationOperation.swift",
+      "bytes": 3966,
+      "status": "reviewed",
+      "method": "Full source read; static audit; background and developer-service flows"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/StandaloneOperations/SignInOperation.swift",
+      "bytes": 14949,
+      "status": "reviewed",
+      "method": "Full source read; static audit; authentication flow"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/StandaloneOperations/SyncAppIDsOperation.swift",
+      "bytes": 4451,
+      "status": "reviewed",
+      "method": "Full source read; static audit; background and developer-service flows"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Operations/StandaloneOperations/UpdateKnownSourcesOperation.swift",
+      "bytes": 2460,
+      "status": "reviewed",
+      "method": "Full source read; static audit; background and developer-service flows"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Pairing/PairingFileManager.swift",
+      "bytes": 6697,
+      "status": "reviewed",
+      "method": "Full source read; static audit; pairing persistence flow"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Profiles/ProfileManager.swift",
+      "bytes": 10631,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 256
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Shortcuts/CellularRefreshManager.swift",
+      "bytes": 8618,
+      "status": "reviewed",
+      "method": "Full source read; static audit; pipeline cross-reference"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Storage/CacheManager.swift",
+      "bytes": 5829,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 151
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/Theme/ThemeManager.swift",
+      "bytes": 4523,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 132
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/tvOS/PairingWebUploadServer.swift",
+      "bytes": 13573,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 341
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/tvOS/SideStoreTopShelfProvider.swift",
+      "bytes": 1895,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 51
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/tvOS/TVWebFileTransferManager.swift",
+      "bytes": 18767,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 468
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Core/tvOS/UISwitch+tvOS.swift",
+      "bytes": 460,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 24
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/DeepLinks/ExportCertificateDialog.swift",
+      "bytes": 2658,
+      "status": "reviewed",
+      "method": "Full source read; static audit; integration patch checked"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/DeepLinks/ExportPairingFileHandler.swift",
+      "bytes": 2265,
+      "status": "reviewed",
+      "method": "Full source read; static audit; integration patch checked"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/DeepLinks/FileImportHandler.swift",
+      "bytes": 3759,
+      "status": "reviewed",
+      "method": "Full source read; static audit"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/DeepLinks/InstallAppDialog.swift",
+      "bytes": 7961,
+      "status": "reviewed",
+      "method": "Full source read; static audit"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/DeepLinks/URLHandler.swift",
+      "bytes": 4404,
+      "status": "reviewed",
+      "method": "Full source read; static audit"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Extensions/NSAttributedString+Markdown.swift",
+      "bytes": 35120,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 795
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Handlers/PipelineHandler.swift",
+      "bytes": 30206,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 628
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Handlers/PresenterProvider.swift",
+      "bytes": 375,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 13
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Handlers/SignInFlowHandler.swift",
+      "bytes": 37111,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 772
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/MaintenanceManager.swift",
+      "bytes": 10472,
+      "status": "reviewed",
+      "method": "Full source read; static audit"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Tests/UITests/UITests.swift",
+      "bytes": 25530,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 545
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Tests/UITests/UITestsLaunchTests.swift",
+      "bytes": 907,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 34
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Tests/UnitTests/datastructures/DataStructuresTests.swift",
+      "bytes": 362,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 17
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Tests/UnitTests/datastructures/LinkedHashMapTests.swift",
+      "bytes": 7825,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 206
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Tests/UnitTests/datastructures/TreeMapTests.swift",
+      "bytes": 4752,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 154
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Utils/common/AppBundleFingerprint.swift",
+      "bytes": 2282,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 58
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Utils/common/ArchiveFingerprint.swift",
+      "bytes": 3700,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 113
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Utils/common/BuildInfo.swift",
+      "bytes": 1550,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 54
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Utils/common/DateTimeUtil.swift",
+      "bytes": 960,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 26
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Utils/common/FileOutputStream.swift",
+      "bytes": 4270,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 111
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Utils/common/OutputStream.swift",
+      "bytes": 1881,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 65
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Utils/concurrency/TaskChainCoalescer.swift",
+      "bytes": 3378,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 114
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Utils/concurrency/TaskChainSerializer.swift",
+      "bytes": 1852,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 46
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Utils/concurrency/TaskMutexSerializer.swift",
+      "bytes": 1309,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 44
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Utils/datastructures/LinkedHashMap.swift",
+      "bytes": 6355,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 226
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Utils/datastructures/SingletonGenericMap.swift",
+      "bytes": 725,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 30
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Utils/datastructures/TreeMap.swift",
+      "bytes": 12458,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 397
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Utils/dignostics/database/CoreDataHelper.swift",
+      "bytes": 6984,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 161
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Utils/dignostics/errors/ErrorProcessing.swift",
+      "bytes": 3963,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 104
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Utils/dignostics/operations/OperationsLoggingControl.swift",
+      "bytes": 1846,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 57
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Utils/importexport/ImportExport.swift",
+      "bytes": 14508,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 319
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Utils/iostreams/AbstractClassError.swift",
+      "bytes": 286,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 14
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Utils/iostreams/ConsoleLog.swift",
+      "bytes": 6061,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 164
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Utils/iostreams/ConsoleLogger.swift",
+      "bytes": 6852,
+      "status": "reviewed",
+      "method": "Full source read in bounded complete batches; static audit",
+      "reviewedThroughLine": 212
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Utils/misc/xcmapping-diff-reporter/xcmapping-diff.py",
+      "bytes": 21735,
+      "status": "partial",
+      "method": "Full line-by-line static audit through reviewedThroughLine",
+      "reviewedThroughLine": 520
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Utils/pagination/PaginationDataHolder.swift",
+      "bytes": 3219,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Components/ActivityViewController.swift",
+      "bytes": 2060,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Components/AppInfoView.swift",
+      "bytes": 45967,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Components/BundleResourceBrowserView.swift",
+      "bytes": 28388,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Components/CodeResourcesViewer.swift",
+      "bytes": 16922,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Components/CustomAppIDAlertViewController.swift",
+      "bytes": 6164,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Components/EntitlementsCustomizationCoreView.swift",
+      "bytes": 27870,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Components/EntitlementsCustomizationSheetView.swift",
+      "bytes": 4275,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Components/EntitlementsCustomizationView.swift",
+      "bytes": 3219,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Components/EntitlementsCustomizationViewModel.swift",
+      "bytes": 12919,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Components/InfoPlistContainerView.swift",
+      "bytes": 31048,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Components/InfoPlistCustomizationCoreView.swift",
+      "bytes": 44181,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Components/InfoPlistCustomizationSheetView.swift",
+      "bytes": 5726,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Components/InfoPlistCustomizationView.swift",
+      "bytes": 4452,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Components/MachOResourceViewer.swift",
+      "bytes": 11370,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Components/SuffixEnforcedTextField.swift",
+      "bytes": 9116,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Components/UIKit/CollapsingMarkdownView.swift",
+      "bytes": 11460,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/MyApps/DeleteAppAlertViewController.swift",
+      "bytes": 2741,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Onboarding/OnboardingView.swift",
+      "bytes": 29464,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/Anisette/AnisetteDataView.swift",
+      "bytes": 37223,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/BackupRestore/BackupAndRestoreView.swift",
+      "bytes": 13563,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/CacheMgmt/CacheManagementView.swift",
+      "bytes": 7699,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/CacheMgmt/CacheViewModel.swift",
+      "bytes": 6348,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/Certificates/ActiveCertSectionView.swift",
+      "bytes": 4975,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/Certificates/CertificateDetailView.swift",
+      "bytes": 18081,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/Certificates/CertificateExporter.swift",
+      "bytes": 4100,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/Certificates/CertificateRowView.swift",
+      "bytes": 12363,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/Certificates/CertificatesListView.swift",
+      "bytes": 8751,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/Certificates/CertificatesView.swift",
+      "bytes": 19402,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/Certificates/CertificatesViewModel.swift",
+      "bytes": 32168,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/Certificates/CertificateTypes.swift",
+      "bytes": 1056,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/Certificates/PrivateKeyTextEditor.swift",
+      "bytes": 1749,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/Certificates/PrivateKeyTextInputView.swift",
+      "bytes": 6681,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/Certificates/RevokeAlertViewController.swift",
+      "bytes": 2831,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/Certificates/SetCertificateAlertViewController.swift",
+      "bytes": 4363,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/Certificates/SignableCertificatesListViewController.swift",
+      "bytes": 10832,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/Connection/ConnectionConfig.swift",
+      "bytes": 5212,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/Connection/ConnectionConfigView.swift",
+      "bytes": 18834,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/DeveloperServices/AppGroups/AppGroupsListView.swift",
+      "bytes": 12229,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/DeveloperServices/AppIDs/AppIDDetailView.swift",
+      "bytes": 9513,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/DeveloperServices/AppIDs/AppIDsListView.swift",
+      "bytes": 9873,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/DeveloperServices/Certificates/CertificatePortalDetailView.swift",
+      "bytes": 4907,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/DeveloperServices/Certificates/CertificatesPortalListView.swift",
+      "bytes": 7083,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/DeveloperServices/DeveloperServicesView.swift",
+      "bytes": 9873,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/DeveloperServices/DeveloperServicesViewModel.swift",
+      "bytes": 20045,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/DeveloperServices/Devices/DevicesListView.swift",
+      "bytes": 20305,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/DeveloperServices/Profiles/CreateManualProfileView.swift",
+      "bytes": 15551,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/DeveloperServices/Profiles/ProfilePortalDetailView.swift",
+      "bytes": 16797,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/DeveloperServices/Profiles/ProfilesListView.swift",
+      "bytes": 9124,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/JIT/SideJITServerConfigView.swift",
+      "bytes": 23167,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/NetworkDiscovery/BonjourDiscoveryView.swift",
+      "bytes": 47910,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/NetworkDiscovery/BonjourDiscoveryViewModel.swift",
+      "bytes": 31492,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/PairingFile/PairingFileDetailView.swift",
+      "bytes": 11060,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/PairingFile/PairingFileEditAlertViewController.swift",
+      "bytes": 2825,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/PairingFile/PairingFileManagementView.swift",
+      "bytes": 23700,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/PairingFile/PairingFileManagementViewModel.swift",
+      "bytes": 7550,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/PairingFile/PairingViewController.swift",
+      "bytes": 13083,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/PairingFile/WirelessPair/WirelessPairTargetDialog.swift",
+      "bytes": 16176,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/PairingFile/WirelessPair/WirelessPairView.swift",
+      "bytes": 15954,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/PairingFile/WirelessPair/WirelessPairViewModel.swift",
+      "bytes": 27636,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/Profiles/ProfileManagementView.swift",
+      "bytes": 24082,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/Profiles/ProfileManagementViewModel.swift",
+      "bytes": 5517,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/Profiles/SelectProfileViewController.swift",
+      "bytes": 9367,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/Profiles/SetProfileAlertViewController.swift",
+      "bytes": 3952,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/UserCustomizations/SideSign/SideSignConfigurationView.swift",
+      "bytes": 23625,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/UserCustomizations/ThemePickerView.swift",
+      "bytes": 9915,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/UserCustomizations/UserCustomizationsView.swift",
+      "bytes": 52187,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Auth/AccountVerificationRow.swift",
+      "bytes": 13687,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Auth/ExportAccountAlertViewController.swift",
+      "bytes": 4616,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Auth/ImportAccountAlertController.swift",
+      "bytes": 4158,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Auth/ResetAdiAlertViewController.swift",
+      "bytes": 3025,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Auth/RevokeCertificatesAlertViewController.swift",
+      "bytes": 7080,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Auth/SignOutAlertViewController.swift",
+      "bytes": 8911,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Diagnostics/DeveloperOptionsView.swift",
+      "bytes": 46055,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Diagnostics/ExperimentalFeaturesView.swift",
+      "bytes": 4909,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/Diagnostics/OperationsLoggingControlView.swift",
+      "bytes": 6104,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/TechyThings/ErrorLog/ConsoleLogView.swift",
+      "bytes": 23304,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/TechyThings/HealthCheck/HealthCheckView.swift",
+      "bytes": 12262,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/TechyThings/HealthCheck/HealthCheckViewModel.swift",
+      "bytes": 12317,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/TechyThings/StorageExplorer/DirectoryExplorerView.swift",
+      "bytes": 27703,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/TechyThings/StorageExplorer/StorageExplorerView.swift",
+      "bytes": 13603,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/Settings/TechyThings/StorageExplorer/StorageExplorerViewModel.swift",
+      "bytes": 18955,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Views/SplashView.swift",
+      "bytes": 2107,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Widget/WidgetData/WidgetDataManager.swift",
+      "bytes": 5509,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Widget/WidgetData/WidgetLogManager.swift",
+      "bytes": 2298,
+      "status": "pending",
+      "method": "Inventory only"
+    },
+    {
+      "path": "Vendor/SideStore/SideStore/Widget/WidgetData/WidgetModels.swift",
+      "bytes": 1228,
+      "status": "pending",
+      "method": "Inventory only"
+    }
+  ]
+}

@@ -165,6 +165,17 @@ actor GitHubUpdateConfigurationStore {
         return true
     }
 
+    /// Clears a skipped build only while the same source and skipped key remain current.
+    @discardableResult
+    func undoSkip(key: String, targetID: String, expectedSource: String) throws -> Bool {
+        guard var current = try configuration(for: targetID),
+              current.sourceIdentity == expectedSource,
+              current.dismissedUpdateKey == key else { return false }
+        current.dismissedUpdateKey = nil
+        try save(current)
+        return true
+    }
+
     // Move only an unambiguous obsolete ID. Keep conflicts intact for explicit
     // resolution; a destination's existence is never permission to delete data.
     func migrateInstalledIdentifiers(_ installations: [String: [String]]) throws {

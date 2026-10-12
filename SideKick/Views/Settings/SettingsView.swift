@@ -57,6 +57,12 @@ struct SettingsView: View {
 
                 Section("App updates") {
                     NavigationLink {
+                        SkippedGitHubUpdatesView()
+                    } label: {
+                        Label("Skipped Updates", systemImage: "arrow.uturn.backward")
+                    }
+                    .fullWidthListSeparators()
+                    NavigationLink {
                         GitHubAccountSettingsView()
                     } label: {
                         Label("GitHub Tokens", systemImage: "chevron.left.forwardslash.chevron.right")

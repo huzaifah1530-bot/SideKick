@@ -62,6 +62,10 @@ actor GitHubUpdateService {
         try await historyClient.page(configuration: configuration, token: token, page: page).builds.map(\.historyEntry)
     }
 
+    func buildHistory(for configuration: GitHubUpdateConfiguration, token: String? = nil, page: Int = 1) async throws -> GitHubHistoryPage {
+        try await historyClient.page(configuration: configuration, token: token, page: page, allowMultiple: true)
+    }
+
     private func legacyReleaseKey(for currentKey: String) -> String? {
         let parts = currentKey.split(separator: ":", omittingEmptySubsequences: false)
         guard parts.count == 4, parts[0] == "release" else { return nil }

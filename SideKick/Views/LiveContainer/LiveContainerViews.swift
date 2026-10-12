@@ -557,10 +557,23 @@ struct LiveContainerGuestDetailView: View {
                 updateCheckRequested = false
                 break
             }
+            guard let check,
+                  await environment.publishDetailGitHubCheck(check, target: target) else {
+                candidate = nil
+                hasChecked = true
+                checkFailed = true
+                checkState = .failed
+                message = "The guest or update settings changed during the check. Check again for current results."
+                if followUpsRemaining > 0 {
+                    updateCheckRequested = true
+                    continue
+                }
+                updateCheckRequested = false
+                break
+            }
             if checkFailed {
                 message = "GitHub could not check this source. Verify repository, workflow, and token settings."
             }
-            await GitHubUpdateNotificationScheduler.notify(result.candidates)
         } while updateCheckRequested && followUpsRemaining > 0
         if followUpsRemaining == 0 { updateCheckRequested = false }
     }
