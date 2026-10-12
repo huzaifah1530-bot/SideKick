@@ -438,49 +438,68 @@ struct SettingsStorageView: View {
 
     private var clearReviewSheet: some View {
         NavigationStack {
-            List {
-                Section {
-                    Text("Removing these \(selectedRemovalApps.count) selected copies also deletes their SideKick import records. The selection may include queued updates or IPAs shown under Ready to Install. To restore an entry later, download or import its IPA again and re-queue it if needed. Installed apps and files in Files are not affected.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-                Section("Downloaded IPA copies (\(selectedRemovalApps.count) selected)") {
-                    ForEach(Array(removableImportedApps.enumerated()), id: \.offset) { _, app in
-                        let key = removalKey(for: app)
-                        SwiftUI.Button {
-                            if selectedRemovalKeys.contains(key) { selectedRemovalKeys.remove(key) }
-                            else { selectedRemovalKeys.insert(key) }
-                        } label: {
-                            HStack {
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(app.name).foregroundStyle(.primary)
-                                    Text("Version \(app.version) · \(app.isUpdateQueued ? "Queued for update" : "Imported IPA")")
-                                        .font(.footnote).foregroundStyle(.secondary)
-                                }
-                                Spacer()
-                                Image(systemName: selectedRemovalKeys.contains(key) ? "checkmark.circle.fill" : "circle")
-                                    .foregroundStyle(selectedRemovalKeys.contains(key) ? .tint : .secondary)
-                            }
-                            .contentShape(Rectangle())
-                        }
-                        .buttonStyle(.plain)
-                    }
-                }
-            }
+            clearReviewList
             .navigationTitle("Review IPA Copies")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    SwiftUI.Button("Cancel") { isShowingClearReview = false }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    SwiftUI.Button("Remove \(selectedRemovalKeys.count)", role: .destructive) {
-                        isShowingClearReview = false
-                        Task { await clearSelectedManagedIPAs() }
-                    }
-                    .disabled(selectedRemovalKeys.isEmpty)
-                }
+            .toolbar { clearReviewToolbar }
+        }
+    }
+
+    private var clearReviewList: some View {
+        List {
+            clearReviewExplanation
+            removableIPAsSection
+        }
+    }
+
+    private var clearReviewExplanation: some View {
+        Section {
+            Text("Removing these \(selectedRemovalApps.count) selected copies also deletes their SideKick import records. The selection may include queued updates or IPAs shown under Ready to Install. To restore an entry later, download or import its IPA again and re-queue it if needed. Installed apps and files in Files are not affected.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+        }
+    }
+
+    private var removableIPAsSection: some View {
+        Section("Downloaded IPA copies (\(selectedRemovalApps.count) selected)") {
+            ForEach(Array(removableImportedApps.enumerated()), id: \.offset) { entry in
+                removalRow(for: entry.element)
             }
+        }
+    }
+
+    private func removalRow(for app: ImportedIPA) -> some View {
+        let key = removalKey(for: app)
+        return SwiftUI.Button {
+            if selectedRemovalKeys.contains(key) { selectedRemovalKeys.remove(key) }
+            else { selectedRemovalKeys.insert(key) }
+        } label: {
+            HStack {
+                VStack(alignment: .leading, spacing: 3) {
+                    Text(app.name).foregroundStyle(.primary)
+                    Text("Version \(app.version) · \(app.isUpdateQueued ? "Queued for update" : "Imported IPA")")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                Spacer()
+                Image(systemName: selectedRemovalKeys.contains(key) ? "checkmark.circle.fill" : "circle")
+                    .foregroundStyle(selectedRemovalKeys.contains(key) ? .tint : .secondary)
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
+    @ToolbarContentBuilder
+    private var clearReviewToolbar: some ToolbarContent {
+        ToolbarItem(placement: .cancellationAction) {
+            SwiftUI.Button("Cancel") { isShowingClearReview = false }
+        }
+        ToolbarItem(placement: .confirmationAction) {
+            SwiftUI.Button("Remove \(selectedRemovalKeys.count)", role: .destructive) {
+                isShowingClearReview = false
+                Task { await clearSelectedManagedIPAs() }
+            }
+            .disabled(selectedRemovalKeys.isEmpty)
         }
     }
 
