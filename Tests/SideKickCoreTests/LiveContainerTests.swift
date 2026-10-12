@@ -152,7 +152,10 @@ final class LiveContainerTests: XCTestCase {
         XCTAssertEqual(disconnected.apps.count, 1)
         XCTAssertFalse(disconnected.connections[0].isConnected)
         do { try await store.rescan(connection.id); XCTFail("Disconnected scan must fail") } catch { }
-        try await store.forget(connection.id)
+        let guestIDs = try await store.beginForget(connection.id)
+        for guestID in guestIDs {
+            try await store.completeForgetSource(guestID, connectionID: connection.id)
+        }
         let forgotten = try await store.snapshot()
         XCTAssertTrue(forgotten.apps.isEmpty)
     }
