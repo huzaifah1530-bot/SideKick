@@ -4050,10 +4050,18 @@ index f720526..3bda6dd 100644
              
              presenter.present(alert, animated: true)
 diff --git a/SideStore/MaintenanceManager.swift b/SideStore/MaintenanceManager.swift
-index 9fe6b24..bde9f07 100644
+index 9fe6b24..122201e 100644
 --- a/SideStore/MaintenanceManager.swift
 +++ b/SideStore/MaintenanceManager.swift
-@@ -29,10 +29,13 @@ public final class MaintenanceManager {
+@@ -9,6 +9,7 @@
+ import Foundation
+ import CoreData
+ import SideSign
++import MinimuxerCommon
+ 
+ public final class MaintenanceManager {
+     public static let shared = MaintenanceManager()
+@@ -29,10 +30,13 @@ public final class MaintenanceManager {
                    let val = Int(str.trimmingCharacters(in: .whitespacesAndNewlines)) else { return 0 }
              return val
          }
@@ -4070,7 +4078,7 @@ index 9fe6b24..bde9f07 100644
      }
  
      private init() {}
-@@ -57,28 +60,42 @@ public final class MaintenanceManager {
+@@ -57,28 +61,44 @@ public final class MaintenanceManager {
  
          for pass in (current + 1)...Self.currentMaintenanceCounter {
              debugLog("[MaintenanceManager] Running maintenance pass \(pass)...")
@@ -4095,9 +4103,11 @@ index 9fe6b24..bde9f07 100644
 +            do {
 +                switch pass {
 +                case 1:
-+                    AnisetteDataManager.shared.clearCache()
++                    Keychain.shared.clearAll()
++                    await AuthManager.shared.signOut(keepCertificate: false, keepAnisetteData: false)
 +                case 2:
 +                    AnisetteDataManager.shared.clearCache()
++                    await AuthManager.shared.signOut(keepCertificate: true, keepAnisetteData: false)
 +                case 3:
 +                    UserDefaults.standard.tunnelOverridePeerIp = nil
 +                case 4:
@@ -4132,7 +4142,7 @@ index 9fe6b24..bde9f07 100644
          debugLog("[MaintenanceManager] Maintenance up to counter \(Self.currentMaintenanceCounter) complete.")
      }
  
-@@ -200,30 +217,53 @@ private extension MaintenanceManager {
+@@ -200,30 +220,53 @@ private extension MaintenanceManager {
          }
      }
  

@@ -358,60 +358,9 @@ struct SettingsStorageView: View {
 
     var body: some View {
         List {
-            Section {
-                HStack {
-                    Text("Documents & Data")
-                    Spacer()
-                    if isMeasuring { ProgressView() }
-                    else { Text(storageUsage.formatted(storageUsage.totalContainer)).foregroundStyle(.secondary) }
-                }
-                ForEach(storageUsage.directories) { directory in
-                    NavigationLink {
-                        StorageDirectoryDetailView(directory: directory)
-                    } label: {
-                        LabeledContent(directory.name, value: storageUsage.formatted(directory.bytes))
-                    }
-                    .fullWidthListSeparators()
-                }
-            } header: { Text("All App Data") } footer: {
-                Text("Includes hidden files, databases, logs, caches and temporary downloads. Tap a folder to see what takes space. iOS Storage may update later or count shared storage differently.")
-            }
-            Section {
-                LabeledContent("Items", value: "\(importedApps.count)")
-                LabeledContent("Downloaded IPA copies", value: storageUsage.formatted(storageUsage.importedIPAs))
-                if storageUsage.importedIPAs > 0 {
-                    SwiftUI.Button("Remove downloaded IPA copies", role: .destructive) {
-                        selectedRemovalKeys.removeAll()
-                        isShowingClearReview = true
-                    }
-                }
-            } header: {
-                Text("Imported IPAs")
-            } footer: {
-                Text("This removes IPA copies stored by SideKick. Files linked from the Files app remain in their original location.")
-            }
-
-            Section {
-                LabeledContent("App signing cache", value: storageUsage.formatted(storageUsage.signingCache))
-                LabeledContent("Temporary install files", value: storageUsage.formatted(storageUsage.temporaryFiles))
-                LabeledContent("Saved resigned IPAs", value: storageUsage.formatted(storageUsage.exportedIPAs))
-                NavigationLink { StorageFilesView() } label: {
-                    Label("Manage Cached & Temporary Files", systemImage: "folder.badge.gearshape")
-                }
-                SwiftUI.Button { Task { await cleanUnusedFiles() } } label: {
-                    HStack {
-                        Label("Clean Unused Files", systemImage: "trash")
-                        Spacer()
-                        if isCleaning { ProgressView() }
-                    }
-                }
-                .disabled(isCleaning)
-                .fullWidthListSeparators()
-            } header: {
-                Text("Signing & Temporary Files")
-            } footer: {
-                Text("SideKick keeps the current extracted source for each app so it can re-sign it. Extracted apps can be larger than their compressed IPAs. SideKick automatically removes completed install files and expired unused sources. Recent sources are kept for 24 hours for recovery. Clean Unused Files also clears disposable network caches. Saved resigned IPAs and app records are kept.")
-            }
+            allAppDataSection
+            importedIPAsSection
+            signingTemporarySection
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Storage")
@@ -419,56 +368,120 @@ struct SettingsStorageView: View {
         .task { await reload() }
         .refreshable { await reload() }
         .onReceive(NotificationCenter.default.publisher(for: .sideKickStorageDidChange)) { _ in Task { await reload() } }
-        .sheet(isPresented: $isShowingClearReview) {
-            NavigationStack {
-                List {
-                    Section {
-                        Text("Removing these \(selectedRemovalApps.count) selected copies also deletes their SideKick import records. The selection may include queued updates or IPAs shown under Ready to Install. To restore an entry later, download or import its IPA again and re-queue it if needed. Installed apps and files in Files are not affected.")
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
-                    }
-                    Section("Downloaded IPA copies (\(selectedRemovalApps.count) selected)") {
-                        ForEach(Array(removableImportedApps.enumerated()), id: \.offset) { _, app in
-                            let key = removalKey(for: app)
-                            SwiftUI.Button {
-                                if selectedRemovalKeys.contains(key) { selectedRemovalKeys.remove(key) }
-                                else { selectedRemovalKeys.insert(key) }
-                            } label: {
-                                HStack {
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(app.name).foregroundStyle(.primary)
-                                        Text("Version \(app.version) · \(app.isUpdateQueued ? "Queued for update" : "Imported IPA")")
-                                            .font(.footnote).foregroundStyle(.secondary)
-                                    }
-                                    Spacer()
-                                    Image(systemName: selectedRemovalKeys.contains(key) ? "checkmark.circle.fill" : "circle")
-                                        .foregroundStyle(selectedRemovalKeys.contains(key) ? .tint : .secondary)
-                                }
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.plain)
-                        }
-                    }
-                }
-                .navigationTitle("Review IPA Copies")
-                .navigationBarTitleDisplayMode(.inline)
-                .toolbar {
-                    ToolbarItem(placement: .cancellationAction) {
-                        SwiftUI.Button("Cancel") { isShowingClearReview = false }
-                    }
-                    ToolbarItem(placement: .confirmationAction) {
-                        SwiftUI.Button("Remove \(selectedRemovalKeys.count)", role: .destructive) {
-                            isShowingClearReview = false
-                            Task { await clearSelectedManagedIPAs() }
-                        }
-                        .disabled(selectedRemovalKeys.isEmpty)
-                    }
-                }
-            }
-        }
+        .sheet(isPresented: $isShowingClearReview) { clearReviewSheet }
         .alert("Storage", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             SwiftUI.Button("OK", role: .cancel) { errorMessage = nil }
         } message: { Text(errorMessage ?? "") }
+    }
+
+    private var allAppDataSection: some View {
+        Section {
+            HStack {
+                Text("Documents & Data")
+                Spacer()
+                if isMeasuring { ProgressView() }
+                else { Text(storageUsage.formatted(storageUsage.totalContainer)).foregroundStyle(.secondary) }
+            }
+            ForEach(storageUsage.directories) { directory in
+                NavigationLink {
+                    StorageDirectoryDetailView(directory: directory)
+                } label: {
+                    LabeledContent(directory.name, value: storageUsage.formatted(directory.bytes))
+                }
+                .fullWidthListSeparators()
+            }
+        } header: { Text("All App Data") } footer: {
+            Text("Includes hidden files, databases, logs, caches and temporary downloads. Tap a folder to see what takes space. iOS Storage may update later or count shared storage differently.")
+        }
+    }
+
+    private var importedIPAsSection: some View {
+        Section {
+            LabeledContent("Items", value: "\(importedApps.count)")
+            LabeledContent("Downloaded IPA copies", value: storageUsage.formatted(storageUsage.importedIPAs))
+            if storageUsage.importedIPAs > 0 {
+                SwiftUI.Button("Remove downloaded IPA copies", role: .destructive) {
+                    selectedRemovalKeys.removeAll()
+                    isShowingClearReview = true
+                }
+            }
+        } header: {
+            Text("Imported IPAs")
+        } footer: {
+            Text("This removes IPA copies stored by SideKick. Files linked from the Files app remain in their original location.")
+        }
+    }
+
+    private var signingTemporarySection: some View {
+        Section {
+            LabeledContent("App signing cache", value: storageUsage.formatted(storageUsage.signingCache))
+            LabeledContent("Temporary install files", value: storageUsage.formatted(storageUsage.temporaryFiles))
+            LabeledContent("Saved resigned IPAs", value: storageUsage.formatted(storageUsage.exportedIPAs))
+            NavigationLink { StorageFilesView() } label: {
+                Label("Manage Cached & Temporary Files", systemImage: "folder.badge.gearshape")
+            }
+            SwiftUI.Button { Task { await cleanUnusedFiles() } } label: {
+                HStack {
+                    Label("Clean Unused Files", systemImage: "trash")
+                    Spacer()
+                    if isCleaning { ProgressView() }
+                }
+            }
+            .disabled(isCleaning)
+            .fullWidthListSeparators()
+        } header: {
+            Text("Signing & Temporary Files")
+        } footer: {
+            Text("SideKick keeps the current extracted source for each app so it can re-sign it. Extracted apps can be larger than their compressed IPAs. SideKick automatically removes completed install files and expired unused sources. Recent sources are kept for 24 hours for recovery. Clean Unused Files also clears disposable network caches. Saved resigned IPAs and app records are kept.")
+        }
+    }
+
+    private var clearReviewSheet: some View {
+        NavigationStack {
+            List {
+                Section {
+                    Text("Removing these \(selectedRemovalApps.count) selected copies also deletes their SideKick import records. The selection may include queued updates or IPAs shown under Ready to Install. To restore an entry later, download or import its IPA again and re-queue it if needed. Installed apps and files in Files are not affected.")
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                }
+                Section("Downloaded IPA copies (\(selectedRemovalApps.count) selected)") {
+                    ForEach(Array(removableImportedApps.enumerated()), id: \.offset) { _, app in
+                        let key = removalKey(for: app)
+                        SwiftUI.Button {
+                            if selectedRemovalKeys.contains(key) { selectedRemovalKeys.remove(key) }
+                            else { selectedRemovalKeys.insert(key) }
+                        } label: {
+                            HStack {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text(app.name).foregroundStyle(.primary)
+                                    Text("Version \(app.version) · \(app.isUpdateQueued ? "Queued for update" : "Imported IPA")")
+                                        .font(.footnote).foregroundStyle(.secondary)
+                                }
+                                Spacer()
+                                Image(systemName: selectedRemovalKeys.contains(key) ? "checkmark.circle.fill" : "circle")
+                                    .foregroundStyle(selectedRemovalKeys.contains(key) ? .tint : .secondary)
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                    }
+                }
+            }
+            .navigationTitle("Review IPA Copies")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) {
+                    SwiftUI.Button("Cancel") { isShowingClearReview = false }
+                }
+                ToolbarItem(placement: .confirmationAction) {
+                    SwiftUI.Button("Remove \(selectedRemovalKeys.count)", role: .destructive) {
+                        isShowingClearReview = false
+                        Task { await clearSelectedManagedIPAs() }
+                    }
+                    .disabled(selectedRemovalKeys.isEmpty)
+                }
+            }
+        }
     }
 
     @MainActor

@@ -121,7 +121,7 @@ enum SideKickCertificateExport {
                         presentError("The certificate callback URL could not be created.", in: presenter)
                         return
                     }
-                    UIApplication.shared.open(callbackURL)
+                    await UIApplication.shared.open(callbackURL)
                 } catch {
                     presentError(error.localizedDescription, in: presenter)
                 }
