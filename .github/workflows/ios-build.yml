@@ -93,6 +93,7 @@ jobs:
         run: |
           set -euo pipefail
           # Each CI run stamps a higher build number so SideKick can test update detection.
+          # Building from Vendor/SideStore/AltStore.xcodeproj with SideKick integration patches applied.
           xcodebuild -project Vendor/SideStore/AltStore.xcodeproj \
             -scheme SideStore \
             -configuration Release \
