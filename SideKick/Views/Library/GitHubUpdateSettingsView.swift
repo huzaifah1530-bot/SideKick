@@ -91,8 +91,7 @@ struct GitHubUpdateSettingsView: View {
                         NavigationLink {
                             GitHubBaselineSelectionView(
                                 history: history,
-                                selectedKey: Binding(get: { selectedBaselineKey }, set: { selectedBaselineKey = $0; baselineWasEdited = true }),
-                                recommendedKey: nil
+                                selectedKey: Binding(get: { selectedBaselineKey }, set: { selectedBaselineKey = $0; baselineWasEdited = true })
                             )
                         } label: {
                             LabeledContent(
@@ -271,52 +270,17 @@ struct GitHubUpdateSettingsView: View {
         guard let date = item.date else { return item.title }
         return "\(item.title) · \(date.formatted(date: .abbreviated, time: .omitted))"
     }
-
-    private func legacyKey(for currentKey: String) -> String? {
-        let parts = currentKey.split(separator: ":", omittingEmptySubsequences: false)
-        guard parts.count == 4, parts[0] == "release" else { return nil }
-        return "release:\(parts[2]):\(parts[3])"
-    }
 }
 
 private struct GitHubBaselineSelectionView: View {
     let history: [GitHubUpdateHistoryEntry]
     @Binding var selectedKey: String?
-    let recommendedKey: String?
 
     @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         List {
             Section {
-                if let recommendedKey,
-                   let recommendation = history.first(where: { $0.key == recommendedKey }) {
-                    SwiftUI.Button(action: {
-                        select(recommendation)
-                    }) {
-                        HStack(spacing: 12) {
-                            Image(systemName: "sparkles")
-                                .foregroundStyle(.tint)
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text("Suggested version")
-                                    .font(.body.weight(.medium))
-                                Text(historyLabel(recommendation))
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            if selectedKey == recommendation.key {
-                                Image(systemName: "checkmark")
-                                    .fontWeight(.semibold)
-                                    .foregroundStyle(.tint)
-                            }
-                        }
-                        .contentShape(Rectangle())
-                    }
-                    .buttonStyle(.plain)
-                    .fullWidthListSeparators()
-                }
-
                 ForEach(history) { item in
                     SwiftUI.Button(action: {
                         select(item)

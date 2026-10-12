@@ -1,6 +1,64 @@
 import Foundation
 
 enum LiveContainerScanner {
+    static func scan(directory: URL, connectionID: UUID, folder: String) throws -> LiveContainerGuest {
+        try Task.checkCancellation()
+        guard directory.lastPathComponent == "Applications",
+              let values = try? directory.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey]),
+              values.isDirectory == true, values.isSymbolicLink != true else { throw LiveContainerError.invalidDirectory }
+        guard !folder.isEmpty, folder == (folder as NSString).lastPathComponent,
+              folder != ".", folder != "..", folder.utf8.count <= 1024 else {
+            throw LiveContainerError.guestMissing
+        }
+
+        let bundle = directory.appendingPathComponent(folder, isDirectory: true)
+        try OwnedStoragePath.validate(bundle, inside: directory)
+        let bundleValues = try bundle.resourceValues(forKeys: [.isDirectoryKey, .isSymbolicLinkKey])
+        guard bundle.pathExtension.lowercased() == "app",
+              bundleValues.isDirectory == true, bundleValues.isSymbolicLink != true else { throw LiveContainerError.guestMissing }
+        try Task.checkCancellation()
+
+        let info = try plist(bundle.appendingPathComponent("Info.plist"), root: directory)
+        guard info["LCBundleIdentifier"] == nil else {
+            throw LiveContainerError.invalidMetadata("Signing is incomplete; retry after LiveContainer finishes.")
+        }
+        var identifier = string(info["CFBundleIdentifier"])
+        let supplemental = bundle.appendingPathComponent("LCAppInfo.plist")
+        if FileManager.default.fileExists(atPath: supplemental.path) {
+            let lcInfo = try plist(supplemental, root: directory)
+            if lcInfo["doUseLCBundleId"] as? Bool == true {
+                identifier = string(lcInfo["LCOrignalBundleIdentifier"])
+            }
+        }
+        guard let identifier, !identifier.isEmpty else {
+            throw LiveContainerError.invalidMetadata("Info.plist has no usable bundle identifier.")
+        }
+        let name = string(info["CFBundleDisplayName"]) ?? string(info["CFBundleName"]) ?? bundle.deletingPathExtension().lastPathComponent
+        let build = string(info["CFBundleVersion"]) ?? "Unknown"
+        let version = string(info["CFBundleShortVersionString"]) ?? build
+        let guest = LiveContainerGuest(
+            connectionID: connectionID,
+            folder: folder,
+            name: name,
+            bundleIdentifier: identifier,
+            version: version,
+            build: build,
+            iconData: nil,
+            lastSeen: .now
+        )
+        var stamp = [version, build]
+        for file in ["Info.plist", string(info["CFBundleExecutable"])].compactMap({ $0 }) {
+            let url = bundle.appendingPathComponent(file)
+            if (try? OwnedStoragePath.validate(url, inside: directory)) != nil,
+               let values = try? url.resourceValues(forKeys: [.fileSizeKey, .contentModificationDateKey]) {
+                stamp.append("\(values.fileSize ?? 0):\(values.contentModificationDate?.timeIntervalSince1970 ?? 0)")
+            }
+        }
+        var validated = guest
+        validated.observation = stamp.joined(separator: "|")
+        return validated
+    }
+
     static func scan(directory: URL, connectionID: UUID) throws -> LiveContainerScan {
         try Task.checkCancellation()
         let manager = FileManager.default

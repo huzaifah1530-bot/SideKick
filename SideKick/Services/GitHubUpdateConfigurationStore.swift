@@ -148,7 +148,7 @@ actor GitHubUpdateConfigurationStore {
             result.installedBuild = nil
             result.lastInstalledUpdateKey = nil
             result.baselineUpdateKey = nil
-            result.dismissedUpdateKey = nil
+            result.clearDismissedUpdate()
         }
         if baselineWasEdited { result.setInstalledBaseline(baselineKey, observation: observation) }
         try save(result)
@@ -158,9 +158,11 @@ actor GitHubUpdateConfigurationStore {
     }
 
     @discardableResult
-    func skip(key: String, targetID: String, expectedSource: String) throws -> Bool {
+    func skip(key: String, title: String, date: Date?, targetID: String, expectedSource: String) throws -> Bool {
         guard var current = try configuration(for: targetID), current.sourceIdentity == expectedSource else { return false }
         current.dismissedUpdateKey = key
+        current.dismissedUpdateTitle = title
+        current.dismissedUpdateDate = date
         try save(current)
         return true
     }
@@ -171,7 +173,7 @@ actor GitHubUpdateConfigurationStore {
         guard var current = try configuration(for: targetID),
               current.sourceIdentity == expectedSource,
               current.dismissedUpdateKey == key else { return false }
-        current.dismissedUpdateKey = nil
+        current.clearDismissedUpdate()
         try save(current)
         return true
     }

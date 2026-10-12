@@ -52,6 +52,9 @@ struct GitHubAccountSettingsView: View {
         .navigationTitle("GitHub Tokens")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { reload() }
+        .onReceive(NotificationCenter.default.publisher(for: .sideKickGitHubSettingsDidChange)) { _ in
+            reload()
+        }
     }
 
     private func reload() {

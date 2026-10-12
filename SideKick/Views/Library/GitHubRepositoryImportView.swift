@@ -31,6 +31,10 @@ struct GitHubRepositoryImportView: View {
                     Text("Actions Builds").tag(GitHubUpdateSource.actionsArtifact)
                 }.pickerStyle(.segmented)
                 if source == .actionsArtifact {
+                    Text("Actions Builds requires a token with Actions: read access to this repository. For private repositories, include the repository in the token; organization tokens may need approval.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                if source == .actionsArtifact {
                     NavigationLink {
                         GitHubWorkflowPickerView(repositoryURL: repositoryURL.absoluteString, tokenID: tokenID, selection: $workflowID, selectedName: $workflowName)
                     } label: {

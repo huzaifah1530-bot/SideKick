@@ -27,18 +27,6 @@ final class HomeViewModel {
         }
     }
 
-    func importIPA(from url: URL) async {
-        isImporting = true
-        defer { isImporting = false }
-        do {
-            let app = try await store.importIPA(from: url)
-            await load()
-            noticeMessage = "\(app.name) is ready to install."
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
-
     func delete(_ app: ImportedIPA) async {
         do {
             try await store.delete(app)

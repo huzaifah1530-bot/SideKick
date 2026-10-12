@@ -71,12 +71,9 @@ struct GitHubUpdateDetailView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var accountStore = SigningAccountStore()
     @State private var errorMessage: String?
-    @State private var account: SigningAccountSummary?
-    @State private var eligibleAccounts: [SigningAccountSummary] = []
     @State private var isConfirmingInstalledBuild = false
     @State private var tokenID: String?
     @State private var isLoadingToken = true
-    @State private var isConfirmingSkip = false
     @State private var discoveredBuilds: [GitHubUpdateCandidate]
     @State private var isLoadingBuilds = false
     @State private var buildHistoryPage = 0
@@ -96,6 +93,16 @@ struct GitHubUpdateDetailView: View {
         app.updateMatchingBundleIdentifiers
     }
 
+    private var eligibleAccounts: [SigningAccountSummary] { accountStore.accounts }
+
+    private var account: SigningAccountSummary? {
+        eligibleAccounts.first {
+            $0.hasSavedSession &&
+            $0.accountIdentifier == app.accountIdentifier &&
+            $0.teamIdentifier == app.teamIdentifier
+        }
+    }
+
     private var downloadJob: GitHubUpdateDownloadJob? { environment.githubUpdateDownloads.jobs[selectedCandidate.id] }
 
     var body: some View {
@@ -108,7 +115,13 @@ struct GitHubUpdateDetailView: View {
             } else if !selectedCandidate.isKnownNewer {
                 Section { Text("The installed GitHub build is unverified. Review this downloadable build or confirm the build you already installed.").foregroundStyle(.secondary) }
             }
-            Section { GitHubTokenSelectionLink(selection: $tokenID).disabled(downloadJob?.isDownloading == true) }
+            Section {
+                GitHubTokenSelectionLink(selection: $tokenID).disabled(downloadJob?.isDownloading == true)
+                if selectedCandidate.source == .actionsArtifact {
+                    Text("Actions builds require a GitHub token with Actions: read access to this repository. For private repositories, include the repository and ensure the organization has approved the token.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+            }
             if let errorMessage {
                 Section {
                     Label(errorMessage, systemImage: "exclamationmark.triangle")
@@ -188,117 +201,73 @@ struct GitHubUpdateDetailView: View {
                 Text("Choose any discovered IPA build to install it. SideKick records it as installed only after installation succeeds.")
             }
 
-            Section {
-                if let job = downloadJob, job.isDownloading {
-                    VStack(alignment: .leading, spacing: 10) {
-                        HStack {
-                            Text("Downloading IPA…").font(.body.weight(.medium))
-                            Spacer()
-                            if let progress = job.progress {
-                                Text(progress > 0 && progress < 0.01 ? "<1%" : String(format: "%.1f%%", progress * 100))
-                            }
-                            else { ProgressView().controlSize(.small) }
-                        }
-                        Text("You can leave this page; the download will continue.")
-                            .font(.footnote).foregroundStyle(.secondary)
-                        if job.bytesWritten > 0 {
-                            Text("Downloaded \(ByteCountFormatter.string(fromByteCount: job.bytesWritten, countStyle: .file))")
-                                .font(.footnote.monospacedDigit()).foregroundStyle(.secondary)
-                        }
-                    }
-                    .padding(16)
-                    .padding(.bottom, 8)
-                    .background(Color(uiColor: .secondarySystemGroupedBackground), in: .rect(cornerRadius: 17))
-                    .overlay(alignment: .bottom) {
-                        if let progress = job.progress {
-                            DownloadProgressBar(progress: progress)
-                                .frame(height: 3)
-                                .padding(.horizontal, 14)
-                                .padding(.bottom, 8)
-                        } else {
-                            ProgressView().progressViewStyle(.linear)
-                                .padding(.horizontal, 14)
-                                .padding(.bottom, 8)
-                        }
-                    }
-                    .listRowInsets(EdgeInsets(top: 5, leading: 0, bottom: 5, trailing: 0))
-                    .listRowBackground(Color.clear)
-                } else if let message = downloadJob?.errorMessage {
-                    VStack(alignment: .leading, spacing: 11) {
-                        Label(message, systemImage: "exclamationmark.triangle")
-                            .font(.footnote).foregroundStyle(.red).textSelection(.enabled)
-                        downloadButton(title: "Try Again") { startDownload() }
-                    }
-                    .listRowInsets(EdgeInsets(top: 5, leading: 0, bottom: 5, trailing: 0))
-                    .listRowBackground(Color.clear)
-                } else if let queuedIPA = downloadJob?.queuedIPA {
-                    if let account {
-                        NavigationLink {
-                            InstallConsoleView(
-                                app: queuedIPA,
-                                account: account,
-                                accountStore: accountStore,
-                                ipaStore: environment.ipaImportStore,
-                                isUpdate: true,
-                                onInstalled: { await finishUpdate(queuedIPA) },
-                                onSourceMissing: { await validateDownload() }
-                            )
-                        } label: {
-                            Label("Update App", systemImage: "arrow.down.app.fill")
-                                .fontWeight(.semibold)
-                        }
-                        .buttonStyle(.plain)
-                        .fullWidthListSeparators()
-                    } else {
-                        VStack(alignment: .leading, spacing: 8) {
-                            if let installedTeamAccount = eligibleAccounts.first(where: {
-                                $0.accountIdentifier == app.accountIdentifier &&
-                                $0.teamIdentifier == app.teamIdentifier
-                            }) {
-                                NavigationLink {
-                                    SigningAccountDetailView(account: installedTeamAccount, accountStore: accountStore)
-                                } label: {
-                                    Label("Reconnect the Apple account for this installed team", systemImage: "person.crop.circle.badge.exclamationmark")
-                                }
-                            } else {
-                                NavigationLink {
-                                    AccountsView()
-                                } label: {
-                                    Label("Add the Apple account for the installed team", systemImage: "person.crop.circle.badge.plus")
-                                }
-                            }
-                            Text("The installed app uses team \(app.teamIdentifier). Use Options to choose another team for a separate installation.")
-                                .font(.footnote).foregroundStyle(.secondary)
-                        }
-                    }
+            Section("Download") {
+                GitHubUpdateDownloadControls(
+                    job: downloadJob,
+                    onDownload: { startDownload() },
+                    onCancel: { environment.githubUpdateDownloads.cancelDownload(for: selectedCandidate) },
+                    onSkip: { Task { await resolveUpdate(markInstalled: false) } },
+                    allowsSkip: selectedCandidate.updateKey == candidate.updateKey
+                ) {
+                    if let queuedIPA = downloadJob?.queuedIPA {
+                        if let account {
                             NavigationLink {
-                                InstallAccountSelectionView(
+                                InstallConsoleView(
                                     app: queuedIPA,
-                                    accounts: eligibleAccounts,
+                                    account: account,
                                     accountStore: accountStore,
                                     ipaStore: environment.ipaImportStore,
                                     isUpdate: true,
                                     onInstalled: { await finishUpdate(queuedIPA) },
-                                    onSourceMissing: { await validateDownload() },
-                                    currentTeamIdentifier: app.teamIdentifier
+                                    onSourceMissing: { await validateDownload() }
                                 )
                             } label: {
-                                Label("Options", systemImage: "slider.horizontal.3")
-                                    .font(.body)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                Label("Update App", systemImage: "arrow.down.app.fill")
+                                    .fontWeight(.semibold)
                             }
                             .buttonStyle(.plain)
                             .fullWidthListSeparators()
-                } else {
-                    downloadButton(title: "Install New IPA") { startDownload() }
+                        } else {
+                            VStack(alignment: .leading, spacing: 8) {
+                                if let installedTeamAccount = eligibleAccounts.first(where: {
+                                    $0.accountIdentifier == app.accountIdentifier &&
+                                    $0.teamIdentifier == app.teamIdentifier
+                                }) {
+                                    NavigationLink {
+                                        SigningAccountDetailView(account: installedTeamAccount, accountStore: accountStore)
+                                    } label: {
+                                        Label("Reconnect the Apple account for this installed team", systemImage: "person.crop.circle.badge.exclamationmark")
+                                    }
+                                } else {
+                                    NavigationLink {
+                                        AccountsView()
+                                    } label: {
+                                        Label("Add the Apple account for the installed team", systemImage: "person.crop.circle.badge.plus")
+                                    }
+                                }
+                                Text("The installed app uses team \(app.teamIdentifier). Use Options to choose another team for a separate installation.")
+                                    .font(.footnote).foregroundStyle(.secondary)
+                            }
+                        }
+                    }
                 }
             }
 
             Section("Update Options") {
                 if downloadJob?.isDownloading != true {
-                    if downloadJob?.queuedIPA != nil {
-                        SwiftUI.Button { startDownload() } label: {
-                            Label("Download Again", systemImage: "arrow.down.circle")
+                    if let queuedIPA = downloadJob?.queuedIPA {
+                        NavigationLink {
+                            InstallAccountSelectionView(
+                                app: queuedIPA,
+                                accountStore: accountStore,
+                                ipaStore: environment.ipaImportStore,
+                                isUpdate: true,
+                                onInstalled: { await finishUpdate(queuedIPA) },
+                                onSourceMissing: { await validateDownload() },
+                                currentTeamIdentifier: app.teamIdentifier
+                            )
+                        } label: {
+                            Label("Options", systemImage: "slider.horizontal.3")
                         }
                         .fullWidthListSeparators()
                     }
@@ -306,12 +275,6 @@ struct GitHubUpdateDetailView: View {
                         Label("Already Installed This Build", systemImage: "checkmark.circle")
                     }
                     .fullWidthListSeparators()
-                    if selectedCandidate.updateKey == candidate.updateKey {
-                        SwiftUI.Button { isConfirmingSkip = true } label: {
-                            Label("Skip This Update", systemImage: "forward.end")
-                        }
-                        .fullWidthListSeparators()
-                    }
                 }
                 NavigationLink {
                     GitHubUpdateSettingsView(app: app)
@@ -324,14 +287,9 @@ struct GitHubUpdateDetailView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("App Update")
         .navigationBarTitleDisplayMode(.inline)
-        .task {
-            await accountStore.reload()
-            eligibleAccounts = accountStore.accounts
-            account = eligibleAccounts.first {
-                $0.hasSavedSession &&
-                $0.accountIdentifier == app.accountIdentifier &&
-                $0.teamIdentifier == app.teamIdentifier
-            }
+        .onAppear { Task { await accountStore.reload() } }
+        .onReceive(NotificationCenter.default.publisher(for: .sideKickSigningAccountsDidChange)) { _ in
+            Task { await accountStore.reload() }
         }
         .task {
             do {
@@ -354,12 +312,6 @@ struct GitHubUpdateDetailView: View {
             SwiftUI.Button("Cancel", role: .cancel) { }
         } message: {
             Text("Only choose this if you installed this exact GitHub release or build. Matching version names alone do not identify an Actions build.")
-        }
-        .alert("Skip this update?", isPresented: $isConfirmingSkip) {
-            SwiftUI.Button("Skip Update") { Task { await resolveUpdate(markInstalled: false) } }
-            SwiftUI.Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("This build will be hidden. SideKick will still show future updates from this source.")
         }
     }
 
@@ -385,10 +337,12 @@ struct GitHubUpdateDetailView: View {
                     updateKey: build.key,
                     source: configuration.source,
                     repositoryURL: configuration.repositoryURL,
+                    targetKind: app.updateTarget.kind,
                     sourceIdentity: configuration.sourceIdentity,
                     isKnownNewer: configuration.effectiveBaselineKey.map {
                         GitHubTrackingPolicy.compare(build.key, to: $0) == .newer
-                    } ?? false
+                    } ?? false,
+                    buildDate: build.date
                 )
             }
             buildHistoryPage = page
@@ -467,6 +421,8 @@ struct GitHubUpdateDetailView: View {
                 let queuedIPA = matchingQueuedIPA(in: imports)
                 guard try await configurationStore.skip(
                     key: selectedCandidate.updateKey,
+                    title: selectedCandidate.title,
+                    date: selectedCandidate.buildDate,
                     targetID: app.id,
                     expectedSource: source
                 ) else {
@@ -499,20 +455,6 @@ struct GitHubUpdateDetailView: View {
         return imports.first(where: matches)
     }
 
-    private func downloadButton(title: String, action: @escaping () -> Void) -> some View {
-        SwiftUI.Button(action: action) {
-            Label(title, systemImage: "arrow.down.circle")
-                .fontWeight(.semibold)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding(.horizontal, 16)
-                .padding(.vertical, 14)
-                .background(Color(uiColor: .secondarySystemGroupedBackground), in: .rect(cornerRadius: 17))
-        }
-        .buttonStyle(.plain)
-        .listRowInsets(EdgeInsets(top: 5, leading: 0, bottom: 5, trailing: 0))
-        .listRowBackground(Color.clear)
-    }
-
     @MainActor
     private func finishUpdate(_ ipa: ImportedIPA) async {
         do {
@@ -522,6 +464,110 @@ struct GitHubUpdateDetailView: View {
         } catch {
             errorMessage = error.localizedDescription
         }
+    }
+}
+
+struct GitHubUpdateDownloadControls<FinalAction: View>: View {
+    let job: GitHubUpdateDownloadJob?
+    let onDownload: () -> Void
+    let onCancel: () -> Void
+    let onSkip: () -> Void
+    let allowsSkip: Bool
+    let isDisabled: Bool
+    let isSkipDisabled: Bool
+    let finalAction: () -> FinalAction
+    @State private var isConfirmingSkip = false
+
+    init(
+        job: GitHubUpdateDownloadJob?,
+        onDownload: @escaping () -> Void,
+        onCancel: @escaping () -> Void,
+        onSkip: @escaping () -> Void,
+        allowsSkip: Bool = true,
+        isDisabled: Bool = false,
+        isSkipDisabled: Bool = false,
+        @ViewBuilder finalAction: @escaping () -> FinalAction
+    ) {
+        self.job = job
+        self.onDownload = onDownload
+        self.onCancel = onCancel
+        self.onSkip = onSkip
+        self.allowsSkip = allowsSkip
+        self.isDisabled = isDisabled
+        self.isSkipDisabled = isSkipDisabled
+        self.finalAction = finalAction
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            if let job, job.isDownloading {
+                VStack(alignment: .leading, spacing: 9) {
+                    HStack {
+                        Text("Downloading IPA…").font(.body.weight(.medium))
+                        Spacer()
+                        if let progress = job.progress {
+                            Text(progress > 0 && progress < 0.01 ? "<1%" : String(format: "%.1f%%", progress * 100))
+                                .font(.footnote.monospacedDigit())
+                        }
+                    }
+                    if let progress = job.progress {
+                        DownloadProgressBar(progress: progress).frame(height: 3)
+                    } else {
+                        ProgressView().progressViewStyle(.linear)
+                    }
+                    if job.bytesWritten > 0 {
+                        let transferred = ByteCountFormatter.string(fromByteCount: job.bytesWritten, countStyle: .file)
+                        Text(job.totalBytesExpected.map {
+                            "Downloaded \(transferred) of \(ByteCountFormatter.string(fromByteCount: $0, countStyle: .file))"
+                        } ?? "Downloaded \(transferred) · total size unknown")
+                            .font(.footnote.monospacedDigit()).foregroundStyle(.secondary)
+                    } else if job.totalBytesExpected == nil {
+                        Text("The server did not report a file size; download activity is still shown above.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                    Text("You can leave this page; the download will continue.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                    SwiftUI.Button("Cancel Download", role: .cancel, action: onCancel)
+                }
+                .padding(16)
+                .background(Color(uiColor: .secondarySystemGroupedBackground), in: .rect(cornerRadius: 17))
+            } else if let message = job?.errorMessage {
+                Label(message, systemImage: "exclamationmark.triangle")
+                    .font(.footnote).foregroundStyle(.red).textSelection(.enabled)
+                if job?.queuedIPA != nil { finalAction().disabled(isDisabled) }
+                actionButton("Try Again", action: onDownload)
+            } else if job?.queuedIPA != nil {
+                finalAction().disabled(isDisabled)
+                actionButton("Download Again", action: onDownload).disabled(isDisabled)
+            } else {
+                actionButton("Download IPA", action: onDownload).disabled(isDisabled)
+            }
+
+            if allowsSkip, job?.isDownloading != true {
+                SwiftUI.Button { isConfirmingSkip = true } label: {
+                    Label("Skip This Build", systemImage: "forward.end")
+                }
+                .disabled(isSkipDisabled)
+            }
+        }
+        .confirmationDialog("Skip this update?", isPresented: $isConfirmingSkip, titleVisibility: .visible) {
+            SwiftUI.Button("Skip Update", role: .destructive, action: onSkip)
+            SwiftUI.Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("This build will be hidden. SideKick will still show future updates from this source.")
+        }
+    }
+
+    private func actionButton(_ title: String, action: @escaping () -> Void) -> some View {
+        SwiftUI.Button(action: action) {
+            Label(title, systemImage: "arrow.down.circle")
+                .fontWeight(.semibold)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .padding(.horizontal, 16)
+                .padding(.vertical, 14)
+                .background(Color(uiColor: .secondarySystemGroupedBackground), in: .rect(cornerRadius: 17))
+        }
+        .buttonStyle(.plain)
     }
 }
 

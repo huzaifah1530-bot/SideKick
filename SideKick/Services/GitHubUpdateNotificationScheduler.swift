@@ -1,6 +1,51 @@
 import Foundation
 import UserNotifications
 
+struct GitHubUpdateNotificationRoute: Codable, Hashable, Sendable {
+    let bundleIdentifier: String
+    let updateKey: String
+    let targetKind: GitHubUpdateTarget.Kind
+    let sourceIdentity: String?
+}
+
+enum GitHubUpdateNotificationRouteStore {
+    static let tappedNotification = Notification.Name("sideKickGitHubUpdateNotificationTapped")
+    private static let pendingRouteKey = "sidekick.github-update.pending-route"
+
+    static func recordTap(userInfo: [AnyHashable: Any]) {
+        guard let bundleIdentifier = userInfo["bundleIdentifier"] as? String,
+              !bundleIdentifier.isEmpty, bundleIdentifier.count <= 512,
+              let updateKey = userInfo["updateKey"] as? String,
+              !updateKey.isEmpty, updateKey.count <= 1_024,
+              let targetKindValue = userInfo["targetKind"] as? String,
+              let targetKind = GitHubUpdateTarget.Kind(rawValue: targetKindValue) else { return }
+        let sourceIdentity = userInfo["sourceIdentity"] as? String
+        if let sourceIdentity, sourceIdentity.isEmpty || sourceIdentity.count > 1_024 { return }
+
+        let route = GitHubUpdateNotificationRoute(
+            bundleIdentifier: bundleIdentifier,
+            updateKey: updateKey,
+            targetKind: targetKind,
+            sourceIdentity: sourceIdentity
+        )
+        guard let data = try? JSONEncoder().encode(route) else { return }
+        UserDefaults.standard.set(data, forKey: pendingRouteKey)
+        Task { @MainActor in
+            NotificationCenter.default.post(name: tappedNotification, object: nil)
+        }
+    }
+
+    static func pendingRoute() -> GitHubUpdateNotificationRoute? {
+        guard let data = UserDefaults.standard.data(forKey: pendingRouteKey) else { return nil }
+        return try? JSONDecoder().decode(GitHubUpdateNotificationRoute.self, from: data)
+    }
+
+    static func clearPendingRoute(_ route: GitHubUpdateNotificationRoute) {
+        guard pendingRoute() == route else { return }
+        UserDefaults.standard.removeObject(forKey: pendingRouteKey)
+    }
+}
+
 enum GitHubUpdateNotificationScheduler {
     private static let prefix = "sidekick.github-update."
 
@@ -45,7 +90,15 @@ enum GitHubUpdateNotificationScheduler {
                 ? "\(candidate.newVersion) is available. Review this guest update in SideKick, then install it in LiveContainer."
                 : "Version \(candidate.newVersion) is ready to install in SideKick."
             content.sound = .default
-            content.userInfo = ["bundleIdentifier": candidate.bundleIdentifier, "updateKey": candidate.updateKey, "targetKind": candidate.targetKind.rawValue]
+            var userInfo: [AnyHashable: Any] = [
+                "bundleIdentifier": candidate.bundleIdentifier,
+                "updateKey": candidate.updateKey,
+                "targetKind": candidate.targetKind.rawValue
+            ]
+            if let sourceIdentity = candidate.sourceIdentity {
+                userInfo["sourceIdentity"] = sourceIdentity
+            }
+            content.userInfo = userInfo
             do {
                 try await center.add(UNNotificationRequest(identifier: identifier, content: content, trigger: nil))
                 // add() suspends. If the source was edited, skipped, or

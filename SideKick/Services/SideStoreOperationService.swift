@@ -340,17 +340,26 @@ final class SideStoreOperationService {
 
     func refreshAllManagedAppsQuietly(
         progressHandler: @escaping @MainActor @Sendable (Int, Int) -> Void = { _, _ in }
-    ) async -> (succeeded: Int, attempted: Int) {
-        let apps = await installedApps()
+    ) async -> QuietRefreshOutcome {
+        let apps: [InstalledAppSummary]
+        do { apps = try await loadInstalledApps() }
+        catch {
+            debugLog("[SideKick] Couldn’t load installed apps for scheduled refresh: \(error.localizedDescription)")
+            return QuietRefreshOutcome(succeeded: 0, attempted: 0, failure: .appListUnavailable,
+                appResults: [], failureMessage: error.localizedDescription)
+        }
         guard !apps.isEmpty else {
             await ExpirationNotificationScheduler.update()
-            return (0, 0)
+            return QuietRefreshOutcome(succeeded: 0, attempted: 0, failure: .noEligibleApps,
+                appResults: [], failureMessage: nil)
         }
 
         do { try SideKickStorageCleanup.beginOperation() }
         catch {
             debugLog("[SideKick] Deferred scheduled refresh while storage cleanup is running.")
-            return (0, apps.count)
+            return QuietRefreshOutcome(succeeded: 0, attempted: apps.count, failure: .operationUnavailable,
+                appResults: apps.map { app in .failure(for: app, reason: error.localizedDescription, recovery: nil) },
+                failureMessage: error.localizedDescription)
         }
         defer { SideKickStorageCleanup.endOperation() }
 
@@ -359,11 +368,14 @@ final class SideStoreOperationService {
         catch {
             debugLog("[SideKick] Could not connect for refresh: \(error.localizedDescription)")
             progressHandler(apps.count, apps.count)
-            return (0, apps.count)
+            return QuietRefreshOutcome(succeeded: 0, attempted: apps.count, failure: .connectionUnavailable,
+                appResults: apps.map { app in .failure(for: app, reason: error.localizedDescription, recovery: .localConnection) },
+                failureMessage: error.localizedDescription)
         }
         defer { LocalVPNService.shared.release(vpnLease) }
 
         var succeeded = 0
+        var appResults: [ManagedAppRefreshResult] = []
         for (index, app) in apps.enumerated() {
             do {
                 try await refresh(
@@ -372,15 +384,94 @@ final class SideStoreOperationService {
                     updatesExpiryNotifications: false
                 )
                 succeeded += 1
+                appResults.append(.success(for: app))
             } catch {
                 // Scheduled attempts are intentionally quiet; the next automation retries failures.
                 debugLog("[SideKick] Scheduled refresh failed for \(app.bundleIdentifier): \(error.localizedDescription)")
+                appResults.append(.failure(for: app, reason: error.localizedDescription,
+                    recovery: error is LocalVPNError ? .localConnection : .account))
             }
             progressHandler(index + 1, apps.count)
         }
         await ExpirationNotificationScheduler.update()
-        return (succeeded, apps.count)
+        return QuietRefreshOutcome(
+            succeeded: succeeded,
+            attempted: apps.count,
+            failure: succeeded == apps.count ? nil : .appRefreshFailed,
+            appResults: appResults,
+            failureMessage: nil
+        )
     }
+
+    func retryFailedManagedApps(
+        _ failedApps: [ManagedAppRefreshResult],
+        progressHandler: @escaping @MainActor @Sendable (Int, Int) -> Void = { _, _ in }
+    ) async -> [ManagedAppRefreshResult] {
+        let failures = failedApps.filter { !$0.succeeded }
+        var results: [ManagedAppRefreshResult] = []
+        for (index, previous) in failures.enumerated() {
+            do {
+                try await refresh(bundleIdentifier: previous.appID)
+                var result = previous
+                result.succeeded = true
+                result.failureMessage = nil
+                result.recovery = nil
+                results.append(result)
+            } catch {
+                var result = previous
+                result.failureMessage = error.localizedDescription
+                result.recovery = error is LocalVPNError ? .localConnection : .account
+                results.append(result)
+            }
+            progressHandler(index + 1, failures.count)
+        }
+        return results
+    }
+}
+
+enum ManagedAppRefreshRecovery: Equatable, Sendable {
+    case account, localConnection
+}
+
+struct ManagedAppRefreshResult: Identifiable, Equatable, Sendable {
+    let appID: String
+    let appName: String
+    let accountIdentifier: String
+    let teamIdentifier: String
+    let accountEmail: String
+    var succeeded: Bool
+    var failureMessage: String?
+    var recovery: ManagedAppRefreshRecovery?
+
+    var id: String { appID }
+
+    static func success(for app: InstalledAppSummary) -> Self {
+        Self(appID: app.id, appName: app.name, accountIdentifier: app.accountIdentifier,
+            teamIdentifier: app.teamIdentifier, accountEmail: app.accountEmail, succeeded: true,
+            failureMessage: nil, recovery: nil)
+    }
+
+    static func failure(for app: InstalledAppSummary, reason: String, recovery: ManagedAppRefreshRecovery?) -> Self {
+        Self(appID: app.id, appName: app.name, accountIdentifier: app.accountIdentifier,
+            teamIdentifier: app.teamIdentifier, accountEmail: app.accountEmail, succeeded: false,
+            failureMessage: reason, recovery: recovery)
+    }
+}
+
+struct QuietRefreshOutcome {
+    enum Failure {
+        case noEligibleApps
+        case appListUnavailable
+        case operationUnavailable
+        case connectionUnavailable
+        case appRefreshFailed
+    }
+
+    var succeeded: Int
+    var attempted: Int
+    var failure: Failure?
+    var appResults: [ManagedAppRefreshResult]
+    var failureMessage: String?
 }
 
 private final class ProgressObservationBox: @unchecked Sendable {

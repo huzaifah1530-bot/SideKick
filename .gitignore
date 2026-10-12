@@ -12,3 +12,4 @@ action-logs-*.zip
 /failed-run.zip
 .build/
 .swiftpm/
+__pycache__/

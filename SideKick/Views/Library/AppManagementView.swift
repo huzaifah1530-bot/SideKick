@@ -123,7 +123,6 @@ struct AppManagementView: View {
                         NavigationLink {
                             InstallAccountSelectionView(
                                 app: importedApp,
-                                accounts: accountStore.accounts,
                                 accountStore: accountStore,
                                 ipaStore: environment.ipaImportStore,
                                 isUpdate: false,
@@ -344,7 +343,6 @@ struct AppManagementView: View {
                 NavigationLink {
                     InstallAccountSelectionView(
                         app: ipa,
-                        accounts: updateAccounts,
                         accountStore: accountStore,
                         ipaStore: environment.ipaImportStore,
                         isUpdate: true,
@@ -535,10 +533,7 @@ private enum AppSigningOperation: Equatable {
     case refresh
     case resign
 
-    var progressTitle: String { self == .refresh ? "Refreshing" : "Re-signing" }
-    var completedTitle: String { self == .refresh ? "Refresh Complete" : "Re-sign Complete" }
-    var failedTitle: String { self == .refresh ? "Refresh Failed" : "Re-sign Failed" }
-    var activityTitle: String { self == .refresh ? "Refresh Activity" : "Re-sign Activity" }
+    var statusTitle: String { self == .refresh ? "Refresh Status" : "Re-sign Status" }
 }
 
 private enum AppSigningError: LocalizedError {
@@ -546,6 +541,125 @@ private enum AppSigningError: LocalizedError {
 
     var errorDescription: String? {
         "Choose a saved Apple ID before re-signing this app."
+    }
+}
+
+private struct OperationStatusView: View {
+    let title: String
+    let appName: String
+    let stageSummary: String
+    let progress: Double
+    let isRunning: Bool
+    let failure: String?
+    let lines: [String]
+    let account: SigningAccountSummary?
+    let accountStore: SigningAccountStore?
+    let onRetry: () -> Void
+    let onClose: () -> Void
+
+    @State private var isActivityExpanded = false
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 20) {
+            VStack(alignment: .leading, spacing: 8) {
+                Text(title)
+                    .font(.largeTitle.bold())
+                Text(appName)
+                    .font(.title3)
+                    .foregroundStyle(.secondary)
+                ProgressView(value: progress)
+                    .tint(failure == nil ? .accentColor : .red)
+                Text(stageSummary)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                if isRunning {
+                    Text("\(Int(progress * 100))%")
+                        .font(.caption.monospacedDigit())
+                        .foregroundStyle(.tertiary)
+                }
+            }
+
+            if let failure {
+                Label(failure, systemImage: "exclamationmark.triangle")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+                    .textSelection(.enabled)
+            }
+
+            DisclosureGroup("Activity Log", isExpanded: $isActivityExpanded) {
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        LazyVStack(alignment: .leading, spacing: 9) {
+                            ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
+                                Text(line)
+                                    .font(.system(.footnote, design: .monospaced))
+                                    .foregroundStyle(line.contains("ERROR") ? .red : .primary)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .id(index)
+                            }
+                        }
+                        .padding(14)
+                    }
+                    .frame(maxHeight: 280)
+                    .background(Color(uiColor: .secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
+                    .onChange(of: lines.count) { _, count in
+                        if isActivityExpanded, count > 0 { proxy.scrollTo(count - 1, anchor: .bottom) }
+                    }
+                    .onChange(of: isActivityExpanded) { _, expanded in
+                        if expanded, !lines.isEmpty { proxy.scrollTo(lines.count - 1, anchor: .bottom) }
+                    }
+                }
+            }
+
+            if !isRunning {
+                if failure != nil {
+                    SwiftUI.Button(action: onRetry) {
+                        Label("Try Again", systemImage: "arrow.clockwise")
+                            .fontWeight(.semibold)
+                            .frame(maxWidth: .infinity)
+                    }
+                    .buttonStyle(.borderedProminent)
+                    .buttonBorderShape(.capsule)
+
+                    if shouldOfferReconnect, let account, let accountStore {
+                        NavigationLink {
+                            SigningAccountDetailView(account: account, accountStore: accountStore, forceReconnect: true)
+                        } label: {
+                            Label("Reconnect Apple ID", systemImage: "person.crop.circle.badge.exclamationmark")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.bordered)
+                        .buttonBorderShape(.capsule)
+                    }
+                }
+
+                if failure == nil {
+                    SwiftUI.Button("Done", action: onClose)
+                        .fontWeight(.semibold)
+                        .frame(maxWidth: .infinity)
+                        .buttonStyle(.borderedProminent)
+                        .buttonBorderShape(.capsule)
+                } else {
+                    SwiftUI.Button("Close", action: onClose)
+                        .fontWeight(.semibold)
+                        .frame(maxWidth: .infinity)
+                        .buttonStyle(.bordered)
+                        .buttonBorderShape(.capsule)
+                }
+            }
+        }
+        .padding()
+        .navigationTitle(title)
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(isRunning ? .hidden : .visible, for: .navigationBar)
+        .interactiveDismissDisabled(isRunning)
+    }
+
+    private var shouldOfferReconnect: Bool {
+        guard let failure else { return false }
+        let message = failure.localizedLowercase
+        return ["account", "apple id", "session", "credential", "sign in", "authentication", "certificate", "keychain", "provision"]
+            .contains { message.localizedCaseInsensitiveContains($0) }
     }
 }
 
@@ -563,60 +677,22 @@ private struct RefreshConsoleView: View {
     @State private var didStart = false
     @State private var failure: String?
     @State private var lastLoggedPercent = -5
+    @State private var stageSummary = "Preparing your app"
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(isRunning ? operation.progressTitle : (failure == nil ? operation.completedTitle : operation.failedTitle))
-                    .font(.largeTitle.bold())
-                Text(app.name)
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-                ProgressView(value: progress)
-                    .tint(failure == nil ? .accentColor : .red)
-                Text(isRunning ? "\(Int(progress * 100))%" : (failure == nil ? "Complete" : "Needs attention"))
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
-
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 9) {
-                        ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
-                            Text(line)
-                                .font(.system(.footnote, design: .monospaced))
-                                .foregroundStyle(line.contains("ERROR") ? .red : .primary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .id(index)
-                        }
-                    }
-                    .padding(14)
-                }
-                .background(Color(uiColor: .secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
-                .onChange(of: lines.count) { _, count in
-                    if count > 0 { proxy.scrollTo(count - 1, anchor: .bottom) }
-                }
-            }
-
-            if let failure {
-                Text(failure)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
-            if !isRunning {
-                SwiftUI.Button(failure == nil ? "Done" : "Close") { dismiss() }
-                    .fontWeight(.semibold)
-                    .frame(maxWidth: .infinity)
-                    .buttonStyle(.borderedProminent)
-                    .buttonBorderShape(.capsule)
-            }
-        }
-        .padding()
-        .navigationTitle(operation.activityTitle)
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(isRunning ? .hidden : .visible, for: .navigationBar)
-        .interactiveDismissDisabled(isRunning)
+        OperationStatusView(
+            title: operation.statusTitle,
+            appName: app.name,
+            stageSummary: stageSummary,
+            progress: progress,
+            isRunning: isRunning,
+            failure: failure,
+            lines: lines,
+            account: reconnectAccount,
+            accountStore: accountStore,
+            onRetry: retry,
+            onClose: { dismiss() }
+        )
         .task {
             guard !didStart else { return }
             didStart = true
@@ -626,6 +702,8 @@ private struct RefreshConsoleView: View {
 
     @MainActor
     private func runRefresh() async {
+        failure = nil
+        stageSummary = "Preparing your app for \(operation == .refresh ? "refresh" : "re-signing")"
         append("Starting \(operation == .refresh ? "refresh" : "re-sign") · \(Date.now.formatted(date: .omitted, time: .standard))")
         append("Account selected · \(selectedAccount?.email ?? app.accountEmail)")
         append(operation == .refresh ? "Preparing signing refresh" : "Preparing app re-sign")
@@ -644,10 +722,12 @@ private struct RefreshConsoleView: View {
                 }
             }
             progress = 1
+            stageSummary = operation == .refresh ? "Your app was refreshed." : "Your app was re-signed."
             append(operation == .refresh ? "Refresh completed successfully" : "Re-sign completed successfully")
             await ExpirationNotificationScheduler.update()
         } catch {
             failure = error.localizedDescription
+            stageSummary = operation == .refresh ? "SideKick couldn’t refresh this app." : "SideKick couldn’t re-sign this app."
             append("ERROR · \(error.localizedDescription)")
         }
         isRunning = false
@@ -657,6 +737,7 @@ private struct RefreshConsoleView: View {
     private func updateProgress(_ value: Double) {
         progress = min(max(value, 0), 1)
         if value > 0 {
+            stageSummary = operation == .refresh ? "Signing and refreshing your app." : "Signing your app."
             let percent = Int(value * 100)
             if percent >= lastLoggedPercent + 5 || percent == 100 {
                 lastLoggedPercent = percent
@@ -668,6 +749,21 @@ private struct RefreshConsoleView: View {
     @MainActor
     private func append(_ message: String) {
         lines.append("[\(Date.now.formatted(date: .omitted, time: .standard))] \(message)")
+    }
+
+    private var reconnectAccount: SigningAccountSummary? {
+        selectedAccount ?? accountStore.accounts.first {
+            $0.accountIdentifier == app.accountIdentifier && $0.teamIdentifier == app.teamIdentifier
+        }
+    }
+
+    @MainActor
+    private func retry() {
+        progress = 0
+        lastLoggedPercent = -5
+        stageSummary = "Preparing your app"
+        isRunning = true
+        Task { await runRefresh() }
     }
 }
 
@@ -878,13 +974,14 @@ private struct JITEnableView: View {
 
 struct InstallAccountSelectionView: View {
     let app: ImportedIPA
-    let accounts: [SigningAccountSummary]
     let accountStore: SigningAccountStore
     let ipaStore: IPAImportStore
     let isUpdate: Bool
     let onInstalled: (() async -> Void)?
     var onSourceMissing: (() async -> Void)? = nil
     var currentTeamIdentifier: String? = nil
+
+    private var accounts: [SigningAccountSummary] { accountStore.accounts }
 
     var body: some View {
         List {
@@ -921,6 +1018,10 @@ struct InstallAccountSelectionView: View {
         .listStyle(.insetGrouped)
         .navigationTitle("Choose Account")
         .navigationBarTitleDisplayMode(.inline)
+        .onAppear { Task { await accountStore.reload() } }
+        .onReceive(NotificationCenter.default.publisher(for: .sideKickSigningAccountsDidChange)) { _ in
+            Task { await accountStore.reload() }
+        }
     }
 }
 
@@ -940,61 +1041,23 @@ struct InstallConsoleView: View {
     @State private var didStart = false
     @State private var failure: String?
     @State private var lastLoggedPercent = -5
+    @State private var stageSummary = "Preparing your app"
     @State private var showingInstallConfirmation = false
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 20) {
-            VStack(alignment: .leading, spacing: 8) {
-                Text(isRunning ? (isUpdate ? "Updating" : "Installing") : (failure == nil ? (isUpdate ? "Updated" : "Installed") : (isUpdate ? "Update Failed" : "Install Failed")))
-                    .font(.largeTitle.bold())
-                Text(app.name)
-                    .font(.title3)
-                    .foregroundStyle(.secondary)
-                ProgressView(value: progress)
-                    .tint(failure == nil ? .accentColor : .red)
-                Text(isRunning ? "\(Int(progress * 100))%" : (failure == nil ? "Complete" : "Needs attention"))
-                    .font(.caption.monospacedDigit())
-                    .foregroundStyle(.secondary)
-            }
-
-            ScrollViewReader { proxy in
-                ScrollView {
-                    LazyVStack(alignment: .leading, spacing: 9) {
-                        ForEach(Array(lines.enumerated()), id: \.offset) { index, line in
-                            Text(line)
-                                .font(.system(.footnote, design: .monospaced))
-                                .foregroundStyle(line.contains("ERROR") ? .red : .primary)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .id(index)
-                        }
-                    }
-                    .padding(14)
-                }
-                .background(Color(uiColor: .secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
-                .onChange(of: lines.count) { _, count in
-                    if count > 0 { proxy.scrollTo(count - 1, anchor: .bottom) }
-                }
-            }
-
-            if let failure {
-                Text(failure)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
-
-            if !isRunning {
-                SwiftUI.Button(failure == nil ? "Done" : "Close") { dismiss() }
-                    .fontWeight(.semibold)
-                    .frame(maxWidth: .infinity)
-                    .buttonStyle(.borderedProminent)
-                    .buttonBorderShape(.capsule)
-            }
-        }
-        .padding()
-        .navigationTitle("Install Activity")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(isRunning ? .hidden : .visible, for: .navigationBar)
-        .interactiveDismissDisabled(isRunning)
+        OperationStatusView(
+            title: isUpdate ? "Update Status" : "Install Status",
+            appName: app.name,
+            stageSummary: stageSummary,
+            progress: progress,
+            isRunning: isRunning,
+            failure: failure,
+            lines: lines,
+            account: account,
+            accountStore: accountStore,
+            onRetry: retry,
+            onClose: { dismiss() }
+        )
         .task {
             guard !didStart else { return }
             didStart = true
@@ -1014,6 +1077,8 @@ struct InstallConsoleView: View {
 
     @MainActor
     private func runInstall() async {
+        failure = nil
+        stageSummary = isUpdate ? "Preparing your app update." : "Preparing your app for installation."
         append("Starting install · \(Date.now.formatted(date: .omitted, time: .standard))")
         append("Account selected · \(account.email)")
         append(isUpdate ? "Preparing update IPA" : "Preparing imported IPA")
@@ -1029,6 +1094,7 @@ struct InstallConsoleView: View {
                     let clamped = min(max(fraction, 0), 1)
                     progress = clamped
                     if clamped > 0 {
+                        stageSummary = "Signing and installing your app."
                         let percent = Int(clamped * 100)
                         if percent >= lastLoggedPercent + 5 || percent == 100 {
                             lastLoggedPercent = percent
@@ -1037,10 +1103,12 @@ struct InstallConsoleView: View {
                     }
                 }
             progress = 1
+            stageSummary = isUpdate ? "Your app was updated." : "Your app was installed."
             append(isUpdate ? "Update completed successfully" : "Install completed successfully")
             await onInstalled?()
         } catch {
             failure = error.localizedDescription
+            stageSummary = isUpdate ? "SideKick couldn’t update this app." : "SideKick couldn’t install this app."
             append("ERROR · \(error.localizedDescription)")
             if let importError = error as? IPAImportError, case .sourceFileMissing = importError {
                 await onSourceMissing?()
@@ -1052,5 +1120,14 @@ struct InstallConsoleView: View {
     @MainActor
     private func append(_ message: String) {
         lines.append("[\(Date.now.formatted(date: .omitted, time: .standard))] \(message)")
+    }
+
+    @MainActor
+    private func retry() {
+        progress = 0
+        lastLoggedPercent = -5
+        stageSummary = "Preparing your app"
+        isRunning = true
+        Task { await runInstall() }
     }
 }

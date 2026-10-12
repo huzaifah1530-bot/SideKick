@@ -5,6 +5,7 @@ struct GitHubTokenPickerView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var credentials: [GitHubCredentialStore.Credential] = []
     @State private var errorMessage: String?
+    @State private var hasLoadedCredentials = false
 
     var body: some View {
         List {
@@ -16,16 +17,41 @@ struct GitHubTokenPickerView: View {
                 }
             }
             Section {
-                Text("Add or edit tokens in Settings → GitHub Tokens.")
-                    .font(.footnote).foregroundStyle(.secondary)
+                NavigationLink {
+                    GitHubTokenEditorView(credential: nil)
+                } label: {
+                    Label("Add Token", systemImage: "plus.circle")
+                }
+                NavigationLink {
+                    GitHubAccountSettingsView()
+                } label: {
+                    Label("Manage Tokens", systemImage: "gearshape")
+                }
             }
             if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
         }
         .navigationTitle("Choose GitHub Token")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear {
-            do { credentials = try GitHubCredentialStore().all() }
-            catch { errorMessage = error.localizedDescription }
+        .onAppear(perform: reloadCredentials)
+        .onReceive(NotificationCenter.default.publisher(for: .sideKickGitHubSettingsDidChange)) { _ in
+            reloadCredentials()
+        }
+    }
+
+    private func reloadCredentials() {
+        do {
+            let refreshed = try GitHubCredentialStore().all()
+            if hasLoadedCredentials {
+                let previousIDs = Set(credentials.map(\.id))
+                if let newlyAdded = refreshed.last(where: { !previousIDs.contains($0.id) }) {
+                    selection = newlyAdded.id
+                }
+            }
+            credentials = refreshed
+            errorMessage = nil
+            hasLoadedCredentials = true
+        } catch {
+            errorMessage = error.localizedDescription
         }
     }
 

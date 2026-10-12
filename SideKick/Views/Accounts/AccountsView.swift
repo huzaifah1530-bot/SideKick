@@ -10,6 +10,23 @@ struct AccountsView: View {
     var body: some View {
         NavigationStack {
             List {
+                if accountStore.isWorking {
+                    Section {
+                        HStack(spacing: 12) {
+                            ProgressView()
+                            VStack(alignment: .leading, spacing: 3) {
+                                Text("Adding Apple ID")
+                                    .font(.subheadline.weight(.medium))
+                                if let checkpoint = accountStore.signInCheckpoint {
+                                    Text(friendlySignInCheckpoint(checkpoint))
+                                        .font(.footnote)
+                                        .foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                        .accessibilityElement(children: .combine)
+                    }
+                }
                 if let loadError = accountStore.loadError {
                     Section {
                         Label(loadError, systemImage: "exclamationmark.triangle")
@@ -101,11 +118,23 @@ struct AccountsView: View {
             }
         }
     }
+
+    private func friendlySignInCheckpoint(_ checkpoint: String) -> String {
+        switch checkpoint {
+        case "Starting Apple ID authentication": "Connecting to Apple"
+        case "Apple authentication succeeded; resolving developer team": "Finding your developer team"
+        case "Apple ID authenticated; saving its signing session": "Saving your sign-in"
+        case "Session saved; refreshing the account list": "Updating your accounts"
+        case "Apple ID authenticated; preparing this device for signing": "Preparing this device for signing"
+        default: "Finishing Apple ID sign-in"
+        }
+    }
 }
 
 struct SigningAccountDetailView: View {
     let account: SigningAccountSummary
     let accountStore: SigningAccountStore
+    var forceReconnect = false
     @Environment(\.dismiss) private var dismiss
     @State private var errorMessage: String?
     @State private var isConfirmingRemoval = false
@@ -128,7 +157,7 @@ struct SigningAccountDetailView: View {
             }
 
             Section {
-                if !currentAccount.hasSavedSession || currentAccount.rawTeamType == nil {
+                if forceReconnect || !currentAccount.hasSavedSession || currentAccount.rawTeamType == nil {
                     SwiftUI.Button { isShowingReconnect = true } label: {
                         Label("Sign In Again", systemImage: "person.crop.circle.badge.checkmark")
                     }

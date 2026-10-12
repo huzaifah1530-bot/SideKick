@@ -7,18 +7,34 @@ extension Notification.Name {
 protocol LiveContainerDirectoryAccess: Sendable {
     func bookmark(for directory: URL) throws -> Data
     func scan(bookmark: Data, connectionID: UUID) throws -> (LiveContainerScan, Data?)
+    func guest(bookmark: Data, connectionID: UUID, folder: String) throws -> LiveContainerGuest
+}
+
+extension LiveContainerDirectoryAccess {
+    func guest(bookmark: Data, connectionID: UUID, folder: String) throws -> LiveContainerGuest {
+        let (scan, _) = try scan(bookmark: bookmark, connectionID: connectionID)
+        guard let guest = scan.apps.first(where: { $0.folder == folder }) else {
+            throw LiveContainerError.guestMissing
+        }
+        return guest
+    }
+}
+
+private enum LiveContainerReadResult: Sendable {
+    case scan(LiveContainerScan, Data?)
+    case guest(LiveContainerGuest)
 }
 
 // Cancellation releases the caller immediately even if a file provider is stalled.
 // The read worker owns its scope until it exits and can never publish late results.
 private final class LiveContainerReadOperation: @unchecked Sendable {
     private let lock = NSLock()
-    private var continuation: CheckedContinuation<(LiveContainerScan, Data?), Error>?
-    private var result: Result<(LiveContainerScan, Data?), Error>?
+    private var continuation: CheckedContinuation<LiveContainerReadResult, Error>?
+    private var result: Result<LiveContainerReadResult, Error>?
     private var worker: Task<Void, Never>?
     private var cancelProvider: (@Sendable () -> Void)?
 
-    func begin(_ continuation: CheckedContinuation<(LiveContainerScan, Data?), Error>) {
+    func begin(_ continuation: CheckedContinuation<LiveContainerReadResult, Error>) {
         lock.lock()
         if let result { lock.unlock(); continuation.resume(with: result) }
         else { self.continuation = continuation; lock.unlock() }
@@ -37,7 +53,7 @@ private final class LiveContainerReadOperation: @unchecked Sendable {
         lock.unlock()
         if finished { callback() }
     }
-    func finish(_ result: Result<(LiveContainerScan, Data?), Error>) {
+    func finish(_ result: Result<LiveContainerReadResult, Error>) {
         lock.lock()
         guard self.result == nil else { lock.unlock(); return }
         self.result = result
@@ -63,6 +79,20 @@ private enum LiveContainerReadContext {
     @TaskLocal static var operation: LiveContainerReadOperation?
 
     static func scan(access: any LiveContainerDirectoryAccess, bookmark: Data, id: UUID) async throws -> (LiveContainerScan, Data?) {
+        guard case .scan(let value, let renewed) = try await read(access: access, bookmark: bookmark, id: id) {
+            throw LiveContainerError.accessRevoked
+        }
+        return (value, renewed)
+    }
+
+    static func guest(access: any LiveContainerDirectoryAccess, bookmark: Data, id: UUID, folder: String) async throws -> LiveContainerGuest {
+        guard case .guest(let value) = try await read(access: access, bookmark: bookmark, id: id, folder: folder) else {
+            throw LiveContainerError.accessRevoked
+        }
+        return value
+    }
+
+    private static func read(access: any LiveContainerDirectoryAccess, bookmark: Data, id: UUID, folder: String? = nil) async throws -> LiveContainerReadResult {
         let operation = LiveContainerReadOperation()
         return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
@@ -71,7 +101,9 @@ private enum LiveContainerReadContext {
                     let result = Result {
                         try $operation.withValue(operation) {
                             try Task.checkCancellation()
-                            return try access.scan(bookmark: bookmark, connectionID: id)
+                            if let folder { return .guest(try access.guest(bookmark: bookmark, connectionID: id, folder: folder)) }
+                            let (scan, renewed) = try access.scan(bookmark: bookmark, connectionID: id)
+                            return .scan(scan, renewed)
                         }
                     }
                     operation.finish(result)
@@ -120,6 +152,30 @@ struct SystemLiveContainerDirectoryAccess: LiveContainerDirectoryAccess {
         return (scan, renewed)
         #endif
     }
+
+    func guest(bookmark: Data, connectionID: UUID, folder: String) throws -> LiveContainerGuest {
+        #if os(Linux)
+        guard let path = String(data: bookmark, encoding: .utf8) else { throw LiveContainerError.accessRevoked }
+        return try LiveContainerScanner.scan(directory: URL(fileURLWithPath: path), connectionID: connectionID, folder: folder)
+        #else
+        var stale = false
+        let url = try URL(resolvingBookmarkData: bookmark, options: [], relativeTo: nil, bookmarkDataIsStale: &stale)
+        let scoped = url.startAccessingSecurityScopedResource()
+        defer { if scoped { url.stopAccessingSecurityScopedResource() } }
+        var coordinationError: NSError?
+        var result: Result<LiveContainerGuest, Error>?
+        let coordinator = NSFileCoordinator()
+        LiveContainerReadContext.operation?.coordinateCancellation { coordinator.cancel() }
+        try Task.checkCancellation()
+        coordinator.coordinate(readingItemAt: url, options: [], error: &coordinationError) { coordinated in
+            result = Result { try LiveContainerScanner.scan(directory: coordinated, connectionID: connectionID, folder: folder) }
+        }
+        try Task.checkCancellation()
+        if let coordinationError { throw coordinationError }
+        guard let result else { throw LiveContainerError.accessRevoked }
+        return try result.get()
+        #endif
+    }
 }
 
 actor LiveContainerStore {
@@ -146,6 +202,7 @@ actor LiveContainerStore {
     @discardableResult
     func link(directory: URL, name: String, scheme: String, storageKind: LiveContainerStorageKind, replacing id: UUID? = nil) async throws -> LiveContainerConnection {
         _ = try LiveContainerLaunch.url(scheme: scheme)
+        if let id, try snapshot().pendingForgetGuestIDs[id] != nil { throw LiveContainerError.busy }
         let access = self.access
         let connectionID = id ?? UUID()
         let generation = UUID()
@@ -176,6 +233,7 @@ actor LiveContainerStore {
     func rescan(_ id: UUID) async throws {
         guard scans[id] == nil else { throw LiveContainerError.busy }
         let state = try snapshot()
+        guard state.pendingForgetGuestIDs[id] == nil else { throw LiveContainerError.busy }
         guard let connection = state.connections.first(where: { $0.id == id }), let bookmark = connection.bookmark else {
             throw LiveContainerError.disconnected
         }
@@ -233,17 +291,38 @@ actor LiveContainerStore {
         accessRevisions[guest.connectionID] = UUID()
     }
 
-    @discardableResult
-    func forget(_ id: UUID) throws -> [String] {
+    /// Records the complete cleanup set before any source settings are removed.
+    /// The connection and catalogue stay intact until every source write succeeds.
+    func beginForget(_ id: UUID, additionalGuestIDs: [String] = []) throws -> [String] {
         var state = try snapshot()
-        let ids = state.apps.filter { $0.connectionID == id }.map(\.id)
-        state.connections.removeAll { $0.id == id }
-        state.apps.removeAll { $0.connectionID == id }
+        let knownIDs = state.pendingForgetGuestIDs[id] ?? state.apps.filter { $0.connectionID == id }.map(\.id)
+        let ids = Array(Set(knownIDs + additionalGuestIDs)).sorted()
+        state.pendingForgetGuestIDs[id] = ids
+        if ids.isEmpty {
+            state.connections.removeAll { $0.id == id }
+            state.apps.removeAll { $0.connectionID == id }
+            state.pendingForgetGuestIDs[id] = nil
+        }
         scans[id] = nil
         links[id] = nil
         try save(state)
         accessRevisions[id] = UUID()
         return ids
+    }
+
+    /// Advances a pending forget only after its GitHub setting was removed.
+    func completeForgetSource(_ guestID: String, connectionID: UUID) throws {
+        var state = try snapshot()
+        guard var remaining = state.pendingForgetGuestIDs[connectionID], remaining.contains(guestID) else { return }
+        remaining.removeAll { $0 == guestID }
+        if remaining.isEmpty {
+            state.pendingForgetGuestIDs[connectionID] = nil
+            state.connections.removeAll { $0.id == connectionID }
+            state.apps.removeAll { $0.connectionID == connectionID }
+        } else {
+            state.pendingForgetGuestIDs[connectionID] = remaining
+        }
+        try save(state)
     }
 
     func launchURL(for guestID: String) async throws -> URL {
@@ -253,9 +332,14 @@ actor LiveContainerStore {
               let bookmark = connection.bookmark else { throw LiveContainerError.disconnected }
         guard connection.storageKind != .snapshot else { throw LiveContainerError.guestMissing }
         let accessRevision = accessRevisions[connection.id]
-        // Launch validates local files independently of background catalogue scans.
-        // It neither waits for a repository check nor takes its scan ownership.
-        let (scan, _) = try await LiveContainerReadContext.scan(access: access, bookmark: bookmark, id: connection.id)
+        // Launch validates only this app bundle. It neither reads sibling apps/icons,
+        // waits for a repository check nor takes catalogue scan ownership.
+        let current = try await LiveContainerReadContext.guest(
+            access: access,
+            bookmark: bookmark,
+            id: connection.id,
+            folder: guest.folder
+        )
         try Task.checkCancellation()
         let state = try snapshot()
         // Access may have been disconnected, forgotten, or replaced during the read.
@@ -266,8 +350,9 @@ actor LiveContainerStore {
               linked.storageKind == connection.storageKind, links[connection.id] == nil else {
             throw LiveContainerError.disconnected
         }
-        guard let current = scan.apps.first(where: { $0.id == guestID }),
-              current.isAvailable, current.warning == nil else { throw LiveContainerError.guestMissing }
+        guard current.id == guestID, current.isAvailable, current.warning == nil else {
+            throw LiveContainerError.guestMissing
+        }
         return try LiveContainerLaunch.url(scheme: connection.scheme, folder: current.folder)
     }
 

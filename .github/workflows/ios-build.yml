@@ -49,6 +49,9 @@ jobs:
       - name: Test SideKick scanner, persistence, baseline, and storage boundaries
         run: swift test
 
+      - name: Test release manifest validation
+        run: python3 -m unittest discover -s Tests/ReleaseManifest -v
+
       - name: Apply SideKick integration patch to SideStore
         run: git -C Vendor/SideStore apply ../../patches/sidestore-sidekick.patch
 
@@ -66,6 +69,19 @@ jobs:
 
       - name: Embed SideKick local VPN extension
         run: python3 scripts/embed-local-vpn.py Vendor/SideStore
+
+      - name: Apply verified audit fixes to pinned vendor sources
+        run: |
+          git -C Vendor/SideStore apply ../../patches/sidestore-audit-fixes.patch
+          git -C Vendor/SideStore/Dependencies/SideSign apply ../../../../patches/sidesign-audit-fixes.patch
+          git -C Vendor/SideStore/Dependencies/minimuxer apply ../../../../patches/minimuxer-audit-fixes.patch
+
+      - name: Test vendor audit regressions
+        run: |
+          python3 scripts/verify-sidestore-regressions.py
+          python3 scripts/verify-dependency-regressions.py
+          swiftc -parse-as-library Vendor/SideStore/AltStore/Core/DataSources/PrefetchTaskRegistry.swift Tests/PrefetchRegistry/PrefetchTaskRegistryRegression.swift -o "$RUNNER_TEMP/sidekick-prefetch-regression"
+          "$RUNNER_TEMP/sidekick-prefetch-regression"
 
       - name: Cache Swift package checkouts
         uses: actions/cache@v4
@@ -174,12 +190,23 @@ jobs:
             --exclude='./.swiftpm' \
             --exclude='./build' \
             --exclude='./artifacts' \
+            --exclude='./dist' \
             --exclude='./Payload' \
             --exclude='./VPNPayload' \
             --exclude='./sidestore-reference' \
             --exclude='./failed-run' \
             --exclude='./action-logs-*' \
             .
+
+      - name: Validate package metadata and identify this build
+        run: python3 scripts/create-release-manifest.py
+
+      - name: Upload release manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: SideKick-release-manifest
+          path: artifacts/SideKick-release-manifest.json
+          if-no-files-found: error
 
       - name: Upload IPA artifact
         uses: actions/upload-artifact@v4

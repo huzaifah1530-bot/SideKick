@@ -1,0 +1,3323 @@
+diff --git a/CLI/CommandHandler.swift b/CLI/CommandHandler.swift
+index e199e8b..20bafb0 100644
+--- a/CLI/CommandHandler.swift
++++ b/CLI/CommandHandler.swift
+@@ -74,11 +74,18 @@ public enum CommandHandler {
+ 
+     public static func handleSign(context: SignContext) async throws {
+         let targetURL = URL(fileURLWithPath: context.targetPath)
++        let resolvedTargetURL = canonicalFileURL(targetURL)
+         var isDir: ObjCBool = false
+         guard FileManager.default.fileExists(atPath: targetURL.path, isDirectory: &isDir) else {
+             throw CLIError.executionFailed("Target path does not exist: \(context.targetPath)")
+         }
+ 
++        let isIPA = targetURL.pathExtension.lowercased() == "ipa"
++        let isApp = targetURL.pathExtension.lowercased() == "app"
++        if (isIPA || isApp), context.entitlementsPath != nil {
++            throw CLIError.invalidArgument("--entitlements is not supported when signing an .app or .ipa; app entitlements are derived from the provisioning profiles.")
++        }
++
+         let p12URL = URL(fileURLWithPath: context.p12Path)
+         guard FileManager.default.fileExists(atPath: p12URL.path) else {
+             throw CLIError.executionFailed("P12 file does not exist: \(context.p12Path)")
+@@ -87,20 +94,47 @@ public enum CommandHandler {
+         let p12Data = try Data(contentsOf: p12URL)
+         let keyStore = try KeyStore(p12Data: p12Data, password: context.password)
+ 
+-        let isIPA = targetURL.pathExtension.lowercased() == "ipa"
+-        let isApp = targetURL.pathExtension.lowercased() == "app"
+-
+         if isIPA || isApp {
+             let workingDir = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+             try FileManager.default.createDirectory(at: workingDir, withIntermediateDirectories: true)
+             defer { try? FileManager.default.removeItem(at: workingDir) }
+ 
+-            let appURL: URL
++            var appURL: URL
+             if isIPA {
+                 print("[Unpack] Unpacking IPA...")
+                 appURL = try FileManager.default.unzipAppBundle(at: targetURL, to: workingDir)
+             } else {
+-                appURL = targetURL
++                appURL = resolvedTargetURL
++            }
++
++            var finalAppOutputURL: URL?
++            var appOutputStagingRoot: URL?
++            defer {
++                if let appOutputStagingRoot {
++                    try? FileManager.default.removeItem(at: appOutputStagingRoot)
++                }
++            }
++            if !isIPA, let outputPath = context.outputPath {
++                let requestedOutputURL = canonicalFileURL(URL(fileURLWithPath: outputPath))
++                if sameCanonicalPath(appURL, requestedOutputURL) {
++                    finalAppOutputURL = appURL
++                } else {
++                    guard !pathsOverlap(appURL, requestedOutputURL) else {
++                        throw CLIError.invalidArgument("Output path overlaps the source App Bundle: \(requestedOutputURL.path)")
++                    }
++                    let outputParent = requestedOutputURL.deletingLastPathComponent()
++                    var isDirectory: ObjCBool = false
++                    guard FileManager.default.fileExists(atPath: outputParent.path, isDirectory: &isDirectory), isDirectory.boolValue else {
++                        throw CLIError.invalidArgument("Output directory does not exist: \(outputParent.path)")
++                    }
++                    let stagingRoot = outputParent.appendingPathComponent(".sidesign-stage-\(UUID().uuidString)", isDirectory: true)
++                    try FileManager.default.createDirectory(at: stagingRoot, withIntermediateDirectories: false)
++                    appOutputStagingRoot = stagingRoot
++                    let stagedAppURL = stagingRoot.appendingPathComponent(appURL.lastPathComponent, isDirectory: true)
++                    try FileManager.default.copyItem(at: appURL, to: stagedAppURL)
++                    appURL = stagedAppURL
++                    finalAppOutputURL = requestedOutputURL
++                }
+             }
+ 
+             if let infoPlistPath = context.infoPlistPath {
+@@ -152,25 +186,28 @@ public enum CommandHandler {
+                 print("[Package] Repackaging IPA...")
+                 let finalOutURL: URL
+                 if let outputPath = context.outputPath {
+-                    finalOutURL = URL(fileURLWithPath: outputPath)
++                    let requestedOutputURL = canonicalFileURL(URL(fileURLWithPath: outputPath))
++                    if sameCanonicalPath(targetURL, requestedOutputURL) {
++                        finalOutURL = resolvedTargetURL
++                    } else {
++                        guard !pathsOverlap(targetURL, requestedOutputURL) else {
++                            throw CLIError.invalidArgument("Output path overlaps the source IPA: \(requestedOutputURL.path)")
++                        }
++                        finalOutURL = requestedOutputURL
++                    }
+                 } else {
+                     let outName = targetURL.deletingPathExtension().lastPathComponent + "_signed.ipa"
+                     finalOutURL = targetURL.deletingLastPathComponent().appendingPathComponent(outName)
+                 }
+                 let zippedIPA = try FileManager.default.zipAppBundle(at: appURL, compressionLevel: .none)
+-                if FileManager.default.fileExists(atPath: finalOutURL.path) {
+-                    try FileManager.default.removeItem(at: finalOutURL)
+-                }
+-                try FileManager.default.moveItem(at: zippedIPA, to: finalOutURL)
++                try replaceOutput(with: zippedIPA, at: finalOutURL)
+                 print("Successfully signed IPA: \(finalOutURL.path)")
+             } else {
+-                if let outputPath = context.outputPath {
+-                    let finalAppURL = URL(fileURLWithPath: outputPath)
+-                    if FileManager.default.fileExists(atPath: finalAppURL.path) {
+-                        try FileManager.default.removeItem(at: finalAppURL)
++                if let finalAppOutputURL {
++                    if !sameCanonicalPath(appURL, finalAppOutputURL) {
++                        try replaceOutput(with: appURL, at: finalAppOutputURL)
+                     }
+-                    try FileManager.default.copyItem(at: appURL, to: finalAppURL)
+-                    print("Successfully signed App Bundle: \(finalAppURL.path)")
++                    print("Successfully signed App Bundle: \(finalAppOutputURL.path)")
+                 } else {
+                     print("Successfully signed App Bundle in place: \(appURL.path)")
+                 }
+@@ -213,6 +250,44 @@ public enum CommandHandler {
+         }
+     }
+ 
++    private static func canonicalFileURL(_ url: URL) -> URL {
++        url.standardizedFileURL.resolvingSymlinksInPath().standardizedFileURL
++    }
++
++    private static func sameCanonicalPath(_ lhs: URL, _ rhs: URL) -> Bool {
++        canonicalFileURL(lhs).path == canonicalFileURL(rhs).path
++    }
++
++    private static func pathsOverlap(_ lhs: URL, _ rhs: URL) -> Bool {
++        let left = canonicalFileURL(lhs).path
++        let right = canonicalFileURL(rhs).path
++        func contains(_ parent: String, _ child: String) -> Bool {
++            if parent == "/" { return child.hasPrefix("/") }
++            return child.hasPrefix(parent + "/")
++        }
++        return left == right || contains(left, right) || contains(right, left)
++    }
++
++    private static func replaceOutput(with stagedURL: URL, at outputURL: URL) throws {
++        let fileManager = FileManager.default
++        let destinationURL = canonicalFileURL(outputURL)
++        let parentURL = destinationURL.deletingLastPathComponent()
++        var isDirectory: ObjCBool = false
++        guard fileManager.fileExists(atPath: parentURL.path, isDirectory: &isDirectory), isDirectory.boolValue else {
++            throw CLIError.invalidArgument("Output directory does not exist: \(parentURL.path)")
++        }
++
++        let replacementURL = parentURL.appendingPathComponent(".sidesign-replacement-\(UUID().uuidString)")
++        try fileManager.copyItem(at: stagedURL, to: replacementURL)
++        defer { try? fileManager.removeItem(at: replacementURL) }
++
++        if fileManager.fileExists(atPath: destinationURL.path) {
++            _ = try fileManager.replaceItemAt(destinationURL, withItemAt: replacementURL, backupItemName: nil, options: [])
++        } else {
++            try fileManager.moveItem(at: replacementURL, to: destinationURL)
++        }
++    }
++
+     public static func handleVerify(context: VerifyContext) throws {
+         let targetURL = URL(fileURLWithPath: context.targetPath)
+         let isIPA = targetURL.pathExtension.lowercased() == "ipa"
+@@ -567,6 +642,9 @@ public enum CommandHandler {
+             let strict,
+             let forceODA
+         ):
++            if asJSON && selectServer {
++                throw CLIError.invalidArgument("--select-server cannot be used with --json; provide --server or --failover with --source.")
++            }
+             if selectServer {
+                 serverURL = try await selectAnisetteServerInteractively(sourceURLString: sourceURLStr)
+             }
+@@ -623,6 +701,9 @@ public enum CommandHandler {
+                             deviceDataPassword = p
+                             loaded = true
+                         } catch DeviceDataError.invalidPassword {
++                            if asJSON {
++                                throw CLIError.executionFailed("Invalid device data password. Supply the correct --machine-password for JSON mode.")
++                            }
+                             printError("Invalid device data password.")
+                             guard let entered = readSecurePassword(prompt: "Enter password for device data ('\(targetDataURL.lastPathComponent)'): "), !entered.isEmpty else {
+                                 throw CLIError.executionFailed("Operation cancelled.")
+@@ -632,6 +713,9 @@ public enum CommandHandler {
+                             throw CLIError.executionFailed("Loading device data from '\(targetDataURL.path)': \(error.localizedDescription)")
+                         }
+                     } else {
++                        if asJSON {
++                            throw CLIError.missingRequiredArgument("--machine-password is required to read existing encrypted device data in JSON mode.")
++                        }
+                         guard let entered = readSecurePassword(prompt: "Enter password for device data ('\(targetDataURL.lastPathComponent)'): "), !entered.isEmpty else {
+                             throw CLIError.missingRequiredArgument("Device data password cannot be empty.")
+                         }
+@@ -720,7 +804,7 @@ public enum CommandHandler {
+             }
+ 
+             if let freshBlob = newAdiPb {
+-                if deviceDataPassword == nil {
++                if deviceDataPassword == nil && !asJSON {
+                     if let entered = readSecurePassword(prompt: "Enter password to encrypt new device data (\(targetDataURL.lastPathComponent)): "), !entered.isEmpty {
+                         deviceDataPassword = entered
+                     }
+@@ -733,16 +817,22 @@ public enum CommandHandler {
+                         localUserID: data.localUserID
+                     )
+                     try DeviceDataManager.save(newData, to: targetDataURL, password: devPass)
+-                    print("Device data saved and encrypted to: \(targetDataURL.path)")
++                    if !asJSON {
++                        print("Device data saved and encrypted to: \(targetDataURL.path)")
++                    }
++                } else if asJSON {
++                    throw CLIError.missingRequiredArgument("--machine-password is required in JSON mode to encrypt and persist newly generated device data.")
+                 }
+             }
+ 
+             if asJSON {
+                 let headers = AnisetteDataManager.toHTTPHeaders(data: data)
+-                if let jsonData = try? JSONSerialization.data(withJSONObject: headers, options: .prettyPrinted),
+-                   let str = String(data: jsonData, encoding: .utf8) {
+-                    print(str)
++                guard JSONSerialization.isValidJSONObject(headers),
++                      let jsonData = try? JSONSerialization.data(withJSONObject: headers, options: [.prettyPrinted, .sortedKeys]),
++                      let str = String(data: jsonData, encoding: .utf8) else {
++                    throw CLIError.executionFailed("Unable to serialize Anisette headers as JSON.")
+                 }
++                print(str)
+             } else {
+                 print("MachineID:              \(data.machineID)")
+                 print("OneTimePassword:        \(data.oneTimePassword)")
+@@ -976,10 +1066,11 @@ public enum CommandHandler {
+     private static func handleAuthDevices(options: PortalDeviceOptions) async throws {
+         try await executePortalOperation(options: options.portalOptions) { portal, account, session in
+             let teams = try await portal.fetchTeams(for: account, session: session)
+-            guard let team = teams.first else {
++            guard !teams.isEmpty else {
+                 printError("No teams found on this account.")
+                 return
+             }
++            let team = try resolveSelectedPortalTeam(from: teams, options: options.portalOptions)
+ 
+             switch options.action {
+             case .register(let name, let udid):
+@@ -1075,13 +1166,28 @@ public enum CommandHandler {
+                     return
+                 }
+ 
+-                print("Found \(candidates.count) candidate device(s) to purge:")
+-                for c in candidates {
+-                    print("  - \(c.name) (ID: \(c.id))")
++                print("Found \(candidates.count) possible simulated-device match(es). These may include real Macs; none will be removed automatically:")
++                for (index, candidate) in candidates.enumerated() {
++                    print("  \(index + 1). \(candidate.name) (ID: \(candidate.id))")
++                }
++                print("Enter the exact device ID(s) to remove, comma-separated, or press Enter to cancel: ", terminator: "")
++                fflush(nil)
++                let selectedIDs = Set((readLine(strippingNewline: true) ?? "")
++                    .split(separator: ",")
++                    .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
++                    .filter { !$0.isEmpty })
++                guard !selectedIDs.isEmpty else {
++                    print("No devices selected; nothing was removed.")
++                    return
++                }
++                let candidateIDs = Set(candidates.map(\.id))
++                guard selectedIDs.isSubset(of: candidateIDs) else {
++                    throw CLIError.invalidArgument("Selection contains a device ID that was not listed. No devices were removed.")
+                 }
++                let selectedDevices = candidates.filter { selectedIDs.contains($0.id) }
+ 
+                 var removedCount = 0
+-                for c in candidates {
++                for c in selectedDevices {
+                     print("Removing '\(c.name)' (ID: \(c.id))...")
+                     do {
+                         if try await portal.removeAuthDevice(id: c.id, session: session) {
+@@ -1091,18 +1197,23 @@ public enum CommandHandler {
+                         printError("Failed to remove '\(c.name)': \(error.localizedDescription)")
+                     }
+                 }
+-                print("Purged \(removedCount)/\(candidates.count) simulated device(s) from account.")
++                print("Removed \(removedCount)/\(selectedDevices.count) selected device(s) from account.")
+             }
+         }
+     }
+ 
+     private static func handleAuthCerts(options: PortalCertOptions) async throws {
++        if case .create(_, _, let csrPath, _) = options.action, csrPath != nil {
++            throw CLIError.invalidArgument("--csr is not supported for portal certificate creation; SideSign currently generates the key pair and CSR used by Apple's certificate API.")
++        }
++
+         try await executePortalOperation(options: options.portalOptions) { portal, account, session in
+             let teams = try await portal.fetchTeams(for: account, session: session)
+-            guard let team = teams.first else {
++            guard !teams.isEmpty else {
+                 printError("No teams found on this account.")
+                 return
+             }
++            let team = try resolveSelectedPortalTeam(from: teams, options: options.portalOptions)
+ 
+             switch options.action {
+             case .create(let name, let certType, _, let outPath):
+@@ -1154,7 +1265,8 @@ public enum CommandHandler {
+     private static func handleAuthAppIDs(options: PortalAppIDOptions) async throws {
+         try await executePortalOperation(options: options.portalOptions) { portal, account, session in
+             let teams = try await portal.fetchTeams(for: account, session: session)
+-            guard let team = teams.first else { return }
++            guard !teams.isEmpty else { return }
++            let team = try resolveSelectedPortalTeam(from: teams, options: options.portalOptions)
+ 
+             switch options.action {
+             case .register(let name, let bundleID):
+@@ -1186,7 +1298,8 @@ public enum CommandHandler {
+     private static func handleAuthAppGroups(options: PortalAppGroupOptions) async throws {
+         try await executePortalOperation(options: options.portalOptions) { portal, account, session in
+             let teams = try await portal.fetchTeams(for: account, session: session)
+-            guard let team = teams.first else { return }
++            guard !teams.isEmpty else { return }
++            let team = try resolveSelectedPortalTeam(from: teams, options: options.portalOptions)
+ 
+             switch options.action {
+             case .create(let name, let groupID):
+@@ -1240,7 +1353,8 @@ public enum CommandHandler {
+     private static func handleAuthProfiles(options: PortalProfileOptions) async throws {
+         try await executePortalOperation(options: options.portalOptions) { portal, account, session in
+             let teams = try await portal.fetchTeams(for: account, session: session)
+-            guard let team = teams.first else { return }
++            guard !teams.isEmpty else { return }
++            let team = try resolveSelectedPortalTeam(from: teams, options: options.portalOptions)
+ 
+             switch options.action {
+             case .create(let bundleID, let profileType, let style, let name, let certIDs, let deviceIDs, let outputPath):
+@@ -1547,6 +1661,37 @@ public enum CommandHandler {
+         }
+     }
+ 
++    private static func resolveSelectedPortalTeam(from teams: [Team], options: PortalOptions) throws -> Team {
++        if let requestedTeamID = options.teamID {
++            guard let team = teams.first(where: { $0.identifier == requestedTeamID }) else {
++                throw CLIError.executionFailed("Selected team '\(requestedTeamID)' is not available to this Apple account.")
++            }
++            return team
++        }
++
++        let selectedSessionURL = options.sessionPath.map { URL(fileURLWithPath: $0) } ?? SessionManager.defaultSessionURL
++        if let selectedSessionData = try? Data(contentsOf: selectedSessionURL) {
++            let matchingTeamIDs = Set(SessionManager.listSessions().compactMap { entry -> String? in
++                guard let teamID = entry.teamID,
++                      teams.contains(where: { $0.identifier == teamID }),
++                      let teamSessionData = try? Data(contentsOf: entry.url),
++                      teamSessionData == selectedSessionData else { return nil }
++                return teamID
++            })
++            if matchingTeamIDs.count == 1,
++               let teamID = matchingTeamIDs.first,
++               let team = teams.first(where: { $0.identifier == teamID }) {
++                return team
++            }
++        }
++
++        if teams.count == 1, let onlyTeam = teams.first {
++            return onlyTeam
++        }
++
++        throw CLIError.invalidArgument("Cannot determine a unique team for this session. Specify --using-team-id <team_id> to choose the team for this operation.")
++    }
++
+     private static func fetchAnisetteHeaders(options: PortalOptions) async throws -> (AnisetteData, Data?, URL, String?) {
+         var serverURL = options.anisetteURL
+         if options.selectServer {
+diff --git a/CLI/PortalCommandsParser.swift b/CLI/PortalCommandsParser.swift
+index a8fc08c..eeae120 100644
+--- a/CLI/PortalCommandsParser.swift
++++ b/CLI/PortalCommandsParser.swift
+@@ -51,7 +51,7 @@ public enum PortalCommandsParser {
+         "appleID":          ["--apple-id", "-u", "-a"],
+         "password":         ["--password", "-p", "-pwd", "-w"],
+         "session":          ["--session", "--session-file", "-s"],
+-        "usingTeam":        ["--using-team", "--select-team", "-t"],
++        "usingTeam":        ["--using-team", "--select-team"],
+         "usingTeamID":      ["--using-team-id", "--select-team-id", "--use-team", "-tid"],
+         "encryptPassword":  ["--encrypt-password", "-ep"],
+         "machinePassword":  ["--machine-password", "--adi-password", "-mpwd"],
+@@ -136,8 +136,16 @@ public enum PortalCommandsParser {
+             case flags["appleID"]:          appleID            = nextVal()
+             case flags["password"]:         password           = nextVal()
+             case flags["session"]:          sessionPath        = nextVal()
+-            case flags["usingTeam"]:        teamID             = try CommandHandler.resolveTeamIDFromIndex(nextVal())
+-            case flags["usingTeamID"]:      teamID             = try nextVal().map { try CommandHandler.validateAndResolveTeamID($0) }
++            case flags["usingTeam"]:
++                guard let teamIndex = nextVal() else {
++                    throw CLIError.missingRequiredArgument("A team index is required after \(args[i]).")
++                }
++                teamID = try CommandHandler.resolveTeamIDFromIndex(teamIndex)
++            case flags["usingTeamID"]:
++                guard let requestedTeamID = nextVal() else {
++                    throw CLIError.missingRequiredArgument("A team ID is required after \(args[i]).")
++                }
++                teamID = try CommandHandler.validateAndResolveTeamID(requestedTeamID)
+             case flags["encryptPassword"]:  encryptPassword    = nextVal()
+             case flags["machinePassword"]:  deviceDataPassword = nextVal()
+             case flags["machinePath"]:      deviceDataPath     = nextVal()
+@@ -268,12 +276,13 @@ public enum PortalCommandsParser {
+                 switch subArgs[idx] {
+                 case flags["name"]:     name = nextVal()
+                 case flags["type"]:
+-                    if let typeStr = nextVal() {
+-                        guard let parsed = CertificateType(argument: typeStr) else {
+-                            throw CLIError.invalidArgument("Invalid certificate type: '\(typeStr)'. Valid types: \(CertificateType.allCases.map(\.rawValue).joined(separator: ", "))")
+-                        }
+-                        certType = parsed
++                    guard let typeStr = nextVal() else {
++                        throw CLIError.missingRequiredArgument("Certificate type value is required after \(subArgs[idx]).")
+                     }
++                    guard let parsed = CertificateType(argument: typeStr) else {
++                        throw CLIError.invalidArgument("Invalid certificate type: '\(typeStr)'. Valid types: \(CertificateType.allCases.map(\.rawValue).joined(separator: ", "))")
++                    }
++                    certType = parsed
+                 case flags["csr"]:      csrPath = nextVal()
+                 case flags["output"]:   outPath = nextVal()
+                 default:                break
+@@ -464,10 +473,14 @@ public enum PortalCommandsParser {
+                 throw CLIError.missingRequiredArgument("Usage: sidesign dev profiles create --bundle-id <bundle_id> --type <\(supported)> [--name <name>] [--cert-ids <id1,id2>] [--device-ids <id1,id2>] [--output <path>] [--xcode|--manual]")
+             }
+ 
+-            guard let rawType = typeStr, let profileType = ProfileType(argument: rawType) else {
++            guard let rawType = typeStr else {
+                 let supported = ProfileType.allCases.map(\.rawValue).joined(separator: ", ")
+                 throw CLIError.missingRequiredArgument("Profile type is required (--type <type>). Supported types: \(supported)")
+             }
++            guard let profileType = ProfileType(argument: rawType) else {
++                let supported = ProfileType.allCases.map(\.rawValue).joined(separator: ", ")
++                throw CLIError.invalidArgument("Invalid profile type '\(rawType)'. Supported types: \(supported)")
++            }
+ 
+             let certIDs = certIDsStr?.split(separator: ",").map { String($0.trimmingCharacters(in: .whitespaces)) }
+             let deviceIDs = deviceIDsStr?.split(separator: ",").map { String($0.trimmingCharacters(in: .whitespaces)) }
+@@ -481,7 +494,11 @@ public enum PortalCommandsParser {
+             while idx < subArgs.count {
+                 switch subArgs[idx] {
+                 case flags["bundleID"]: bundleIDStr   = nextVal()
+-                case flags["type"]:     typeStr       = nextVal()
++                case flags["type"]:
++                    guard let value = nextVal() else {
++                        throw CLIError.missingRequiredArgument("Profile type value is required after \(subArgs[idx]).")
++                    }
++                    typeStr = value
+                 case flags["output"]:   outputPath    = nextVal()
+                 case "--manual":        isTeamProfile = false
+                 case "--xcode":         isTeamProfile = true
+@@ -492,7 +509,16 @@ public enum PortalCommandsParser {
+             guard let bundleID = bundleIDStr else {
+                 throw CLIError.missingRequiredArgument("Usage: sidesign dev profiles download --bundle-id <bundle_id> [--type <type>] [--manual|--xcode] [--output <path>]")
+             }
+-            let profileType = typeStr != nil ? ProfileType(argument: typeStr!) : nil
++            let profileType: ProfileType?
++            if let typeStr {
++                guard let parsedType = ProfileType(argument: typeStr) else {
++                    let supported = ProfileType.allCases.map(\.rawValue).joined(separator: ", ")
++                    throw CLIError.invalidArgument("Invalid profile type '\(typeStr)'. Supported types: \(supported)")
++                }
++                profileType = parsedType
++            } else {
++                profileType = nil
++            }
+             subAction = .download(bundleID: bundleID, type: profileType, isTeamProfile: isTeamProfile, outputPath: outputPath)
+         } else if subArgs.contains("edit") || subArgs.contains("update") || subArgs.contains("modify") {
+             var profileID: String?
+@@ -508,7 +534,11 @@ public enum PortalCommandsParser {
+                 case flags["id"]:           profileID       = nextVal()
+                 case flags["name"]:         nameStr         = nextVal()
+                 case flags["appID"]:        appIDStr        = nextVal()
+-                case flags["type"]:         typeStr         = nextVal()
++                case flags["type"]:
++                    guard let value = nextVal() else {
++                        throw CLIError.missingRequiredArgument("Profile type value is required after \(subArgs[idx]).")
++                    }
++                    typeStr = value
+                 case flags["certIDs"]:      certIDsStr      = nextVal()
+                 case flags["deviceIDs"]:    deviceIDsStr    = nextVal()
+                 case flags["output"]:       outputPath      = nextVal()
+@@ -521,7 +551,16 @@ public enum PortalCommandsParser {
+                 throw CLIError.missingRequiredArgument("Usage: sidesign dev profiles edit --id <profile_id_or_uuid> [--name <name>] [--app-id <app_id>] [--type <type>] [--cert-ids <id1,id2>] [--device-ids <id1,id2>] [--output <path>]")
+             }
+ 
+-            let profileType = typeStr != nil ? ProfileType(argument: typeStr!) : nil
++            let profileType: ProfileType?
++            if let typeStr {
++                guard let parsedType = ProfileType(argument: typeStr) else {
++                    let supported = ProfileType.allCases.map(\.rawValue).joined(separator: ", ")
++                    throw CLIError.invalidArgument("Invalid profile type '\(typeStr)'. Supported types: \(supported)")
++                }
++                profileType = parsedType
++            } else {
++                profileType = nil
++            }
+             let certIDs = certIDsStr?.split(separator: ",").map { String($0.trimmingCharacters(in: .whitespaces)) }
+             let deviceIDs = deviceIDsStr?.split(separator: ",").map { String($0.trimmingCharacters(in: .whitespaces)) }
+ 
+diff --git a/CLI/main.swift b/CLI/main.swift
+index 13da156..962a74e 100644
+--- a/CLI/main.swift
++++ b/CLI/main.swift
+@@ -13,6 +13,26 @@ func ~= (pattern: [String]?, value: String) -> Bool {
+     return pattern?.contains(value) ?? false
+ }
+ 
++private struct GlobalOptions {
++    let commandIndex: Int
++    let loggingEnabled: Bool
++}
++
++private func parseLeadingGlobalOptions(_ args: [String]) -> GlobalOptions {
++    var commandIndex = 0
++    var loggingEnabled = false
++    while commandIndex < args.count {
++        switch args[commandIndex] {
++        case "--verbose", "-vv", "--debug":
++            loggingEnabled = true
++            commandIndex += 1
++        default:
++            return GlobalOptions(commandIndex: commandIndex, loggingEnabled: loggingEnabled)
++        }
++    }
++    return GlobalOptions(commandIndex: commandIndex, loggingEnabled: loggingEnabled)
++}
++
+ private enum FlagRegistry {
+     static let commands: [String: [String]] = [
+         "sign":             ["sign", "-s", "--sign"],
+@@ -122,8 +142,8 @@ func printUsage() {
+       remove-signature      Remove code signature from Mach-O binary or bundle
+ 
+     Global Options:
+-      --verbose, -v         Enable verbose logging
+-      --debug, -d           Enable debug logging
++      --verbose, -vv        Enable verbose logging (before the command)
++      --debug               Enable debug logging (before the command)
+       --help, -h            Show help and usage information
+ 
+     Examples:
+@@ -153,7 +173,7 @@ func printUsage() {
+       sidesign dev select-team-id TEAM123456
+ 
+       # Use a specific Team's session (by list index or Team ID):
+-      sidesign dev certs -t 1
++      sidesign dev certs --using-team 1
+       sidesign dev certs -tid TEAM123456
+ 
+       # Login with interactive Anisette server selection:
+@@ -532,6 +552,9 @@ private func parseCSRContext(args: [String]) throws -> CSRContext {
+ 
+ private func parseAnisetteContext(args: [String]) throws -> AnisetteContext {
+     if args.first == "servers" || args.first == "list" || args.first == "ls" {
++        if let jsonFlags = FlagRegistry.anisette["json"], args.contains(where: { jsonFlags.contains($0) }) {
++            throw CLIError.invalidArgument("--json is only supported for Anisette data generation, not server-list output.")
++        }
+         var sourceURLStr: String?
+         var idx = 1
+         func nextVal() -> String? {
+@@ -627,24 +650,31 @@ private func parseAnisetteContext(args: [String]) throws -> AnisetteContext {
+ }
+ 
+ private func run(rawArgs: [String]) async throws {
++    let jsonMode = isAnisetteJSONInvocation(rawArgs)
++    if jsonMode && (rawArgs.contains("-h") || rawArgs.contains("--help") || rawArgs.contains("help")) {
++        throw CLIError.invalidArgument("--help cannot be combined with Anisette --json output.")
++    }
+     if rawArgs.isEmpty || rawArgs.contains("-h") || rawArgs.contains("--help") || rawArgs.contains("help") {
+         printUsage()
+         return
+     }
+ 
+-    if rawArgs.contains("--verbose") || rawArgs.contains("-v") || rawArgs.contains("-vv") || rawArgs.contains("--debug") || rawArgs.contains("-d") {
++    let globalOptions = parseLeadingGlobalOptions(rawArgs)
++    if !jsonMode && globalOptions.loggingEnabled {
+         SideSignLogging.setLogging(true)
+     }
+ 
+-    print()
+-    defer { print() }
++    if !jsonMode {
++        print()
++        defer { print() }
++    }
+ 
+-    let nonGlobalArgs = rawArgs.filter { !["-v", "--verbose", "-vv", "--debug", "-d"].contains($0) }
+-    guard let command = nonGlobalArgs.first else {
++    guard globalOptions.commandIndex < rawArgs.count else {
+         printUsage()
+         return
+     }
+-    let subArgs = Array(nonGlobalArgs.dropFirst())
++    let command = rawArgs[globalOptions.commandIndex]
++    let subArgs = Array(rawArgs.dropFirst(globalOptions.commandIndex + 1))
+ 
+     let cmd = FlagRegistry.commands
+     switch command {
+@@ -695,11 +725,30 @@ private func run(rawArgs: [String]) async throws {
+     }
+ }
+ 
++private func isAnisetteJSONInvocation(_ args: [String]) -> Bool {
++    let globalOptions = parseLeadingGlobalOptions(args)
++    guard globalOptions.commandIndex < args.count,
++          FlagRegistry.commands["anisette"]?.contains(args[globalOptions.commandIndex]) == true,
++          let jsonFlags = FlagRegistry.anisette["json"] else { return false }
++    return args.dropFirst(globalOptions.commandIndex + 1).contains { jsonFlags.contains($0) }
++}
++
+ func main() async {
++    let rawArgs = Array(CommandLine.arguments.dropFirst())
++    let jsonMode = isAnisetteJSONInvocation(rawArgs)
+     do {
+-        try await run(rawArgs: Array(CommandLine.arguments.dropFirst()))
++        try await run(rawArgs: rawArgs)
+     } catch {
+         CommandHandler.printError(error.localizedDescription)
++        if jsonMode {
++            let errorObject = ["error": error.localizedDescription]
++            if let data = try? JSONSerialization.data(withJSONObject: errorObject, options: [.sortedKeys]),
++               let json = String(data: data, encoding: .utf8) {
++                print(json)
++            } else {
++                print("{\"error\":\"Anisette request failed\"}")
++            }
++        }
+         exit(1)
+     }
+ }
+diff --git a/Sources/Anisette/AnisetteDataManager.swift b/Sources/Anisette/AnisetteDataManager.swift
+index 8c64485..5f47041 100644
+--- a/Sources/Anisette/AnisetteDataManager.swift
++++ b/Sources/Anisette/AnisetteDataManager.swift
+@@ -175,6 +175,7 @@ public enum AnisetteError: LocalizedError, Sendable {
+     case missingODAEntry
+     case downloadFailed(String)
+     case sha256Mismatch(expected: String, actual: String)
++    case libraryRecoveryFailed(preservedPath: String, reason: String)
+     case invalidBase64Payload
+     case decompressionFailed(String)
+     case missingRequiredLibs([String])
+@@ -202,6 +203,8 @@ public enum AnisetteError: LocalizedError, Sendable {
+             return "Failed to download On-Device Anisette package: \(reason)"
+         case .sha256Mismatch(let expected, let actual):
+             return "SHA-256 checksum mismatch for On-Device Anisette package (expected \(expected), got \(actual))."
++        case .libraryRecoveryFailed(let preservedPath, let reason):
++            return "Anisette library recovery failed (\(reason)). Recovery data is preserved at \(preservedPath)."
+         case .invalidBase64Payload:
+             return "Downloaded On-Device Anisette payload is not valid Base64 data."
+         case .decompressionFailed(let reason):
+@@ -232,6 +235,77 @@ public enum AnisetteError: LocalizedError, Sendable {
+     }
+ }
+ 
++private struct AnisetteLibraryCacheRequest: Hashable, Sendable {
++    let sourceURL: String?
++    let payloadDigest: String?
++    let expectedSHA256: String?
++    let targetDirectory: String
++    let provisioningDirectory: String
++    let clientInfo: String
++}
++
++private actor AnisetteLibraryCacheCoordinator {
++    static let shared = AnisetteLibraryCacheCoordinator()
++
++    private struct InFlight {
++        let id: UUID
++        let task: Task<Void, Error>
++    }
++
++    private var operations: [AnisetteLibraryCacheRequest: InFlight] = [:]
++    private var activeRequestByTarget: [String: AnisetteLibraryCacheRequest] = [:]
++
++    func perform(
++        request: AnisetteLibraryCacheRequest,
++        operation: @escaping @Sendable () async throws -> Void
++    ) async throws {
++        if let inFlight = operations[request] {
++            try await waitFor(inFlight, request: request)
++            return
++        }
++
++        // A different source or client configuration must never write to the
++        // same target concurrently. Wait for that request, then perform our own.
++        while let activeRequest = activeRequestByTarget[request.targetDirectory],
++              let activeOperation = operations[activeRequest] {
++            do { try await activeOperation.task.value } catch { }
++            remove(activeRequest, id: activeOperation.id)
++        }
++
++        // Actor methods are reentrant across awaits, so another caller may
++        // have started this exact request while we waited on a conflicting one.
++        if let inFlight = operations[request] {
++            try await waitFor(inFlight, request: request)
++            return
++        }
++
++        let inFlight = InFlight(id: UUID(), task: Task.detached {
++            try await operation()
++        })
++        operations[request] = inFlight
++        activeRequestByTarget[request.targetDirectory] = request
++        try await waitFor(inFlight, request: request)
++    }
++
++    private func waitFor(_ inFlight: InFlight, request: AnisetteLibraryCacheRequest) async throws {
++        do {
++            try await inFlight.task.value
++            remove(request, id: inFlight.id)
++        } catch {
++            remove(request, id: inFlight.id)
++            throw error
++        }
++    }
++
++    private func remove(_ request: AnisetteLibraryCacheRequest, id: UUID) {
++        guard operations[request]?.id == id else { return }
++        operations[request] = nil
++        if activeRequestByTarget[request.targetDirectory] == request {
++            activeRequestByTarget[request.targetDirectory] = nil
++        }
++    }
++}
++
+ public final class AnisetteDataManager: @unchecked Sendable {
+     public static let shared = AnisetteDataManager()
+ 
+@@ -239,10 +313,17 @@ public final class AnisetteDataManager: @unchecked Sendable {
+         AnisetteClient.validateLibrariesExist(at: directory)
+     }
+ 
+-    public var activeMode: AnisetteMode?
++    private let stateLock = NSLock()
++    private var storedActiveMode: AnisetteMode?
+     public let baseAnisetteDirectory: URL
+-    private var localProvider: AnisetteClient?
+-    private var isCaching: Bool = false
++
++    private struct LocalProviderCacheEntry {
++        let libraryDirectory: URL
++        let provisioningDirectory: URL
++        let clientInfo: String
++        let provider: AnisetteClient
++    }
++    private var localProvider: LocalProviderCacheEntry?
+ 
+     private struct RemoteAnisetteCacheEntry {
+         let serverURL: URL
+@@ -252,9 +333,14 @@ public final class AnisetteDataManager: @unchecked Sendable {
+         let timestamp: Date
+     }
+     private var remoteCache: RemoteAnisetteCacheEntry?
++
++    public var activeMode: AnisetteMode? {
++        get { withStateLock { storedActiveMode } }
++        set { withStateLock { storedActiveMode = newValue } }
++    }
+     
+     public func clearCache() {
+-        remoteCache = nil
++        withStateLock { remoteCache = nil }
+     }
+ 
+     public static var defaultBaseDirectory: URL {
+@@ -280,7 +366,7 @@ public final class AnisetteDataManager: @unchecked Sendable {
+     }
+ 
+     public init(mode: AnisetteMode? = nil, baseDirectory: URL? = nil) {
+-        self.activeMode = mode
++        self.storedActiveMode = mode
+         self.baseAnisetteDirectory = baseDirectory ?? Self.defaultBaseDirectory
+     }
+ 
+@@ -423,7 +509,7 @@ public final class AnisetteDataManager: @unchecked Sendable {
+         }
+ 
+         if case .remote(let serverURL) = resolvedMode {
+-            if let cache = remoteCache,
++            if let cache = withStateLock({ remoteCache }),
+                cache.serverURL == serverURL,
+                cache.identifier == identifier,
+                Date().timeIntervalSince(cache.timestamp) < Constants.Anisette.remoteCacheDuration 
+@@ -446,19 +532,22 @@ public final class AnisetteDataManager: @unchecked Sendable {
+             let anisetteData = try Self.validateAndCreateAnisetteData(from: rawHeaders)
+ 
+             if case .remote(let serverURL) = resolvedMode {
+-                remoteCache = RemoteAnisetteCacheEntry(
++                let cacheEntry = RemoteAnisetteCacheEntry(
+                     serverURL: serverURL,
+                     identifier: identifier,
+                     data: anisetteData,
+                     newAdiBlob: newBlob,
+                     timestamp: Date()
+                 )
++                withStateLock { remoteCache = cacheEntry }
+             }
+ 
+             return (anisetteData, newBlob)
+         } catch {
+-            if case .remote(let serverURL) = resolvedMode, remoteCache?.serverURL == serverURL {
+-                remoteCache = nil
++            if case .remote(let serverURL) = resolvedMode {
++                withStateLock {
++                    if remoteCache?.serverURL == serverURL { remoteCache = nil }
++                }
+             }
+             if let errorHandler = onError {
+                 let shouldContinue = try await errorHandler(error)
+@@ -610,20 +699,36 @@ public final class AnisetteDataManager: @unchecked Sendable {
+     }
+ 
+     public func downloadAndCacheLibs(from oda: ODAInfo, targetDirectory: URL? = nil, clientInfo: String = Constants.Anisette.defaultClientInfo) async throws {
+-        guard !isCaching else {
+-            while isCaching {
+-                try await Task.sleep(nanoseconds: Constants.Anisette.cachingPollingDelayNanoseconds)
++        let libDir = targetDirectory ?? remoteLibsDir
++        let prov = provisioningDir
++        let payloadDigest = oda.base64Payload.map { payload in
++            SHA256.hash(data: Data(payload.utf8)).map { String(format: "%02x", $0) }.joined()
++        }
++        let request = AnisetteLibraryCacheRequest(
++            sourceURL: oda.url,
++            payloadDigest: payloadDigest,
++            expectedSHA256: oda.sha256?.lowercased(),
++            targetDirectory: libDir.standardizedFileURL.path,
++            provisioningDirectory: prov.standardizedFileURL.path,
++            clientInfo: clientInfo
++        )
++
++        try await AnisetteLibraryCacheCoordinator.shared.perform(request: request) { [self] in
++            try await cacheLibraries(from: oda, targetDirectory: libDir, provisioningDirectory: prov, clientInfo: clientInfo)
++            guard AnisetteClient.validateLibrariesExist(at: libDir, requiredLibraries: Constants.Anisette.Libraries.requiredNames) else {
++                throw AnisetteError.missingRequiredLibs(Constants.Anisette.Libraries.requiredNames)
+             }
+-            return
+         }
+-        isCaching = true
+-        defer { isCaching = false }
++    }
+ 
+-        let libDir = targetDirectory ?? remoteLibsDir
+-        let prov = provisioningDir
++    private func cacheLibraries(
++        from oda: ODAInfo,
++        targetDirectory libDir: URL,
++        provisioningDirectory prov: URL,
++        clientInfo: String
++    ) async throws {
+         let fm = FileManager.default
+ 
+-        try fm.createDirectory(at: libDir, withIntermediateDirectories: true)
+         try fm.createDirectory(at: prov, withIntermediateDirectories: true)
+ 
+         let zipData = try await resolveZipData(from: oda)
+@@ -631,7 +736,7 @@ public final class AnisetteDataManager: @unchecked Sendable {
+         if let expectedSHA = oda.sha256, !expectedSHA.isEmpty {
+             let zipSHA = computeSHA256(data: zipData)
+             if zipSHA.caseInsensitiveCompare(expectedSHA) != .orderedSame {
+-                debugLog("[AnisetteDataManager] SHA-256 mismatch (expected: \(expectedSHA), actual: \(zipSHA)). Proceeding with extraction.")
++                throw AnisetteError.sha256Mismatch(expected: expectedSHA, actual: zipSHA)
+             }
+         }
+ 
+@@ -639,20 +744,99 @@ public final class AnisetteDataManager: @unchecked Sendable {
+         try zipData.write(to: tempZipURL, options: .atomic)
+         defer { try? fm.removeItem(at: tempZipURL) }
+ 
+-        try fm.unzipArchive(at: tempZipURL, to: libDir)
++        let stagingDir = libDir.deletingLastPathComponent()
++            .appendingPathComponent(".\(libDir.lastPathComponent).staging-\(UUID().uuidString)", isDirectory: true)
++        try fm.createDirectory(at: stagingDir, withIntermediateDirectories: true)
++        defer { try? fm.removeItem(at: stagingDir) }
+ 
+-        guard AnisetteClient.validateLibrariesExist(at: libDir, requiredLibraries: Constants.Anisette.Libraries.requiredNames) else {
++        try fm.unzipArchive(at: tempZipURL, to: stagingDir)
++
++        guard AnisetteClient.validateLibrariesExist(at: stagingDir, requiredLibraries: Constants.Anisette.Libraries.requiredNames) else {
+             throw AnisetteError.missingRequiredLibs(Constants.Anisette.Libraries.requiredNames)
+         }
+ 
+-        self.localProvider = try AnisetteClient(
+-            provisioningDir: prov,
+-            clientInfo: clientInfo,
+-            userAgent: Constants.Anisette.defaultUserAgent,
+-            lookupURL: Constants.Anisette.URLs.grandSlamLookup,
+-            requiredLibraries: Constants.Anisette.Libraries.requiredNames,
+-            libraryDirectoryResolver: { libDir }
+-        )
++        let backupDir = libDir.deletingLastPathComponent()
++            .appendingPathComponent(".\(libDir.lastPathComponent).backup-\(UUID().uuidString)", isDirectory: true)
++        let hadPreviousLibraries = fm.fileExists(atPath: libDir.path)
++        withStateLock {
++            if localProvider?.libraryDirectory.standardizedFileURL == libDir.standardizedFileURL {
++                localProvider = nil
++            }
++        }
++        if hadPreviousLibraries {
++            try fm.moveItem(at: libDir, to: backupDir)
++        }
++
++        do {
++            try fm.moveItem(at: stagingDir, to: libDir)
++            let provider = try AnisetteClient(
++                provisioningDir: prov,
++                clientInfo: clientInfo,
++                userAgent: Constants.Anisette.defaultUserAgent,
++                lookupURL: Constants.Anisette.URLs.grandSlamLookup,
++                requiredLibraries: Constants.Anisette.Libraries.requiredNames,
++                libraryDirectoryResolver: { libDir }
++            )
++            withStateLock {
++                localProvider = LocalProviderCacheEntry(
++                    libraryDirectory: libDir,
++                    provisioningDirectory: prov,
++                    clientInfo: clientInfo,
++                    provider: provider
++                )
++            }
++            if hadPreviousLibraries {
++                try? fm.removeItem(at: backupDir)
++            }
++        } catch {
++            let failedPromotionDir = libDir.deletingLastPathComponent()
++                .appendingPathComponent(".\(libDir.lastPathComponent).failed-\(UUID().uuidString)", isDirectory: true)
++            if fm.fileExists(atPath: libDir.path) {
++                do {
++                    try fm.moveItem(at: libDir, to: failedPromotionDir)
++                } catch {
++                    throw AnisetteError.libraryRecoveryFailed(
++                        preservedPath: libDir.path,
++                        reason: "could not move the failed promotion aside: \(error.localizedDescription)"
++                    )
++                }
++            }
++
++            guard hadPreviousLibraries else {
++                if fm.fileExists(atPath: failedPromotionDir.path) {
++                    do {
++                        try fm.removeItem(at: failedPromotionDir)
++                    } catch {
++                        throw AnisetteError.libraryRecoveryFailed(
++                            preservedPath: failedPromotionDir.path,
++                            reason: "the failed promotion was moved out of the active cache but could not be removed: \(error.localizedDescription)"
++                        )
++                    }
++                }
++                throw error
++            }
++
++            do {
++                try fm.moveItem(at: backupDir, to: libDir)
++            } catch {
++                throw AnisetteError.libraryRecoveryFailed(
++                    preservedPath: backupDir.path,
++                    reason: "could not move the backup back into place: \(error.localizedDescription)"
++                )
++            }
++
++            if fm.fileExists(atPath: failedPromotionDir.path) {
++                do {
++                    try fm.removeItem(at: failedPromotionDir)
++                } catch {
++                    throw AnisetteError.libraryRecoveryFailed(
++                        preservedPath: failedPromotionDir.path,
++                        reason: "the previous libraries were restored, but the failed promotion could not be removed: \(error.localizedDescription)"
++                    )
++                }
++            }
++            throw error
++        }
+     }
+ 
+     private func resolveZipData(from oda: ODAInfo) async throws -> Data {
+@@ -688,12 +872,17 @@ public final class AnisetteDataManager: @unchecked Sendable {
+     }
+ 
+     public func ensureProviderLoaded(clientInfo: String = Constants.Anisette.defaultClientInfo) async throws -> AnisetteClient {
+-        if let existing = self.localProvider {
+-            return existing
+-        }
+-
+         let libDir = libsDir
+         let prov = provisioningDir
++        if let existing = withStateLock({
++            guard let cached = localProvider,
++                  cached.libraryDirectory.standardizedFileURL == libDir.standardizedFileURL,
++                  cached.provisioningDirectory.standardizedFileURL == prov.standardizedFileURL,
++                  cached.clientInfo == clientInfo else { return nil }
++            return cached.provider
++        }) {
++            return existing
++        }
+ 
+         if AnisetteClient.validateLibrariesExist(at: libDir, requiredLibraries: Constants.Anisette.Libraries.requiredNames) {
+             let provider = try AnisetteClient(
+@@ -704,13 +893,32 @@ public final class AnisetteDataManager: @unchecked Sendable {
+                 requiredLibraries: Constants.Anisette.Libraries.requiredNames,
+                 libraryDirectoryResolver: { libDir }
+             )
+-            self.localProvider = provider
+-            return provider
++            return withStateLock {
++                if let cached = localProvider,
++                   cached.libraryDirectory.standardizedFileURL == libDir.standardizedFileURL,
++                   cached.provisioningDirectory.standardizedFileURL == prov.standardizedFileURL,
++                   cached.clientInfo == clientInfo {
++                    return cached.provider
++                }
++                localProvider = LocalProviderCacheEntry(
++                    libraryDirectory: libDir,
++                    provisioningDirectory: prov,
++                    clientInfo: clientInfo,
++                    provider: provider
++                )
++                return provider
++            }
+         }
+ 
+         throw AnisetteError.providerNotReady("ADI shared libraries missing locally at: \(libDir.path)")
+     }
+ 
++    private func withStateLock<T>(_ body: () throws -> T) rethrows -> T {
++        stateLock.lock()
++        defer { stateLock.unlock() }
++        return try body()
++    }
++
+     private func computeSHA256(data: Data) -> String {
+         let digest = SHA256.hash(data: data)
+         return digest.map { String(format: "%02x", $0) }.joined()
+diff --git a/Sources/Archiver/Archive.swift b/Sources/Archiver/Archive.swift
+index 0746561..c5e72ba 100644
+--- a/Sources/Archiver/Archive.swift
++++ b/Sources/Archiver/Archive.swift
+@@ -31,6 +31,7 @@ public enum Archive {
+         public let externalAttributes: UInt32
+         public let compressionMethod: UInt16
+         public let localHeaderOffset: UInt64
++        public let generalPurposeBitFlags: UInt16
+ 
+         public var isDirectory: Bool {
+             return filename.hasSuffix("/") || ((externalAttributes >> 16) & 0o040000 != 0)
+@@ -49,7 +50,8 @@ public enum Archive {
+             crc: UInt32,
+             externalAttributes: UInt32,
+             compressionMethod: UInt16 = 0,
+-            localHeaderOffset: UInt64 = 0
++            localHeaderOffset: UInt64 = 0,
++            generalPurposeBitFlags: UInt16 = 0
+         ) {
+             self.filename = filename
+             self.uncompressedSize = uncompressedSize
+@@ -58,6 +60,7 @@ public enum Archive {
+             self.externalAttributes = externalAttributes
+             self.compressionMethod = compressionMethod
+             self.localHeaderOffset = localHeaderOffset
++            self.generalPurposeBitFlags = generalPurposeBitFlags
+         }
+     }
+ 
+@@ -65,12 +68,14 @@ public enum Archive {
+         private let fileURL: URL
+         private let fileHandle: FileHandle
+         private let parsedEntries: [Entry]
++        private let centralDirectoryOffset: UInt64
+         private var currentIndex: Int = 0
+ 
+-        private init(fileURL: URL, fileHandle: FileHandle, entries: [Entry]) {
++        private init(fileURL: URL, fileHandle: FileHandle, entries: [Entry], centralDirectoryOffset: UInt64) {
+             self.fileURL = fileURL
+             self.fileHandle = fileHandle
+             self.parsedEntries = entries
++            self.centralDirectoryOffset = centralDirectoryOffset
+             self.currentIndex = 0
+         }
+ 
+@@ -89,9 +94,9 @@ public enum Archive {
+                 throw Archive.Error.readFailed(url)
+             }
+ 
+-            let entries = try parseCentralDirectory(handle: handle, fileURL: url)
++            let (entries, centralDirectoryOffset) = try parseCentralDirectory(handle: handle, fileURL: url)
+             verboseLog("[SideSign] Archive.Reader.open succeeded with \(entries.count) entries")
+-            return Reader(fileURL: url, fileHandle: handle, entries: entries)
++            return Reader(fileURL: url, fileHandle: handle, entries: entries, centralDirectoryOffset: centralDirectoryOffset)
+         }
+ 
+         public func goToFirstFile() throws {
+@@ -155,6 +160,7 @@ public enum Archive {
+ 
+             let fileManager = FileManager.default
+             if entry.isDirectory {
++                _ = try extractData(for: entry)
+                 try fileManager.createDirectory(at: destinationURL, withIntermediateDirectories: true)
+                 applyPermissions(entry.posixPermissions, to: destinationURL)
+                 verboseLog("[SideSign] Archive.Reader.extractCurrentFile created directory")
+@@ -171,8 +177,8 @@ public enum Archive {
+         }
+ 
+         private func extractData(for entry: Entry) throws -> Data {
+-            if entry.isDirectory || entry.uncompressedSize == 0 {
+-                return Data()
++            guard entry.compressedSize <= Int64(Int.max), entry.uncompressedSize <= Int64(Int.max) else {
++                throw Archive.Error.unsupportedFormat(fileURL, "entry size exceeds the current platform's addressable range")
+             }
+ 
+             try fileHandle.seek(toOffset: entry.localHeaderOffset)
+@@ -187,7 +193,47 @@ public enum Archive {
+ 
+             let nameLen = Int(localHeaderData.readUInt16LE(at: 26))
+             let extraLen = Int(localHeaderData.readUInt16LE(at: 28))
++            let localFlags = localHeaderData.readUInt16LE(at: 6)
++            let localCRC = localHeaderData.readUInt32LE(at: 14)
++            let localCompressedSize = localHeaderData.readUInt32LE(at: 18)
++            let localUncompressedSize = localHeaderData.readUInt32LE(at: 22)
+             let skipOffset = entry.localHeaderOffset + 30 + UInt64(nameLen + extraLen)
++            let localRecordEnd = skipOffset + UInt64(entry.compressedSize)
++            guard localRecordEnd >= skipOffset, localRecordEnd <= centralDirectoryOffset else {
++                throw Archive.Error.corruptArchive(fileURL)
++            }
++
++            try fileHandle.seek(toOffset: entry.localHeaderOffset + 30)
++            guard let localName = try fileHandle.read(upToCount: nameLen), localName.count == nameLen,
++                  String(data: localName, encoding: .utf8) == entry.filename else {
++                throw Archive.Error.corruptArchive(fileURL)
++            }
++
++            guard localHeaderData.readUInt16LE(at: 8) == entry.compressionMethod,
++                  localFlags == entry.generalPurposeBitFlags else {
++                throw Archive.Error.corruptArchive(fileURL)
++            }
++            let hasDataDescriptor = (localFlags & 0x0008) != 0
++            let expectedCRC = entry.crc
++            let expectedCompressedSize = UInt32(entry.compressedSize)
++            let expectedUncompressedSize = UInt32(entry.uncompressedSize)
++            if hasDataDescriptor {
++                guard (localCRC == 0 || localCRC == expectedCRC),
++                      (localCompressedSize == 0 || localCompressedSize == expectedCompressedSize),
++                      (localUncompressedSize == 0 || localUncompressedSize == expectedUncompressedSize) else {
++                    throw Archive.Error.corruptArchive(fileURL)
++                }
++                try validateDataDescriptor(for: entry, at: localRecordEnd)
++            } else {
++                guard localCRC == expectedCRC,
++                      localCompressedSize == expectedCompressedSize,
++                      localUncompressedSize == expectedUncompressedSize else {
++                    throw Archive.Error.corruptArchive(fileURL)
++                }
++            }
++            if entry.uncompressedSize == 0 {
++                return Data()
++            }
+ 
+             try fileHandle.seek(toOffset: skipOffset)
+             guard let rawData = try fileHandle.read(upToCount: Int(entry.compressedSize)),
+@@ -247,7 +293,7 @@ public enum Archive {
+             }
+         }
+ 
+-        private static func parseCentralDirectory(handle: FileHandle, fileURL: URL) throws -> [Entry] {
++        private static func parseCentralDirectory(handle: FileHandle, fileURL: URL) throws -> ([Entry], UInt64) {
+             let fileSize = try handle.seekToEnd()
+             guard fileSize >= 22 else {
+                 throw Archive.Error.corruptArchive(fileURL)
+@@ -272,13 +318,35 @@ public enum Archive {
+                 throw Archive.Error.corruptArchive(fileURL)
+             }
+ 
++            guard eocdPos + 22 <= searchData.count else {
++                throw Archive.Error.corruptArchive(fileURL)
++            }
++            let commentLength = Int(searchData.readUInt16LE(at: eocdPos + 20))
++            guard eocdPos + 22 + commentLength == searchData.count,
++                  searchData.readUInt16LE(at: eocdPos + 4) == 0,
++                  searchData.readUInt16LE(at: eocdPos + 6) == 0,
++                  searchData.readUInt16LE(at: eocdPos + 8) == searchData.readUInt16LE(at: eocdPos + 10) else {
++                throw Archive.Error.corruptArchive(fileURL)
++            }
++            if eocdPos >= 20, searchData.readUInt32LE(at: eocdPos - 20) == 0x07064b50 {
++                throw Archive.Error.unsupportedFormat(fileURL, "ZIP64 archives are not supported")
++            }
+             let totalEntries = searchData.readUInt16LE(at: eocdPos + 10)
+-            let cdSize = UInt64(searchData.readUInt32LE(at: eocdPos + 12))
+-            let cdOffset = UInt64(searchData.readUInt32LE(at: eocdPos + 16))
++            let rawCDSize = searchData.readUInt32LE(at: eocdPos + 12)
++            let rawCDOffset = searchData.readUInt32LE(at: eocdPos + 16)
++            guard rawCDSize != UInt32.max, rawCDOffset != UInt32.max, totalEntries != UInt16.max else {
++                throw Archive.Error.unsupportedFormat(fileURL, "ZIP64 archives are not supported")
++            }
++            let cdSize = UInt64(rawCDSize)
++            let cdOffset = UInt64(rawCDOffset)
++            let eocdOffset = searchOffset + UInt64(eocdPos)
+ 
+-            guard cdOffset + cdSize <= fileSize else {
++            guard cdOffset <= eocdOffset, cdSize == eocdOffset - cdOffset else {
+                 throw Archive.Error.corruptArchive(fileURL)
+             }
++            guard cdSize <= UInt64(Int.max) else {
++                throw Archive.Error.unsupportedFormat(fileURL, "central directory exceeds the current platform's addressable range")
++            }
+ 
+             try handle.seek(toOffset: cdOffset)
+             guard let cdData = try handle.read(upToCount: Int(cdSize)), cdData.count == Int(cdSize) else {
+@@ -288,39 +356,98 @@ public enum Archive {
+             var entries: [Entry] = []
+             var offset = 0
+             for _ in 0..<totalEntries {
+-                guard offset + 46 <= cdData.count else { break }
++                guard offset <= cdData.count, cdData.count - offset >= 46 else {
++                    throw Archive.Error.corruptArchive(fileURL)
++                }
+                 let magic = cdData.readUInt32LE(at: offset)
+-                guard magic == 0x02014b50 else { break }
++                guard magic == 0x02014b50 else {
++                    throw Archive.Error.corruptArchive(fileURL)
++                }
+ 
+                 let method = cdData.readUInt16LE(at: offset + 10)
++                let flags = cdData.readUInt16LE(at: offset + 8)
+                 let crc = cdData.readUInt32LE(at: offset + 16)
+-                let compSize = Int64(cdData.readUInt32LE(at: offset + 20))
+-                let uncompSize = Int64(cdData.readUInt32LE(at: offset + 24))
++                let rawCompSize = cdData.readUInt32LE(at: offset + 20)
++                let rawUncompSize = cdData.readUInt32LE(at: offset + 24)
+                 let nameLen = Int(cdData.readUInt16LE(at: offset + 28))
+                 let extraLen = Int(cdData.readUInt16LE(at: offset + 30))
+                 let commentLen = Int(cdData.readUInt16LE(at: offset + 32))
+                 let externalAttr = cdData.readUInt32LE(at: offset + 38)
+-                let localOffset = UInt64(cdData.readUInt32LE(at: offset + 42))
++                let rawLocalOffset = cdData.readUInt32LE(at: offset + 42)
++                guard rawCompSize != UInt32.max, rawUncompSize != UInt32.max, rawLocalOffset != UInt32.max else {
++                    throw Archive.Error.unsupportedFormat(fileURL, "ZIP64 entry fields are not supported")
++                }
+ 
+                 let nameStart = offset + 46
+-                guard nameStart + nameLen <= cdData.count else { break }
++                let variableLength = nameLen + extraLen + commentLen
++                guard nameLen > 0, variableLength <= cdData.count - nameStart else {
++                    throw Archive.Error.corruptArchive(fileURL)
++                }
++                var extraOffset = nameStart + nameLen
++                let extraEnd = extraOffset + extraLen
++                while extraOffset < extraEnd {
++                    guard extraEnd - extraOffset >= 4 else {
++                        throw Archive.Error.corruptArchive(fileURL)
++                    }
++                    let extraID = cdData.readUInt16LE(at: extraOffset)
++                    let extraFieldLength = Int(cdData.readUInt16LE(at: extraOffset + 2))
++                    guard extraFieldLength <= extraEnd - extraOffset - 4 else {
++                        throw Archive.Error.corruptArchive(fileURL)
++                    }
++                    guard extraID != 0x0001 else {
++                        throw Archive.Error.unsupportedFormat(fileURL, "ZIP64 entry fields are not supported")
++                    }
++                    extraOffset += 4 + extraFieldLength
++                }
+                 let nameBytes = cdData.subdata(in: nameStart..<(nameStart + nameLen))
+                 let filename = String(data: nameBytes, encoding: .utf8) ?? String(decoding: nameBytes, as: UTF8.self)
+ 
+                 entries.append(Entry(
+                     filename: filename,
+-                    uncompressedSize: uncompSize,
+-                    compressedSize: compSize,
++                    uncompressedSize: Int64(rawUncompSize),
++                    compressedSize: Int64(rawCompSize),
+                     crc: crc,
+                     externalAttributes: externalAttr,
+                     compressionMethod: method,
+-                    localHeaderOffset: localOffset
++                    localHeaderOffset: UInt64(rawLocalOffset),
++                    generalPurposeBitFlags: flags
+                 ))
+ 
+-                offset = nameStart + nameLen + extraLen + commentLen
++                offset = nameStart + variableLength
+             }
+ 
+-            return entries
++            guard offset == cdData.count else {
++                throw Archive.Error.corruptArchive(fileURL)
++            }
++            return (entries, cdOffset)
++        }
++
++        private func validateDataDescriptor(for entry: Entry, at offset: UInt64) throws {
++            guard offset <= centralDirectoryOffset, centralDirectoryOffset - offset >= 12 else {
++                throw Archive.Error.corruptArchive(fileURL)
++            }
++            let bytesToRead = Int(min(UInt64(16), centralDirectoryOffset - offset))
++            try fileHandle.seek(toOffset: offset)
++            guard let descriptor = try fileHandle.read(upToCount: bytesToRead), descriptor.count >= 12 else {
++                throw Archive.Error.corruptArchive(fileURL)
++            }
++
++            let expectedCRC = entry.crc
++            let expectedCompressedSize = UInt32(entry.compressedSize)
++            let expectedUncompressedSize = UInt32(entry.uncompressedSize)
++            if descriptor.count >= 16,
++               descriptor.readUInt32LE(at: 0) == 0x08074b50,
++               descriptor.readUInt32LE(at: 4) == expectedCRC,
++               descriptor.readUInt32LE(at: 8) == expectedCompressedSize,
++               descriptor.readUInt32LE(at: 12) == expectedUncompressedSize {
++                return
++            }
++            if descriptor.readUInt32LE(at: 0) == expectedCRC,
++               descriptor.readUInt32LE(at: 4) == expectedCompressedSize,
++               descriptor.readUInt32LE(at: 8) == expectedUncompressedSize {
++                return
++            }
++            throw Archive.Error.corruptArchive(fileURL)
+         }
+ 
+         private func applyPermissions(_ permissions: UInt32, to url: URL) {
+@@ -427,6 +554,15 @@ public enum Archive {
+ 
+             let (dosDate, dosTime) = Self.dosDateTime(from: date)
+             let nameData = Data(path.utf8)
++            guard nameData.count <= Int(UInt16.max) else {
++                throw Archive.Error.unsupportedFormat(destinationURL, "ZIP file names cannot exceed 65,535 UTF-8 bytes")
++            }
++            guard UInt64(data.count) <= UInt64(UInt32.max) else {
++                throw Archive.Error.unsupportedFormat(destinationURL, "ZIP32 entries cannot exceed 4 GiB")
++            }
++            guard centralDirectoryEntries.count < Int(UInt16.max) - 1 else {
++                throw Archive.Error.unsupportedFormat(destinationURL, "ZIP32 cannot contain more than 65,534 entries")
++            }
+             let uncompressedSize = UInt32(data.count)
+ 
+             let crc: UInt32
+@@ -464,8 +600,15 @@ public enum Archive {
+                 }
+             }
+ 
++            guard UInt64(payload.count) < UInt64(UInt32.max) else {
++                throw Archive.Error.unsupportedFormat(destinationURL, "compressed entry exceeds ZIP32 limits")
++            }
+             let compressedSize = UInt32(payload.count)
+             let localHeaderOffset = currentOffset
++            let projectedOffset = currentOffset + 30 + UInt64(nameData.count) + UInt64(payload.count)
++            guard localHeaderOffset <= UInt64(UInt32.max), projectedOffset <= UInt64(UInt32.max) else {
++                throw Archive.Error.unsupportedFormat(destinationURL, "ZIP32 archive offsets cannot exceed 4 GiB")
++            }
+ 
+             // Local File Header (30 bytes + filename)
+             var localHeader = Data(count: 30)
+@@ -511,9 +654,19 @@ public enum Archive {
+ 
+         public func close() throws {
+             guard !isClosed else { return }
++            let cdStartOffset = currentOffset
++            let cdSize = centralDirectoryEntries.reduce(UInt64(0)) { size, record in
++                size + 46 + UInt64(record.filename.utf8.count)
++            }
++            let archiveEnd = cdStartOffset + cdSize + 22
++            guard centralDirectoryEntries.count <= Int(UInt16.max),
++                  cdStartOffset <= UInt64(UInt32.max),
++                  cdSize <= UInt64(UInt32.max),
++                  archiveEnd <= UInt64(UInt32.max) else {
++                throw Archive.Error.unsupportedFormat(destinationURL, "archive exceeds ZIP32 catalogue limits; ZIP64 is not supported")
++            }
+             isClosed = true
+ 
+-            let cdStartOffset = currentOffset
+             for record in centralDirectoryEntries {
+                 let nameData = Data(record.filename.utf8)
+ 
+@@ -541,7 +694,7 @@ public enum Archive {
+                 currentOffset += UInt64(46 + nameData.count)
+             }
+ 
+-            let cdSize = UInt32(currentOffset - cdStartOffset)
++            let cdSize32 = UInt32(currentOffset - cdStartOffset)
+             let totalRecords = UInt16(centralDirectoryEntries.count)
+ 
+             // End of Central Directory (EOCD: 22 bytes)
+@@ -551,7 +704,7 @@ public enum Archive {
+             eocd.writeUInt16LE(0, at: 6) // Disk with CD
+             eocd.writeUInt16LE(totalRecords, at: 8) // Entries this disk
+             eocd.writeUInt16LE(totalRecords, at: 10) // Total entries
+-            eocd.writeUInt32LE(cdSize, at: 12) // CD size
++            eocd.writeUInt32LE(cdSize32, at: 12) // CD size
+             eocd.writeUInt32LE(UInt32(cdStartOffset), at: 16) // CD start offset
+             eocd.writeUInt16LE(0, at: 20) // Comment length
+ 
+@@ -582,6 +735,7 @@ public enum Archive {
+         case corruptArchive(URL)
+         case readFailed(URL)
+         case writeFailed(URL)
++        case unsupportedFormat(URL, String)
+         case missingAppBundle(URL)
+ 
+         public var errorDescription: String? {
+@@ -594,6 +748,8 @@ public enum Archive {
+                 return "Failed to read archive: \(url.lastPathComponent)"
+             case .writeFailed(let url):
+                 return "Failed to write archive: \(url.lastPathComponent)"
++            case .unsupportedFormat(let url, let reason):
++                return "Cannot process archive at \(url.lastPathComponent): \(reason)"
+             case .missingAppBundle(let url):
+                 return "No .app bundle found inside \(url.lastPathComponent)"
+             }
+diff --git a/Sources/Archiver/FileManagerZip.swift b/Sources/Archiver/FileManagerZip.swift
+index 46c4c89..7c020d9 100644
+--- a/Sources/Archiver/FileManagerZip.swift
++++ b/Sources/Archiver/FileManagerZip.swift
+@@ -8,6 +8,26 @@
+ 
+ import Foundation
+ 
++private enum ArchiveExtractionError: LocalizedError {
++    case invalidExtractionRoot(URL)
++    case unsafeEntryPath(String)
++    case symbolicLinkTraversal(String)
++    case resourceLimitExceeded(String)
++
++    var errorDescription: String? {
++        switch self {
++        case .invalidExtractionRoot(let url):
++            "The archive extraction directory is not a usable directory: \(url.path)"
++        case .unsafeEntryPath(let path):
++            "The archive contains an unsafe entry path: \(path)"
++        case .symbolicLinkTraversal(let path):
++            "The archive entry would traverse a symbolic link: \(path)"
++        case .resourceLimitExceeded(let reason):
++            "The archive exceeds extraction limits: \(reason)"
++        }
++    }
++}
++
+ extension FileManager {
+ 
+     // POSIX file type flags (external attributes in ZIP catalog are shifted by 16 bits)
+@@ -17,59 +37,191 @@ extension FileManager {
+     // Default permissions when not defined in the source archive
+     private static let defaultFilePermissions: UInt32 = 0o644
+     private static let defaultDirPermissions: UInt32  = 0o755
++    private static let maximumArchiveEntryCount = 65_535
++    private static let maximumEntrySize: Int64 = 1_073_741_824
++    private static let maximumTotalUncompressedSize: Int64 = 8_589_934_592
++
++    private func temporaryArchiveURL(for destinationURL: URL) -> URL {
++        destinationURL.deletingLastPathComponent()
++            .appendingPathComponent(".\(destinationURL.lastPathComponent).\(UUID().uuidString).tmp")
++    }
++
++    private func promoteArchive(at temporaryURL: URL, to destinationURL: URL) throws {
++        if fileExists(atPath: destinationURL.path) {
++            _ = try replaceItemAt(destinationURL, withItemAt: temporaryURL)
++        } else {
++            try moveItem(at: temporaryURL, to: destinationURL)
++        }
++    }
++
++    private func writeArchive(
++        at temporaryURL: URL,
++        compressionLevel: Int16,
++        populate: (Archive.Writer) throws -> Void
++    ) throws {
++        let writer = try Archive.Writer.create(at: temporaryURL)
++        writer.setCompressLevel(compressionLevel)
++        try populate(writer)
++        try writer.close()
++    }
+ 
+     public func unzipArchive(at archiveURL: URL, to directoryURL: URL, progress: Progress? = nil) throws {
+         verboseLog("[SideSign] FileManager.unzipArchive started for archive: \(archiveURL.path) to: \(directoryURL.path)")
++        guard directoryURL.isFileURL else { throw ArchiveExtractionError.invalidExtractionRoot(directoryURL) }
++        try createDirectory(at: directoryURL, withIntermediateDirectories: true)
++        let extractionRoot = directoryURL.standardizedFileURL.resolvingSymlinksInPath().standardizedFileURL
++        var rootIsDirectory: ObjCBool = false
++        guard fileExists(atPath: extractionRoot.path, isDirectory: &rootIsDirectory), rootIsDirectory.boolValue,
++              extractionRoot.pathComponents.count > 1 else {
++            throw ArchiveExtractionError.invalidExtractionRoot(directoryURL)
++        }
++
+         let archive = try Archive.Reader.open(at: archiveURL)
++        let entries = try archive.entries()
++        try Self.validateExtractionLimits(entries)
+         try archive.goToFirstFile()
+ 
+-        repeat {
+-
++        for index in entries.indices {
++            let entry = entries[index]
+             let name = try archive.currentFilename()
+-
+-            if name.hasPrefix("__MACOSX") {
++            guard name == entry.filename else { throw Archive.Error.corruptArchive(archiveURL) }
++            let isDirectory = entry.isDirectory
++            let archivedPermissions = (entry.externalAttributes >> 16) & 0x01FF
++            let permissions = archivedPermissions == 0
++                ? (isDirectory ? Self.defaultDirPermissions : Self.defaultFilePermissions)
++                : archivedPermissions
++            let path = try Self.destinationPath(for: name, isDirectory: isDirectory, under: extractionRoot)
++
++            if path.components.first == "__MACOSX" {
+                 verboseLog("[SideSign] FileManager.unzipArchive: skipping __MACOSX entry: \(name)")
+-                continue
++            } else {
++                let outputURL = path.url
++                try validateNoSymbolicLinks(path.components, under: extractionRoot, leafIsDirectory: isDirectory)
++
++                if isDirectory {
++                    _ = try archive.readCurrentFile()
++                    verboseLog("[SideSign] FileManager.unzipArchive: creating directory: \(outputURL.path)")
++                    try createDirectory(
++                        at: outputURL,
++                        withIntermediateDirectories: true,
++                        attributes: [.posixPermissions: NSNumber(value: permissions)]
++                    )
++                    try validateNoSymbolicLinks(path.components, under: extractionRoot, leafIsDirectory: true)
++                } else {
++                    let parentComponents = Array(path.components.dropLast())
++                    let parentURL = parentComponents.reduce(extractionRoot) {
++                        $0.appendingPathComponent($1, isDirectory: true)
++                    }
++                    try createDirectory(at: parentURL, withIntermediateDirectories: true)
++                    try validateNoSymbolicLinks(parentComponents, under: extractionRoot, leafIsDirectory: true)
++                    try validateNoSymbolicLinks(path.components, under: extractionRoot, leafIsDirectory: false)
++
++                    verboseLog("[SideSign] FileManager.unzipArchive: extracting file: \(outputURL.path)")
++                    let data = try archive.readCurrentFile()
++                    try validateNoSymbolicLinks(path.components, under: extractionRoot, leafIsDirectory: false)
++                    try data.write(to: outputURL, options: .atomic)
++                    try validateNoSymbolicLinks(path.components, under: extractionRoot, leafIsDirectory: false)
++                    try setAttributes([.posixPermissions: NSNumber(value: permissions)], ofItemAtPath: outputURL.path)
++                }
++
++                progress?.completedUnitCount += entry.uncompressedSize
+             }
+ 
+-            let outputURL =
+-                directoryURL.appendingPathComponent(name)
+-
+-            let externalAttributes = archive.currentFileExternalAttributes()
+-            var permissions = (externalAttributes >> 16) & 0x01FF
+-            if permissions == 0 {
+-                permissions = name.hasSuffix("/") ? Self.defaultDirPermissions : Self.defaultFilePermissions
++            if index + 1 < entries.count, !archive.goToNextFile() {
++                throw Archive.Error.corruptArchive(archiveURL)
+             }
++        }
++        verboseLog("[SideSign] FileManager.unzipArchive completed successfully")
++    }
++
++    private static func validateExtractionLimits(_ entries: [Archive.Entry]) throws {
++        guard entries.count <= maximumArchiveEntryCount else {
++            throw ArchiveExtractionError.resourceLimitExceeded("more than \(maximumArchiveEntryCount) entries")
++        }
+ 
+-            if name.hasSuffix("/") {
+-                verboseLog("[SideSign] FileManager.unzipArchive: creating directory: \(outputURL.path)")
+-                try createDirectory(
+-                    at: outputURL,
+-                    withIntermediateDirectories: true,
+-                    attributes: [.posixPermissions: NSNumber(value: permissions)]
+-                )
+-                continue
++        var totalUncompressedSize: Int64 = 0
++        for entry in entries {
++            guard entry.compressedSize >= 0, entry.uncompressedSize >= 0,
++                  entry.compressedSize <= maximumEntrySize,
++                  entry.uncompressedSize <= maximumEntrySize else {
++                throw ArchiveExtractionError.resourceLimitExceeded("an entry is larger than \(maximumEntrySize) bytes")
++            }
++            guard totalUncompressedSize <= maximumTotalUncompressedSize - entry.uncompressedSize else {
++                throw ArchiveExtractionError.resourceLimitExceeded("total expanded data is larger than \(maximumTotalUncompressedSize) bytes")
+             }
++            totalUncompressedSize += entry.uncompressedSize
++        }
++    }
+ 
+-            verboseLog("[SideSign] FileManager.unzipArchive: extracting file: \(outputURL.path)")
+-            try createDirectory(
+-                at: outputURL.deletingLastPathComponent(),
+-                withIntermediateDirectories: true
+-            )
++    private static func destinationPath(
++        for name: String,
++        isDirectory: Bool,
++        under root: URL
++    ) throws -> (url: URL, components: [String]) {
++        let relativeName = isDirectory && name.hasSuffix("/") ? String(name.dropLast()) : name
++        let drivePath = relativeName.range(of: "^[A-Za-z]:", options: .regularExpression) != nil
++        guard !relativeName.isEmpty,
++              !relativeName.hasPrefix("/"),
++              !relativeName.hasPrefix("~"),
++              !relativeName.contains("\\"),
++              !relativeName.contains("\0"),
++              !drivePath else {
++            throw ArchiveExtractionError.unsafeEntryPath(name)
++        }
+ 
+-            try archive.extractCurrentFile(to: outputURL)
++        let components = relativeName.split(separator: "/", omittingEmptySubsequences: false).map(String.init)
++        guard !components.isEmpty,
++              components.allSatisfy({ !$0.isEmpty && $0 != "." && $0 != ".." }) else {
++            throw ArchiveExtractionError.unsafeEntryPath(name)
++        }
+ 
+-            if permissions != 0 {
+-                try setAttributes([.posixPermissions: NSNumber(value: permissions)], ofItemAtPath: outputURL.path)
+-            }
++        let output = components.reduce(root) { partial, component in
++            partial.appendingPathComponent(component)
++        }.standardizedFileURL
++        let resolvedOutput = output.resolvingSymlinksInPath().standardizedFileURL
++        guard isDescendant(output, of: root), isDescendant(resolvedOutput, of: root) else {
++            throw ArchiveExtractionError.unsafeEntryPath(name)
++        }
++        return (output, components)
++    }
+ 
+-            if let attributes = try? attributesOfItem(atPath: outputURL.path),
+-               let size = attributes[.size] as? NSNumber {
+-                progress?.completedUnitCount += size.int64Value
++    private static func isDescendant(_ candidate: URL, of root: URL) -> Bool {
++        let rootComponents = root.standardizedFileURL.pathComponents
++        let candidateComponents = candidate.standardizedFileURL.pathComponents
++        guard candidateComponents.count > rootComponents.count else { return false }
++        for (rootComponent, candidateComponent) in zip(rootComponents, candidateComponents) {
++            #if os(Windows)
++            guard rootComponent.caseInsensitiveCompare(candidateComponent) == .orderedSame else { return false }
++            #else
++            guard rootComponent == candidateComponent else { return false }
++            #endif
++        }
++        return true
++    }
++
++    private func validateNoSymbolicLinks(
++        _ components: [String],
++        under root: URL,
++        leafIsDirectory: Bool?
++    ) throws {
++        var current = root
++        for (index, component) in components.enumerated() {
++            current.appendPathComponent(component)
++            if (try? destinationOfSymbolicLink(atPath: current.path)) != nil {
++                throw ArchiveExtractionError.symbolicLinkTraversal(current.path)
+             }
+ 
+-        } while archive.goToNextFile()
+-        verboseLog("[SideSign] FileManager.unzipArchive completed successfully")
++            var isDirectory: ObjCBool = false
++            if fileExists(atPath: current.path, isDirectory: &isDirectory) {
++                let isLeaf = index == components.count - 1
++                if !isLeaf && !isDirectory.boolValue {
++                    throw ArchiveExtractionError.unsafeEntryPath(current.path)
++                }
++                if isLeaf, let leafIsDirectory, isDirectory.boolValue != leafIsDirectory {
++                    throw ArchiveExtractionError.unsafeEntryPath(current.path)
++                }
++            }
++        }
+     }
+ 
+     public func unzipAppBundle(at ipaURL: URL, to directoryURL: URL) throws -> URL {
+@@ -126,88 +278,84 @@ extension FileManager {
+             .deletingLastPathComponent()
+             .appendingPathComponent("\(name).ipa")
+ 
+-        if fileExists(atPath: ipaURL.path) {
+-            verboseLog("[SideSign] FileManager.zipAppBundle: removing existing ipa at \(ipaURL.path)")
+-            try removeItem(at: ipaURL)
+-        }
++        let temporaryURL = temporaryArchiveURL(for: ipaURL)
++        defer { try? removeItem(at: temporaryURL) }
+ 
+-        let writer = try Archive.Writer.create(at: ipaURL)
+-        writer.setCompressLevel(compressionLevel.rawValue)
++        try writeArchive(at: temporaryURL, compressionLevel: compressionLevel.rawValue) { writer in
++            let canonicalBundleURL = appBundleURL.resolvingSymlinksInPath()
++            let basePath = canonicalBundleURL.path.hasSuffix("/") ? canonicalBundleURL.path : canonicalBundleURL.path + "/"
+ 
++            let enumerator = self.enumerator(
++                at: canonicalBundleURL,
++                includingPropertiesForKeys: [.isDirectoryKey]
++            )!
+ 
+-        let canonicalBundleURL = appBundleURL.resolvingSymlinksInPath()
+-        let basePath = canonicalBundleURL.path.hasSuffix("/") ? canonicalBundleURL.path : canonicalBundleURL.path + "/"
++            verboseLog("[SideSign] FileManager.zipAppBundle: enumerating contents of app bundle...")
++            for case let fileURL as URL in enumerator {
++                let canonicalFileURL = fileURL.resolvingSymlinksInPath()
++                let isDir = (try? canonicalFileURL.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
+ 
+-        let enumerator = self.enumerator(
+-            at: canonicalBundleURL,
+-            includingPropertiesForKeys: [.isDirectoryKey]
+-        )!
++                let fullPath = canonicalFileURL.path
++                guard fullPath.hasPrefix(basePath) else { continue }
++                let relative = String(fullPath.dropFirst(basePath.count))
+ 
+-        verboseLog("[SideSign] FileManager.zipAppBundle: enumerating contents of app bundle...")
+-        for case let fileURL as URL in enumerator {
+-            let canonicalFileURL = fileURL.resolvingSymlinksInPath()
+-            let isDir = (try? canonicalFileURL.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
++                let zipPath = "Payload/\(appBundleURL.lastPathComponent)/\(relative)" + (isDir ? "/" : "")
+ 
+-            let fullPath = canonicalFileURL.path
+-            guard fullPath.hasPrefix(basePath) else { continue }
+-            let relative = String(fullPath.dropFirst(basePath.count))
++                let attributes = try self.attributesOfItem(atPath: canonicalFileURL.path)
++                let posixPermissions = (attributes[.posixPermissions] as? NSNumber)?.uint32Value ?? (isDir ? Self.defaultDirPermissions : Self.defaultFilePermissions)
+ 
+-            let zipPath = "Payload/\(appBundleURL.lastPathComponent)/\(relative)" + (isDir ? "/" : "")
++                verboseLog("[SideSign] FileManager.zipAppBundle: writing zip entry relative: \(relative), path in zip: \(zipPath), isDir: \(isDir), permissions: \(String(format: "%0o", posixPermissions))")
+ 
+-            let attributes = try self.attributesOfItem(atPath: canonicalFileURL.path)
+-            let posixPermissions = (attributes[.posixPermissions] as? NSNumber)?.uint32Value ?? (isDir ? Self.defaultDirPermissions : Self.defaultFilePermissions)
+-
+-            verboseLog("[SideSign] FileManager.zipAppBundle: writing zip entry relative: \(relative), path in zip: \(zipPath), isDir: \(isDir), permissions: \(String(format: "%0o", posixPermissions))")
+-
+-            if isDir {
+-                let permissions = Self.S_IFDIR + posixPermissions
+-                try writer.writeFile(path: zipPath, data: nil, permissions: permissions)
+-            } else {
+-                try writer.addFile(at: canonicalFileURL, pathInZip: zipPath)
++                if isDir {
++                    let permissions = Self.S_IFDIR + posixPermissions
++                    try writer.writeFile(path: zipPath, data: nil, permissions: permissions)
++                } else {
++                    try writer.addFile(at: canonicalFileURL, pathInZip: zipPath)
++                }
+             }
+         }
+ 
++        try promoteArchive(at: temporaryURL, to: ipaURL)
+         verboseLog("[SideSign] FileManager.zipAppBundle completed. Packaged ipa path: \(ipaURL.path)")
+         return ipaURL
+     }
+ 
+     public func zipDirectory(at directoryURL: URL, to destinationZipURL: URL, compressionLevel: CompressionLevel = .standard) throws {
+         verboseLog("[SideSign] FileManager.zipDirectory starting for: \(directoryURL.path) to \(destinationZipURL.path)")
+-        if fileExists(atPath: destinationZipURL.path) {
+-            try removeItem(at: destinationZipURL)
+-        }
+-        let writer = try Archive.Writer.create(at: destinationZipURL)
+-        writer.setCompressLevel(compressionLevel.rawValue)
+-
+-        let canonicalDirURL = directoryURL.resolvingSymlinksInPath()
+-        let basePath = canonicalDirURL.path.hasSuffix("/") ? canonicalDirURL.path : canonicalDirURL.path + "/"
+-
+-        guard let enumerator = self.enumerator(
+-            at: canonicalDirURL,
+-            includingPropertiesForKeys: [.isDirectoryKey]
+-        ) else { return }
+-
+-        for case let fileURL as URL in enumerator {
+-            let canonicalFileURL = fileURL.resolvingSymlinksInPath()
+-            let isDir = (try? canonicalFileURL.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
+-
+-            let fullPath = canonicalFileURL.path
+-            guard fullPath.hasPrefix(basePath) else { continue }
+-            let relative = String(fullPath.dropFirst(basePath.count))
+-            guard !relative.isEmpty else { continue }
+-
+-            let zipPath = relative + (isDir ? "/" : "")
+-            let attributes = try self.attributesOfItem(atPath: canonicalFileURL.path)
+-            let posixPermissions = (attributes[.posixPermissions] as? NSNumber)?.uint32Value ?? (isDir ? Self.defaultDirPermissions : Self.defaultFilePermissions)
+-
+-            if isDir {
+-                let permissions = Self.S_IFDIR + posixPermissions
+-                try writer.writeFile(path: zipPath, data: nil, permissions: permissions)
+-            } else {
+-                try writer.addFile(at: canonicalFileURL, pathInZip: zipPath)
++        let temporaryURL = temporaryArchiveURL(for: destinationZipURL)
++        defer { try? removeItem(at: temporaryURL) }
++
++        try writeArchive(at: temporaryURL, compressionLevel: compressionLevel.rawValue) { writer in
++            let canonicalDirURL = directoryURL.resolvingSymlinksInPath()
++            let basePath = canonicalDirURL.path.hasSuffix("/") ? canonicalDirURL.path : canonicalDirURL.path + "/"
++
++            guard let enumerator = self.enumerator(
++                at: canonicalDirURL,
++                includingPropertiesForKeys: [.isDirectoryKey]
++            ) else { throw Archive.Error.readFailed(canonicalDirURL) }
++
++            for case let fileURL as URL in enumerator {
++                let canonicalFileURL = fileURL.resolvingSymlinksInPath()
++                let isDir = (try? canonicalFileURL.resourceValues(forKeys: [.isDirectoryKey]))?.isDirectory == true
++
++                let fullPath = canonicalFileURL.path
++                guard fullPath.hasPrefix(basePath) else { continue }
++                let relative = String(fullPath.dropFirst(basePath.count))
++                guard !relative.isEmpty else { continue }
++
++                let zipPath = relative + (isDir ? "/" : "")
++                let attributes = try self.attributesOfItem(atPath: canonicalFileURL.path)
++                let posixPermissions = (attributes[.posixPermissions] as? NSNumber)?.uint32Value ?? (isDir ? Self.defaultDirPermissions : Self.defaultFilePermissions)
++
++                if isDir {
++                    let permissions = Self.S_IFDIR + posixPermissions
++                    try writer.writeFile(path: zipPath, data: nil, permissions: permissions)
++                } else {
++                    try writer.addFile(at: canonicalFileURL, pathInZip: zipPath)
++                }
+             }
+         }
+-        try writer.close()
++        try promoteArchive(at: temporaryURL, to: destinationZipURL)
+         verboseLog("[SideSign] FileManager.zipDirectory completed: \(destinationZipURL.path)")
+     }
+ }
+diff --git a/Sources/Certificates/CertificateParser.swift b/Sources/Certificates/CertificateParser.swift
+index 5db1a77..26bfbc7 100644
+--- a/Sources/Certificates/CertificateParser.swift
++++ b/Sources/Certificates/CertificateParser.swift
+@@ -11,10 +11,52 @@ import CodeSignKit
+ 
+ public enum CertificateParser {
+     public static func extractDER(_ data: Data, boundaryKeyword: String = "CERTIFICATE") -> Data? {
+-        if let str = String(data: data, encoding: .utf8), str.contains("-----BEGIN ") {
+-            return ASN1Helper.decodePEM(str)
++        guard let text = String(data: data, encoding: .utf8),
++              text.contains("-----BEGIN ") || text.contains("-----END ") else { return data }
++        let keyword = boundaryKeyword.trimmingCharacters(in: .whitespacesAndNewlines)
++        guard !keyword.isEmpty, keyword == boundaryKeyword,
++              !keyword.contains("-----"), !keyword.contains("\n"), !keyword.contains("\r") else { return nil }
++
++        let acceptedLabels: Set<String>
++        if keyword == "PRIVATE KEY" {
++            acceptedLabels = ["PRIVATE KEY", "RSA PRIVATE KEY", "EC PRIVATE KEY", "ENCRYPTED PRIVATE KEY"]
++        } else {
++            acceptedLabels = [keyword]
++        }
++
++        let lines = text.components(separatedBy: .newlines)
++        var selectedLabel: String?
++        var payload = ""
++        for line in lines {
++            let line = line.trimmingCharacters(in: .whitespaces)
++            if selectedLabel == nil {
++                guard let label = pemBoundaryLabel(line, prefix: "-----BEGIN ") else { continue }
++                if acceptedLabels.contains(label) { selectedLabel = label }
++                continue
++            }
++
++            if let endLabel = pemBoundaryLabel(line, prefix: "-----END ") {
++                guard endLabel == selectedLabel,
++                      !payload.isEmpty,
++                      payload.utf8.allSatisfy({
++                          (65...90).contains($0) || (97...122).contains($0)
++                              || (48...57).contains($0) || $0 == 43 || $0 == 47 || $0 == 61
++                      }),
++                      let decoded = Data(base64Encoded: payload) else { return nil }
++                return decoded
++            }
++            if line.hasPrefix("-----BEGIN ") { return nil }
++            payload += line.filter { !$0.isWhitespace }
+         }
+-        return data
++        return nil
++    }
++
++    private static func pemBoundaryLabel(_ line: String, prefix: String) -> String? {
++        guard line.hasPrefix(prefix), line.hasSuffix("-----"), line.count > prefix.count + 5 else { return nil }
++        let label = String(line.dropFirst(prefix.count).dropLast(5))
++        guard !label.isEmpty, !label.hasPrefix("-"), !label.hasSuffix("-"),
++              !label.contains("--"), !label.contains("  "), !label.contains("\t") else { return nil }
++        return label
+     }
+ 
+     public static func extractX509(_ data: Data) -> X509Certificate? {
+diff --git a/Sources/Certificates/PKCS12Parser.swift b/Sources/Certificates/PKCS12Parser.swift
+index 192935c..30da4ea 100644
+--- a/Sources/Certificates/PKCS12Parser.swift
++++ b/Sources/Certificates/PKCS12Parser.swift
+@@ -11,12 +11,20 @@ import CodeSignKit
+ 
+ public enum PKCS12Parser {
+     public static func extract(_ data: Data, password: String?) throws -> (cert: Data, key: Data) {
++        guard data.isPKCS12 else {
++            throw CertificateError.invalidData(cause: "Malformed or unsupported PKCS#12 PFX structure")
++        }
+         do {
+             let parser = try CodeSignKit.PKCS12Parser(p12Data: data, password: password ?? "")
+             guard let certDER = parser.leafCertificate?.rawDER else {
+                 throw CertificateError.pkcs12ImportFailed(cause: "No X.509 certificate in PKCS#12 archive")
+             }
+-            return (certDER, parser.privateKeyDER ?? Data())
++            guard let privateKeyDER = parser.privateKeyDER, !privateKeyDER.isEmpty else {
++                throw CertificateError.missingPrivateKey
++            }
++            return (certDER, privateKeyDER)
++        } catch let error as CertificateError {
++            throw error
+         } catch {
+             throw CertificateError.pkcs12ImportFailed(cause: error.localizedDescription)
+         }
+@@ -26,7 +34,15 @@ public enum PKCS12Parser {
+         guard let certDER = CertificateParser.extractDER(cert) else {
+             throw CertificateError.invalidData(cause: "Invalid certificate data")
+         }
+-        let keyDER = key.flatMap { CertificateParser.extractDER($0, boundaryKeyword: "PRIVATE KEY") } ?? key
++        let keyDER: Data?
++        if let key {
++            guard let extractedKey = CertificateParser.extractDER(key, boundaryKeyword: "PRIVATE KEY") else {
++                throw CertificateError.invalidData(cause: "Malformed PRIVATE KEY PEM boundaries or base64 content")
++            }
++            keyDER = extractedKey
++        } else {
++            keyDER = nil
++        }
+         do {
+             return try PKCS12Builder.build(certificateDER: certDER, privateKeyDER: keyDER, password: password)
+         } catch {
+diff --git a/Sources/Compatibility.swift b/Sources/Compatibility.swift
+index 545c4be..26ea356 100644
+--- a/Sources/Compatibility.swift
++++ b/Sources/Compatibility.swift
+@@ -153,7 +153,188 @@ public extension AppGroup {
+ 
+ public extension Data {
+     var isPKCS12: Bool {
+-        ASN1Helper.parseTLV(from: self)?.tag == 0x30
++        PFXASN1.isValid(self)
++    }
++}
++
++private enum PFXASN1 {
++    private struct TLV {
++        let tag: UInt8
++        let content: Range<Int>
++        let end: Int
++    }
++
++    private static let dataContentType: [UInt8] = [0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x07, 0x01]
++    private static let signedDataContentType: [UInt8] = [0x2A, 0x86, 0x48, 0x86, 0xF7, 0x0D, 0x01, 0x07, 0x02]
++
++    static func isValid(_ data: Data) -> Bool {
++        let bytes = Array(data)
++        guard let pfx = read(bytes, at: 0, limit: bytes.count),
++              pfx.tag == 0x30, pfx.end == bytes.count,
++              let version = read(bytes, at: pfx.content.lowerBound, limit: pfx.content.upperBound),
++              version.tag == 0x02, version.content.count == 1,
++              bytes[version.content.lowerBound] == 0x03,
++              let authSafe = read(bytes, at: version.end, limit: pfx.content.upperBound),
++              authSafe.tag == 0x30, isPFXAuthSafe(bytes, authSafe),
++              authSafe.end <= pfx.content.upperBound else { return false }
++
++        guard authSafe.end < pfx.content.upperBound else { return true }
++        guard let macData = read(bytes, at: authSafe.end, limit: pfx.content.upperBound),
++              macData.tag == 0x30, macData.end == pfx.content.upperBound else { return false }
++        return isMacData(bytes, macData)
++    }
++
++    private static func isPFXAuthSafe(_ bytes: [UInt8], _ sequence: TLV) -> Bool {
++        guard let contentType = read(bytes, at: sequence.content.lowerBound, limit: sequence.content.upperBound),
++              contentType.tag == 0x06,
++              let explicitContent = read(bytes, at: contentType.end, limit: sequence.content.upperBound),
++              explicitContent.tag == 0xA0, explicitContent.end == sequence.content.upperBound,
++              let payload = read(bytes, at: explicitContent.content.lowerBound, limit: explicitContent.content.upperBound),
++              payload.end == explicitContent.content.upperBound else { return false }
++
++        let contentTypeBytes = Array(bytes[contentType.content])
++        if contentTypeBytes == signedDataContentType {
++            return payload.tag == 0x30 && isSignedData(bytes, payload)
++        }
++        guard contentTypeBytes == dataContentType, payload.tag == 0x04 else { return false }
++        return isAuthenticatedSafe(Array(bytes[payload.content]))
++    }
++
++    private static func isAuthenticatedSafe(_ bytes: [UInt8]) -> Bool {
++        guard let authenticatedSafe = read(bytes, at: 0, limit: bytes.count),
++              authenticatedSafe.tag == 0x30, authenticatedSafe.end == bytes.count else { return false }
++        var cursor = authenticatedSafe.content.lowerBound
++        while cursor < authenticatedSafe.content.upperBound {
++            guard let contentInfo = read(bytes, at: cursor, limit: authenticatedSafe.content.upperBound),
++                  contentInfo.tag == 0x30, isContentInfo(bytes, contentInfo) else { return false }
++            cursor = contentInfo.end
++        }
++        return cursor == authenticatedSafe.content.upperBound
++    }
++
++    private static func isSignedData(_ bytes: [UInt8], _ sequence: TLV) -> Bool {
++        var cursor = sequence.content.lowerBound
++        guard let version = read(bytes, at: cursor, limit: sequence.content.upperBound),
++              version.tag == 0x02, isNonNegativeInteger(bytes, version) else { return false }
++        cursor = version.end
++        guard let digestAlgorithms = read(bytes, at: cursor, limit: sequence.content.upperBound),
++              digestAlgorithms.tag == 0x31 else { return false }
++        var algorithmCursor = digestAlgorithms.content.lowerBound
++        while algorithmCursor < digestAlgorithms.content.upperBound {
++            guard let algorithm = read(bytes, at: algorithmCursor, limit: digestAlgorithms.content.upperBound),
++                  algorithm.tag == 0x30, isAlgorithmIdentifier(bytes, algorithm) else { return false }
++            algorithmCursor = algorithm.end
++        }
++        cursor = digestAlgorithms.end
++        guard let encapsulatedContent = read(bytes, at: cursor, limit: sequence.content.upperBound),
++              encapsulatedContent.tag == 0x30,
++              let contentType = read(bytes, at: encapsulatedContent.content.lowerBound, limit: encapsulatedContent.content.upperBound),
++              contentType.tag == 0x06, Array(bytes[contentType.content]) == dataContentType,
++              let explicitOctets = read(bytes, at: contentType.end, limit: encapsulatedContent.content.upperBound),
++              explicitOctets.tag == 0xA0, explicitOctets.end == encapsulatedContent.content.upperBound,
++              let octets = read(bytes, at: explicitOctets.content.lowerBound, limit: explicitOctets.content.upperBound),
++              octets.tag == 0x04, octets.end == explicitOctets.content.upperBound,
++              isAuthenticatedSafe(Array(bytes[octets.content])) else { return false }
++        cursor = encapsulatedContent.end
++        while cursor < sequence.content.upperBound {
++            guard let optionalField = read(bytes, at: cursor, limit: sequence.content.upperBound) else { return false }
++            if optionalField.tag == 0xA0 || optionalField.tag == 0xA1 {
++                cursor = optionalField.end
++            } else {
++                return optionalField.tag == 0x31 && optionalField.end == sequence.content.upperBound
++            }
++        }
++        return false
++    }
++
++    private static func isAlgorithmIdentifier(_ bytes: [UInt8], _ sequence: TLV) -> Bool {
++        guard let oid = read(bytes, at: sequence.content.lowerBound, limit: sequence.content.upperBound),
++              oid.tag == 0x06, isValidOID(Array(bytes[oid.content])) else { return false }
++        guard oid.end < sequence.content.upperBound else { return true }
++        guard let parameters = read(bytes, at: oid.end, limit: sequence.content.upperBound) else { return false }
++        return parameters.end == sequence.content.upperBound
++    }
++
++    private static func isContentInfo(_ bytes: [UInt8], _ sequence: TLV) -> Bool {
++        guard let contentType = read(bytes, at: sequence.content.lowerBound, limit: sequence.content.upperBound),
++              contentType.tag == 0x06, isValidOID(Array(bytes[contentType.content])) else { return false }
++        guard contentType.end == sequence.content.upperBound else {
++            guard let content = read(bytes, at: contentType.end, limit: sequence.content.upperBound),
++                  content.tag == 0xA0, content.end == sequence.content.upperBound,
++                  let inner = read(bytes, at: content.content.lowerBound, limit: content.content.upperBound) else { return false }
++            return inner.end == content.content.upperBound
++        }
++        return true
++    }
++
++    private static func isMacData(_ bytes: [UInt8], _ sequence: TLV) -> Bool {
++        guard let digestInfo = read(bytes, at: sequence.content.lowerBound, limit: sequence.content.upperBound),
++              digestInfo.tag == 0x30,
++              let salt = read(bytes, at: digestInfo.end, limit: sequence.content.upperBound), salt.tag == 0x04 else { return false }
++        guard salt.end == sequence.content.upperBound else {
++            guard let iterations = read(bytes, at: salt.end, limit: sequence.content.upperBound),
++                  iterations.tag == 0x02, isNonNegativeInteger(bytes, iterations),
++                  iterations.end == sequence.content.upperBound else { return false }
++        }
++        guard let algorithm = read(bytes, at: digestInfo.content.lowerBound, limit: digestInfo.content.upperBound),
++              algorithm.tag == 0x30, isAlgorithmIdentifier(bytes, algorithm),
++              let digest = read(bytes, at: algorithm.end, limit: digestInfo.content.upperBound),
++              digest.tag == 0x04, digest.end == digestInfo.content.upperBound else { return false }
++        return true
++    }
++
++    private static func isNonNegativeInteger(_ bytes: [UInt8], _ value: TLV) -> Bool {
++        guard !value.content.isEmpty, bytes[value.content.lowerBound] & 0x80 == 0 else { return false }
++        if value.content.count > 1, bytes[value.content.lowerBound] == 0,
++           bytes[value.content.lowerBound + 1] & 0x80 == 0 { return false }
++        return true
++    }
++
++    private static func isValidOID(_ bytes: [UInt8]) -> Bool {
++        guard !bytes.isEmpty else { return false }
++        var atComponentStart = true
++        for byte in bytes {
++            if atComponentStart && byte == 0x80 { return false }
++            atComponentStart = byte & 0x80 == 0
++        }
++        return atComponentStart
++    }
++
++    private static func read(_ bytes: [UInt8], at offset: Int, limit: Int) -> TLV? {
++        guard offset >= 0, offset < limit, limit <= bytes.count else { return nil }
++        let tag = bytes[offset]
++        var cursor = offset + 1
++        if tag & 0x1F == 0x1F {
++            var sawLast = false
++            while cursor < limit, cursor - offset <= 6 {
++                let part = bytes[cursor]
++                cursor += 1
++                if cursor == offset + 3, part & 0x7F == 0 { return nil }
++                if part & 0x80 == 0 { sawLast = true; break }
++            }
++            guard sawLast else { return nil }
++        }
++        guard cursor < limit else { return nil }
++        let firstLength = bytes[cursor]
++        cursor += 1
++        let length: Int
++        if firstLength & 0x80 == 0 {
++            length = Int(firstLength)
++        } else {
++            let count = Int(firstLength & 0x7F)
++            guard count > 0, count <= 4, cursor + count <= limit, bytes[cursor] != 0 else { return nil }
++            var decoded = 0
++            for _ in 0..<count {
++                let byte = Int(bytes[cursor])
++                guard decoded <= (Int.max - byte) / 256 else { return nil }
++                decoded = decoded * 256 + byte
++                cursor += 1
++            }
++            guard decoded >= 128 else { return nil }
++            length = decoded
++        }
++        guard length <= limit - cursor else { return nil }
++        return TLV(tag: tag, content: cursor..<(cursor + length), end: cursor + length)
+     }
+ }
+ 
+diff --git a/Sources/Constants.swift b/Sources/Constants.swift
+index 53d3070..ff730e0 100644
+--- a/Sources/Constants.swift
++++ b/Sources/Constants.swift
+@@ -62,6 +62,9 @@ public enum Constants {
+ 
+         // iOS Actions
+         public static let listAppIDs                = URL(string: "\(servicesBase)/ios/listAppIds.action")!
++        // Unlike the legacy Developer Services endpoints, App ID details are
++        // returned by the Developer Portal account endpoint.
++        public static let getAppIDDetail            = URL(string: "https://developer.apple.com/services-account/\(Constants.DeveloperServices.protocolVersion)/account/ios/identifiers/getAppIdDetail.action")!
+         public static let addAppID                  = URL(string: "\(servicesBase)/ios/addAppId.action")!
+         public static let updateAppID               = URL(string: "\(servicesBase)/ios/updateAppId.action")!
+         public static let deleteAppID               = URL(string: "\(servicesBase)/ios/deleteAppId.action")!
+diff --git a/Sources/DeveloperPortal/AppIDs.swift b/Sources/DeveloperPortal/AppIDs.swift
+index efb5c44..c30e7af 100644
+--- a/Sources/DeveloperPortal/AppIDs.swift
++++ b/Sources/DeveloperPortal/AppIDs.swift
+@@ -28,6 +28,19 @@ public extension DeveloperPortal {
+         return appIDs
+     }
+ 
++    func fetchAppIDDetails(for appID: AppID, team: Team, session: Session) async throws -> AppID {
++        let response: AppIDResponse = try await sendRequest(
++            url: Constants.URLs.getAppIDDetail,
++            additionalParameters: ["appIdId": appID.identifier],
++            session: session,
++            team: team
++        )
++        guard let detailedAppID = response.appId else {
++            throw ServerError.badServerResponse(reason: "Missing App ID details in response", jsonPayload: "")
++        }
++        return detailedAppID
++    }
++
+     func addAppID(withName name: String, bundleIdentifier: String, team: Team, session: Session) async throws -> AppID {
+         debugLog("[SideSign] addAppID starting...")
+         verboseLog("[SideSign] Name: '\(name)', BundleID: '\(bundleIdentifier)', Team: \(team.name)")
+diff --git a/Sources/DeveloperPortal/AuthModels.swift b/Sources/DeveloperPortal/AuthModels.swift
+index 94ff14e..d93fc44 100644
+--- a/Sources/DeveloperPortal/AuthModels.swift
++++ b/Sources/DeveloperPortal/AuthModels.swift
+@@ -8,6 +8,10 @@
+ 
+ import Foundation
+ 
++// Compatibility DTOs remain public for existing library clients. The live
++// authentication implementation uses dictionaries; these CodingKeys mirror
++// that wire protocol and must not introduce a second spelling of its fields.
++
+ public struct ClientPayload: Sendable, Codable, Equatable {
+     public var bootstrap: Bool
+     public var icscrec: Bool
+@@ -35,6 +39,14 @@ public struct SRPInitRequest: Sendable, Codable, Equatable {
+     public var ps: [String]
+     public var u: String
+ 
++    enum CodingKeys: String, CodingKey {
++        case a = "A2k"
++        case cpd
++        case o
++        case ps
++        case u
++    }
++
+     public init(publicKey: Data, clientPayload: ClientPayload, username: String) {
+         self.a = publicKey
+         self.cpd = clientPayload
+@@ -51,6 +63,14 @@ public struct SRPCompleteRequest: Sendable, Codable, Equatable {
+     public var o: String
+     public var u: String
+ 
++    enum CodingKeys: String, CodingKey {
++        case c
++        case cpd
++        case m1 = "M1"
++        case o
++        case u
++    }
++
+     public init(challenge: String?, clientPayload: ClientPayload, verificationMessage: Data, username: String) {
+         self.c = challenge
+         self.cpd = clientPayload
+@@ -104,12 +124,12 @@ public struct GrandSlamAuthResponse: Sendable, Codable, Equatable {
+     enum CodingKeys: String, CodingKey {
+         case status = "Status"
+         case s
+-        case b
++        case b = "B"
+         case i
+         case sp
+         case c
+         case spd
+-        case m2
++        case m2 = "M2"
+         case au
+     }
+ }
+diff --git a/Sources/DeveloperPortal/Authentication.swift b/Sources/DeveloperPortal/Authentication.swift
+index f60d4c6..5786ae8 100644
+--- a/Sources/DeveloperPortal/Authentication.swift
++++ b/Sources/DeveloperPortal/Authentication.swift
+@@ -9,6 +9,8 @@
+ import Foundation
+ import GSACryptoKit
+ 
++private let redactedAuthenticationPayload = "[authentication payload redacted]"
++
+ public extension DeveloperPortal {
+ 
+     func authenticate(appleID unsanitizedAppleID: String,
+@@ -48,7 +50,7 @@ public extension DeveloperPortal {
+             throw DeveloperPortalError.authenticationHandshakeFailed(cause: "Failed to start SRPClient / generate public key A")
+         }
+ 
+-        verboseLog("[SideSign] SRPClient started. Generated public key A: \(publicKey.hexEncodedString())")
++        verboseLog("[SideSign] SRPClient started and generated public key A.")
+ 
+         // 1. Send authentication 'init' request
+         let initParameters: [String: any Sendable] = [
+@@ -67,19 +69,11 @@ public extension DeveloperPortal {
+               let iterations = initResponse["i"] as? Int,
+               let serverPublicKey = initResponse["B"] as? Data
+         else {
+-            let payload = prettyJSONString(from: initResponse)
+             debugLog("[SideSign] Failed to parse authentication init response dictionary: missing c/s/i/B parameters")
+-            throw ServerError.badServerResponse(reason: "Auth init response missing c/s/i/B parameters", jsonPayload: payload)
++            throw ServerError.badServerResponse(reason: "Auth init response missing c/s/i/B parameters", jsonPayload: redactedAuthenticationPayload)
+         }
+ 
+-        verboseLog("""
+-        [SideSign] Received init response:
+-          • c: \(c)
+-          • sp: \(initResponse["sp"] as? String ?? "nil")
+-          • salt: \(salt.hexEncodedString())
+-          • iterations: \(iterations)
+-          • B: \(serverPublicKey.hexEncodedString())
+-        """)
++        verboseLog("[SideSign] Received authentication init parameters (c/s/i/B).")
+ 
+         let sp = initResponse["sp"] as? String
+         let isHexadecimal = (sp == "s2k_fo")
+@@ -112,7 +106,7 @@ public extension DeveloperPortal {
+         }
+ 
+         debugLog("[SideSign] Initiating SRP authentication step 2 (complete)...")
+-        verboseLog("[SideSign] Generated verification message M1: \(verificationMessage.hexEncodedString())")
++        verboseLog("[SideSign] Generated SRP verification message M1.")
+ 
+         // 2. Send authentication 'complete' request
+         let completeParameters: [String: any Sendable] = [
+@@ -127,22 +121,16 @@ public extension DeveloperPortal {
+         debugLog("[SideSign] SRP complete step finished.")
+ 
+         guard let encryptedData = completeResponseDictionary["spd"] as? Data else {
+-            let payload = prettyJSONString(from: completeResponseDictionary)
+-            debugLog("[SideSign] Missing encrypted data 'spd' in auth complete response: \(payload)")
+-            throw ServerError.missingKey(key: "spd", jsonPayload: payload)
++            debugLog("[SideSign] Auth complete response is missing encrypted data 'spd'.")
++            throw ServerError.missingKey(key: "spd", jsonPayload: redactedAuthenticationPayload)
+         }
+ 
+         guard let serverVerificationMessage = completeResponseDictionary["M2"] as? Data else {
+-            let payload = prettyJSONString(from: completeResponseDictionary)
+-            debugLog("[SideSign] Missing server verification message 'M2' in auth complete response: \(payload)")
+-            throw ServerError.missingKey(key: "M2", jsonPayload: payload)
++            debugLog("[SideSign] Auth complete response is missing server verification message 'M2'.")
++            throw ServerError.missingKey(key: "M2", jsonPayload: redactedAuthenticationPayload)
+         }
+ 
+-        verboseLog("""
+-        [SideSign] Received SPD payload:
+-          • Encrypted SPD bytes: \(encryptedData.count)
+-          • M2: \(serverVerificationMessage.hexEncodedString())
+-        """)
++        verboseLog("[SideSign] Received encrypted SPD payload (\(encryptedData.count) bytes) and M2 proof.")
+ 
+         guard srpClient.verifyServerProof(serverVerificationMessage) else {
+             debugLog("[SideSign] Server M2 verification message validation failed")
+@@ -163,34 +151,31 @@ public extension DeveloperPortal {
+         }
+ 
+         guard let decryptedDictionary = parsePlistOrJSON(decryptedData) else {
+-            let rawDecrypted = prettyJSONString(from: decryptedData)
+             debugLog("[SideSign] Decrypted payload format is invalid (neither Plist nor JSON)")
+-            throw ServerError.invalidResponseFormat(rawPayload: rawDecrypted)
++            throw ServerError.invalidResponseFormat(rawPayload: redactedAuthenticationPayload)
+         }
+ 
+         let adsid = decryptedDictionary["adsid"] as? String
+         let dsidString = (decryptedDictionary["dsid"] as? CustomStringConvertible)?.description
+         guard let dsid = adsid ?? dsidString else {
+-            let jsonStr = prettyJSONString(from: decryptedDictionary)
+             debugLog("[SideSign] Decrypted dictionary missing adsid/dsid")
+-            throw ServerError.missingKey(key: "adsid", jsonPayload: jsonStr)
++            throw ServerError.missingKey(key: "adsid", jsonPayload: redactedAuthenticationPayload)
+         }
+ 
+         let gsIdmsToken = decryptedDictionary["GsIdmsToken"] as? String
+         let rawIdmsToken = decryptedDictionary["idmsToken"] as? String
+         guard let idmsToken = gsIdmsToken ?? rawIdmsToken else {
+-            let jsonStr = prettyJSONString(from: decryptedDictionary)
+             debugLog("[SideSign] Decrypted dictionary missing GsIdmsToken/idmsToken")
+-            throw ServerError.missingKey(key: "GsIdmsToken", jsonPayload: jsonStr)
++            throw ServerError.missingKey(key: "GsIdmsToken", jsonPayload: redactedAuthenticationPayload)
+         }
+ 
+-        verboseLog("[SideSign] Parse complete. dsid: \(dsid), token: \(idmsToken)")
++        verboseLog("[SideSign] Authentication credentials parsed successfully.")
+         
+         // 2FA auth type
+         let statusDictionary = completeResponseDictionary["Status"] as? [String: any Sendable]
+         let authType = (statusDictionary?["au"] as? String)
+            ?? (completeResponseDictionary["au"] as? String)
+-        verboseLog("[SideSign] Authentication status type: \(authType ?? "nil")")
++        verboseLog("[SideSign] Authentication status type present: \(authType != nil).")
+ 
+         let twoFactorAuthContext = TwoFactorAuthContext(
+             dsid: dsid, 
+@@ -227,16 +212,9 @@ public extension DeveloperPortal {
+                 let repairURLString = directRepairURL ?? directURL ?? statusURL
+                 let repairURL = repairURLString.flatMap { URL(string: $0) } ?? Constants.URLs.developerAccount
+ 
+-                let rawMessage = (statusDictionary?["em"] as? String)?.trimmingCharacters(in: .whitespacesAndNewlines)
+-
+-                let message: String
+-                if let rawMessage, !rawMessage.isEmpty {
+-                    message = rawMessage
+-                } else {
+-                    message = Constants.defaultAccountRepairMessage
+-                }
++                let message = Constants.defaultAccountRepairMessage
+ 
+-                debugLog("[SideSign] Account repair required: \(message) (url: \(repairURL.absoluteString)). Prompting accountRepairHandler...")
++                debugLog("[SideSign] Account repair required (host: \(repairURL.host ?? "unknown")). Prompting accountRepairHandler...")
+                 let decision = try await accountRepairHandler(repairURL, message)
+ 
+                 if decision == .cancel {
+@@ -252,12 +230,12 @@ public extension DeveloperPortal {
+ 
+         guard let sessionKey = decryptedDictionary["sk"] as? Data else {
+             debugLog("[SideSign] Decrypted dictionary missing 'sk' key for apptokens")
+-            throw ServerError.missingKey(key: "sk", jsonPayload: prettyJSONString(from: decryptedDictionary))
++            throw ServerError.missingKey(key: "sk", jsonPayload: redactedAuthenticationPayload)
+         }
+ 
+         guard let c = decryptedDictionary["c"] as? Data else {
+             debugLog("[SideSign] Decrypted dictionary missing 'c' key for apptokens")
+-            throw ServerError.missingKey(key: "c", jsonPayload: prettyJSONString(from: decryptedDictionary))
++            throw ServerError.missingKey(key: "c", jsonPayload: redactedAuthenticationPayload)
+         }
+ 
+         let app = customHeaders.grandSlam.authApp
+@@ -336,32 +314,29 @@ public extension DeveloperPortal {
+         }
+ 
+         guard let responseDictionary = parsePlistOrJSON(data) else {
+-            let rawStr = String(data: data, encoding: .utf8) ?? data.hexEncodedString()
+-            debugLog("[SideSign] Auth endpoint returned invalid response format: \(rawStr)")
+-            throw ServerError.invalidResponseFormat(rawPayload: rawStr)
++            debugLog("[SideSign] Auth endpoint returned an invalid response format (HTTP \(statusCode)).")
++            throw ServerError.invalidResponseFormat(rawPayload: redactedAuthenticationPayload)
+         }
+ 
+         let dictionary = (responseDictionary["Response"] as? [String: any Sendable]) ?? responseDictionary
+         guard let status = dictionary["Status"] as? [String: any Sendable] else {
+-            let rawStr = prettyJSONString(from: responseDictionary)
+-            debugLog("[SideSign] Auth endpoint response missing 'Status': \(rawStr)")
+-            throw ServerError.missingKey(key: "Status", jsonPayload: rawStr)
++            debugLog("[SideSign] Auth endpoint response is missing 'Status' (HTTP \(statusCode)).")
++            throw ServerError.missingKey(key: "Status", jsonPayload: redactedAuthenticationPayload)
+         }
+ 
+         let errorCode = status["ec"] as? Int ?? 0
+         if errorCode != 0 {
+-            let errorDesc = status["em"] as? String
+-            debugLog("[SideSign] Auth endpoint returned error code \(errorCode): \(errorDesc ?? "No error message")")
++            debugLog("[SideSign] Auth endpoint returned error code \(errorCode) (HTTP \(statusCode)).")
+             switch errorCode {
+             case GrandSlamAuthErrorCodes.incorrectCredentials:
+-                throw DeveloperPortalError.incorrectCredentials(cause: errorDesc)
++                throw DeveloperPortalError.incorrectCredentials()
+             case GrandSlamAuthErrorCodes.appSpecificPasswordRequired,
+                  GrandSlamAuthErrorCodes.appSpecificPasswordRequiredFallback:
+-                throw DeveloperPortalError.appSpecificPasswordRequired(cause: errorDesc)
++                throw DeveloperPortalError.appSpecificPasswordRequired()
+             case GrandSlamAuthErrorCodes.incorrectVerificationCode:
+-                throw DeveloperPortalError.incorrectVerificationCode(cause: errorDesc)
++                throw DeveloperPortalError.incorrectVerificationCode()
+             default:
+-                throw ServerError.underlyingError(code: errorCode, message: errorDesc ?? "Authentication failed")
++                throw ServerError.underlyingError(code: errorCode, message: "Authentication failed")
+             }
+         }
+ 
+@@ -379,9 +354,8 @@ public extension DeveloperPortal {
+         let responseDictionary = try await sendAuthenticationRequest(parameters: parameters, anisetteData: anisetteData)
+ 
+         guard let encryptedToken = responseDictionary["et"] as? Data else {
+-            let payload = prettyJSONString(from: responseDictionary)
+             debugLog("[SideSign] fetchAuthToken missing 'et' key in response")
+-            throw ServerError.missingKey(key: "et", jsonPayload: payload)
++            throw ServerError.missingKey(key: "et", jsonPayload: redactedAuthenticationPayload)
+         }
+ 
+         guard encryptedToken.count > 35 else {
+@@ -400,21 +374,19 @@ public extension DeveloperPortal {
+         }
+ 
+         guard let tokensDictionary = parsePlistOrJSON(token) else {
+-            let rawStr = prettyJSONString(from: token)
+             debugLog("[SideSign] Failed to parse decrypted token dictionary")
+-            throw ServerError.invalidResponseFormat(rawPayload: rawStr)
++            throw ServerError.invalidResponseFormat(rawPayload: redactedAuthenticationPayload)
+         }
+ 
+         guard let appTokens = tokensDictionary["t"] as? [String: any Sendable],
+               let tokens = appTokens[app] as? [String: any Sendable],
+               let authToken = tokens["token"] as? String
+         else {
+-            let payload = prettyJSONString(from: tokensDictionary)
+             debugLog("[SideSign] Decrypted tokens missing t/\(app)/token")
+-            throw ServerError.missingKey(key: "t/\(app)/token", jsonPayload: payload)
++            throw ServerError.missingKey(key: "t/\(app)/token", jsonPayload: redactedAuthenticationPayload)
+         }
+ 
+-        verboseLog("[SideSign] Decrypted GrandSlam response: \(prettyJSONString(from: sanitizeTokens(tokensDictionary)))")
++        verboseLog("[SideSign] Decrypted app-token response parsed successfully for app \(app).")
+ 
+         let now = Date()
+         var expirationDate: Date? = nil
+@@ -514,12 +486,8 @@ public extension DeveloperPortal {
+     private func throwIfXMLUIErrorAlert(in data: Data, statusCode: Int, actionName: String) throws {
+         let (xmluiTitle, xmluiMessage) = parseXMLUIAlertMessage(from: data)
+         if xmluiTitle != nil || xmluiMessage != nil {
+-            let alertMsg = [xmluiTitle, xmluiMessage]
+-                .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
+-                .filter { !$0.isEmpty }
+-                .joined(separator: ": ")
+-            debugLog("[SideSign] \(actionName) alert from Apple (HTTP \(statusCode)): \(alertMsg)")
+-            throw DeveloperPortalError.invalid2FAResponse(cause: xmluiMessage ?? alertMsg)
++            debugLog("[SideSign] \(actionName) received an authentication alert (HTTP \(statusCode)).")
++            throw DeveloperPortalError.invalid2FAResponse(cause: "The authentication service returned an alert. Please try again.")
+         }
+     }
+ 
+@@ -670,9 +638,8 @@ public extension DeveloperPortal {
+         try throwIfXMLUIErrorAlert(in: data, statusCode: statusCode, actionName: "sendTrustedDevice2FACodeRequest")
+ 
+         guard statusCode == HTTPStatusCodes.ok else {
+-            let rawStr = prettyJSONString(from: data)
+-            debugLog("[SideSign] sendTrustedDevice2FACodeRequest failed (HTTP \(statusCode)): \(rawStr)")
+-            throw ServerError.badServerResponse(reason: "Trusted device request failed (HTTP \(statusCode))", jsonPayload: rawStr)
++            debugLog("[SideSign] sendTrustedDevice2FACodeRequest failed (HTTP \(statusCode)).")
++            throw ServerError.badServerResponse(reason: "Trusted device request failed (HTTP \(statusCode))", jsonPayload: redactedAuthenticationPayload)
+         }
+     }
+ 
+@@ -710,34 +677,30 @@ public extension DeveloperPortal {
+         let httpResponse = response as? HTTPURLResponse
+         let statusCode = httpResponse?.safeStatusCode ?? 0
+ 
+-        let rawStr = prettyJSONString(from: data)
+-        verboseLog("[SideSign] sendPhone2FACodeRequest raw response (HTTP \(statusCode)): \(rawStr)")
++        verboseLog("[SideSign] sendPhone2FACodeRequest received a response (HTTP \(statusCode)).")
+ 
+         try throwIfXMLUIErrorAlert(in: data, statusCode: statusCode, actionName: "sendPhone2FACodeRequest")
+ 
+         let responseDict = parsePlistOrJSON(data)
+         let errorCode = responseDict?["ec"] as? Int ?? 0
+-        let errorMsg = (responseDict?["em"] as? String)
+-                   ?? ((responseDict?["Status"] as? [String: any Sendable])?["em"] as? String)
+ 
+         if errorCode == GrandSlamAuthErrorCodes.tooManyAttempts 
+             || errorCode == GrandSlamAuthErrorCodes.tooManyCodesRequested 
+             || errorCode == GrandSlamAuthErrorCodes.rateLimited 
+             || statusCode == HTTPStatusCodes.tooManyRequests
+         {
+-            let msg = errorMsg ?? "Verification codes cannot be sent to this phone number at this time. Please try again later."
+-            debugLog("[SideSign] sendPhone2FACodeRequest rate-limited (\(errorCode), HTTP \(statusCode)): \(msg)")
++            let msg = "Verification codes cannot be sent to this phone number at this time. Please try again later."
++            debugLog("[SideSign] sendPhone2FACodeRequest rate-limited (\(errorCode), HTTP \(statusCode)).")
+             throw DeveloperPortalError.tooManyAttempts(cause: msg)
+         } else if errorCode != 0 {
+-            let msg = errorMsg ?? "Failed to request verification code from Apple."
+-            debugLog("[SideSign] sendPhone2FACodeRequest error (\(errorCode), HTTP \(statusCode)): \(msg)")
+-            throw ServerError.underlyingError(code: errorCode, message: msg)
++            debugLog("[SideSign] sendPhone2FACodeRequest error (\(errorCode), HTTP \(statusCode)).")
++            throw ServerError.underlyingError(code: errorCode, message: "Failed to request a verification code.")
+         }
+ 
+         guard statusCode == HTTPStatusCodes.ok else {
+-            let reason = errorMsg ?? HTTPStatusCodes.localizedDescription(for: statusCode)
+-            debugLog("[SideSign] sendPhone2FACodeRequest failed (HTTP \(statusCode)): \(reason)")
+-            throw ServerError.badServerResponse(reason: reason, jsonPayload: rawStr)
++            let reason = HTTPStatusCodes.localizedDescription(for: statusCode)
++            debugLog("[SideSign] sendPhone2FACodeRequest failed (HTTP \(statusCode)).")
++            throw ServerError.badServerResponse(reason: reason, jsonPayload: redactedAuthenticationPayload)
+         }
+ 
+         var parsedNumbers = parseTrustedPhoneNumbers(from: responseDict)
+@@ -833,48 +796,39 @@ public extension DeveloperPortal {
+         let verifyDictionary = parsePlistOrJSON(data)
+         let (xmluiTitle, xmluiMessage) = parseXMLUIAlertMessage(from: data)
+         let errorCode = verifyDictionary?["ec"] as? Int ?? 0
+-        let statusDict = verifyDictionary?["Status"] as? [String: any Sendable]
+-        let errorMsg = (verifyDictionary?["em"] as? String)
+-                    ?? (statusDict?["em"] as? String)
+-                    ?? xmluiMessage
+-                    ?? xmluiTitle
+ 
+         if errorCode == GrandSlamAuthErrorCodes.tooManyAttempts 
+             || errorCode == GrandSlamAuthErrorCodes.tooManyCodesRequested 
+             || errorCode == GrandSlamAuthErrorCodes.rateLimited 
+             || statusCode == HTTPStatusCodes.tooManyRequests
+         {
+-            let msg = errorMsg ?? "Too many verification code attempts. Please try again later."
+-            debugLog("[SideSign] Too many 2FA attempts (\(errorCode), HTTP \(statusCode)): \(msg)")
++            let msg = "Too many verification code attempts. Please try again later."
++            debugLog("[SideSign] Too many 2FA attempts (\(errorCode), HTTP \(statusCode)).")
+             throw DeveloperPortalError.tooManyAttempts(cause: msg)
+         } else if errorCode == GrandSlamAuthErrorCodes.incorrectVerificationCode {
+-            let msg = errorMsg ?? "Incorrect verification code. Please try again."
+-            debugLog("[SideSign] Incorrect 2FA verification code (\(errorCode), HTTP \(statusCode)): \(msg)")
++            let msg = "Incorrect verification code. Please try again."
++            debugLog("[SideSign] Incorrect 2FA verification code (\(errorCode), HTTP \(statusCode)).")
+             return .retry(message: msg)
+         } else if errorCode != 0 {
+-            let msg = errorMsg ?? "2FA verification error"
+-            debugLog("[SideSign] 2FA verification error (\(errorCode), HTTP \(statusCode)): \(msg)")
+-            throw ServerError.underlyingError(code: errorCode, message: msg)
++            debugLog("[SideSign] 2FA verification error (\(errorCode), HTTP \(statusCode)).")
++            throw ServerError.underlyingError(code: errorCode, message: "Two-factor verification failed.")
+         }
+ 
+         if xmluiTitle != nil || xmluiMessage != nil {
+-            let message = xmluiMessage ?? errorMsg ?? xmluiTitle ?? "Verification failed"
+-            debugLog("[SideSign] 2FA verification fatal alert from Apple (HTTP \(statusCode)): \(message)")
+-            throw DeveloperPortalError.invalid2FAResponse(cause: message)
++            debugLog("[SideSign] 2FA verification received an authentication alert (HTTP \(statusCode)).")
++            throw DeveloperPortalError.invalid2FAResponse(cause: "The authentication service rejected the verification request.")
+         }
+ 
+         guard statusCode == HTTPStatusCodes.ok else {
+-            let rawStr = prettyJSONString(from: data)
+-            let reason = errorMsg ?? HTTPStatusCodes.localizedDescription(for: statusCode)
+-            debugLog("[SideSign] 2FA verification failed (HTTP \(statusCode)): \(reason) - body: \(rawStr)")
++            let reason = HTTPStatusCodes.localizedDescription(for: statusCode)
++            debugLog("[SideSign] 2FA verification failed (HTTP \(statusCode)).")
+             return .retry(message: reason)
+         }
+ 
+         if requirePeToken {
+             guard httpResponse?.allHeaderFields.keys.contains(where: { ($0 as? String)?.lowercased() == "x-apple-pe-token" }) == true else {
+-                let rawStr = prettyJSONString(from: data)
+-                let reason = errorMsg ?? "Incorrect verification code or missing session token"
+-                debugLog("[SideSign] Secondary code verification failed (HTTP \(HTTPStatusCodes.ok) missing PE token header): \(reason) - Body: \(rawStr)")
++                let reason = "Incorrect verification code or missing session token"
++                debugLog("[SideSign] Secondary code verification failed (HTTP \(HTTPStatusCodes.ok), missing PE token header).")
+                 return .retry(message: reason)
+             }
+         }
+diff --git a/Sources/DeveloperPortal/DeveloperPortalAPI.swift b/Sources/DeveloperPortal/DeveloperPortalAPI.swift
+index dfea7cc..7e69439 100644
+--- a/Sources/DeveloperPortal/DeveloperPortalAPI.swift
++++ b/Sources/DeveloperPortal/DeveloperPortalAPI.swift
+@@ -116,6 +116,7 @@ public protocol DeveloperPortalAPI: Sendable {
+     func deleteDevice(_ device: Device, team: Team, session: Session) async throws -> Bool
+     
+     func fetchAppIDs(for team: Team, session: Session) async throws -> [AppID]
++    func fetchAppIDDetails(for appID: AppID, team: Team, session: Session) async throws -> AppID
+     func addAppID(withName name: String, bundleIdentifier: String, team: Team, session: Session) async throws -> AppID
+     func updateAppID(_ appID: AppID, team: Team, session: Session) async throws -> AppID
+     func deleteAppID(_ appID: AppID, for team: Team, session: Session) async throws -> Bool
+@@ -351,26 +352,26 @@ public final class DeveloperPortal: DeveloperPortalAPI, Sendable {
+ 
+         let httpResponse = response as? HTTPURLResponse
+         let statusCode = httpResponse?.statusCode ?? 0
++        let isSuccessfulHTTPResponse = (200..<300).contains(statusCode)
+ 
+         guard !data.isEmpty else {
+-            if statusCode == HTTPStatusCodes.noContent || T.self == EmptyResponse.self {
++            if isSuccessfulHTTPResponse && (statusCode == HTTPStatusCodes.noContent || T.self == EmptyResponse.self) {
+                 if let empty = EmptyResponse() as? T {
+                     return empty
+                 }
+             }
+             debugLog("[SideSign] sendRequest server returned 0 bytes (HTTP \(statusCode))")
+-            throw ServerError.badServerResponse(reason: "Server returned empty response (Content-Length: 0)", jsonPayload: "0 bytes")
++            throw ServerError.badServerResponse(reason: "Server returned empty response (HTTP \(statusCode), Content-Length: 0)", jsonPayload: "0 bytes")
+         }
+ 
+-        if let payloadString = formatPayload(data) {
+-            verboseLog("[SideSign] sendRequest response: \(payloadString)")
+-        }
++        verboseLog("[SideSign] sendRequest received response body (\(data.count) bytes)")
+ 
+         if let status = (try? PropertyListDecoder().decode(DeveloperPortalStatusResponse.self, from: data))
+             ?? (try? JSONDecoder().decode(DeveloperPortalStatusResponse.self, from: data)) {
+             if let errors = status.errors, let firstError = errors.first, let detail = firstError.detail {
+-                debugLog("[SideSign] processResponse parsed Apple developer API error: \(detail)")
+-                throw ServerError.underlyingError(code: -1, message: detail)
++                let serverError = ServerError.underlyingError(code: -1, message: detail)
++                debugLog("[SideSign] processResponse failed: \(serverError.diagnosticDescription)")
++                throw serverError
+             }
+             if let code = status.resultCode, code != DeveloperPortalResultCodes.success {
+                 let message = status.userString ?? status.resultString ?? status.errorString ?? "Apple Developer Portal Error"
+@@ -378,11 +379,19 @@ public final class DeveloperPortal: DeveloperPortalAPI, Sendable {
+                     debugLog("[SideSign] processResponse error (code: \(code)): \(customError.localizedDescription)")
+                     throw customError
+                 }
+-                debugLog("[SideSign] processResponse error: \(message) (code: \(code))")
+-                throw ServerError.underlyingError(code: code, message: message)
++                let serverError = ServerError.underlyingError(code: code, message: message)
++                debugLog("[SideSign] processResponse failed: \(serverError.diagnosticDescription)")
++                throw serverError
+             }
+         }
+ 
++        guard isSuccessfulHTTPResponse else {
++            throw ServerError.badServerResponse(
++                reason: "Server returned unsuccessful HTTP status \(statusCode)",
++                jsonPayload: String(data: data, encoding: .utf8) ?? "[non-text response]"
++            )
++        }
++
+         do {
+             if let plistDecoded = try? PropertyListDecoder().decode(T.self, from: data) {
+                 return plistDecoded
+@@ -390,8 +399,9 @@ public final class DeveloperPortal: DeveloperPortalAPI, Sendable {
+             return try JSONDecoder().decode(T.self, from: data)
+         } catch {
+             let rawStr = String(data: data, encoding: .utf8) ?? data.hexEncodedString()
+-            debugLog("[SideSign] sendRequest failed to decode \(T.self): \(error). Raw payload: \(rawStr)")
+-            throw ServerError.invalidResponseFormat(rawPayload: rawStr)
++            let serverError = ServerError.invalidResponseFormat(rawPayload: rawStr)
++            debugLog("[SideSign] sendRequest failed to decode \(T.self): \(error). \(serverError.diagnosticDescription)")
++            throw serverError
+         }
+     }
+ 
+@@ -465,26 +475,26 @@ public final class DeveloperPortal: DeveloperPortalAPI, Sendable {
+         let statusCode = httpResponse?.statusCode ?? 0
+         let isDelete = methodOverride == "DELETE"
+         let isNoContent = statusCode == HTTPStatusCodes.noContent
++        let isSuccessfulHTTPResponse = (200..<300).contains(statusCode)
+ 
+         guard !data.isEmpty else {
+-            if isDelete || isNoContent || T.self == EmptyResponse.self {
++            if isSuccessfulHTTPResponse && (isDelete || isNoContent || T.self == EmptyResponse.self) {
+                 verboseLog("[SideSign] sendServicesRequest: successful empty response for DELETE or \(HTTPStatusCodes.noContent)")
+                 if let empty = EmptyResponse() as? T {
+                     return empty
+                 }
+             }
+             debugLog("[SideSign] sendServicesRequest server returned 0 bytes (HTTP \(statusCode))")
+-            throw ServerError.badServerResponse(reason: "Server returned empty response", jsonPayload: "0 bytes")
++            throw ServerError.badServerResponse(reason: "Server returned empty response (HTTP \(statusCode))", jsonPayload: "0 bytes")
+         }
+ 
+-        if let payloadString = formatPayload(data) {
+-            verboseLog("[SideSign] sendServicesRequest response: \(payloadString)")
+-        }
++        verboseLog("[SideSign] sendServicesRequest received response body (\(data.count) bytes)")
+ 
+         if let status = try? JSONDecoder().decode(DeveloperPortalStatusResponse.self, from: data) {
+             if let errors = status.errors, let firstError = errors.first, let detail = firstError.detail {
+-                debugLog("[SideSign] processResponse parsed Apple developer API error: \(detail)")
+-                throw ServerError.underlyingError(code: -1, message: detail)
++                let serverError = ServerError.underlyingError(code: -1, message: detail)
++                debugLog("[SideSign] processResponse failed: \(serverError.diagnosticDescription)")
++                throw serverError
+             }
+             if let code = status.resultCode, code != DeveloperPortalResultCodes.success {
+                 let message = status.userString ?? status.resultString ?? status.errorString ?? "Apple Developer Portal Error"
+@@ -492,20 +502,32 @@ public final class DeveloperPortal: DeveloperPortalAPI, Sendable {
+                     debugLog("[SideSign] processResponse error (code: \(code)): \(customError.localizedDescription)")
+                     throw customError
+                 }
+-                debugLog("[SideSign] processResponse error: \(message) (code: \(code))")
+-                throw ServerError.underlyingError(code: code, message: message)
++                let serverError = ServerError.underlyingError(code: code, message: message)
++                debugLog("[SideSign] processResponse failed: \(serverError.diagnosticDescription)")
++                throw serverError
+             }
+         }
+ 
++        if !isSuccessfulHTTPResponse {
++            let rawStr = String(data: data, encoding: .utf8) ?? data.hexEncodedString()
++            let serverError = ServerError.badServerResponse(
++                reason: "Server returned unsuccessful HTTP status \(statusCode)",
++                jsonPayload: rawStr
++            )
++            debugLog("[SideSign] sendServicesRequest failed: \(serverError.diagnosticDescription)")
++            throw serverError
++        }
++
+         do {
+             return try JSONDecoder().decode(T.self, from: data)
+         } catch {
+-            if isDelete || isNoContent, let empty = EmptyResponse() as? T {
++            if isSuccessfulHTTPResponse && (isDelete || isNoContent), let empty = EmptyResponse() as? T {
+                 return empty
+             }
+             let rawStr = String(data: data, encoding: .utf8) ?? data.hexEncodedString()
+-            debugLog("[SideSign] sendServicesRequest failed to decode \(T.self): \(error). Raw payload: \(rawStr)")
+-            throw ServerError.invalidResponseFormat(rawPayload: rawStr)
++            let serverError = ServerError.invalidResponseFormat(rawPayload: rawStr)
++            debugLog("[SideSign] sendServicesRequest failed to decode \(T.self): \(error). \(serverError.diagnosticDescription)")
++            throw serverError
+         }
+     }
+ }
+diff --git a/Sources/Logging.swift b/Sources/Logging.swift
+index 5a90099..e0fce53 100644
+--- a/Sources/Logging.swift
++++ b/Sources/Logging.swift
+@@ -91,22 +91,6 @@ func formatPayload(_ data: Data) -> String? {
+     return nil
+ }
+ 
+-func sanitizeTokens(_ tokensDictionary: [String: any Sendable]) -> [String: any Sendable] {
+-    guard let appTokens = tokensDictionary["t"] as? [String: [String: any Sendable]] else {
+-        return tokensDictionary
+-    }
+-
+-    var sanitized = tokensDictionary
+-    sanitized["t"] = appTokens.mapValues { (app: [String: any Sendable]) -> [String: any Sendable] in
+-        guard let token = app["token"] as? String else { return app }
+-        var updated = app
+-        let suffix = token.count > 4 ? token.suffix(4) : token[...]
+-        updated["token"] = "••••••••\(suffix)"
+-        return updated
+-    }
+-    return sanitized
+-}
+-
+ public func sanitizeHeadersForLogging(_ headers: [String: String]) -> [String: String] {
+     var sanitized = headers
+     let sensitiveKeys: Set<String> = [
+@@ -115,13 +99,24 @@ public func sanitizeHeadersForLogging(_ headers: [String: String]) -> [String: S
+         "x-apple-session-token",
+         "x-apple-gs-token",
+         "x-apple-identity-token",
++        "x-apple-i-md",
++        "x-apple-i-md-m",
++        "x-apple-i-md-lu",
++        "x-apple-i-md-rinfo",
++        "x-apple-i-srl-no",
++        "x-mme-device-id",
++        "x-mme-client-info",
++        "x-apple-pe-token",
+         "cookie",
+         "set-cookie"
+     ]
+     for (key, val) in headers {
+-        if sensitiveKeys.contains(key.lowercased()) {
+-            let suffix = val.count > 4 ? val.suffix(4) : val[...]
+-            sanitized[key] = "••••••••\(suffix)"
++        let normalizedKey = key.lowercased()
++        if sensitiveKeys.contains(normalizedKey)
++            || normalizedKey.contains("token")
++            || normalizedKey.contains("password")
++            || normalizedKey.contains("secret") {
++            sanitized[key] = "[redacted]"
+         }
+     }
+     return sanitized
+diff --git a/Sources/Models/AppID.swift b/Sources/Models/AppID.swift
+index 62b2f78..c78d2d5 100644
+--- a/Sources/Models/AppID.swift
++++ b/Sources/Models/AppID.swift
+@@ -16,13 +16,17 @@ public struct AppID: Sendable, Codable, Identifiable {
+     public var expirationDate: Date?
+     public var features: [Feature: String]
+     public var entitlements: [String: String]
++    public var associatedAppGroups: [AppGroup]?
++    public var associatedAppGroupsCount: Int?
+ 
+     public init(identifier: String,
+                 name: String,
+                 bundleIdentifier: String,
+                 expirationDate: Date? = nil,
+                 features: [Feature: String] = [:],
+-                entitlements: [String: String] = [:])
++                entitlements: [String: String] = [:],
++                associatedAppGroups: [AppGroup]? = nil,
++                associatedAppGroupsCount: Int? = nil)
+     {
+         self.identifier = identifier
+         self.name = name
+@@ -30,6 +34,8 @@ public struct AppID: Sendable, Codable, Identifiable {
+         self.expirationDate = expirationDate
+         self.features = features
+         self.entitlements = entitlements
++        self.associatedAppGroups = associatedAppGroups
++        self.associatedAppGroupsCount = associatedAppGroupsCount
+     }
+ 
+     public func copy() -> AppID {
+@@ -42,6 +48,9 @@ public struct AppID: Sendable, Codable, Identifiable {
+         case bundleIdentifier = "identifier"
+         case expirationDate
+         case features
++        case entitlements
++        case associatedAppGroups = "associatedApplicationGroups"
++        case associatedAppGroupsCount = "associatedApplicationGroupsCount"
+     }
+ 
+     public init(from decoder: Decoder) throws {
+@@ -58,7 +67,9 @@ public struct AppID: Sendable, Codable, Identifiable {
+         } else {
+             self.features = [:]
+         }
+-        self.entitlements = [:]
++        self.entitlements = (try? container.decodeIfPresent([String: String].self, forKey: .entitlements)) ?? [:]
++        self.associatedAppGroups = try container.decodeIfPresent([AppGroup].self, forKey: .associatedAppGroups)
++        self.associatedAppGroupsCount = try container.decodeIfPresent(Int.self, forKey: .associatedAppGroupsCount)
+     }
+ 
+     public func encode(to encoder: Encoder) throws {
+@@ -67,5 +78,12 @@ public struct AppID: Sendable, Codable, Identifiable {
+         try container.encode(identifier, forKey: .identifier)
+         try container.encode(bundleIdentifier, forKey: .bundleIdentifier)
+         try container.encodeIfPresent(expirationDate, forKey: .expirationDate)
++        let encodedFeatures = features.reduce(into: [String: String]()) {
++            $0[$1.key.rawValue] = $1.value
++        }
++        try container.encode(encodedFeatures, forKey: .features)
++        try container.encode(entitlements, forKey: .entitlements)
++        try container.encodeIfPresent(associatedAppGroups, forKey: .associatedAppGroups)
++        try container.encodeIfPresent(associatedAppGroupsCount, forKey: .associatedAppGroupsCount)
+     }
+ }
+diff --git a/Sources/Models/Errors.swift b/Sources/Models/Errors.swift
+index cca02c7..a1f9659 100644
+--- a/Sources/Models/Errors.swift
++++ b/Sources/Models/Errors.swift
+@@ -78,19 +78,57 @@ public enum ServerError: LocalizedError, CustomStringConvertible, Sendable {
+ 
+     public var description: String {
+         switch self {
+-        case .badServerResponse(let reason, let jsonPayload): return "badServerResponse(reason: \"\(reason)\"):\n\(jsonPayload)"
+-        case .invalidResponseFormat(let rawPayload):          return "invalidResponseFormat:\n\(rawPayload)"
+-        case .missingKey(let key, let jsonPayload):           return "missingKey(\"\(key)\"):\n\(jsonPayload)"
+-        case .underlyingError(let code, let message):         return "underlyingError(code: \(code), message: \"\(message)\")"
++        case .badServerResponse(let reason, _): return "badServerResponse(reason: \"\(reason)\")"
++        case .invalidResponseFormat:             return "invalidResponseFormat"
++        case .missingKey(let key, _):            return "missingKey(\"\(key)\")"
++        case .underlyingError(let code, _):      return "underlyingError(code: \(code))"
+         }
+     }
+ 
++    /// A bounded diagnostic intended for logs or a dedicated details view, never for routine error UI.
++    public var diagnosticDescription: String {
++        let diagnostic: String
++        switch self {
++        case .badServerResponse(let reason, let jsonPayload):
++            diagnostic = "badServerResponse(reason: \(reason)); payload: \(jsonPayload)"
++        case .invalidResponseFormat(let rawPayload):
++            diagnostic = "invalidResponseFormat; payload: \(rawPayload)"
++        case .missingKey(let key, let jsonPayload):
++            diagnostic = "missingKey(\(key)); payload: \(jsonPayload)"
++        case .underlyingError(let code, let message):
++            diagnostic = "underlyingError(code: \(code)); message: \(message)"
++        }
++
++        let redacted = Self.redactingSensitiveValues(in: diagnostic)
++        let limit = 2_048
++        guard redacted.count > limit else { return redacted }
++        return String(redacted.prefix(limit)) + "… [truncated]"
++    }
++
++    private static func redactingSensitiveValues(in value: String) -> String {
++        let credentialKey = #"(?:access[_-]?token|refresh[_-]?token|idms[_-]?token|gs[_-]?idms[_-]?token|auth(?:entication)?[_-]?token|token|password|cookie|authorization|session(?:[_-]?id)?|identity[_-]?token|secret|anisette)"#
++        let keyValuePattern = "(?i)(\\b" + credentialKey + #"\b\s*["']?\s*[:=]\s*)(?:Bearer\s+)?(?:"(?:\\.|[^"\\])*"|'(?:\\.|[^'\\])*'|[^\s,<>}]+)"#
++        let xmlPattern = "(?is)(<\\s*(" + credentialKey + #")\b[^>]*>).*?(</\s*\2\s*>)"#
++        let plistPattern = "(?is)(<key>\\s*" + credentialKey + #"\s*</key>\s*<(?:string|data)>).*?(</(?:string|data)>)"#
++        let range = NSRange(value.startIndex..., in: value)
++        guard let keyValueRegex = try? NSRegularExpression(pattern: keyValuePattern),
++              let xmlRegex = try? NSRegularExpression(pattern: xmlPattern),
++              let plistRegex = try? NSRegularExpression(pattern: plistPattern) else {
++            return "[diagnostic redacted]"
++        }
++        let keyValueRedacted = keyValueRegex.stringByReplacingMatches(in: value, range: range, withTemplate: "$1[redacted]")
++        let xmlRange = NSRange(keyValueRedacted.startIndex..., in: keyValueRedacted)
++        let xmlRedacted = xmlRegex.stringByReplacingMatches(in: keyValueRedacted, range: xmlRange, withTemplate: "$1[redacted]$3")
++        let plistRange = NSRange(xmlRedacted.startIndex..., in: xmlRedacted)
++        return plistRegex.stringByReplacingMatches(in: xmlRedacted, range: plistRange, withTemplate: "$1[redacted]$2")
++    }
++
+     public var errorDescription: String? {
+         switch self {
+-        case .badServerResponse(let reason, let jsonPayload): return "Invalid server response: \(reason)\n\(jsonPayload)"
+-        case .invalidResponseFormat(let rawPayload):          return "Invalid server response: unparseable format\n\(rawPayload)"
+-        case .missingKey(let key, let jsonPayload):           return "Invalid server response: missing required key '\(key)'\n\(jsonPayload)"
+-        case .underlyingError(let code, let message):         return "\(message) (\(code))"
++        case .badServerResponse, .invalidResponseFormat, .missingKey:
++            return "Apple’s developer service returned an unexpected response. Please try again. If this continues, reconnect your account and inspect diagnostics."
++        case .underlyingError:
++            return "Apple’s developer service could not complete the request. Please try again; if this continues, reconnect your account or inspect diagnostics."
+         }
+     }
+ }
+@@ -117,6 +155,7 @@ public enum CertificateError: Error, LocalizedError, Sendable {
+     case csrGenerationFailed(cause: String)
+     case pkcs12ImportFailed(cause: String)
+     case pkcs12ExportFailed(cause: String)
++    case missingPrivateKey
+     case decryptionFailed(cause: String? = nil)
+     case invalidData(cause: String)
+ 
+@@ -125,6 +164,7 @@ public enum CertificateError: Error, LocalizedError, Sendable {
+         case .csrGenerationFailed(let cause):  return "CSR generation failed: \(cause)"
+         case .pkcs12ImportFailed(let cause):   return "PKCS#12 import failed: \(cause)"
+         case .pkcs12ExportFailed(let cause):   return "PKCS#12 export failed: \(cause)"
++        case .missingPrivateKey:               return "This certificate archive does not contain a private key."
+         case .decryptionFailed(let cause):     return "Decryption failed: \(cause ?? "Incorrect password")"
+         case .invalidData(let cause):          return "Invalid certificate data: \(cause)"
+         }
+diff --git a/Sources/Models/KeyStore.swift b/Sources/Models/KeyStore.swift
+index e44213a..4602cc8 100644
+--- a/Sources/Models/KeyStore.swift
++++ b/Sources/Models/KeyStore.swift
+@@ -50,6 +50,13 @@ public struct KeyStore: Sendable, Equatable, Hashable, Identifiable {
+         let result: (cert: Data, key: Data)
+         do {
+             result = try PKCS12Parser.extract(p12Data, password: password)
++        } catch let error as CertificateError {
++            switch error {
++            case .invalidData(_), .missingPrivateKey:
++                throw error
++            default:
++                throw CertificateError.decryptionFailed(cause: error.localizedDescription)
++            }
+         } catch {
+             throw CertificateError.decryptionFailed(cause: error.localizedDescription)
+         }
+diff --git a/build.sh b/build.sh
+index 0383d32..d70b774 100755
+--- a/build.sh
++++ b/build.sh
+@@ -1,5 +1,5 @@
+ #!/bin/bash
+-set -e
++set -euo pipefail
+ 
+ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+ cd "$SCRIPT_DIR"
+@@ -9,9 +9,9 @@ cd "$SCRIPT_DIR"
+     echo "Timestamp: $(date -u +"%Y-%m-%dT%H:%M:%SZ")"
+     echo ""
+ 
+-    swift build -c release --product sidesign
+-    BIN_PATH="$(swift build -c release --show-bin-path)/sidesign"
+-    cp "$BIN_PATH" ./sidesign
++    swift build -c release --product sidesign || exit $?
++    BIN_PATH="$(swift build -c release --show-bin-path)/sidesign" || exit $?
++    cp "$BIN_PATH" ./sidesign || exit $?
+ 
+     echo ""
+     echo "=== Build Complete! Binary copied to ./sidesign ==="
+diff --git a/sample-usages.sh b/sample-usages.sh
+index 466ba41..188f423 100644
+--- a/sample-usages.sh
++++ b/sample-usages.sh
+@@ -1,81 +1,80 @@
+ #!/usr/bin/env bash
+ 
+ # 1. Developer Portal Management APIs
++# Illustrative commands only; replace placeholder IDs, URLs, and credentials. These examples can modify or delete account resources.
++# Authenticate first with `sidesign dev login`; the auth alias below uses the same saved session.
+ 
+ # Developer Teams:
+-./sidesign auth -v teams --server https://ani.some.com --devicedata-password test
++./sidesign auth teams --server https://ani.some.com --machine-password test
+ 
+ # Registered Devices:
+ # List devices
+-./sidesign auth -v devices --server https://ani.some.com --devicedata-password test
++./sidesign auth devices --server https://ani.some.com --machine-password test
+ 
+ # Register a new device
+-./sidesign auth -v devices register --name "My iPad" --udid "<UDID>" --server https://ani.some.com --devicedata-password test
++./sidesign auth devices register --name "My iPad" --udid "<UDID>" --server https://ani.some.com --machine-password test
+ 
+ # Rename / Update a device
+-./sidesign auth -v devices update --udid "<UDID>" --name "My New iPad" --server https://ani.some.com --devicedata-password test
++./sidesign auth devices update --udid "<UDID>" --name "My New iPad" --server https://ani.some.com --machine-password test
+ 
+ # Disable a device
+-./sidesign auth -v devices disable --udid "<UDID>" --server https://ani.some.com --devicedata-password test
++./sidesign auth devices disable --udid "<UDID>" --server https://ani.some.com --machine-password test
+ 
+ # Delete a device
+-./sidesign auth -v devices delete --udid "<UDID>" --server https://ani.some.com --devicedata-password test
++./sidesign auth devices delete --udid "<UDID>" --server https://ani.some.com --machine-password test
+ 
+ # Development Certificates:
+ # List active certificates
+-./sidesign auth -v certs --server https://ani.some.com --devicedata-password test
++./sidesign auth certs --server https://ani.some.com --machine-password test
+ 
+ # Create a new certificate & export to .p12
+-./sidesign auth -v certs create --server https://ani.some.com --devicedata-password test --output-p12 dev.p12 --password secret
++./sidesign auth certs create --server https://ani.some.com --machine-password test --output dev.p12 --password secret
+ 
+ # Revoke a certificate by ID
+-./sidesign auth -v certs revoke --id "<CERT_ID>" --server https://ani.some.com --devicedata-password test
++./sidesign auth certs revoke --id "<CERT_ID>" --server https://ani.some.com --machine-password test
+ 
+ # App IDs (Bundle Identifiers):
+ # List App IDs
+-./sidesign auth -v appids --server https://ani.some.com --devicedata-password test
++./sidesign auth appids --server https://ani.some.com --machine-password test
+ 
+ # Register a new App ID
+-./sidesign auth -v appids register --name "MyApp" --bundle-id "com.example.myapp" --server https://ani.some.com --devicedata-password test
++./sidesign auth appids register --name "MyApp" --bundle-id "com.example.myapp" --server https://ani.some.com --machine-password test
+ 
+ # Delete an App ID
+-./sidesign auth -v appids delete --id "<APP_ID>" --server https://ani.some.com --devicedata-password test
++./sidesign auth appids delete --id "<APP_ID>" --server https://ani.some.com --machine-password test
+ 
+ # App Groups:
+ # List App Groups
+-./sidesign auth -v appgroups --server https://ani.some.com --devicedata-password test
++./sidesign auth appgroups --server https://ani.some.com --machine-password test
+ 
+ # Create a new App Group
+-./sidesign auth -v appgroups create --name "MyGroup" --group-id "group.com.example.myapp" --server https://ani.some.com --devicedata-password test
++./sidesign auth appgroups create --name "MyGroup" --group-id "group.com.example.myapp" --server https://ani.some.com --machine-password test
+ 
+ # Rename / Update an App Group
+-./sidesign auth -v appgroups update --id "<GROUP_ID>" --name "My Renamed Group" --server https://ani.some.com --devicedata-password test
++./sidesign auth appgroups update --id "<GROUP_ID>" --name "My Renamed Group" --server https://ani.some.com --machine-password test
+ 
+ # Assign App Group to App ID
+-./sidesign auth -v appgroups assign --app-id "<APP_ID>" --group-id "<GROUP_ID>" --server https://ani.some.com --devicedata-password test
++./sidesign auth appgroups assign --app-id "<APP_ID>" --group-id "<GROUP_ID>" --server https://ani.some.com --machine-password test
+ 
+ # Delete an App Group
+-./sidesign auth -v appgroups delete --id "<GROUP_ID>" --server https://ani.some.com --devicedata-password test
++./sidesign auth appgroups delete --id "<GROUP_ID>" --server https://ani.some.com --machine-password test
+ 
+ # Provisioning Profiles:
+ # List existing profiles
+-./sidesign auth -v profiles --server https://ani.some.com --devicedata-password test
++./sidesign auth profiles --server https://ani.some.com --machine-password test
+ 
+ # Download/generate profile for a Bundle ID
+-./sidesign auth -v profiles download --bundle-id "com.SideStore.SideStore" --output embedded.mobileprovision --server https://ani.some.com --devicedata-password test
++./sidesign auth profiles download --bundle-id "com.SideStore.SideStore" --output embedded.mobileprovision --server https://ani.some.com --machine-password test
+ 
+ # Delete a profile by ID/UUID
+-./sidesign auth -v profiles delete --id "<PROFILE_ID>" --server https://ani.some.com --devicedata-password test
++./sidesign auth profiles delete --id "<PROFILE_ID>" --server https://ani.some.com --machine-password test
+ 
+ # 2. Standalone Anisette & Signing APIs
+ 
+ # Acquire Anisette Headers (JSON Output):
+-./sidesign anisette --server https://ani.some.com --devicedata-password test --json
++./sidesign anisette --server https://ani.some.com --machine-password test --json
+ 
+ # PKCS#12 (.p12) Operations:
+-# Inspect .p12 certificate & private key metadata
+-./sidesign p12 info --input dev.p12 --password secret
+-
+ # Extract DER certificate and raw private key
+ ./sidesign p12 extract --input dev.p12 --password secret --output-cert cert.der --output-key key.der
+ 
+@@ -101,8 +100,8 @@
+ ./sidesign dev login -u "developer@example.com" -p "secret" -s "/path/to/custom_session.json"
+ 
+ # Login with interactive Anisette server selection
+-./sidesign dev login -u "developer@example.com" --select-server
+-./sidesign dev login -u "developer@example.com" -sel
++./sidesign dev login -u "developer@example.com" --select-server --source "https://example.com/servers.json"
++./sidesign dev login -u "developer@example.com" -sel -src "https://example.com/servers.json"
+ 
+ # Login with remote Anisette server & custom ADI credentials
+ ./sidesign dev login -u "developer@example.com" -p "secret" --anisette-url "https://ani.some.com" --machine-password "adipass" --machine-path "machine.dat"
+@@ -149,7 +148,7 @@
+ # Logout of active session
+ ./sidesign dev logout
+ ./sidesign dev logout --session "/path/to/custom_session.json"
+-./sidesign dev logout -t 1
++./sidesign dev logout --using-team 1
+ ./sidesign dev logout -tid TEAM123456
+ 
+ # Developer Portal Subcommands with Team Selection:
+@@ -159,7 +158,7 @@
+ 
+ # Devices management with team index or Team ID
+ ./sidesign dev devices list --using-team 1
+-./sidesign dev devices list -t 1
++./sidesign dev devices list --using-team 1
+ ./sidesign dev devices list --using-team-id TEAM123456
+ ./sidesign dev devices list -tid TEAM123456
+ ./sidesign dev devices ls
+@@ -185,14 +184,14 @@
+ # Certificates management:
+ # List certificates with team selector
+ ./sidesign dev certs list
+-./sidesign dev certs list -t 1
++./sidesign dev certs list --using-team 1
+ ./sidesign dev certs list -tid TEAM123456
+ ./sidesign dev certs ls
+ 
+ # Create development certificate (auto keypair + portal submit)
+ ./sidesign dev certs create
+-./sidesign dev certs create --output "dev.cer"
+-./sidesign dev certs create -o "dev.cer" -t 1
++./sidesign dev certs create --output "dev.p12"
++./sidesign dev certs create -o "dev.p12" --using-team 1
+ 
+ # Revoke certificate with aliases
+ ./sidesign dev certs revoke --id "ABC123XYZ0"
+@@ -202,13 +201,13 @@
+ # App IDs management:
+ # List App IDs
+ ./sidesign dev appids list
+-./sidesign dev appids list -t 1
++./sidesign dev appids list --using-team 1
+ ./sidesign dev appids ls
+ 
+ # Register App ID with long and short flags
+ ./sidesign dev appids register --name "MyApp" --bundle-id "com.example.myapp"
+ ./sidesign dev appids register -n "MyApp" -b "com.example.myapp"
+-./sidesign dev appids add -n "MyApp" -i "com.example.myapp" -t 1
++./sidesign dev appids add -n "MyApp" -i "com.example.myapp" --using-team 1
+ 
+ # Delete App ID with aliases
+ ./sidesign dev appids delete --id "APP_ID_123"
+@@ -218,7 +217,7 @@
+ # App Groups management:
+ # List App Groups
+ ./sidesign dev appgroups list
+-./sidesign dev appgroups list -t 1
++./sidesign dev appgroups list --using-team 1
+ ./sidesign dev appgroups ls
+ 
+ # Create App Group with long and short flags
+@@ -243,14 +242,14 @@
+ # Provisioning Profiles management:
+ # List profiles
+ ./sidesign dev profiles list
+-./sidesign dev profiles list -t 1
++./sidesign dev profiles list --using-team 1
+ ./sidesign dev profiles ls
+ 
+ # Download / generate profile for bundle ID
+ ./sidesign dev profiles download --bundle-id "com.example.myapp"
+ ./sidesign dev profiles download --bundle-id "com.example.myapp" --output "dev.mobileprovision"
+ ./sidesign dev profiles download -b "com.example.myapp" -o "dev.mobileprovision"
+-./sidesign dev profiles fetch -i "com.example.myapp" -o "dev.mobileprovision" -t 1
++./sidesign dev profiles fetch -i "com.example.myapp" -o "dev.mobileprovision" --using-team 1
+ 
+ # Delete profile with aliases
+ ./sidesign dev profiles delete --id "PROFILE_ID_123"
+@@ -258,10 +257,9 @@
+ ./sidesign dev profiles rm -i "PROFILE_ID_123"
+ 
+ # Standalone Anisette Commands & Permutations:
+-# Fetch Anisette headers with default server
+-./sidesign anisette
+-./sidesign anisette --json
+-./sidesign anisette -j
++# Fetch Anisette headers from a remote server (and persist a newly issued machine identity)
++./sidesign anisette --server "https://ani.some.com" --machine-password "adipass" --json
++./sidesign anisette -srv "https://ani.some.com" -mpwd "adipass" -j
+ 
+ # Fetch Anisette headers with specific server
+ ./sidesign anisette --server "https://ani.some.com"
+@@ -272,20 +270,18 @@
+ ./sidesign anisette -srv "https://ani.some.com" -mpwd "secret" -mp "adi.dat" -j
+ 
+ # List public Anisette servers from URL
+-./sidesign anisette servers
+ ./sidesign anisette servers --source "https://example.com/servers.json"
+ ./sidesign anisette servers -src "https://example.com/servers.json"
+ 
+ # Interactively select server from public list
+-./sidesign anisette --select-server
+-./sidesign anisette -sel
+-./sidesign anisette -sel -j
++./sidesign anisette --select-server --source "https://example.com/servers.json"
++./sidesign anisette -sel -src "https://example.com/servers.json"
+ 
+ # Auto-failover Anisette across server list
+ ./sidesign anisette --failover --source "https://example.com/servers.json"
+ ./sidesign anisette -f -src "https://example.com/servers.json" -j
+-./sidesign anisette -f --start-index 2 -j
+-./sidesign anisette -f -idx 2 -j
++./sidesign anisette -f --source "https://example.com/servers.json" --start-index 2 -j
++./sidesign anisette -f -src "https://example.com/servers.json" -idx 2 -j
+ 
+ # Fetch Anisette headers via remote ODA package
+ ./sidesign anisette --oda "https://example.com/oda.json"
+@@ -300,10 +296,6 @@
+ ./sidesign anisette -srv "https://ani.some.com" -st -j
+ 
+ # PKCS#12 (.p12) Operations:
+-# Inspect .p12 metadata
+-./sidesign p12 info --input dev.p12 --password secret
+-./sidesign p12 info -i dev.p12 -p secret
+-
+ # Create .p12 bundle from certificate and private key
+ ./sidesign p12 create --cert cert.der --key private.key --password secret --output dev.p12
+ ./sidesign p12 create -c cert.der -k private.key -p secret -o dev.p12
+@@ -330,8 +322,8 @@
+ ./sidesign sign app.ipa -p dev.p12 -pwd secret -m dev.mobileprovision -b "com.example.custom" -o signed.ipa
+ 
+ # Sign IPA with custom entitlements
+-./sidesign sign app.ipa -p dev.p12 -pwd secret -m dev.mobileprovision --entitlements entitlements.plist -o signed.ipa
+-./sidesign sign app.ipa -p dev.p12 -pwd secret -m dev.mobileprovision -e entitlements.plist -o signed.ipa
++./sidesign sign "Payload/MyApp.app/MyApp" -p dev.p12 -pwd secret --entitlements entitlements.plist
++./sidesign sign "Payload/MyApp.app/MyApp" -p dev.p12 -pwd secret -e entitlements.plist
+ 
+ # Sign IPA with team resolution
+ ./sidesign sign app.ipa -p dev.p12 -pwd secret -m dev.mobileprovision --using-team 1 -o signed.ipa
+@@ -347,10 +339,9 @@
+ ./sidesign sign "Payload/MyApp.app/Frameworks/MyFramework.framework" -p dev.p12 -pwd secret
+ ./sidesign sign "Payload/MyApp.app/Frameworks/libfoo.dylib" -p dev.p12 -pwd secret
+ 
+-# Code Signature Verification (verify / check):
++# Code Signature Verification:
+ # Verify IPA signature integrity
+ ./sidesign verify app.ipa
+-./sidesign check app.ipa
+ 
+ # Verify .app directory
+ ./sidesign verify "Payload/MyApp.app"
+@@ -367,7 +358,7 @@
+ ./sidesign verify app.ipa --deep --strict
+ ./sidesign verify app.ipa -d -s
+ 
+-# Inspection & Display (inspect / display / info / entitlements):
++# Inspection & Display (inspect / display / info):
+ # Inspect binary / bundle overview
+ ./sidesign inspect app.ipa
+ ./sidesign display app.ipa
+@@ -376,7 +367,6 @@
+ # Dump embedded entitlements
+ ./sidesign inspect app.ipa --entitlements
+ ./sidesign inspect app.ipa -e
+-./sidesign entitlements app.ipa
+ 
+ # Dump code signing requirements
+ ./sidesign inspect app.ipa --requirements
+@@ -389,22 +379,20 @@
+ ./sidesign inspect "Payload/MyApp.app"
+ ./sidesign inspect "Payload/MyApp.app/MyApp" -e
+ 
+-# Provisioning Profile Operations (profile / provision):
++# Provisioning Profile Operations:
+ # Dump XML metadata and entitlements
+ ./sidesign profile dump embedded.mobileprovision
+ ./sidesign profile dump embedded.mobileprovision -d
+-./sidesign provision dump embedded.mobileprovision
+ 
+ # Validate profile expiration and structure
+ ./sidesign profile validate embedded.mobileprovision
+ ./sidesign profile validate embedded.mobileprovision -v
+ 
+-# App Extensions (extensions / plugins / appex):
++# App Extensions:
+ # List app extensions
+ ./sidesign extensions list app.ipa
+ ./sidesign extensions ls app.ipa
+-./sidesign plugins list "Payload/MyApp.app"
+-./sidesign appex list app.ipa
++./sidesign extensions list "Payload/MyApp.app"
+ 
+ # Remove all app extensions to output IPA
+ ./sidesign extensions remove app.ipa --all --output app_no_ext.ipa
+@@ -420,38 +408,30 @@
+ ./sidesign extensions remove app.ipa --all
+ ./sidesign extensions remove "Payload/MyApp.app" -i "com.example.myapp.widget"
+ 
+-# Packaging & Archiving (archive / ipa / zip / unzip):
++# Packaging & Archiving:
+ # Unpack IPA into directory
+ ./sidesign archive unzip app.ipa --output Payload/
+ ./sidesign archive unzip app.ipa -o Payload/
+ ./sidesign archive unzip app.ipa
+-./sidesign unzip app.ipa -o Payload/
+ 
+ # Repack .app into IPA
+ ./sidesign archive zip "Payload/MyApp.app" --output repackaged.ipa
+ ./sidesign archive zip "Payload/MyApp.app" -o repackaged.ipa
+-./sidesign zip "Payload/MyApp.app" -o repackaged.ipa
+ 
+-# Remove Code Signature (remove-signature / unsign / strip-signature):
++# Remove Code Signature (remove-signature / unsign):
+ # Strip code signature from binary
+ ./sidesign remove-signature "Payload/MyApp.app/MyApp"
+ ./sidesign unsign "Payload/MyApp.app/MyApp"
+-./sidesign strip-signature "Payload/MyApp.app/MyApp"
+ 
+ # Strip code signature from .app bundle
+ ./sidesign remove-signature "Payload/MyApp.app"
+ 
+ # Global Options applicable across all commands:
+ # Verbose / trace logging
+-./sidesign -v dev list
++./sidesign --verbose dev list
+ ./sidesign --verbose sign app.ipa -p dev.p12 -pwd secret -m dev.mobileprovision -o signed.ipa
+-./sidesign -v verify app.ipa -d -s
+-./sidesign -v inspect app.ipa -e
+-
+-# Version information
+-./sidesign version
+-./sidesign --version
+-./sidesign -v version
++./sidesign --verbose verify app.ipa -d -s
++./sidesign --verbose inspect app.ipa -e
+ 
+ # Help information
+ ./sidesign help

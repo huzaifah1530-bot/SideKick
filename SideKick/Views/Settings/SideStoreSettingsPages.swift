@@ -58,12 +58,50 @@ struct RefreshSettingsView: View {
             } footer: {
                 Text("SideStore’s background service can help keep its refresh helper available. iOS may still pause background work.")
             }
+
+            Section {
+                Link("Get Refresh Shortcut", destination: URL(string: "https://www.icloud.com/shortcuts/2af57f665d434568a589f1e9b7d7f4d1")!)
+                Link("Open Shortcuts", destination: URL(string: "shortcuts://")!)
+                NavigationLink {
+                    DailyRefreshAutomationGuideView()
+                } label: {
+                    Label("How to schedule daily refresh", systemImage: "list.number")
+                }
+            } header: {
+                Text("Optional daily automation")
+            } footer: {
+                Text("Adding the shortcut does not schedule it, and SideKick cannot verify whether a personal automation was created. Daily scheduling is optional; you can also refresh manually. iOS controls when background work runs.")
+            }
         }
         .navigationTitle("App Refresh")
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { locationAccess = CLLocationManager().authorizationStatus }
         }
+    }
+}
+
+private struct DailyRefreshAutomationGuideView: View {
+    var body: some View {
+        List {
+            Section {
+                Text("The refresh shortcut and its daily automation are separate. Installing the shortcut does not schedule it.")
+                Text("SideKick cannot read or confirm your personal automations. Check the Shortcuts app to see whether you created one.")
+                    .foregroundStyle(.secondary)
+            }
+            Section("Create a daily automation") {
+                LabeledContent("1", value: "Open Shortcuts and choose Automation.")
+                LabeledContent("2", value: "Create a Time of Day automation and choose Daily.")
+                LabeledContent("3", value: "Choose Run Shortcut, then select Refresh SideKick Apps.")
+                LabeledContent("4", value: "Set it to run immediately, if that option is shown, and confirm.")
+            }
+            Section {
+                Text("You can skip automation and refresh from SideKick whenever you want. Background timing is controlled by iOS.")
+                    .foregroundStyle(.secondary)
+            }
+        }
+        .navigationTitle("Daily Refresh Guide")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 
@@ -133,8 +171,13 @@ struct InstallSigningSettingsView: View {
 struct ConnectionSettingsView: View {
     @AppStorage("isAutoRetryRemotePairingPortEnabled") private var autoRetryPort = true
     @AppStorage("remotePairingPortOverride") private var portOverride = 0
+    @State private var vpn = LocalVPNService.shared
+    @State private var isAutomaticPortDraft = true
+    @State private var fixedPortDraft = ""
     @State private var isChoosingPairingFile = false
+    @State private var isShowingLocalConnection = false
     @State private var pairingStatus: String?
+    @State private var pairingRecoveryAction: String?
     @State private var isShowingPairingStatus = false
 
     var body: some View {
@@ -145,10 +188,34 @@ struct ConnectionSettingsView: View {
                 }
                 .fullWidthListSeparators()
                 Toggle("Retry remote pairing ports automatically", isOn: $autoRetryPort)
-                Stepper(value: $portOverride, in: 0...65_535) {
-                    LabeledContent("Remote pairing port", value: portOverride == 0 ? "Automatic" : String(portOverride))
+                Toggle("Automatic port selection", isOn: $isAutomaticPortDraft)
+                LabeledContent("Fixed remote pairing port") {
+                    TextField("1–65,535", text: $fixedPortDraft)
+                        .keyboardType(.numberPad)
+                        .multilineTextAlignment(.trailing)
+                        .disabled(isAutomaticPortDraft)
                 }
-                .onChange(of: portOverride) { _, _ in syncMinimuxerBackendFromUserDefaults() }
+                if !isAutomaticPortDraft, !isValidFixedPortDraft {
+                    Text("Enter a whole number from 1 to 65,535.")
+                        .font(.footnote)
+                        .foregroundStyle(.red)
+                }
+                if !isAutomaticPortDraft {
+                    Stepper(value: Binding<Int>(
+                        get: { validatedFixedPortDraft ?? 1 },
+                        set: { fixedPortDraft = String($0) }
+                    ), in: 1...65_535) {
+                        LabeledContent("Adjust fixed port", value: validatedFixedPortDraft.map(String.init) ?? "Enter a port")
+                    }
+                }
+                SwiftUI.Button("Save Port") {
+                    if isAutomaticPortDraft {
+                        portOverride = 0
+                    } else if let port = validatedFixedPortDraft {
+                        portOverride = port
+                    }
+                }
+                .disabled(isAutomaticPortDraft ? portOverride == 0 : validatedFixedPortDraft == nil)
             } header: {
                 Text("Pairing")
             } footer: {
@@ -166,6 +233,17 @@ struct ConnectionSettingsView: View {
         }
         .navigationTitle("Connection & Pairing")
         .navigationBarTitleDisplayMode(.inline)
+        .onChange(of: portOverride) { _, value in
+            isAutomaticPortDraft = value == 0
+            fixedPortDraft = value == 0 ? "" : String(value)
+            syncMinimuxerBackendFromUserDefaults()
+        }
+        .onAppear {
+            isAutomaticPortDraft = portOverride == 0
+            fixedPortDraft = portOverride == 0 ? "" : String(portOverride)
+        }
+        .navigationDestination(isPresented: $isShowingLocalConnection) { LocalConnectionSettingsView() }
+        .task { await vpn.refreshStatus() }
         .fileImporter(
             isPresented: $isChoosingPairingFile,
             allowedContentTypes: PairingFileManager.supportedContentTypes,
@@ -174,15 +252,31 @@ struct ConnectionSettingsView: View {
             Task { await importPairingFile(result) }
         }
         .alert("Device pairing", isPresented: $isShowingPairingStatus) {
+            if let pairingRecoveryAction {
+                SwiftUI.Button(pairingRecoveryAction) {
+                    isShowingLocalConnection = true
+                    self.pairingRecoveryAction = nil
+                }
+            }
             SwiftUI.Button("OK", role: .cancel) { pairingStatus = nil }
         } message: {
             Text(pairingStatus ?? "")
         }
     }
 
+    private var validatedFixedPortDraft: Int? {
+        guard !fixedPortDraft.isEmpty,
+              fixedPortDraft.unicodeScalars.allSatisfy({ (48...57).contains($0.value) }),
+              let port = Int(fixedPortDraft), (1...65_535).contains(port) else { return nil }
+        return port
+    }
+
+    private var isValidFixedPortDraft: Bool { validatedFixedPortDraft != nil }
+
     @MainActor
     private func importPairingFile(_ result: Result<[URL], Error>) async {
         var didImport = false
+        pairingRecoveryAction = nil
         do {
             guard let url = try result.get().first else { return }
             UserDefaults.standard.set(false, forKey: "sidekick.setup.pairing-verified")
@@ -191,15 +285,22 @@ struct ConnectionSettingsView: View {
             guard PairingFileManager.shared.fetchPairingFile() != nil else {
                 throw PairingSetupError.unreadableFile
             }
-            let vpnLease = try await LocalVPNService.shared.acquire()
-            defer { LocalVPNService.shared.release(vpnLease) }
             do {
+                let vpnLease = try await LocalVPNService.shared.acquire()
+                defer { LocalVPNService.shared.release(vpnLease) }
                 try await ensureMinimuxerReady()
                 _ = try await fetchUDID(forceLive: true)
                 UserDefaults.standard.set(true, forKey: "sidekick.setup.pairing-verified")
+                pairingRecoveryAction = nil
                 pairingStatus = "Pairing is set up and SideKick can reach this iPhone. Install and refresh are ready."
             } catch {
-                pairingStatus = "Pairing file imported. SideKick couldn’t reach the iPhone yet. Allow SideKick’s Local Connection in Settings, check that this pairing file belongs to your iPhone, then retry.\n\n\(error.localizedDescription)"
+                await vpn.refreshStatus()
+                let recovery = vpn.mode == .external
+                    ? (vpn.externalInstalled ? "Connect LocalDevVPN" : "Get LocalDevVPN")
+                    : (vpn.isConfigured ? "Verify Device Connection" : "Allow Built-in VPN")
+                pairingRecoveryAction = recovery
+                let instruction = "In Settings → Connection & Pairing → Local Connection, choose \(recovery), then retry."
+                pairingStatus = "Pairing file imported. SideKick couldn’t reach the iPhone yet. \(instruction) Check that this pairing file belongs to your iPhone.\n\n\(error.localizedDescription)"
             }
         } catch {
             pairingStatus = didImport
@@ -251,7 +352,8 @@ struct SettingsStorageView: View {
     @State private var storageUsage = SideKickStorageUsage()
     @State private var isMeasuring = false
     @State private var isCleaning = false
-    @State private var isConfirmingClear = false
+    @State private var isShowingClearReview = false
+    @State private var selectedRemovalKeys = Set<String>()
     @State private var errorMessage: String?
 
     var body: some View {
@@ -279,7 +381,8 @@ struct SettingsStorageView: View {
                 LabeledContent("Downloaded IPA copies", value: storageUsage.formatted(storageUsage.importedIPAs))
                 if storageUsage.importedIPAs > 0 {
                     SwiftUI.Button("Remove downloaded IPA copies", role: .destructive) {
-                        isConfirmingClear = true
+                        selectedRemovalKeys.removeAll()
+                        isShowingClearReview = true
                     }
                 }
             } header: {
@@ -316,11 +419,52 @@ struct SettingsStorageView: View {
         .task { await reload() }
         .refreshable { await reload() }
         .onReceive(NotificationCenter.default.publisher(for: .sideKickStorageDidChange)) { _ in Task { await reload() } }
-        .alert("Remove downloaded IPA copies?", isPresented: $isConfirmingClear) {
-            SwiftUI.Button("Remove", role: .destructive) { Task { await clearManagedIPAs() } }
-            SwiftUI.Button("Cancel", role: .cancel) { }
-        } message: {
-            Text("This only removes IPA files saved inside SideKick. Installed apps and files in Files are not affected.")
+        .sheet(isPresented: $isShowingClearReview) {
+            NavigationStack {
+                List {
+                    Section {
+                        Text("Removing these \(selectedRemovalApps.count) selected copies also deletes their SideKick import records. The selection may include queued updates or IPAs shown under Ready to Install. To restore an entry later, download or import its IPA again and re-queue it if needed. Installed apps and files in Files are not affected.")
+                            .font(.footnote)
+                            .foregroundStyle(.secondary)
+                    }
+                    Section("Downloaded IPA copies (\(selectedRemovalApps.count) selected)") {
+                        ForEach(Array(removableImportedApps.enumerated()), id: \.offset) { _, app in
+                            let key = removalKey(for: app)
+                            SwiftUI.Button {
+                                if selectedRemovalKeys.contains(key) { selectedRemovalKeys.remove(key) }
+                                else { selectedRemovalKeys.insert(key) }
+                            } label: {
+                                HStack {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(app.name).foregroundStyle(.primary)
+                                        Text("Version \(app.version) · \(app.isUpdateQueued ? "Queued for update" : "Imported IPA")")
+                                            .font(.footnote).foregroundStyle(.secondary)
+                                    }
+                                    Spacer()
+                                    Image(systemName: selectedRemovalKeys.contains(key) ? "checkmark.circle.fill" : "circle")
+                                        .foregroundStyle(selectedRemovalKeys.contains(key) ? .tint : .secondary)
+                                }
+                                .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.plain)
+                        }
+                    }
+                }
+                .navigationTitle("Review IPA Copies")
+                .navigationBarTitleDisplayMode(.inline)
+                .toolbar {
+                    ToolbarItem(placement: .cancellationAction) {
+                        SwiftUI.Button("Cancel") { isShowingClearReview = false }
+                    }
+                    ToolbarItem(placement: .confirmationAction) {
+                        SwiftUI.Button("Remove \(selectedRemovalKeys.count)", role: .destructive) {
+                            isShowingClearReview = false
+                            Task { await clearSelectedManagedIPAs() }
+                        }
+                        .disabled(selectedRemovalKeys.isEmpty)
+                    }
+                }
+            }
         }
         .alert("Storage", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
             SwiftUI.Button("OK", role: .cancel) { errorMessage = nil }
@@ -341,16 +485,30 @@ struct SettingsStorageView: View {
     }
 
     @MainActor
-    private func clearManagedIPAs() async {
+    private func clearSelectedManagedIPAs() async {
         do {
-            for app in importedApps where app.fileName != nil {
+            for app in importedApps where app.fileName != nil && selectedRemovalKeys.contains(removalKey(for: app)) {
                 try await environment.ipaImportStore.delete(app)
             }
             try await environment.ipaImportStore.cleanupOrphanedManagedIPAs()
+            selectedRemovalKeys.removeAll()
             await reload()
         } catch {
             errorMessage = error.localizedDescription
+            await reload()
         }
+    }
+
+    private func removalKey(for app: ImportedIPA) -> String {
+        "\(app.id)|\(app.importedAt.timeIntervalSince1970)"
+    }
+
+    private var removableImportedApps: [ImportedIPA] {
+        importedApps.filter { $0.fileName != nil }
+    }
+
+    private var selectedRemovalApps: [ImportedIPA] {
+        removableImportedApps.filter { selectedRemovalKeys.contains(removalKey(for: $0)) }
     }
 
     @MainActor

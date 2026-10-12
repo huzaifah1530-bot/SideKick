@@ -1,5 +1,5 @@
 diff --git a/AltStore.xcodeproj/project.pbxproj b/AltStore.xcodeproj/project.pbxproj
-index a511c447..0c64db14 100644
+index a511c44..987aa30 100644
 --- a/AltStore.xcodeproj/project.pbxproj
 +++ b/AltStore.xcodeproj/project.pbxproj
 @@ -112,6 +112,7 @@
@@ -42,13 +42,13 @@ index a511c447..0c64db14 100644
  				A8EEC3B92F4B0EFC00F2436D /* AltWidget */,
  				A8EEC3482F4B0D8600F2436D /* Shared */,
 @@ -366,6 +377,7 @@
- 			fileSystemSynchronizedGroups = (
  				A8EEC3482F4B0D8600F2436D /* Shared */,
  				A8EEC8412F4B146A00F2436D /* AltStore */,
  				A8EECF2A2F4B195000F2436D /* SideStore */,
 +				F1A0A0000000000000000001 /* SideKick */,
  			);
  			name = SideStore;
+ 			packageProductDependencies = (
 @@ -828,7 +840,7 @@
  				ENABLE_DEBUG_DYLIB = NO;
  				GCC_UNROLL_LOOPS = YES;
@@ -67,11 +67,115 @@ index a511c447..0c64db14 100644
  				LD_EXPORT_SYMBOLS = NO;
  				LD_RUNPATH_SEARCH_PATHS = (
  					"$(inherited)",
+diff --git a/AltStore/AltStoreFree.entitlements b/AltStore/AltStoreFree.entitlements
+index a1035f8..6631ffa 100644
+--- a/AltStore/AltStoreFree.entitlements
++++ b/AltStore/AltStoreFree.entitlements
+@@ -2,9 +2,5 @@
+ <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+ <plist version="1.0">
+ <dict>
+-    <key>com.apple.security.application-groups</key>
+-    <array>
+-        <string>group.$(APP_GROUP_IDENTIFIER)</string>
+-    </array>
+ </dict>
+ </plist>
+diff --git a/AltStore/AppDelegate.swift b/AltStore/AppDelegate.swift
+index eb41f3e..b4be693 100644
+--- a/AltStore/AppDelegate.swift
++++ b/AltStore/AppDelegate.swift
+@@ -149,11 +149,12 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
+         // Recreate Database if requested
+         // NOTE: Userdefaults are local to the SideStore.app sandbox and are not shared
+         if UserDefaults.standard.recreateDatabaseOnNextStart{
+-            // reset the state
+-            UserDefaults.standard.recreateDatabaseOnNextStart = false
+-            
+-            // re-create database
+-            DatabaseManager.recreateDatabase()
++            do {
++                // Preserve the request and avoid initializing Core Data until private storage is ready.
++                try SideKickDataDirectory.prepareBeforeDatabaseStart()
++            } catch {
++                debugLog("[AppDelegate] Could not prepare private storage for database recreation; retry remains pending: \(error.localizedDescription)")
++            }
+         }
+         
+         
+@@ -173,8 +174,9 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
+         Task.detached(priority: .userInitiated) {
+             do
+             {
++                try SideKickDataDirectory.prepareBeforeDatabaseStart()
+                 await MaintenanceManager.shared.performDatabaseMigrationIfNeeded()
+-                
++
+                 debugLog("Starting DatabaseManager...")
+                 try await DatabaseManager.shared.start()
+                 debugLog("Started DatabaseManager.")
+@@ -379,10 +381,12 @@ extension AppDelegate
+ {
+     private func prepareForBackgroundFetch()
+     {
+-        UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { (success, error) in
+-            // no-op
+-        }
+-        
++        UIApplication.shared.setMinimumBackgroundFetchInterval(
++            UserDefaults.standard.isBackgroundRefreshEnabled
++                ? UIApplication.backgroundFetchIntervalMinimum
++                : UIApplication.backgroundFetchIntervalNever
++        )
++
+         #if DEBUG && targetEnvironment(simulator)
+         UIApplication.shared.registerForRemoteNotifications()
+         #endif
+@@ -437,6 +441,7 @@ extension AppDelegate
+             Task.detached(priority: .userInitiated) {
+                 do
+                 {
++                    try SideKickDataDirectory.prepareBeforeDatabaseStart()
+                     try await DatabaseManager.shared.start()
+                     self.performBackgroundFetch { (backgroundFetchResult) in
+                         backgroundFetchCompletionHandler(backgroundFetchResult)
+@@ -446,6 +451,7 @@ extension AppDelegate
+                 }
+                 catch
+                 {
++                    debugLog("Failed to prepare/start database for background fetch: \(error.localizedDescription)")
+                     backgroundFetchCompletionHandler(.failed)
+                     taskCompletionHandler()
+                 }
+@@ -655,9 +661,8 @@ private extension AppDelegate {
+     }
+     
+     static func reconcileSelfReinstallationIfNeeded() {
+-        guard let appGroup = Bundle.main.altstoreAppGroup,
+-              let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) else {
+-            debugLog("[AppDelegate] reconcileSelfReinstallation: Failed to get App Group container.")
++        guard let containerURL = FileManager.default.altstoreSharedDirectory else {
++            debugLog("[AppDelegate] reconcileSelfReinstallation: Failed to get SideKick private data directory.")
+             return
+         }
+         
+@@ -716,6 +721,10 @@ private extension AppDelegate {
+ 
+ extension AppDelegate: UNUserNotificationCenterDelegate {
+     func userNotificationCenter(_ center: UNUserNotificationCenter, willPresent notification: UNNotification, withCompletionHandler completionHandler: @escaping (UNNotificationPresentationOptions) -> Void) {
+-        completionHandler([.banner, .sound])
++        completionHandler([.banner, .list, .sound])
++    }
++    func userNotificationCenter(_ center: UNUserNotificationCenter, didReceive response: UNNotificationResponse, withCompletionHandler completionHandler: @escaping () -> Void) {
++        GitHubUpdateNotificationRouteStore.recordTap(userInfo: response.notification.request.content.userInfo)
++        completionHandler()
+     }
+ }
 diff --git a/AltStore/Info.plist b/AltStore/Info.plist
-index 868efe81..a5a9a77c 100644
+index 868efe8..585d482 100644
 --- a/AltStore/Info.plist
 +++ b/AltStore/Info.plist
-@@ -14,7 +14,7 @@
+@@ -14,9 +14,9 @@
  			<key>CFBundleTypeName</key>
  			<string>iOS App</string>
  			<key>CFBundleTypeRole</key>
@@ -81,6 +185,8 @@ index 868efe81..a5a9a77c 100644
 -			<string>Alternate</string>
 +			<string>Owner</string>
  			<key>LSItemContentTypes</key>
+ 			<array>
+ 				<string>com.apple.itunes.ipa</string>
 @@ -41,7 +41,9 @@
  	<key>CFBundleInfoDictionaryVersion</key>
  	<string>6.0</string>
@@ -92,31 +198,43 @@ index 868efe81..a5a9a77c 100644
  	<key>CFBundlePackageType</key>
  	<string>APPL</string>
  	<key>CFBundleShortVersionString</key>
-@@ -55,4 +55,5 @@
+@@ -55,6 +57,7 @@
  			<string>SideStore General</string>
  			<key>CFBundleURLSchemes</key>
  			<array>
 +				<string>sidekick</string>
  				<string>sidestore</string>
-@@ -78,8 +81,10 @@
+ 			</array>
+ 		</dict>
+@@ -78,6 +81,8 @@
  	</array>
--	<key>LSApplicationQueriesSchemes</key>
--	<array>
--		<string>sidestore-com.SideStore.SideStore</string>
--		<string>sidestore-com.SideStore.SideStore.Beta</string>
--		<string>localdevvpn</string>
--	</array>
-+	<key>LSApplicationQueriesSchemes</key>
-+	<array>
+ 	<key>LSApplicationQueriesSchemes</key>
+ 	<array>
 +		<string>livecontainer</string>
 +		<string>livecontainer2</string>
-+		<string>sidestore-com.SideStore.SideStore</string>
-+		<string>sidestore-com.SideStore.SideStore.Beta</string>
-+		<string>localdevvpn</string>
-+	</array>
- 	<key>LSRequiresIPhoneOS</key>
+ 		<string>sidestore-com.SideStore.SideStore</string>
+ 		<string>sidestore-com.SideStore.SideStore.Beta</string>
+ 		<string>localdevvpn</string>
+diff --git a/AltStore/Intents/App Intents/AppShortcuts.swift b/AltStore/Intents/App Intents/AppShortcuts.swift
+index 0765022..7beb1f6 100644
+--- a/AltStore/Intents/App Intents/AppShortcuts.swift	
++++ b/AltStore/Intents/App Intents/AppShortcuts.swift	
+@@ -29,6 +29,13 @@ public struct ShortcutsProvider: AppShortcutsProvider
+                     ],
+                     shortTitle: "Install IPA",
+                     systemImageName: "square.and.arrow.down")
++
++        AppShortcut(intent: RefreshManagedAppsIntent(),
++                    phrases: [
++                        "Refresh managed apps with \(.applicationName)",
++                    ],
++                    shortTitle: "Refresh SideKick Apps",
++                    systemImageName: "arrow.clockwise")
+     }
+     
+     public static var shortcutTileColor: ShortcutTileColor {
 diff --git a/AltStore/SceneDelegate.swift b/AltStore/SceneDelegate.swift
-index b3b01cfd..c937fe85 100644
+index b3b01cf..a635bd8 100644
 --- a/AltStore/SceneDelegate.swift
 +++ b/AltStore/SceneDelegate.swift
 @@ -7,6 +7,7 @@
@@ -127,12 +245,15 @@ index b3b01cfd..c937fe85 100644
  
  
  final class SceneDelegate: UIResponder, UIWindowSceneDelegate
-@@ -19,7 +20,21 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate
+@@ -19,7 +20,24 @@ final class SceneDelegate: UIResponder, UIWindowSceneDelegate
          // Use this method to optionally configure and attach the UIWindow `window` to the provided UIWindowScene `scene`.
          // If using a storyboard, the `window` property will automatically be initialized and attached to the scene.
          // This delegate does not imply the connecting scene or session are new (see `application:configurationForConnectingSceneSession` instead).
 -        guard let _ = (scene as? UIWindowScene) else { return }
 +        guard let windowScene = scene as? UIWindowScene else { return }
++
++        UITableView.appearance().separatorInset = .zero
++        UITableView.appearance().separatorInsetReference = .fromCellEdges
 +
 +        let rootView = ContentView()
 +            .environment(AppEnvironment())
@@ -151,10 +272,10 @@ index b3b01cfd..c937fe85 100644
          if let context = connectionOptions.urlContexts.first
          {
 diff --git a/Build.xcconfig b/Build.xcconfig
-index 3fd3b5c9..c8cb3f03 100644
+index 3fd3b5c..c8cb3f0 100644
 --- a/Build.xcconfig
 +++ b/Build.xcconfig
-@@ -6,7 +6,7 @@
+@@ -6,7 +6,7 @@ CURRENT_PROJECT_VERSION = 0700
  
  // Vars to be overwritten by `CodeSigning.xcconfig` if exists
  DEVELOPMENT_TEAM = S32Z3HMYVQ
@@ -163,7 +284,8 @@ index 3fd3b5c9..c8cb3f03 100644
  
  // Default is free for CI builds, override it using CodeSigning.xcconfig if required
  CODE_SIGN_ENTITLEMENTS = ./AltStore/AltStoreFree.entitlements
-@@ -16,6 +16,6 @@
+@@ -16,7 +16,7 @@ CODE_SIGN_ENTITLEMENTS = ./AltStore/AltStoreFree.entitlements
+ 
  PRODUCT_NAME = SideStore
  
 -BASE_BUNDLE_ID                                  = $(ORG_IDENTIFIER).SideStore
@@ -171,32 +293,25 @@ index 3fd3b5c9..c8cb3f03 100644
  MAIN_BUNDLE_IDENTIFIER[config=Debug]            = $(BASE_BUNDLE_ID).$(DEVELOPMENT_TEAM)
  MAIN_BUNDLE_IDENTIFIER[config=Release]          = $(BASE_BUNDLE_ID)
  APP_GROUP_IDENTIFIER                            = $(MAIN_BUNDLE_IDENTIFIER)
-diff --git a/SideStore/Core/Auth/AuthManager.swift b/SideStore/Core/Auth/AuthManager.swift
-index c426783d..983e8fca 100644
---- a/SideStore/Core/Auth/AuthManager.swift
-+++ b/SideStore/Core/Auth/AuthManager.swift
-@@ -140,13 +140,14 @@ public final class AuthManager: @unchecked Sendable {
-     @discardableResult
-     func signIn(
-         presentingViewController: UIViewController? = nil,
-+        signInHandler: SignInFlowHandler? = nil,
-         skipDeviceRegistration: Bool = false,
-         skipCertificateProvisioning: Bool = false,
-         skipResign: Bool = false,
-         skipHowTos: Bool = false
-     ) async throws -> SignInResult {
-         let dbBackgroundContext = DatabaseManager.shared.persistentContainer.newBackgroundContext()
--        let signInFlowHandler = SignInFlowHandler(presentingViewController: presentingViewController)
-+        let signInFlowHandler = signInHandler ?? SignInFlowHandler(presentingViewController: presentingViewController)
-         let context = StandaloneOperationContext(
-             steps: .signIn,
-             dbBackgroundContext: dbBackgroundContext
-         )
+diff --git a/Shared/Extensions/Bundle+AltStore.swift b/Shared/Extensions/Bundle+AltStore.swift
+index 83062c7..03086bc 100644
+--- a/Shared/Extensions/Bundle+AltStore.swift
++++ b/Shared/Extensions/Bundle+AltStore.swift
+@@ -16,7 +16,8 @@ private nonisolated(unsafe) var appGroupsCache: [URL: (modDate: Date?, groups: [
+ private extension Bundle {
+     @objc dynamic static let activeBundle: Bundle = Bundle.main
+     @objc dynamic static let storeAppBundleIdentifier = "com.SideStore.SideStore"
+-    @objc dynamic static let appbundleIdentifier = "com.SideStore.SideStore"
++    // SideKick is the managed app. Keep the engine's self-app identity tied to the actual bundle.
++    @objc dynamic static let appbundleIdentifier = Bundle.activeBundle.bundleIdentifier ?? "com.sidekick.app"
+ }
+ 
+ public extension Bundle
 diff --git a/Shared/Extensions/FileManager+SharedDirectories.swift b/Shared/Extensions/FileManager+SharedDirectories.swift
-index 0000000..0000000 100644
+index 081f07a..0700106 100644
 --- a/Shared/Extensions/FileManager+SharedDirectories.swift
 +++ b/Shared/Extensions/FileManager+SharedDirectories.swift
-@@ -13,11 +13,12 @@ public extension FileManager
+@@ -14,12 +14,13 @@ public extension FileManager
          #if os(tvOS)
          return self.cachesDirectory
          #else
@@ -215,127 +330,71 @@ index 0000000..0000000 100644
 +        #endif
          #endif
      }
+     
 diff --git a/SideStore/AppConstants.swift b/SideStore/AppConstants.swift
-index 0000000..0000000 100644
+index de03a9c..b6603b4 100644
 --- a/SideStore/AppConstants.swift
 +++ b/SideStore/AppConstants.swift
-@@ -12,6 +12,4 @@ public enum AppConstants {
+@@ -12,9 +12,7 @@ import Minimuxer
+ 
+ public enum AppConstants {
      // features required for functioning
 -    public static let mandatoryFeatures: Set<ALTFeature> = [
 -        .appGroups
 -    ]
 +    public static let mandatoryFeatures: Set<ALTFeature> = []
-
+ 
      public enum Database {
-diff --git a/AltStore/AltStoreFree.entitlements b/AltStore/AltStoreFree.entitlements
-index 0000000..0000000 100644
---- a/AltStore/AltStoreFree.entitlements
-+++ b/AltStore/AltStoreFree.entitlements
-@@ -1,9 +1,5 @@
- <?xml version="1.0" encoding="UTF-8"?>
- <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
- <plist version="1.0">
- <dict>
--    <key>com.apple.security.application-groups</key>
--    <array>
--        <string>group.$(APP_GROUP_IDENTIFIER)</string>
--    </array>
- </dict>
- </plist>
-diff --git a/Shared/Extensions/Bundle+AltStore.swift b/Shared/Extensions/Bundle+AltStore.swift
---- a/Shared/Extensions/Bundle+AltStore.swift
-+++ b/Shared/Extensions/Bundle+AltStore.swift
-@@ -16,4 +16,5 @@ private extension Bundle {
-     @objc dynamic static let activeBundle: Bundle = Bundle.main
-     @objc dynamic static let storeAppBundleIdentifier = "com.SideStore.SideStore"
--    @objc dynamic static let appbundleIdentifier = "com.SideStore.SideStore"
-+    // SideKick is the managed app. Keep the engine's self-app identity tied to the actual bundle.
-+    @objc dynamic static let appbundleIdentifier = Bundle.activeBundle.bundleIdentifier ?? "com.sidekick.app"
- }
-diff --git a/AltStore/AppDelegate.swift b/AltStore/AppDelegate.swift
---- a/AltStore/AppDelegate.swift
-+++ b/AltStore/AppDelegate.swift
-@@ -655,8 +655,7 @@ final class AppDelegate: UIResponder, UIApplicationDelegate {
-     }
-     
-     static func reconcileSelfReinstallationIfNeeded() {
--        guard let appGroup = Bundle.main.altstoreAppGroup,
--              let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) else {
--            debugLog("[AppDelegate] reconcileSelfReinstallation: Failed to get App Group container.")
-+        guard let containerURL = FileManager.default.altstoreSharedDirectory else {
-+            debugLog("[AppDelegate] reconcileSelfReinstallation: Failed to get SideKick private data directory.")
-             return
-         }
-diff --git a/SideStore/Core/Operations/PipelineOperations/InstallAppOperation.swift b/SideStore/Core/Operations/PipelineOperations/InstallAppOperation.swift
---- a/SideStore/Core/Operations/PipelineOperations/InstallAppOperation.swift
-+++ b/SideStore/Core/Operations/PipelineOperations/InstallAppOperation.swift
-@@ -152,7 +152,6 @@ final class InstallAppOperation: BasePipelineOperation<InstallAppOperationContext, InstalledApp>, @unchecked Sendable {
-             let isSelfReinstall = !isDifferentSideStore &&
-                                    installedApp.storeApp?.bundleIdentifier.range(of: Bundle.Info.appbundleIdentifier) != nil
-             if isSelfReinstall {
--                if let _ = provisioningProfiles[self.context.targetBundleIdentifier],
--                   let appGroup = Bundle.main.altstoreAppGroup,
--                   let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) 
-+                if let _ = provisioningProfiles[self.context.targetBundleIdentifier],
-+                   let containerURL = FileManager.default.altstoreSharedDirectory
-                 {
-diff --git a/AltStore/Intents/App Intents/AppShortcuts.swift b/AltStore/Intents/App Intents/AppShortcuts.swift
---- a/AltStore/Intents/App Intents/AppShortcuts.swift
-+++ b/AltStore/Intents/App Intents/AppShortcuts.swift
-@@ -29,6 +29,13 @@ public struct ShortcutsProvider: AppShortcutsProvider
-                     ],
-                     shortTitle: "Install IPA",
-                     systemImageName: "square.and.arrow.down")
-+
-+        AppShortcut(intent: RefreshManagedAppsIntent(),
-+                    phrases: [
-+                        "Refresh managed apps with \(.applicationName)",
-+                    ],
-+                    shortTitle: "Refresh SideKick Apps",
-+                    systemImageName: "arrow.clockwise")
-     }
-     
-     public static var shortcutTileColor: ShortcutTileColor {
-diff --git a/SideStore/DeepLinks/URLHandler.swift b/SideStore/DeepLinks/URLHandler.swift
---- a/SideStore/DeepLinks/URLHandler.swift
-+++ b/SideStore/DeepLinks/URLHandler.swift
-@@ -16,6 +16,8 @@ class URLHandler {
+         public static let name           = "SideStore"
+diff --git a/SideStore/Core/Auth/AuthManager.swift b/SideStore/Core/Auth/AuthManager.swift
+index c426783..983e8fc 100644
+--- a/SideStore/Core/Auth/AuthManager.swift
++++ b/SideStore/Core/Auth/AuthManager.swift
+@@ -140,13 +140,14 @@ public final class AuthManager: @unchecked Sendable {
      @discardableResult
-     func handle(_ url: URL) -> Bool {
-         debugLog("[URLHandler] handle(_:) called with URL: \(url.absoluteString)")
-+        if SideKickShareLink.handle(url) { return true }
-+        if SideKickIncomingIPA.handle(url) { return true }
-         if url.isFileURL {
-             return FileImportHandler.shared.handle(fileURL: url)
-         }
-@@ -87,6 +87,6 @@ class URLHandler {
-             guard let callbackTemplate = queryItems["callback_template"]?.removingPercentEncoding else { return false }
-             
-             Task {
--                ExportCertificateDialog.present(callbackTemplate: callbackTemplate)
-+                SideKickCertificateExport.present(callbackTemplate: callbackTemplate)
-             }
-             return true
+     func signIn(
+         presentingViewController: UIViewController? = nil,
++        signInHandler: SignInFlowHandler? = nil,
+         skipDeviceRegistration: Bool = false,
+         skipCertificateProvisioning: Bool = false,
+         skipResign: Bool = false,
+         skipHowTos: Bool = false
+     ) async throws -> SignInResult {
+         let dbBackgroundContext = DatabaseManager.shared.persistentContainer.newBackgroundContext()
+-        let signInFlowHandler = SignInFlowHandler(presentingViewController: presentingViewController)
++        let signInFlowHandler = signInHandler ?? SignInFlowHandler(presentingViewController: presentingViewController)
+         let context = StandaloneOperationContext(
+             steps: .signIn,
+             dbBackgroundContext: dbBackgroundContext
 diff --git a/SideStore/Core/Operations/OperationContexts.swift b/SideStore/Core/Operations/OperationContexts.swift
+index 50e29ea..ce952c7 100644
 --- a/SideStore/Core/Operations/OperationContexts.swift
 +++ b/SideStore/Core/Operations/OperationContexts.swift
-@@ -297,3 +297,4 @@
+@@ -295,11 +295,16 @@ class InstallAppOperationContext: PipelineOperationContext
+     var targetBundleIdentifier: String { customBundleIdentifier ?? bundleIdentifier }
+ 
      lazy var temporaryDirectory: URL = {
 -        let temporaryDirectory = FileManager.default.uniqueTemporaryURL()
 +        let temporaryDirectory = FileManager.default.temporaryDirectory
 +            .appendingPathComponent("sidekick-pipeline-\(UUID().uuidString)", isDirectory: true)
          do {
-@@ -302,2 +303,6 @@
+             try FileManager.default.createDirectory(at: temporaryDirectory,
+                                                     withIntermediateDirectories: true,
                                                      attributes: nil)
 +            try String(ProcessInfo.processInfo.processIdentifier).write(
 +                to: temporaryDirectory.appendingPathComponent(".sidekick-process"),
 +                atomically: true, encoding: .utf8
 +            )
          }
+         catch { self.error = error }
+         return temporaryDirectory
 diff --git a/SideStore/Core/Operations/PipelineExecutor.swift b/SideStore/Core/Operations/PipelineExecutor.swift
+index 44c710e..13e212b 100644
 --- a/SideStore/Core/Operations/PipelineExecutor.swift
 +++ b/SideStore/Core/Operations/PipelineExecutor.swift
-@@ -30,2 +30,11 @@
+@@ -28,6 +28,15 @@ final class PipelineExecutor: @unchecked Sendable {
+         permissionsMode: PermissionReviewMode,
+         operationProgress: Progress?
      ) async throws -> InstalledApp {
 +        // Failed and cancelled pipelines also own their staged files. Waiting
 +        // for the last success-only step leaked extracted apps and generated IPAs.
@@ -347,14 +406,41 @@ diff --git a/SideStore/Core/Operations/PipelineExecutor.swift b/SideStore/Core/O
 +            }
 +        }
          var finalApp: InstalledApp?
-diff --git a/AltStore/AppDelegate.swift b/AltStore/AppDelegate.swift
---- a/AltStore/AppDelegate.swift
-+++ b/AltStore/AppDelegate.swift
-@@ -381,2 +381,7 @@
-     {
-+        UIApplication.shared.setMinimumBackgroundFetchInterval(
-+            UserDefaults.standard.isBackgroundRefreshEnabled
-+                ? UIApplication.backgroundFetchIntervalMinimum
-+                : UIApplication.backgroundFetchIntervalNever
-+        )
-         UNUserNotificationCenter.current().requestAuthorization(options: [.alert, .badge, .sound]) { (success, error) in
+         
+         for pipelineStep in pipelineSteps {
+diff --git a/SideStore/Core/Operations/PipelineOperations/InstallAppOperation.swift b/SideStore/Core/Operations/PipelineOperations/InstallAppOperation.swift
+index cf721ec..7438d62 100644
+--- a/SideStore/Core/Operations/PipelineOperations/InstallAppOperation.swift
++++ b/SideStore/Core/Operations/PipelineOperations/InstallAppOperation.swift
+@@ -153,8 +153,7 @@ final class InstallAppOperation: BasePipelineOperation<InstallAppOperationContex
+                                    installedApp.storeApp?.bundleIdentifier.range(of: Bundle.Info.appbundleIdentifier) != nil
+             if isSelfReinstall {
+                 if let _ = provisioningProfiles[self.context.targetBundleIdentifier],
+-                   let appGroup = Bundle.main.altstoreAppGroup,
+-                   let containerURL = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: appGroup) 
++                   let containerURL = FileManager.default.altstoreSharedDirectory
+                 {
+                     let jsonURL = containerURL.appendingPathComponent("StagedSelfReinstall.json")
+                     
+diff --git a/SideStore/DeepLinks/URLHandler.swift b/SideStore/DeepLinks/URLHandler.swift
+index a21e245..7635842 100644
+--- a/SideStore/DeepLinks/URLHandler.swift
++++ b/SideStore/DeepLinks/URLHandler.swift
+@@ -16,6 +16,8 @@ class URLHandler {
+     @discardableResult
+     func handle(_ url: URL) -> Bool {
+         debugLog("[URLHandler] handle(_:) called with URL: \(url.absoluteString)")
++        if SideKickShareLink.handle(url) { return true }
++        if SideKickIncomingIPA.handle(url) { return true }
+         if url.isFileURL {
+             return FileImportHandler.shared.handle(fileURL: url)
+         }
+@@ -87,7 +89,7 @@ class URLHandler {
+             guard let callbackTemplate = queryItems["callback_template"]?.removingPercentEncoding else { return false }
+             
+             Task {
+-                ExportCertificateDialog.present(callbackTemplate: callbackTemplate)
++                SideKickCertificateExport.present(callbackTemplate: callbackTemplate)
+             }
+             return true
+             

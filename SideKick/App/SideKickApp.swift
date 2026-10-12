@@ -2,6 +2,8 @@ import SwiftUI
 import UIKit
 import UserNotifications
 
+// Dormant standalone bootstrap: the integrated product excludes this file.
+// Its active root and scene lifecycle are installed by the SideStore integration patch.
 @main
 struct SideKickApp: App {
     @State private var environment = AppEnvironment()

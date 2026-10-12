@@ -1,9 +1,23 @@
 import Foundation
 
 enum SideKickDataDirectory {
-    // Resolve once before Core Data opens. Signing entitlements must never select
-    // a different database during the lifetime of the app.
-    static let url: URL? = {
+    // Cache only a successful preparation. Core Data resolves its default store
+    // URL when DatabaseManager is created, so failures must remain retryable
+    // before that singleton is first touched.
+    private final class PreparationState: @unchecked Sendable {
+        let lock = NSRecursiveLock()
+        var cachedURL: URL?
+    }
+
+    private static let state = PreparationState()
+
+    static var url: URL? { try? prepare() }
+
+    static func prepare() throws -> URL {
+        state.lock.lock()
+        defer { state.lock.unlock() }
+        if let cachedURL = state.cachedURL { return cachedURL }
+
         let manager = FileManager.default
         let support = manager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let destination = support.appendingPathComponent("SideKick", isDirectory: true)
@@ -46,10 +60,21 @@ enum SideKickDataDirectory {
                     debugLog("[SideKick] Migrated legacy App Group data to stable private storage.")
                 }
             }
+            state.cachedURL = destination
             return destination
         } catch {
             debugLog("[SideKick] Could not prepare private storage: \(error.localizedDescription)")
-            return nil
+            throw error
         }
-    }()
+    }
+
+    static func prepareBeforeDatabaseStart() throws {
+        state.lock.lock()
+        defer { state.lock.unlock() }
+        _ = try prepare()
+        if UserDefaults.standard.recreateDatabaseOnNextStart {
+            UserDefaults.standard.recreateDatabaseOnNextStart = false
+            DatabaseManager.recreateDatabase()
+        }
+    }
 }

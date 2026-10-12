@@ -23,29 +23,93 @@ struct SideKickStorageUsage: Sendable {
         let cache = InstalledApp.appsDirectoryURL
         return await Task.detached(priority: .utility) {
             let manager = FileManager.default
-            let documents = manager.urls(for: .documentDirectory, in: .userDomainMask)[0]
-            let library = manager.urls(for: .libraryDirectory, in: .userDomainMask)[0]
-            let support = manager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
-            let temporary = manager.temporaryDirectory
-            let directories = [
-                StorageDirectoryUsage(name: "Documents", url: documents, bytes: size(of: documents)),
-                StorageDirectoryUsage(name: "Library", url: library, bytes: size(of: library)),
-                StorageDirectoryUsage(name: "Temporary Files", url: temporary, bytes: size(of: temporary))
+            let documentsURL = manager.urls(for: .documentDirectory, in: .userDomainMask)[0]
+            let libraryURL = manager.urls(for: .libraryDirectory, in: .userDomainMask)[0]
+            let supportURL = manager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
+            let temporaryURL = manager.temporaryDirectory
+            let container = URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true).standardizedFileURL
+            let documents = documentsURL.standardizedFileURL
+            let library = libraryURL.standardizedFileURL
+            let support = supportURL.standardizedFileURL
+            let temporary = temporaryURL.standardizedFileURL
+            let cache = cache.standardizedFileURL
+            let exports = documents.appendingPathComponent("ResignedApps", isDirectory: true)
+            let imports = support.appendingPathComponent("ImportedIPAs", isDirectory: true)
+            var result = SideKickStorageUsage()
+            var documentBytes: Int64 = 0
+            var libraryBytes: Int64 = 0
+            var temporaryBytes: Int64 = 0
+            var containerBytes: Int64 = 0
+
+            func isWithin(_ path: URL, _ root: URL) -> Bool {
+                let path = path.standardizedFileURL.path
+                let root = root.standardizedFileURL.path
+                return path == root || path.hasPrefix(root.hasSuffix("/") ? root : root + "/")
+            }
+
+            func add(_ bytes: Int64, at file: URL, relativeTo root: URL) {
+                guard isWithin(file, root) else { return }
+                if root == container { containerBytes += bytes }
+                if root == documents { documentBytes += bytes }
+                if root == library { libraryBytes += bytes }
+                if root == temporary { temporaryBytes += bytes }
+                if root == cache { result.signingCache += bytes }
+                if root == exports { result.exportedIPAs += bytes }
+                if root == imports { result.importedIPAs += bytes }
+            }
+
+            func accumulate(_ root: URL) {
+                let keys: Set<URLResourceKey> = [.isRegularFileKey, .isSymbolicLinkKey,
+                    .fileSizeKey, .totalFileAllocatedSizeKey, .fileAllocatedSizeKey]
+                guard let enumerator = manager.enumerator(at: root, includingPropertiesForKeys: Array(keys), options: []) else { return }
+                for case let file as URL in enumerator {
+                    guard let values = try? file.resourceValues(forKeys: keys), values.isSymbolicLink != true else {
+                        enumerator.skipDescendants()
+                        continue
+                    }
+                    guard values.isRegularFile == true else { continue }
+                    let bytes = Int64(values.totalFileAllocatedSize ?? values.fileAllocatedSize ?? values.fileSize ?? 0)
+                    add(bytes, at: file, relativeTo: container)
+                    add(bytes, at: file, relativeTo: documents)
+                    add(bytes, at: file, relativeTo: library)
+                    add(bytes, at: file, relativeTo: temporary)
+                    add(bytes, at: file, relativeTo: cache)
+                    add(bytes, at: file, relativeTo: exports)
+                    add(bytes, at: file, relativeTo: imports)
+                }
+            }
+
+            accumulate(container)
+            result.temporaryFiles = temporaryBytes
+            result.totalContainer = containerBytes
+            result.directories = [
+                StorageDirectoryUsage(name: "Documents", url: documents, bytes: documentBytes),
+                StorageDirectoryUsage(name: "Library", url: library, bytes: libraryBytes),
+                StorageDirectoryUsage(name: "Temporary Files", url: temporary, bytes: temporaryBytes)
             ]
-            var result = SideKickStorageUsage(signingCache: size(of: cache),
-                temporaryFiles: size(of: temporary),
-                exportedIPAs: size(of: documents.appendingPathComponent("ResignedApps")),
-                importedIPAs: size(of: support.appendingPathComponent("ImportedIPAs")),
-                totalContainer: size(of: URL(fileURLWithPath: NSHomeDirectory(), isDirectory: true)),
-                directories: directories)
             // Legacy App Group copies live outside the private app container.
             if let group = Bundle.main.altstoreAppGroup,
                let shared = manager.containerURL(forSecurityApplicationGroupIdentifier: group),
-               !shared.standardizedFileURL.path.hasPrefix(NSHomeDirectory() + "/") {
-                let bytes = size(of: shared)
-                if bytes > 0 {
-                    result.directories.append(StorageDirectoryUsage(name: "Shared App Group", url: shared, bytes: bytes))
-                    result.totalContainer += bytes
+               !isWithin(shared, container) {
+                var sharedBytes: Int64 = 0
+                let shared = shared.standardizedFileURL
+                let keys: Set<URLResourceKey> = [.isRegularFileKey, .isSymbolicLinkKey,
+                    .fileSizeKey, .totalFileAllocatedSizeKey, .fileAllocatedSizeKey]
+                if let enumerator = manager.enumerator(at: shared, includingPropertiesForKeys: Array(keys), options: []) {
+                    for case let file as URL in enumerator {
+                        guard let values = try? file.resourceValues(forKeys: keys), values.isSymbolicLink != true else {
+                            enumerator.skipDescendants()
+                            continue
+                        }
+                        guard values.isRegularFile == true else { continue }
+                        let bytes = Int64(values.totalFileAllocatedSize ?? values.fileAllocatedSize ?? values.fileSize ?? 0)
+                        sharedBytes += bytes
+                        if isWithin(file, cache) { result.signingCache += bytes }
+                    }
+                }
+                if sharedBytes > 0 {
+                    result.directories.append(StorageDirectoryUsage(name: "Shared App Group", url: shared, bytes: sharedBytes))
+                    result.totalContainer += sharedBytes
                 }
             }
             return result

@@ -32,7 +32,7 @@ actor GitHubUpdateService {
             GitHubImportChoice(candidate: GitHubUpdateCandidate(bundleIdentifier: "", appName: build.title,
                 currentVersion: "", newVersion: build.version, title: build.title, assetName: build.assetName,
                 downloadURL: build.downloadURL, updateKey: build.key, source: source,
-                repositoryURL: GitHubSourceIdentity.repository(repositoryURL)), workflow: workflow, branch: branch, date: build.date)
+                repositoryURL: GitHubSourceIdentity.repository(repositoryURL), buildDate: build.date), workflow: workflow, branch: branch, date: build.date)
         }, hasMore: result.hasMore)
     }
 
@@ -54,29 +54,12 @@ actor GitHubUpdateService {
         return result
     }
 
-    func candidate(for target: GitHubUpdateTarget, configuration: GitHubUpdateConfiguration, token: String? = nil) async throws -> GitHubUpdateCandidate? {
-        try await check(for: target, configuration: configuration, token: token).candidate
-    }
-
     func history(for configuration: GitHubUpdateConfiguration, token: String? = nil, page: Int = 1) async throws -> [GitHubUpdateHistoryEntry] {
         try await historyClient.page(configuration: configuration, token: token, page: page).builds.map(\.historyEntry)
     }
 
     func buildHistory(for configuration: GitHubUpdateConfiguration, token: String? = nil, page: Int = 1) async throws -> GitHubHistoryPage {
         try await historyClient.page(configuration: configuration, token: token, page: page, allowMultiple: true)
-    }
-
-    private func legacyReleaseKey(for currentKey: String) -> String? {
-        let parts = currentKey.split(separator: ":", omittingEmptySubsequences: false)
-        guard parts.count == 4, parts[0] == "release" else { return nil }
-        return "release:\(parts[2]):\(parts[3])"
-    }
-
-    private func parseGitHubDate(_ value: String?) -> Date? {
-        guard let value else { return nil }
-        let formatter = ISO8601DateFormatter()
-        formatter.formatOptions = [.withInternetDateTime, .withFractionalSeconds]
-        return formatter.date(from: value) ?? ISO8601DateFormatter().date(from: value)
     }
 
     func validateToken(_ token: String) async throws -> String {
@@ -102,53 +85,39 @@ actor GitHubUpdateService {
         request.setValue("SideKick iOS app", forHTTPHeaderField: "User-Agent")
         if let usableToken, !usableToken.isEmpty { request.setValue("Bearer \(usableToken)", forHTTPHeaderField: "Authorization") }
         let (downloadURL, response) = try await ProgressFileDownload(onProgress: onProgress).download(request)
-        guard let response = response as? HTTPURLResponse else {
-            try? FileManager.default.removeItem(at: downloadURL)
-            throw GitHubUpdateError.downloadFailed
-        }
-        guard (200..<300).contains(response.statusCode) else {
-            try? FileManager.default.removeItem(at: downloadURL)
-            throw error(for: response)
-        }
+        var keepDownload = false
+        defer { if !keepDownload { try? FileManager.default.removeItem(at: downloadURL) } }
+        guard let response = response as? HTTPURLResponse else { throw GitHubUpdateError.downloadFailed }
+        guard (200..<300).contains(response.statusCode) else { throw error(for: response) }
         if candidate.source == .latestRelease {
+            keepDownload = true
             return downloadURL
         }
 
-        defer { try? FileManager.default.removeItem(at: downloadURL) }
         let archive: Archive
         do { archive = try Archive(url: downloadURL, accessMode: .read) }
-        catch {
-            try? FileManager.default.removeItem(at: downloadURL)
-            throw GitHubUpdateError.invalidArtifact
-        }
+        catch { throw GitHubUpdateError.invalidArtifact }
         let ipaEntries = archive.filter { $0.path.lowercased().hasSuffix(".ipa") }
         guard ipaEntries.count <= 1 else {
-            try? FileManager.default.removeItem(at: downloadURL)
             throw GitHubUpdateError.multipleIPAsInArtifact
         }
         guard let ipaEntry = ipaEntries.first else {
-            try? FileManager.default.removeItem(at: downloadURL)
             throw GitHubUpdateError.noIPAInArtifact
         }
         let output = FileManager.default.temporaryDirectory
             .appendingPathComponent("sidekick-github-\(ProcessInfo.processInfo.processIdentifier)-\(UUID().uuidString)")
             .appendingPathExtension("ipa")
+        var keepOutput = false
+        defer { if !keepOutput { try? FileManager.default.removeItem(at: output) } }
         FileManager.default.createFile(atPath: output.path, contents: nil)
-        let handle: FileHandle
-        do { handle = try FileHandle(forWritingTo: output) }
-        catch {
-            try? FileManager.default.removeItem(at: output)
-            throw error
-        }
+        let handle = try FileHandle(forWritingTo: output)
         do {
             _ = try archive.extract(ipaEntry) { chunk in try handle.write(contentsOf: chunk) }
             try handle.close()
-            try FileManager.default.removeItem(at: downloadURL)
+            keepOutput = true
             return output
         } catch {
             try? handle.close()
-            try? FileManager.default.removeItem(at: output)
-            try? FileManager.default.removeItem(at: downloadURL)
             throw GitHubUpdateError.invalidArtifact
         }
     }

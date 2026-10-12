@@ -7,6 +7,12 @@ extension Notification.Name {
 
 actor IPAImportStore {
     static let shared = IPAImportStore()
+    private struct ExecutableMetadataExtractionStop: Error {}
+    private static let maximumInfoPlistSize = 1 * 1024 * 1024
+    private static let maximumIconSize = 4 * 1024 * 1024
+    // LC_UUID is in the Mach-O header/load-command region. This cap bounds
+    // retained executable bytes even for malformed binaries with huge commands.
+    private static let maximumExecutableMetadataSize = 16 * 1024 * 1024
     private let fileManager: FileManager
     private let directory: URL
     private let indexURL: URL
@@ -285,19 +291,12 @@ actor IPAImportStore {
                 guard fileManager.isReadableFile(atPath: retainedURL.path) else {
                     throw IPAImportError.sourceFileMissing
                 }
-                let temporaryURL = temporaryIPAURL()
-                do {
-                    try fileManager.copyItem(at: retainedURL, to: temporaryURL)
-                    try Task.checkCancellation()
-                    let copiedMetadata = try readMetadata(from: temporaryURL)
-                    guard metadataMatches(copiedMetadata, reviewed: app) else { throw IPAImportError.sourceChanged }
-                    return temporaryURL
-                } catch {
-                    try? fileManager.removeItem(at: temporaryURL)
-                    if error is IPAImportError { throw error }
-                    if error is CancellationError { throw error }
-                    throw IPAImportError.sourceFileMissing
-                }
+                return try makeValidatedTemporaryCopy(
+                    of: retainedURL,
+                    reviewed: app,
+                    checkCancellationAfterCopy: true,
+                    translateUnexpectedErrors: true
+                )
             }
             let metadata = try readMetadata(from: downloadURL)
             guard metadataMatches(metadata, reviewed: app) else { throw IPAImportError.sourceChanged }
@@ -334,40 +333,19 @@ actor IPAImportStore {
                 throw error
             }
 
-            let temporaryURL = temporaryIPAURL()
-            do {
-                try Task.checkCancellation()
-                try fileManager.copyItem(at: managedURL, to: temporaryURL)
-                try Task.checkCancellation()
-                let copiedMetadata = try readMetadata(from: temporaryURL)
-                guard metadataMatches(copiedMetadata, reviewed: app) else { throw IPAImportError.sourceChanged }
-                return temporaryURL
-            } catch {
-                try? fileManager.removeItem(at: temporaryURL)
-                if error is IPAImportError { throw error }
-                if error is CancellationError { throw error }
-                throw IPAImportError.sourceFileMissing
-            }
+            return try makeValidatedTemporaryCopy(
+                of: managedURL,
+                reviewed: app,
+                checkCancellationBeforeCopy: true,
+                checkCancellationAfterCopy: true,
+                translateUnexpectedErrors: true
+            )
         } else {
             throw IPAImportError.sourceFileMissing
         }
         defer { if securityScoped { sourceURL.stopAccessingSecurityScopedResource() } }
         guard fileManager.isReadableFile(atPath: sourceURL.path) else { throw IPAImportError.sourceFileMissing }
-        let temporaryURL = temporaryIPAURL()
-        do {
-            try fileManager.copyItem(at: sourceURL, to: temporaryURL)
-        } catch {
-            try? fileManager.removeItem(at: temporaryURL)
-            throw IPAImportError.sourceFileMissing
-        }
-        do {
-            let copiedMetadata = try readMetadata(from: temporaryURL)
-            guard metadataMatches(copiedMetadata, reviewed: app) else { throw IPAImportError.sourceChanged }
-            return temporaryURL
-        } catch {
-            try? fileManager.removeItem(at: temporaryURL)
-            throw error
-        }
+        return try makeValidatedTemporaryCopy(of: sourceURL, reviewed: app)
     }
 
     func delete(_ app: ImportedIPA) throws {
@@ -380,6 +358,13 @@ actor IPAImportStore {
         }
         discardPreparedIPA(app)
         NotificationCenter.default.post(name: .sideKickImportedIPAsDidChange, object: nil)
+    }
+
+    /// Deletes SideKick-managed queued IPAs for one LiveContainer guest target.
+    /// The target ID is the stable LiveContainer guest ID, not the app bundle ID.
+    func deleteQueuedUpdates(forGuestTargetID targetID: String) throws {
+        let queued = try importedApps().filter { $0.queuedForInstalledAppID == targetID }
+        for app in queued { try delete(app) }
     }
 
     func discardPreparedIPA(_ app: ImportedIPA) {
@@ -427,9 +412,18 @@ actor IPAImportStore {
             throw IPAImportError.missingAppBundle
         }
 
+        guard entry.uncompressedSize >= 0,
+              entry.uncompressedSize <= Int64(Self.maximumInfoPlistSize) else {
+            throw IPAImportError.invalidArchive
+        }
         var plistData = Data()
         do {
-            _ = try archive.extract(entry) { chunk in plistData.append(chunk) }
+            _ = try archive.extract(entry) { chunk in
+                guard chunk.count <= Self.maximumInfoPlistSize - plistData.count else {
+                    throw IPAImportError.invalidArchive
+                }
+                plistData.append(chunk)
+            }
         } catch {
             throw IPAImportError.invalidArchive
         }
@@ -465,18 +459,62 @@ actor IPAImportStore {
             }.first
         }.first
         var iconData: Data?
-        if let iconEntry {
+        if let iconEntry, iconEntry.uncompressedSize >= 0,
+           iconEntry.uncompressedSize <= Int64(Self.maximumIconSize) {
             var data = Data()
-            try? archive.extract(iconEntry) { data.append($0) }
-            iconData = data.isEmpty ? nil : data
+            do {
+                try archive.extract(iconEntry) { chunk in
+                    guard chunk.count <= Self.maximumIconSize - data.count else {
+                        throw IPAImportError.invalidArchive
+                    }
+                    data.append(chunk)
+                }
+                iconData = data.isEmpty ? nil : data
+            } catch {
+                iconData = nil
+            }
         }
         var executableIdentity: String?
         if let executable = plist["CFBundleExecutable"] as? String,
            !executable.contains("/"), !executable.contains("\\"),
            let binary = archive.first(where: { $0.path == String(entry.path.dropLast("Info.plist".count)) + executable }) {
             var data = Data()
-            _ = try archive.extract(binary) { data.append($0) }
-            executableIdentity = GitHubExecutableIdentity.read(data)
+            do {
+                _ = try archive.extract(binary) { chunk in
+                    var chunkOffset = 0
+                    while chunkOffset < chunk.count {
+                        if data.count < 32 {
+                            let end = min(chunk.count, chunkOffset + 32 - data.count)
+                            data.append(chunk[chunkOffset..<end])
+                            chunkOffset = end
+                            guard data.count == 32 else { continue }
+                        }
+
+                        guard let metadataSize = GitHubExecutableIdentity.metadataRegionSize(
+                            data,
+                            maximumSize: Self.maximumExecutableMetadataSize
+                        ) else {
+                            throw ExecutableMetadataExtractionStop()
+                        }
+                        let end = min(chunk.count, chunkOffset + metadataSize - data.count)
+                        data.append(chunk[chunkOffset..<end])
+                        chunkOffset = end
+                        guard data.count == metadataSize else { continue }
+
+                        executableIdentity = GitHubExecutableIdentity.read(data)
+                        data.removeAll(keepingCapacity: false)
+                        throw ExecutableMetadataExtractionStop()
+                    }
+                }
+            } catch is ExecutableMetadataExtractionStop {
+                // Stop ZIP extraction once the Mach-O load-command region is read.
+            } catch {
+                executableIdentity = nil
+                data.removeAll(keepingCapacity: false)
+            }
+            if executableIdentity == nil {
+                executableIdentity = GitHubExecutableIdentity.read(data)
+            }
         }
         return (bundleIdentifier, name, version, iconData, plist["CFBundleVersion"] as? String, executableIdentity)
     }
@@ -501,6 +539,43 @@ actor IPAImportStore {
         fileManager.temporaryDirectory.appendingPathComponent(
             "sidekick-import-\(ProcessInfo.processInfo.processIdentifier)-\(UUID().uuidString).ipa"
         )
+    }
+
+    private func makeValidatedTemporaryCopy(
+        of sourceURL: URL,
+        reviewed app: ImportedIPA,
+        checkCancellationBeforeCopy: Bool = false,
+        checkCancellationAfterCopy: Bool = false,
+        translateUnexpectedErrors: Bool = false
+    ) throws -> URL {
+        let temporaryURL = temporaryIPAURL()
+        var keepTemporary = false
+        defer {
+            if !keepTemporary { try? fileManager.removeItem(at: temporaryURL) }
+        }
+
+        do {
+            if checkCancellationBeforeCopy { try Task.checkCancellation() }
+            try fileManager.copyItem(at: sourceURL, to: temporaryURL)
+            if checkCancellationAfterCopy { try Task.checkCancellation() }
+        } catch {
+            if error is CancellationError { throw error }
+            throw IPAImportError.sourceFileMissing
+        }
+
+        do {
+            let copiedMetadata = try readMetadata(from: temporaryURL)
+            guard metadataMatches(copiedMetadata, reviewed: app) else { throw IPAImportError.sourceChanged }
+        } catch {
+            if translateUnexpectedErrors,
+               !(error is IPAImportError), !(error is CancellationError) {
+                throw IPAImportError.sourceFileMissing
+            }
+            throw error
+        }
+
+        keepTemporary = true
+        return temporaryURL
     }
 
     private func metadataMatches(

@@ -1,33 +1,13 @@
 import Foundation
 
 struct GitHubUpdateTarget: Sendable {
-    enum Kind: String, Sendable { case installed, liveContainer }
+    enum Kind: String, Codable, Hashable, Sendable { case installed, liveContainer }
     let id: String
     let name: String
     let version: String
     var kind: Kind = .installed
     var observation: String? = nil
     var legacyObservation: String? = nil
-}
-
-enum GitHubBuildComparison {
-    static func isNewer(_ key: String, than baseline: String, historyKeys: [String]) -> Bool {
-        guard key != baseline else { return false }
-        if let index = historyKeys.firstIndex(where: { $0 == baseline || legacyReleaseKey($0) == baseline }) {
-            return historyKeys.first == key && index > 0
-        }
-        let previous = baseline.split(separator: ":")
-        let latest = key.split(separator: ":")
-        guard previous.count >= 3, latest.count >= 3, previous[0] == latest[0],
-              let previousID = Int64(previous[1]), let latestID = Int64(latest[1]) else { return false }
-        return latestID > previousID
-    }
-
-    static func legacyReleaseKey(_ key: String) -> String? {
-        let parts = key.split(separator: ":", omittingEmptySubsequences: false)
-        guard parts.count == 4, parts[0] == "release" else { return nil }
-        return "release:\(parts[2]):\(parts[3])"
-    }
 }
 
 enum GitHubUpdateSource: String, Codable, CaseIterable, Identifiable, Sendable {
@@ -49,6 +29,8 @@ struct GitHubUpdateConfiguration: Codable, Identifiable, Hashable, Sendable {
     var baselineUpdateKey: String? = nil
     var lastInstalledUpdateKey: String?
     var dismissedUpdateKey: String? = nil
+    var dismissedUpdateTitle: String? = nil
+    var dismissedUpdateDate: Date? = nil
     var tokenID: String? = nil
     var installedBuild: GitHubInstalledBuild? = nil
     var pendingSelfUpdate: GitHubPendingSelfUpdate? = nil
@@ -68,7 +50,7 @@ struct GitHubUpdateConfiguration: Codable, Identifiable, Hashable, Sendable {
         // Reinstalling the same build refreshes its evidence without undoing a
         // decision to skip a different, newer build.
         if effectiveBaselineKey != key || (installedBuild != nil && installedBuild?.sourceIdentity != sourceIdentity) {
-            dismissedUpdateKey = nil
+            clearDismissedUpdate()
         }
         pendingSelfUpdate = nil
         installedBuild = GitHubInstalledBuild(key: key, sourceIdentity: sourceIdentity, observation: observation, confirmedAt: .now)
@@ -78,7 +60,7 @@ struct GitHubUpdateConfiguration: Codable, Identifiable, Hashable, Sendable {
 
     mutating func setInstalledBaseline(_ key: String?, observation: String? = nil) {
         pendingSelfUpdate = nil
-        if key != effectiveBaselineKey { lastInstalledUpdateKey = nil; dismissedUpdateKey = nil }
+        if key != effectiveBaselineKey { lastInstalledUpdateKey = nil; clearDismissedUpdate() }
         baselineUpdateKey = key
         if let key { confirmInstalled(key, observation: observation); lastInstalledUpdateKey = nil }
         else { installedBuild = nil; lastInstalledUpdateKey = nil }
@@ -86,6 +68,12 @@ struct GitHubUpdateConfiguration: Codable, Identifiable, Hashable, Sendable {
 
     func hasSameSource(as other: GitHubUpdateConfiguration) -> Bool {
         sourceIdentity == other.sourceIdentity
+    }
+
+    mutating func clearDismissedUpdate() {
+        dismissedUpdateKey = nil
+        dismissedUpdateTitle = nil
+        dismissedUpdateDate = nil
     }
 }
 
@@ -111,6 +99,7 @@ struct GitHubUpdateCandidate: Identifiable, Equatable, Sendable {
     var targetKind: GitHubUpdateTarget.Kind = .installed
     var sourceIdentity: String? = nil
     var isKnownNewer: Bool = true
+    var buildDate: Date? = nil
 
     var id: String { "\(bundleIdentifier):\(updateKey)" }
 }

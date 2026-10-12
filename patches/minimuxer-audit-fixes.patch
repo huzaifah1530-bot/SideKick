@@ -1,0 +1,2427 @@
+diff --git a/Common/FFIDispatcher.swift b/Common/FFIDispatcher.swift
+index d6c03c2..5d92031 100644
+--- a/Common/FFIDispatcher.swift
++++ b/Common/FFIDispatcher.swift
+@@ -40,3 +40,23 @@ public func matchingPriority<T: Sendable>(
+         try await body()
+     }.value
+ }
++
++/// Serializes ownership of native gateway handles while allowing synchronous
++/// callbacks already running on the executor to re-enter safely.
++public final class NativeOperationExecutor: @unchecked Sendable {
++    public let queue: DispatchQueue
++    private let key = DispatchSpecificKey<UUID>()
++    private let identity = UUID()
++
++    public init(label: String) {
++        queue = DispatchQueue(label: label)
++        queue.setSpecific(key: key, value: identity)
++    }
++
++    public func sync<T>(_ body: () throws -> T) rethrows -> T {
++        if DispatchQueue.getSpecific(key: key) == identity {
++            return try body()
++        }
++        return try queue.sync(execute: body)
++    }
++}
+diff --git a/Common/TCPAcceptor.swift b/Common/TCPAcceptor.swift
+index 8d30238..f16710d 100644
+--- a/Common/TCPAcceptor.swift
++++ b/Common/TCPAcceptor.swift
+@@ -8,11 +8,49 @@
+ 
+ import Foundation
+ 
++public final class TCPAcceptorCancellation: @unchecked Sendable {
++    private let lock = NSLock()
++    private var cancelled = false
++    private var cancelHandler: (() -> Void)?
++
++    public init() {}
++
++    public var isCancelled: Bool {
++        lock.withLock { cancelled }
++    }
++
++    public func cancel() {
++        let handler = lock.withLock { () -> (() -> Void)? in
++            guard !cancelled else { return nil }
++            cancelled = true
++            return cancelHandler
++        }
++        handler?()
++    }
++
++    fileprivate func installCancelHandler(_ handler: @escaping () -> Void) {
++        let cancelImmediately = lock.withLock { () -> Bool in
++            guard !cancelled else { return true }
++            cancelHandler = handler
++            return false
++        }
++        if cancelImmediately { handler() }
++    }
++
++    fileprivate func clearCancelHandler() {
++        lock.withLock { cancelHandler = nil }
++    }
++}
++
+ public final class TCPAcceptor {
+-    private let serverFd: Int32
++    private let lock = NSLock()
++    private var serverFd: Int32?
++    private var acceptedClientFd: Int32?
++    private var cancelled = false
++    private let cancellation: TCPAcceptorCancellation?
+     public let port: UInt16
+ 
+-    public init(port: UInt16 = 0) throws {
++    public init(port: UInt16 = 0, cancellation: TCPAcceptorCancellation? = nil) throws {
+         let fd = socket(AF_INET, SOCK_STREAM, 0)
+         guard fd >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+ 
+@@ -51,16 +89,65 @@ public final class TCPAcceptor {
+         }
+ 
+         self.serverFd = fd
++        self.cancellation = cancellation
+         self.port = UInt16(bigEndian: addr.sin_port)
++
++        cancellation?.installCancelHandler { [weak self] in
++            self?.cancel()
++        }
+     }
+ 
+     public func accept() throws -> Int32 {
+-        let fd = Darwin.accept(serverFd, nil, nil)
+-        guard fd >= 0 else { throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO) }
+-        return fd
++        guard let listeningFd = lock.withLock({ cancelled ? nil : serverFd }) else {
++            throw CancellationError()
++        }
++
++        let clientFd = Darwin.accept(listeningFd, nil, nil)
++        guard clientFd >= 0 else {
++            if lock.withLock({ cancelled }) { throw CancellationError() }
++            throw POSIXError(POSIXErrorCode(rawValue: errno) ?? .EIO)
++        }
++
++        let shouldKeepClient = lock.withLock { () -> Bool in
++            guard !cancelled else { return false }
++            acceptedClientFd = clientFd
++            return true
++        }
++        guard shouldKeepClient else {
++            close(clientFd)
++            throw CancellationError()
++        }
++        return clientFd
++    }
++
++    public func closeAcceptedClient(_ clientFd: Int32) {
++        let ownsClient = lock.withLock { () -> Bool in
++            guard acceptedClientFd == clientFd else { return false }
++            acceptedClientFd = nil
++            return true
++        }
++        if ownsClient { close(clientFd) }
++    }
++
++    private func cancel() {
++        lock.withLock {
++            guard !cancelled else { return }
++            cancelled = true
++            if let listeningFd = serverFd {
++                _ = shutdown(listeningFd, SHUT_RDWR)
++                close(listeningFd)
++            }
++            serverFd = nil
++            // Keep the ownership lock through shutdown so closeAcceptedClient
++            // cannot close and allow this descriptor to be reused first.
++            if let clientFd = acceptedClientFd {
++                _ = shutdown(clientFd, SHUT_RDWR)
++            }
++        }
+     }
+ 
+     deinit {
+-        close(serverFd)
++        cancellation?.clearCancelHandler()
++        cancel()
+     }
+ }
+diff --git a/DeviceGateway/BaseDeviceGateway.swift b/DeviceGateway/BaseDeviceGateway.swift
+index 2501584..537616d 100644
+--- a/DeviceGateway/BaseDeviceGateway.swift
++++ b/DeviceGateway/BaseDeviceGateway.swift
+@@ -15,47 +15,73 @@ enum AbstractClassError: Error, Sendable {
+ }
+ 
+ open class BaseDeviceGateway: @unchecked Sendable {
+-    public package(set) var pairingFileType: PairingProtocol = .unknown
+-    public package(set) var pairingDataDict: [String: any Sendable]? = nil
++    package let nativeOperations: NativeOperationExecutor
++    private var storedPairingFileType: PairingProtocol = .unknown
++    private var storedPairingDataDict: [String: any Sendable]? = nil
++    private var storedPairingFileData: Data? = nil
++    private var storedDeviceEndpointIp: String? = nil
++    private var storedIsInitialized: Bool = false
++
++    public package(set) var pairingFileType: PairingProtocol {
++        get { nativeOperations.sync { storedPairingFileType } }
++        set { nativeOperations.sync { storedPairingFileType = newValue } }
++    }
+ 
+-    public package(set) var pairingFileData: Data? = nil {
+-        didSet {
+-            guard let pairingFileData else {
+-                self.pairingDataDict = nil
+-                return
++    public package(set) var pairingDataDict: [String: any Sendable]? {
++        get { nativeOperations.sync { storedPairingDataDict } }
++        set { nativeOperations.sync { storedPairingDataDict = newValue } }
++    }
++
++    public package(set) var pairingFileData: Data? {
++        get { nativeOperations.sync { storedPairingFileData } }
++        set {
++            nativeOperations.sync {
++                storedPairingFileData = newValue
++                guard let newValue else {
++                    storedPairingDataDict = nil
++                    return
++                }
++                storedPairingDataDict = try? PropertyListSerialization.propertyList(
++                    from: newValue,
++                    options: [],
++                    format: nil
++                ) as? [String: any Sendable]
+             }
+-            self.pairingDataDict = try? PropertyListSerialization.propertyList(
+-                from: pairingFileData,
+-                options: [],
+-                format: nil
+-            ) as? [String: any Sendable]
+         }
+     }
+ 
+-    public package(set) var deviceEndpointIp: String? = nil
+-    public package(set) var isInitialized: Bool = false
++    public package(set) var deviceEndpointIp: String? {
++        get { nativeOperations.sync { storedDeviceEndpointIp } }
++        set { nativeOperations.sync { storedDeviceEndpointIp = newValue } }
++    }
++
++    public package(set) var isInitialized: Bool {
++        get { nativeOperations.sync { storedIsInitialized } }
++        set { nativeOperations.sync { storedIsInitialized = newValue } }
++    }
+     private var protocolPorts: [PairingProtocol: UInt16] = [:]
+ 
+     public init() throws {
+         if Self.self === BaseDeviceGateway.self {
+             throw AbstractClassError.abstractInitializerInvoked
+         }
++        nativeOperations = NativeOperationExecutor(label: "DeviceGateway.native-operations.\(UUID().uuidString)")
+     }
+ 
+     public func setPairingFileData(_ data: Data?) {
+-        self.pairingFileData = data
++        nativeOperations.sync { self.pairingFileData = data }
+     }
+ 
+     public func setPairingFileType(_ type: PairingProtocol) {
+-        self.pairingFileType = type
++        nativeOperations.sync { self.pairingFileType = type }
+     }
+ 
+     public func setInitialized(_ initialized: Bool) {
+-        self.isInitialized = initialized
++        nativeOperations.sync { self.isInitialized = initialized }
+     }
+ 
+     public func getPort(for protocolType: PairingProtocol) -> UInt16 {
+-        protocolPorts[protocolType] ?? protocolType.defaultPort
++        nativeOperations.sync { protocolPorts[protocolType] ?? protocolType.defaultPort }
+     }
+ 
+     private var logTag: String {
+@@ -63,25 +89,31 @@ open class BaseDeviceGateway: @unchecked Sendable {
+     }
+ 
+     public func setPort(_ port: UInt16, for protocolType: PairingProtocol) {
+-        guard protocolPorts[protocolType] != port else { return }
+-        debugLog("[\(logTag)] setPort(\(port), for: .\(protocolType)) called")
+-        protocolPorts[protocolType] = port
+-        invalidateConnection()
++        nativeOperations.sync {
++            guard protocolPorts[protocolType] != port else { return }
++            debugLog("[\(logTag)] setPort(\(port), for: .\(protocolType)) called")
++            protocolPorts[protocolType] = port
++            invalidateConnection()
++        }
+     }
+ 
+     public func setDeviceEndpointIp(_ ip: String?) {
+-        debugLog("[\(logTag)] setDeviceEndpointIp(\(ip ?? "nil")) called")
+-        guard deviceEndpointIp != ip else {
+-            debugLog("[\(logTag)] setDeviceEndpointIp: IP is already \(ip ?? "nil"), skipping invalidation")
+-            return
++        nativeOperations.sync {
++            debugLog("[\(logTag)] setDeviceEndpointIp(\(ip ?? "nil")) called")
++            guard deviceEndpointIp != ip else {
++                debugLog("[\(logTag)] setDeviceEndpointIp: IP is already \(ip ?? "nil"), skipping invalidation")
++                return
++            }
++            deviceEndpointIp = ip
++            invalidateConnection()
+         }
+-        deviceEndpointIp = ip
+-        invalidateConnection()
+     }
+ 
+     open func setLogging(_ enabled: Bool) {
+-        DeviceGatewayLogging.setLogging(enabled)
+-        debugLog("[\(logTag)] setLogging(\(enabled)) called")
++        nativeOperations.sync {
++            DeviceGatewayLogging.setLogging(enabled)
++            debugLog("[\(logTag)] setLogging(\(enabled)) called")
++        }
+     }
+ 
+     open func invalidateConnection() {
+@@ -89,10 +121,12 @@ open class BaseDeviceGateway: @unchecked Sendable {
+     }
+ 
+     open func cleanup() {
+-        setInitialized(false)
+-        setPairingFileData(nil)
+-        setPairingFileType(.unknown)
+-        invalidateConnection()
++        nativeOperations.sync {
++            setInitialized(false)
++            setPairingFileData(nil)
++            setPairingFileType(.unknown)
++            invalidateConnection()
++        }
+     }
+ 
+     open func stop() async throws {
+diff --git a/DeviceGateway/DeviceGatewayAPI.swift b/DeviceGateway/DeviceGatewayAPI.swift
+index 0a581fb..e358d5d 100644
+--- a/DeviceGateway/DeviceGatewayAPI.swift
++++ b/DeviceGateway/DeviceGatewayAPI.swift
+@@ -63,6 +63,7 @@ public protocol DeviceGatewayAPI: AnyObject, Sendable {
+         hostName: String,
+         hostModel: String,
+         outPath: String,
++        cancellation: TCPAcceptorCancellation,
+         resolveFileName: (@Sendable (String, String) -> String)?,
+         onReady: @escaping @Sendable (String, UInt16, [String: String]) -> Void,
+         onPin: @escaping @Sendable (String) -> Void
+diff --git a/DeviceGateway/idevice/IdeviceGateway.swift b/DeviceGateway/idevice/IdeviceGateway.swift
+index e9310d0..5934e2a 100644
+--- a/DeviceGateway/idevice/IdeviceGateway.swift
++++ b/DeviceGateway/idevice/IdeviceGateway.swift
+@@ -85,19 +85,21 @@ public final class IdeviceGateway: BaseDeviceGateway, DeviceGatewayAPI, @uncheck
+     }
+ 
+     public override func cleanup() {
+-        debugLog("[IdeviceGateway] cleanup() called")
+-        if let pairingFile = self.pairingFile {
+-            verboseLog("[IdeviceGateway] cleanup() freeing pairingFile")
+-            if pairingFileType == .rppairing {
+-                rp_pairing_file_free(pairingFile)
+-            } else {
+-                idevice_pairing_file_free(pairingFile)
++        nativeOperations.sync {
++            debugLog("[IdeviceGateway] cleanup() called")
++            if let pairingFile = self.pairingFile {
++                verboseLog("[IdeviceGateway] cleanup() freeing pairingFile")
++                if pairingFileType == .rppairing {
++                    rp_pairing_file_free(pairingFile)
++                } else {
++                    idevice_pairing_file_free(pairingFile)
++                }
++                self.pairingFile = nil
+             }
+-            self.pairingFile = nil
+-        }
+ 
+-        lastError = nil
+-        super.cleanup()
++            lastError = nil
++            super.cleanup()
++        }
+     }
+ 
+     private func verifyInitialized() throws {
+@@ -108,34 +110,38 @@ public final class IdeviceGateway: BaseDeviceGateway, DeviceGatewayAPI, @uncheck
+     }
+ 
+     public override func invalidateConnection() {
+-        debugLog("[IdeviceGateway] invalidateConnection() called - clearing stale adapter and handshake")
+-        if let handshake = handshake {
+-            rsd_handshake_free(handshake)
+-            self.handshake = nil
+-        }
+-        if let adapter = adapter {
+-            adapter_free(adapter)
+-            self.adapter = nil
++        nativeOperations.sync {
++            debugLog("[IdeviceGateway] invalidateConnection() called - clearing stale adapter and handshake")
++            if let handshake = handshake {
++                rsd_handshake_free(handshake)
++                self.handshake = nil
++            }
++            if let adapter = adapter {
++                adapter_free(adapter)
++                self.adapter = nil
++            }
+         }
+     }
+ 
+     public override func stop() async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             self.cleanup()
+         }
+         try await super.stop()
+     }
+ 
+     public override func setLogging(_ enabled: Bool) {
+-        let lowerBoundLevel = IdeviceLogLevel(rawValue: 0)
+-        #if DEBUG
+-        let upperBoundLevel = IdeviceLogLevel(rawValue: 5)
+-        #else
+-        let upperBoundLevel = IdeviceLogLevel(rawValue: enabled ? 1 : 0)
+-        #endif
+-        // set actual logging
+-        idevice_init_logger(upperBoundLevel, lowerBoundLevel, nil)
+-        super.setLogging(enabled)
++        nativeOperations.sync {
++            let lowerBoundLevel = IdeviceLogLevel(rawValue: 0)
++            #if DEBUG
++            let upperBoundLevel = IdeviceLogLevel(rawValue: 5)
++            #else
++            let upperBoundLevel = IdeviceLogLevel(rawValue: enabled ? 1 : 0)
++            #endif
++            // set actual logging
++            idevice_init_logger(upperBoundLevel, lowerBoundLevel, nil)
++            super.setLogging(enabled)
++        }
+     }
+ 
+     private func syncStart(pairingFileContent: String, preferred: PairingProtocol?) throws {
+@@ -1289,6 +1295,7 @@ public final class IdeviceGateway: BaseDeviceGateway, DeviceGatewayAPI, @uncheck
+     private func syncDumpProfiles(docsPath: String) throws -> String {
+         debugLog("[IdeviceGateway] dumpProfiles() called, docsPath: \(docsPath)")
+         try verifyInitialized()
++        let dumpURL = try profileDumpDirectory(docsPath: docsPath)
+         return try performWithEitherService(
+             connectRP: misagent_connect_rsd,
+             connectLockdown: misagent_connect,
+@@ -1308,38 +1315,85 @@ public final class IdeviceGateway: BaseDeviceGateway, DeviceGatewayAPI, @uncheck
+                 throw IdeviceGatewayError(.serviceError, reason: "Failed to copy profiles from misagent, error: (\(msg))")
+             }
+ 
+-            let path = docsPath.hasPrefix("file://") ? String(docsPath.dropFirst(7)) : docsPath
+-            let dumpDir = path.hasSuffix("/Profiles") || path.hasSuffix("/Profiles/") ? path : "\(path)/Profiles"
+-            verboseLog("[IdeviceGateway] dumpProfiles() writing profiles to: \(dumpDir), count: \(outCount)")
+-            try? FileManager.default.createDirectory(atPath: dumpDir, withIntermediateDirectories: true)
++            guard outCount >= 0 else {
++                throw IdeviceGatewayError(.serviceError, reason: "misagent returned an invalid profile count: \(outCount)")
++            }
++            verboseLog("[IdeviceGateway] dumpProfiles() writing profiles to: \(dumpURL.path), count: \(outCount)")
++
++            if outCount > 0 && (outProfiles == nil || outProfilesLen == nil) {
++                throw IdeviceGatewayError(.serviceError, reason: "misagent returned profiles without both profile data buffers and lengths")
++            }
+ 
+-            if let outProfiles = outProfiles, let outProfilesLen = outProfilesLen, outCount > 0 {
++            if let outProfiles, let outProfilesLen {
++                defer { misagent_free_profiles(outProfiles, outProfilesLen, outCount) }
+                 let xmlPrefix = "<?xml version=".data(using: .utf8)!
+                 let xmlSuffix = "</plist>".data(using: .utf8)!
+ 
+                 for i in 0..<outCount {
+-                    guard let profPtr = outProfiles[i] else { continue }
++                    guard let profPtr = outProfiles[i] else {
++                        throw IdeviceGatewayError(.serviceError, reason: "misagent returned a missing profile at index \(i)")
++                    }
+                     let len = outProfilesLen[i]
++                    guard len > 0 else {
++                        throw IdeviceGatewayError(.serviceError, reason: "misagent returned an invalid profile length at index \(i): \(len)")
++                    }
+                     let profileData = Data(bytes: profPtr, count: len)
++                    var baseName = "Profile_\(i)"
++                    var plistBytesToWrite: Data? = nil
+ 
+-                    guard let prefixRange = profileData.range(of: xmlPrefix) else { continue }
+-                    guard let suffixRange = profileData.range(of: xmlSuffix, options: [], in: prefixRange.lowerBound..<profileData.count) else { continue }
+-
+-                    let plistBytes = profileData.subdata(in: prefixRange.lowerBound..<suffixRange.upperBound)
++                    if let prefixRange = profileData.range(of: xmlPrefix) {
++                        guard let suffixRange = profileData.range(of: xmlSuffix, options: [], in: prefixRange.lowerBound..<profileData.count) else {
++                            throw IdeviceGatewayError(.serviceError, reason: "Profile at index \(i) contains an unterminated property list")
++                        }
++                        let plistBytes = profileData.subdata(in: prefixRange.lowerBound..<suffixRange.upperBound)
++                        let profilePlist: [String: Any]
++                        do {
++                            guard let parsed = try PropertyListSerialization.propertyList(from: plistBytes, options: [], format: nil) as? [String: Any] else {
++                                throw IdeviceGatewayError(.serviceError, reason: "Profile at index \(i) did not contain a property list dictionary")
++                            }
++                            profilePlist = parsed
++                        } catch {
++                            throw IdeviceGatewayError(.serviceError, reason: "Failed to decode profile at index \(i): \(error.localizedDescription)")
++                        }
++                        if let uuid = profilePlist["UUID"] as? String, UUID(uuidString: uuid) != nil {
++                            baseName = uuid
++                        }
++                        plistBytesToWrite = plistBytes
++                    }
+ 
+-                    if let innerPlist = try? PropertyListSerialization.propertyList(from: plistBytes, options: [], format: nil) as? [String: Any],
+-                       let uuid = innerPlist["UUID"] as? String {
+-                        try? profileData.write(to: URL(fileURLWithPath: "\(dumpDir)/\(uuid).mobileprovision"))
+-                        try? plistBytes.write(to: URL(fileURLWithPath: "\(dumpDir)/\(uuid).plist"))
+-                    } else {
+-                        try? profileData.write(to: URL(fileURLWithPath: "\(dumpDir)/unknown_\(i).mobileprovision"))
++                    let profileURL = dumpURL.appendingPathComponent("\(baseName).mobileprovision")
++                    do {
++                        try profileData.write(to: profileURL, options: .atomic)
++                        if let plistBytesToWrite {
++                            try plistBytesToWrite.write(to: dumpURL.appendingPathComponent("\(baseName).plist"), options: .atomic)
++                        }
++                    } catch {
++                        throw IdeviceGatewayError(.serviceError, reason: "Failed to write profile files for index \(i) in \(dumpURL.path): \(error.localizedDescription)")
+                     }
+                 }
+-                misagent_free_profiles(outProfiles, outProfilesLen, outCount)
+             }
+             debugLog("[IdeviceGateway] dumpProfiles() complete")
+-            return dumpDir
++            return dumpURL.path
++        }
++    }
++
++    private func profileDumpDirectory(docsPath: String) throws -> URL {
++        let requestedURL: URL
++        if docsPath.hasPrefix("file://"), let fileURL = URL(string: docsPath), fileURL.isFileURL {
++            requestedURL = fileURL
++        } else {
++            requestedURL = URL(fileURLWithPath: docsPath)
++        }
++        let baseURL = requestedURL.standardizedFileURL
++        let dumpURL = baseURL.lastPathComponent == "Profiles"
++            ? baseURL
++            : baseURL.appendingPathComponent("Profiles", isDirectory: true)
++        do {
++            try FileManager.default.createDirectory(at: dumpURL, withIntermediateDirectories: true)
++        } catch {
++            throw IdeviceGatewayError(.serviceError, reason: "Failed to create profile dump directory \(dumpURL.path): \(error.localizedDescription)")
+         }
++        return dumpURL
+     }
+ 
+     private func syncPerformHeartbeat(interval: UInt64, newInterval: UnsafeMutablePointer<UInt64>) throws {
+@@ -1840,11 +1894,13 @@ public final class IdeviceGateway: BaseDeviceGateway, DeviceGatewayAPI, @uncheck
+         hostName: String,
+         hostModel: String,
+         outPath: String,
++        cancellation: TCPAcceptorCancellation,
+         resolveFileName: ((String, String) -> String)?,
+         onReady: @escaping (String, UInt16, [String: String]) -> Void,
+         onPin: @escaping (String) -> Void
+     ) throws -> PairedDeviceRecord {
+         debugLog("[IdeviceGateway] startWirelessPair() called, hostName: \(hostName), hostModel: \(hostModel), outPath: \(outPath)")
++        guard !cancellation.isCancelled else { throw CancellationError() }
+ 
+         var handle: OpaquePointer? = nil
+         var serviceIdC: UnsafeMutablePointer<CChar>? = nil
+@@ -1888,13 +1944,14 @@ public final class IdeviceGateway: BaseDeviceGateway, DeviceGatewayAPI, @uncheck
+             }
+         }
+ 
+-        let acceptor = try TCPAcceptor()
++        let acceptor = try TCPAcceptor(cancellation: cancellation)
++        guard !cancellation.isCancelled else { throw CancellationError() }
+         verboseLog("[IdeviceGateway] startWirelessPair() bound listening socket on port \(acceptor.port), invoking onReady")
+         onReady(identifier, acceptor.port, txtRecords)
+ 
+         verboseLog("[IdeviceGateway] startWirelessPair() waiting for incoming connection via accept()...")
+         let clientFd = try acceptor.accept()
+-        defer { close(clientFd) }
++        defer { acceptor.closeAcceptedClient(clientFd) }
+ 
+         verboseLog("[IdeviceGateway] startWirelessPair() client connected on fd: \(clientFd), starting handshake via pairable_host_accept_fd...")
+ 
+@@ -2252,7 +2309,7 @@ public final class IdeviceGateway: BaseDeviceGateway, DeviceGatewayAPI, @uncheck
+         return try afcGetFileInfo(client: client, path: path)
+     }
+ 
+-        private func afcRemovePathRecursive(client: OpaquePointer, path: String) throws {
++    private func afcRemovePathRecursive(client: OpaquePointer, path: String) throws {
+         let (isDirectory, _) = try afcGetFileInfo(client: client, path: path)
+         if isDirectory {
+             let contents = try afcListDirectory(client: client, path: path)
+@@ -2267,8 +2324,10 @@ public final class IdeviceGateway: BaseDeviceGateway, DeviceGatewayAPI, @uncheck
+             afc_remove_path(client, pathPtr)
+         }
+         if let err = err {
+-            verboseLog("[IdeviceGateway] afcRemovePathRecursive() afc_remove_path failed for: \(path)")
++            let message = getErrorMessage(from: err)
++            debugLog("[IdeviceGateway] afcRemovePathRecursive() afc_remove_path failed for: \(path), error: (\(message))")
+             defer { safeFreeError(err) }
++            throw IdeviceGatewayError(.serviceError, reason: "Failed to remove container path: \(path), error: (\(message))")
+         }
+     }
+ 
+@@ -2294,85 +2353,85 @@ public final class IdeviceGateway: BaseDeviceGateway, DeviceGatewayAPI, @uncheck
+ // Async FFI Dispatcher Extensions
+ extension IdeviceGateway {
+     public func start(pairingFileContent: String, preferred: PairingProtocol?) async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncStart(pairingFileContent: pairingFileContent, preferred: preferred)
+         }
+     }
+ 
+     public func fetchUDID() async throws -> String {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncFetchUDID()
+         }
+     }
+ 
+     public func getLockdownValue(key: String) async throws -> String {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncGetLockdownValue(key: key)
+         }
+     }
+ 
+     public func installProvisioningProfile(profile: Data) async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncInstallProvisioningProfile(profile: profile)
+         }
+     }
+ 
+     public func removeProvisioningProfile(id: String) async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncRemoveProvisioningProfile(id: id)
+         }
+     }
+ 
+     public func removeApp(bundleId: String) async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncRemoveApp(bundleId: bundleId)
+         }
+     }
+ 
+     public func sendIpaAfc(bundleId: String, ipaBytes: Data) async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncsendIpaAfc(bundleId: bundleId, ipaBytes: ipaBytes)
+         }
+     }
+ 
+     public func sendAppBundleAfc(bundleId: String, appURL: URL) async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncsendAppBundleAfc(bundleId: bundleId, appURL: appURL)
+         }
+     }
+ 
+     public func installIpa(bundleId: String) async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncInstallIpa(bundleId: bundleId)
+         }
+     }
+ 
+     public func installAppBundle(bundleId: String, appName: String) async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncInstallAppBundle(bundleId: bundleId, appName: appName)
+         }
+     }
+ 
+     public func debugApp(appId: String) async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncDebugApp(appId: appId)
+         }
+     }
+ 
+     public func debugProcess(pid: UInt32) async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncDebugProcess(pid: pid)
+         }
+     }
+ 
+     public func dumpProfiles(docsPath: String) async throws -> String {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncDumpProfiles(docsPath: docsPath)
+         }
+     }
+ 
+     public func performHeartbeat(interval: UInt64) async throws -> UInt64 {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             var newInterval: UInt64 = 0
+             try self.syncPerformHeartbeat(interval: interval, newInterval: &newInterval)
+             return newInterval > 0 ? newInterval : 1000
+@@ -2380,19 +2439,19 @@ extension IdeviceGateway {
+     }
+ 
+     public func mountPersonalizedDdi(image: Data, trustcache: Data, manifest: Data) async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncMountPersonalizedDdi(image: image, trustcache: trustcache, manifest: manifest)
+         }
+     }
+ 
+     public func isDDIMounted() async throws -> Bool {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncIsDDIMounted()
+         }
+     }
+ 
+     public func mountDeveloperImage(image: Data, signature: Data) async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncMountDeveloperImage(image: image, signature: signature)
+         }
+     }
+@@ -2401,19 +2460,25 @@ extension IdeviceGateway {
+         hostName: String,
+         hostModel: String,
+         outPath: String,
++        cancellation: TCPAcceptorCancellation,
+         resolveFileName: (@Sendable (String, String) -> String)?,
+         onReady: @escaping @Sendable (String, UInt16, [String: String]) -> Void,
+         onPin: @escaping @Sendable (String) -> Void
+     ) async throws -> PairedDeviceRecord {
+-        try await withFFIDispatch {
+-            try self.syncStartWirelessPair(
+-                hostName: hostName,
+-                hostModel: hostModel,
+-                outPath: outPath,
+-                resolveFileName: resolveFileName,
+-                onReady: onReady,
+-                onPin: onPin
+-            )
++        try await withTaskCancellationHandler {
++            try await withFFIDispatch {
++                try self.syncStartWirelessPair(
++                    hostName: hostName,
++                    hostModel: hostModel,
++                    outPath: outPath,
++                    cancellation: cancellation,
++                    resolveFileName: resolveFileName,
++                    onReady: onReady,
++                    onPin: onPin
++                )
++            }
++        } onCancel: {
++            cancellation.cancel()
+         }
+     }
+ 
+@@ -2440,25 +2505,25 @@ extension IdeviceGateway {
+     }
+ 
+     public func afcListDirectory(bundleId: String, path: String) async throws -> [String] {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncAfcListDirectory(bundleId: bundleId, path: path)
+         }
+     }
+ 
+     public func afcReadFile(bundleId: String, path: String) async throws -> Data {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncAfcReadFile(bundleId: bundleId, path: path)
+         }
+     }
+ 
+     public func afcGetFileInfo(bundleId: String, path: String) async throws -> (isDirectory: Bool, fileSize: Int64) {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncAfcGetFileInfo(bundleId: bundleId, path: path)
+         }
+     }
+ 
+     public func wipeContainer(identifier: String) async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncWipeContainer(identifier: identifier)
+         }
+     }
+diff --git a/DeviceGateway/libimobiledevice/LibimobiledeviceGateway.swift b/DeviceGateway/libimobiledevice/LibimobiledeviceGateway.swift
+index 44de525..c6afefa 100644
+--- a/DeviceGateway/libimobiledevice/LibimobiledeviceGateway.swift
++++ b/DeviceGateway/libimobiledevice/LibimobiledeviceGateway.swift
+@@ -108,33 +108,50 @@ public final class LibimobiledeviceGateway: BaseDeviceGateway, DeviceGatewayAPI,
+     }
+ 
+     public override func cleanup() {
+-        debugLog("[LibimobiledeviceGateway] cleanup() called")
+-        self.cachedUDID = nil
+-        rpIdentity = nil
+-        super.cleanup()
++        nativeOperations.sync {
++            debugLog("[LibimobiledeviceGateway] cleanup() called")
++            self.cachedUDID = nil
++            rpIdentity = nil
++            super.cleanup()
++        }
+     }
+ 
+     public override func invalidateConnection() {
+-        cleanupRPTunnel()
++        nativeOperations.sync { cleanupRPTunnel() }
+     }
+ 
+     public override func stop() async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             self.cleanup()
+         }
+         try await super.stop()
+     }
+ 
+     public override func setLogging(_ enabled: Bool) {
+-        super.setLogging(enabled)
+-        idevice_set_debug_level(enabled ? 1 : 0)
+-        rppairing_set_debug_level(enabled ? 1 : 0)
++        nativeOperations.sync {
++            super.setLogging(enabled)
++            idevice_set_debug_level(enabled ? 1 : 0)
++            rppairing_set_debug_level(enabled ? 1 : 0)
++        }
+     }
+ 
+     private func verifyInitialized() throws {
+-        guard isInitialized, cachedUDID != nil else {
++        guard isInitialized else {
+             throw LibimobiledeviceGatewayError(.notInitialized)
+         }
++
++        switch pairingFileType {
++        case .rppairing:
++            guard rpIdentity != nil else {
++                throw LibimobiledeviceGatewayError(.notInitialized, reason: "RPPairing identity not loaded")
++            }
++        case .lockdown:
++            guard let cachedUDID, !cachedUDID.isEmpty else {
++                throw LibimobiledeviceGatewayError(.notInitialized, reason: "Lockdown UDID not loaded")
++            }
++        default:
++            throw LibimobiledeviceGatewayError(.notInitialized, reason: "No supported pairing protocol is loaded")
++        }
+     }
+ 
+     private func requireDeviceEndpointIp() throws -> String {
+@@ -483,6 +500,7 @@ public final class LibimobiledeviceGateway: BaseDeviceGateway, DeviceGatewayAPI,
+     }
+ 
+     func syncMountDeveloperImage(image: Data, signature: Data) throws {
++        try verifyInitialized()
+         if pairingFileType == .rppairing {
+             try withRSDService(.mobileImageMounter) { stream in
+                 try rsdSendPlist(stream, dict: ["Command": "ReceiveBytes", "ImageSize": image.count, "ImageType": "Developer"])
+@@ -515,35 +533,14 @@ public final class LibimobiledeviceGateway: BaseDeviceGateway, DeviceGatewayAPI,
+             return
+         }
+ 
+-        try withService(
+-            service: .mobileImageMounter,
+-            create: mobile_image_mounter_new,
+-            cleanup: mobile_image_mounter_free
+-        ) { mounter in
+-            try signature.withUnsafeBytes { sigBuf in
+-                guard let sigPtr = sigBuf.baseAddress?.assumingMemoryBound(to: UInt8.self) else {
+-                    throw LibimobiledeviceGatewayError(.serviceError, reason: "Invalid signature buffer")
+-                }
+-                var resultPlist: plist_t? = nil
+-                let res = mobile_image_mounter_mount_image(
+-                    mounter,
+-                    "/tmp/DeveloperDiskImage.dmg",
+-                    sigPtr,
+-                    UInt32(signature.count),
+-                    "Developer",
+-                    &resultPlist
+-                )
+-                if let resultPlist = resultPlist {
+-                    plist_free(resultPlist)
+-                }
+-                if res != MOBILE_IMAGE_MOUNTER_E_SUCCESS {
+-                    throw LibimobiledeviceGatewayError(.serviceError, reason: "mobile_image_mounter_mount_image failed with code \(res.rawValue)")
+-                }
+-            }
+-        }
++        throw LibimobiledeviceGatewayError(
++            .unsupportedOperation,
++            reason: "Mount developer image from supplied data: lockdown image upload/staging is unsupported; no image was mounted"
++        )
+     }
+ 
+     func syncMountPersonalizedDdi(image: Data, trustcache: Data, manifest: Data) throws {
++        try verifyInitialized()
+         if pairingFileType == .rppairing {
+             try withRSDService(.mobileImageMounter) { stream in
+                 debugLog("[LibimobiledeviceGateway] Sending ReceiveBytes for DDI (size: \(image.count))...")
+@@ -584,49 +581,10 @@ public final class LibimobiledeviceGateway: BaseDeviceGateway, DeviceGatewayAPI,
+             return
+         }
+ 
+-        try withService(
+-            service: .mobileImageMounter,
+-            create: mobile_image_mounter_new,
+-            cleanup: mobile_image_mounter_free
+-        ) { mounter in
+-            try signaturePlaceholder(image: image, trustcache: trustcache, manifest: manifest, mounter: mounter)
+-        }
+-    }
+-
+-    private func signaturePlaceholder(image: Data, trustcache: Data, manifest: Data, mounter: mobile_image_mounter_client_t) throws {
+-        var optionsPlist: plist_t? = plist_new_dict()
+-        defer { if let p = optionsPlist { plist_free(p) } }
+-
+-        try trustcache.withUnsafeBytes { tcBuf in
+-            if let tcPtr = tcBuf.baseAddress?.assumingMemoryBound(to: CChar.self) {
+-                let tcDataPlist = plist_new_data(tcPtr, UInt64(trustcache.count))
+-                plist_dict_set_item(optionsPlist, "ImageTrustCache", tcDataPlist)
+-            }
+-        }
+-
+-        try manifest.withUnsafeBytes { mftBuf in
+-            if let mftPtr = mftBuf.baseAddress?.assumingMemoryBound(to: CChar.self) {
+-                let mftDataPlist = plist_new_data(mftPtr, UInt64(manifest.count))
+-                plist_dict_set_item(optionsPlist, "ImageManifest", mftDataPlist)
+-            }
+-        }
+-
+-        var resultPlist: plist_t? = nil
+-        let res = mobile_image_mounter_mount_image_with_options(
+-            mounter,
+-            "/tmp/PersonalizedImage.dmg",
+-            nil,
+-            0,
+-            "Personalized",
+-            optionsPlist,
+-            &resultPlist
++        throw LibimobiledeviceGatewayError(
++            .unsupportedOperation,
++            reason: "Mount personalized developer image from supplied data: lockdown image upload/staging is unsupported; no image was mounted"
+         )
+-        if let resultPlist = resultPlist {
+-            plist_free(resultPlist)
+-        }
+-        if res != MOBILE_IMAGE_MOUNTER_E_SUCCESS {
+-            throw LibimobiledeviceGatewayError(.serviceError, reason: "mobile_image_mounter_mount_image_with_options failed with code \(res.rawValue)")
+-        }
+     }
+ 
+     func syncInstallProvisioningProfile(profile: Data) throws {
+@@ -688,21 +646,17 @@ public final class LibimobiledeviceGateway: BaseDeviceGateway, DeviceGatewayAPI,
+     }
+ 
+     func syncDumpProfiles(docsPath: String) throws -> String {
+-        let path = docsPath.hasPrefix("file://") ? String(docsPath.dropFirst(7)) : docsPath
+-        let dumpDir = path.hasSuffix("/Profiles") || path.hasSuffix("/Profiles/") ? path : "\(path)/Profiles"
+-        try? FileManager.default.createDirectory(atPath: dumpDir, withIntermediateDirectories: true)
++        try verifyInitialized()
++        let dumpURL = try profileDumpDirectory(docsPath: docsPath)
+         if pairingFileType == .rppairing {
+             return try withRSDService(.misagent) { stream in
+                 try rsdSendPlist(stream, dict: ["MessageType": "CopyAll"])
+                 let resp = try rsdRecvPlist(stream, timeoutMs: 10000)
+                 guard let profiles = resp["ProfileArray"] as? [Data] else {
+-                    return ""
+-                }
+-                for (idx, pData) in profiles.enumerated() {
+-                    let filePath = (dumpDir as NSString).appendingPathComponent("Profile_\(idx).mobileprovision")
+-                    try? pData.write(to: URL(fileURLWithPath: filePath))
++                    throw LibimobiledeviceGatewayError(.serviceError, reason: "misagent CopyAll response did not contain a profile array")
+                 }
+-                return dumpDir
++                try writeProfiles(profiles, to: dumpURL)
++                return dumpURL.path
+             }
+         }
+ 
+@@ -716,17 +670,61 @@ public final class LibimobiledeviceGateway: BaseDeviceGateway, DeviceGatewayAPI,
+             if res != MISAGENT_E_SUCCESS {
+                 throw LibimobiledeviceGatewayError(.serviceError, reason: "misagent_copy_all failed with code \(res.rawValue)")
+             }
+-            defer { if let p = profilesPlist { plist_free(p) } }
++            guard let profilesPlist else {
++                throw LibimobiledeviceGatewayError(.serviceError, reason: "misagent_copy_all succeeded without returning profile data")
++            }
++            defer { plist_free(profilesPlist) }
+ 
+             var xmlPtr: UnsafeMutablePointer<CChar>? = nil
+             var xmlLen: UInt32 = 0
+-            plist_to_xml(profilesPlist, &xmlPtr, &xmlLen)
+-            if let xmlPtr = xmlPtr {
+-                let xmlStr = String(cString: xmlPtr)
+-                free(xmlPtr)
+-                return xmlStr
++            let xmlErr = plist_to_xml(profilesPlist, &xmlPtr, &xmlLen)
++            guard xmlErr == PLIST_ERR_SUCCESS, let xmlPtr else {
++                throw LibimobiledeviceGatewayError(.serviceError, reason: "Failed to serialize profiles returned by misagent: code \(xmlErr.rawValue)")
++            }
++            defer { free(xmlPtr) }
++
++            let xmlData = Data(bytes: xmlPtr, count: Int(xmlLen))
++            let plist: Any
++            do {
++                plist = try PropertyListSerialization.propertyList(from: xmlData, options: [], format: nil)
++            } catch {
++                throw LibimobiledeviceGatewayError(.serviceError, reason: "Failed to decode profiles returned by misagent: \(error.localizedDescription)")
++            }
++            guard let profiles = plist as? [Data] else {
++                throw LibimobiledeviceGatewayError(.serviceError, reason: "misagent CopyAll response was not an array of profiles")
++            }
++            try writeProfiles(profiles, to: dumpURL)
++            return dumpURL.path
++        }
++    }
++
++    private func profileDumpDirectory(docsPath: String) throws -> URL {
++        let requestedURL: URL
++        if docsPath.hasPrefix("file://"), let fileURL = URL(string: docsPath), fileURL.isFileURL {
++            requestedURL = fileURL
++        } else {
++            requestedURL = URL(fileURLWithPath: docsPath)
++        }
++        let baseURL = requestedURL.standardizedFileURL
++        let dumpURL = baseURL.lastPathComponent == "Profiles"
++            ? baseURL
++            : baseURL.appendingPathComponent("Profiles", isDirectory: true)
++        do {
++            try FileManager.default.createDirectory(at: dumpURL, withIntermediateDirectories: true)
++        } catch {
++            throw LibimobiledeviceGatewayError(.serviceError, reason: "Failed to create profile dump directory \(dumpURL.path): \(error.localizedDescription)")
++        }
++        return dumpURL
++    }
++
++    private func writeProfiles(_ profiles: [Data], to directory: URL) throws {
++        for (index, profile) in profiles.enumerated() {
++            let fileURL = directory.appendingPathComponent("Profile_\(index).mobileprovision")
++            do {
++                try profile.write(to: fileURL, options: .atomic)
++            } catch {
++                throw LibimobiledeviceGatewayError(.serviceError, reason: "Failed to write profile to \(fileURL.path): \(error.localizedDescription)")
+             }
+-            return ""
+         }
+     }
+ 
+@@ -856,6 +854,45 @@ public final class LibimobiledeviceGateway: BaseDeviceGateway, DeviceGatewayAPI,
+         _ = try? rsdAfcRecvResponse(stream)
+     }
+ 
++    private func ensureAfcDirectory(_ client: afc_client_t, path: String) throws {
++        let result = afc_make_directory(client, path)
++        guard result == AFC_E_SUCCESS || result == AFC_E_OBJECT_EXISTS else {
++            throw LibimobiledeviceGatewayError(.serviceError, reason: "Failed to create staging directory \(path): code \(result.rawValue)")
++        }
++    }
++
++    private func removeStagedAfcPathIfPresent(_ client: afc_client_t, path: String) throws {
++        let result = afc_remove_path_and_contents(client, path)
++        guard result == AFC_E_SUCCESS || result == AFC_E_OBJECT_NOT_FOUND else {
++            throw LibimobiledeviceGatewayError(.serviceError, reason: "Failed to remove stale staging path \(path): code \(result.rawValue)")
++        }
++    }
++
++    private func writeAfcData(_ data: Data, client: afc_client_t, handle: UInt64, path: String) throws {
++        try data.withUnsafeBytes { rawBuffer in
++            guard data.isEmpty || rawBuffer.baseAddress != nil else {
++                throw LibimobiledeviceGatewayError(.serviceError, reason: "Invalid data buffer for \(path)")
++            }
++
++            var offset = 0
++            while offset < data.count {
++                let requestedCount = UInt32(min(kAfcChunkSize, data.count - offset))
++                let address = rawBuffer.baseAddress!
++                    .advanced(by: offset)
++                    .assumingMemoryBound(to: CChar.self)
++                var bytesWritten: UInt32 = 0
++                let result = afc_file_write(client, handle, address, requestedCount, &bytesWritten)
++                guard result == AFC_E_SUCCESS else {
++                    throw LibimobiledeviceGatewayError(.serviceError, reason: "AFC write failed for \(path) at offset \(offset): code \(result.rawValue)")
++                }
++                guard bytesWritten > 0, bytesWritten <= requestedCount else {
++                    throw LibimobiledeviceGatewayError(.serviceError, reason: "AFC write made invalid progress for \(path) at offset \(offset): requested \(requestedCount), wrote \(bytesWritten)")
++                }
++                offset += Int(bytesWritten)
++            }
++        }
++    }
++
+     func syncsendIpaAfc(bundleId: String, ipaBytes: Data) throws {
+         if pairingFileType == .rppairing {
+             try withRSDService(.afc) { stream in
+@@ -903,23 +940,15 @@ public final class LibimobiledeviceGateway: BaseDeviceGateway, DeviceGatewayAPI,
+             cleanup: afc_client_free
+         ) { afc in
+             let remotePath = "PublicStaging/\(bundleId).ipa"
++            try ensureAfcDirectory(afc, path: "PublicStaging")
++            try removeStagedAfcPathIfPresent(afc, path: remotePath)
+             var handle: UInt64 = 0
+-            let openRes = afc_file_open(afc, remotePath, AFC_FOPEN_RW, &handle)
++            let openRes = afc_file_open(afc, remotePath, AFC_FOPEN_WRONLY, &handle)
+             guard openRes == AFC_E_SUCCESS, handle != 0 else {
+                 throw LibimobiledeviceGatewayError(.serviceError, reason: "afc_file_open failed with code \(openRes.rawValue)")
+             }
+             defer { _ = afc_file_close(afc, handle) }
+-
+-            try ipaBytes.withUnsafeBytes { rawBuf in
+-                guard let baseAddr = rawBuf.baseAddress?.assumingMemoryBound(to: CChar.self) else {
+-                    throw LibimobiledeviceGatewayError(.serviceError, reason: "Invalid IPA buffer")
+-                }
+-                var bytesWritten: UInt32 = 0
+-                let writeRes = afc_file_write(afc, handle, baseAddr, UInt32(ipaBytes.count), &bytesWritten)
+-                if writeRes != AFC_E_SUCCESS {
+-                    throw LibimobiledeviceGatewayError(.serviceError, reason: "afc_file_write failed with code \(writeRes.rawValue)")
+-                }
+-            }
++            try writeAfcData(ipaBytes, client: afc, handle: handle, path: remotePath)
+         }
+     }
+ 
+@@ -1032,9 +1061,10 @@ public final class LibimobiledeviceGateway: BaseDeviceGateway, DeviceGatewayAPI,
+             create: afc_client_new,
+             cleanup: afc_client_free
+         ) { afc in
+-            _ = afc_make_directory(afc, "PublicStaging")
+-            _ = afc_make_directory(afc, remoteBaseDir)
+-            _ = afc_make_directory(afc, remoteAppPath)
++            try ensureAfcDirectory(afc, path: "PublicStaging")
++            try removeStagedAfcPathIfPresent(afc, path: remoteBaseDir)
++            try ensureAfcDirectory(afc, path: remoteBaseDir)
++            try ensureAfcDirectory(afc, path: remoteAppPath)
+ 
+             let fileManager = FileManager.default
+             guard let enumerator = fileManager.enumerator(
+@@ -1053,28 +1083,17 @@ public final class LibimobiledeviceGateway: BaseDeviceGateway, DeviceGatewayAPI,
+                 fileManager.fileExists(atPath: fileURL.path, isDirectory: &isDirectory)
+ 
+                 if isDirectory.boolValue {
+-                    _ = afc_make_directory(afc, remoteItemPath)
++                    try ensureAfcDirectory(afc, path: remoteItemPath)
+                 } else {
+                     var handle: UInt64 = 0
+-                    let openRes = afc_file_open(afc, remoteItemPath, AFC_FOPEN_RW, &handle)
++                    let openRes = afc_file_open(afc, remoteItemPath, AFC_FOPEN_WRONLY, &handle)
+                     guard openRes == AFC_E_SUCCESS, handle != 0 else {
+                         throw LibimobiledeviceGatewayError(.serviceError, reason: "afc_file_open failed for \(remoteItemPath) with code \(openRes.rawValue)")
+                     }
+                     defer { _ = afc_file_close(afc, handle) }
+ 
+                     let data = try Data(contentsOf: fileURL, options: .alwaysMapped)
+-                    if !data.isEmpty {
+-                        try data.withUnsafeBytes { rawBuf in
+-                            guard let baseAddr = rawBuf.baseAddress?.assumingMemoryBound(to: CChar.self) else {
+-                                throw LibimobiledeviceGatewayError(.serviceError, reason: "Invalid file buffer")
+-                            }
+-                            var bytesWritten: UInt32 = 0
+-                            let writeRes = afc_file_write(afc, handle, baseAddr, UInt32(data.count), &bytesWritten)
+-                            if writeRes != AFC_E_SUCCESS {
+-                                throw LibimobiledeviceGatewayError(.serviceError, reason: "afc_file_write failed for \(remoteItemPath) with code \(writeRes.rawValue)")
+-                            }
+-                        }
+-                    }
++                    try writeAfcData(data, client: afc, handle: handle, path: remoteItemPath)
+                 }
+             }
+             debugLog("[LibimobiledeviceGateway] Successfully uploaded app bundle to \(remoteAppPath) via Lockdown AFC!")
+@@ -1129,14 +1148,10 @@ public final class LibimobiledeviceGateway: BaseDeviceGateway, DeviceGatewayAPI,
+ 
+     func syncWipeContainer(identifier: String) throws {
+         if pairingFileType == .rppairing {
+-            try withRSDService(.houseArrest) { stream in
+-                try rsdSendPlist(stream, dict: [
+-                    "Command": "VendContainer",
+-                    "Identifier": identifier
+-                ])
+-                _ = try? rsdRecvPlist(stream, timeoutMs: 10000)
+-            }
+-            return
++            throw LibimobiledeviceGatewayError(
++                .unsupportedOperation,
++                reason: "Recursive app-container wipe is not supported over the Remote Pairing AFC transport"
++            )
+         }
+ 
+         try withService(
+@@ -1150,12 +1165,98 @@ public final class LibimobiledeviceGateway: BaseDeviceGateway, DeviceGatewayAPI,
+             }
+             var resultDict: plist_t? = nil
+             let gRes = house_arrest_get_result(ha, &resultDict)
+-            if let resultDict = resultDict {
+-                plist_free(resultDict)
+-            }
+             if gRes != HOUSE_ARREST_E_SUCCESS {
++                if let resultDict { plist_free(resultDict) }
+                 throw LibimobiledeviceGatewayError(.serviceError, reason: "house_arrest_get_result failed with code \(gRes.rawValue)")
+             }
++            guard let resultDict else {
++                throw LibimobiledeviceGatewayError(.serviceError, reason: "house_arrest_get_result returned no vend-container response")
++            }
++            defer { plist_free(resultDict) }
++
++            guard let statusNode = plist_dict_get_item(resultDict, "Status") else {
++                throw LibimobiledeviceGatewayError(.serviceError, reason: "VendContainer response did not contain a status")
++            }
++            var statusPointer: UnsafeMutablePointer<CChar>? = nil
++            plist_get_string_val(statusNode, &statusPointer)
++            guard let statusPointer else {
++                throw LibimobiledeviceGatewayError(.serviceError, reason: "VendContainer response status was not a string")
++            }
++            let status = String(cString: statusPointer)
++            free(statusPointer)
++            guard status == "Complete" else {
++                var errorPointer: UnsafeMutablePointer<CChar>? = nil
++                if let errorNode = plist_dict_get_item(resultDict, "Error") {
++                    plist_get_string_val(errorNode, &errorPointer)
++                }
++                let message = errorPointer.map { pointer -> String in
++                    defer { free(pointer) }
++                    return String(cString: pointer)
++                } ?? "unknown House Arrest error"
++                throw LibimobiledeviceGatewayError(.serviceError, reason: "VendContainer failed for \(identifier): \(message)")
++            }
++
++            var afc: afc_client_t? = nil
++            let afcRes = afc_client_new_from_house_arrest_client(ha, &afc)
++            guard afcRes == AFC_E_SUCCESS, let afc else {
++                throw LibimobiledeviceGatewayError(.serviceError, reason: "Failed to create AFC client for container \(identifier): code \(afcRes.rawValue)")
++            }
++            defer { _ = afc_client_free(afc) }
++
++            try self.wipeAfcDirectoryContents(afc, path: "/")
++        }
++    }
++
++    private func wipeAfcDirectoryContents(_ client: afc_client_t, path: String) throws {
++        var entries: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>? = nil
++        let listResult = afc_read_directory(client, path, &entries)
++        guard listResult == AFC_E_SUCCESS else {
++            throw LibimobiledeviceGatewayError(.serviceError, reason: "Failed to list container path \(path): code \(listResult.rawValue)")
++        }
++        guard let entries else { return }
++        defer { afc_dictionary_free(entries) }
++
++        var index = 0
++        while let entry = entries[index] {
++            let name = String(cString: entry)
++            index += 1
++            if name == "." || name == ".." { continue }
++            guard !name.isEmpty, !name.contains("/") else {
++                throw LibimobiledeviceGatewayError(.serviceError, reason: "AFC returned an invalid child name while listing \(path)")
++            }
++            let childPath = path == "/" ? "/\(name)" : "\(path)/\(name)"
++            try wipeAfcPath(client, path: childPath)
++        }
++    }
++
++    private func wipeAfcPath(_ client: afc_client_t, path: String) throws {
++        var info: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>? = nil
++        let infoResult = afc_get_file_info(client, path, &info)
++        guard infoResult == AFC_E_SUCCESS, let info else {
++            throw LibimobiledeviceGatewayError(.serviceError, reason: "Failed to inspect container path \(path): code \(infoResult.rawValue)")
++        }
++        defer { afc_dictionary_free(info) }
++
++        var isDirectory: Bool? = nil
++        var index = 0
++        while let keyPointer = info[index], let valuePointer = info[index + 1] {
++            let key = String(cString: keyPointer)
++            let value = String(cString: valuePointer)
++            if key == "st_ifmt" {
++                isDirectory = value == "S_IFDIR"
++            }
++            index += 2
++        }
++        guard let isDirectory else {
++            throw LibimobiledeviceGatewayError(.serviceError, reason: "Container metadata for \(path) did not include a file type")
++        }
++        if isDirectory {
++            try wipeAfcDirectoryContents(client, path: path)
++        }
++
++        let removeResult = afc_remove_path(client, path)
++        guard removeResult == AFC_E_SUCCESS else {
++            throw LibimobiledeviceGatewayError(.serviceError, reason: "Failed to remove container path \(path): code \(removeResult.rawValue)")
+         }
+     }
+ 
+@@ -1194,11 +1295,12 @@ public final class LibimobiledeviceGateway: BaseDeviceGateway, DeviceGatewayAPI,
+     }
+ 
+     func syncDebugApp(appId: String) throws {
++        try verifyInitialized()
+         if pairingFileType == .rppairing {
+-            try withRSDService(.debugserver) { stream in
+-                debugLog("[LibimobiledeviceGateway] RSD debugApp connected to debugserver for \(appId)")
+-            }
+-            return
++            throw LibimobiledeviceGatewayError(
++                .unsupportedOperation,
++                reason: "debugApp over Remote Pairing is unsupported; no process attach was performed for \(appId)"
++            )
+         }
+ 
+         try withService(
+@@ -1229,11 +1331,12 @@ public final class LibimobiledeviceGateway: BaseDeviceGateway, DeviceGatewayAPI,
+     }
+ 
+     func syncDebugProcess(pid: UInt32) throws {
++        try verifyInitialized()
+         if pairingFileType == .rppairing {
+-            try withRSDService(.debugserver) { stream in
+-                debugLog("[LibimobiledeviceGateway] RSD debugProcess connected to debugserver for PID \(pid)")
+-            }
+-            return
++            throw LibimobiledeviceGatewayError(
++                .unsupportedOperation,
++                reason: "debugProcess over Remote Pairing is unsupported; no process attach was performed for PID \(pid)"
++            )
+         }
+ 
+         try withService(
+@@ -1296,12 +1399,70 @@ public final class LibimobiledeviceGateway: BaseDeviceGateway, DeviceGatewayAPI,
+         }
+     }
+ 
++    private func withHouseArrestAFC<T>(bundleId: String, _ body: (afc_client_t) throws -> T) throws -> T {
++        guard pairingFileType == .lockdown else {
++            throw LibimobiledeviceGatewayError(
++                .unsupportedOperation,
++                reason: "House Arrest app-container AFC is only supported in lockdown mode"
++            )
++        }
++
++        return try withService(
++            service: .house_arrest,
++            create: house_arrest_client_new,
++            cleanup: house_arrest_client_free
++        ) { ha in
++            let sendResult = house_arrest_send_command(ha, "VendContainer", bundleId)
++            guard sendResult == HOUSE_ARREST_E_SUCCESS else {
++                throw LibimobiledeviceGatewayError(.serviceError, reason: "house_arrest_send_command failed for \(bundleId): code \(sendResult.rawValue)")
++            }
++
++            var resultDict: plist_t? = nil
++            let result = house_arrest_get_result(ha, &resultDict)
++            guard result == HOUSE_ARREST_E_SUCCESS else {
++                if let resultDict { plist_free(resultDict) }
++                throw LibimobiledeviceGatewayError(.serviceError, reason: "house_arrest_get_result failed for \(bundleId): code \(result.rawValue)")
++            }
++            guard let resultDict else {
++                throw LibimobiledeviceGatewayError(.serviceError, reason: "VendContainer returned no response for \(bundleId)")
++            }
++            defer { plist_free(resultDict) }
++
++            guard let statusNode = plist_dict_get_item(resultDict, "Status") else {
++                throw LibimobiledeviceGatewayError(.serviceError, reason: "VendContainer response for \(bundleId) did not contain a status")
++            }
++            var statusPointer: UnsafeMutablePointer<CChar>? = nil
++            plist_get_string_val(statusNode, &statusPointer)
++            guard let statusPointer else {
++                throw LibimobiledeviceGatewayError(.serviceError, reason: "VendContainer status for \(bundleId) was not a string")
++            }
++            let status = String(cString: statusPointer)
++            free(statusPointer)
++            guard status == "Complete" else {
++                var errorPointer: UnsafeMutablePointer<CChar>? = nil
++                if let errorNode = plist_dict_get_item(resultDict, "Error") {
++                    plist_get_string_val(errorNode, &errorPointer)
++                }
++                let message = errorPointer.map { pointer -> String in
++                    defer { free(pointer) }
++                    return String(cString: pointer)
++                } ?? "unknown House Arrest error"
++                throw LibimobiledeviceGatewayError(.serviceError, reason: "VendContainer failed for \(bundleId): \(message)")
++            }
++
++            var afc: afc_client_t? = nil
++            let afcResult = afc_client_new_from_house_arrest_client(ha, &afc)
++            guard afcResult == AFC_E_SUCCESS, let afc else {
++                throw LibimobiledeviceGatewayError(.serviceError, reason: "Failed to create AFC client for container \(bundleId): code \(afcResult.rawValue)")
++            }
++            defer { _ = afc_client_free(afc) }
++            return try body(afc)
++        }
++    }
++
+     func syncAfcListDirectory(bundleId: String, path: String) throws -> [String] {
+-        try withService(
+-            service: .afc,
+-            create: afc_client_new,
+-            cleanup: afc_client_free
+-        ) { afc in
++        try verifyInitialized()
++        return try withHouseArrestAFC(bundleId: bundleId) { afc in
+             var dirList: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>? = nil
+             let res = afc_read_directory(afc, path, &dirList)
+             if res != AFC_E_SUCCESS {
+@@ -1326,11 +1487,8 @@ public final class LibimobiledeviceGateway: BaseDeviceGateway, DeviceGatewayAPI,
+     }
+ 
+     func syncAfcReadFile(bundleId: String, path: String) throws -> Data {
+-        try withService(
+-            service: .afc,
+-            create: afc_client_new,
+-            cleanup: afc_client_free
+-        ) { afc in
++        try verifyInitialized()
++        return try withHouseArrestAFC(bundleId: bundleId) { afc in
+             var handle: UInt64 = 0
+             let openRes = afc_file_open(afc, path, AFC_FOPEN_RDONLY, &handle)
+             guard openRes == AFC_E_SUCCESS, handle != 0 else {
+@@ -1359,11 +1517,8 @@ public final class LibimobiledeviceGateway: BaseDeviceGateway, DeviceGatewayAPI,
+     }
+ 
+     func syncAfcGetFileInfo(bundleId: String, path: String) throws -> (isDirectory: Bool, fileSize: Int64) {
+-        try withService(
+-            service: .afc,
+-            create: afc_client_new,
+-            cleanup: afc_client_free
+-        ) { afc in
++        try verifyInitialized()
++        return try withHouseArrestAFC(bundleId: bundleId) { afc in
+             var infoList: UnsafeMutablePointer<UnsafeMutablePointer<CChar>?>? = nil
+             let res = afc_get_file_info(afc, path, &infoList)
+             if res != AFC_E_SUCCESS {
+@@ -1399,85 +1554,85 @@ public final class LibimobiledeviceGateway: BaseDeviceGateway, DeviceGatewayAPI,
+ // Async FFI Dispatcher Extensions
+ extension LibimobiledeviceGateway {
+     public func start(pairingFileContent: String, preferred: PairingProtocol?) async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncStart(pairingFileContent: pairingFileContent, preferred: preferred)
+         }
+     }
+ 
+     public func fetchUDID() async throws -> String {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncFetchUDID()
+         }
+     }
+ 
+     public func getLockdownValue(key: String) async throws -> String {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncGetLockdownValue(key: key)
+         }
+     }
+ 
+     public func installProvisioningProfile(profile: Data) async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncInstallProvisioningProfile(profile: profile)
+         }
+     }
+ 
+     public func removeProvisioningProfile(id: String) async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncRemoveProvisioningProfile(id: id)
+         }
+     }
+ 
+     public func removeApp(bundleId: String) async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncRemoveApp(bundleId: bundleId)
+         }
+     }
+ 
+     public func sendIpaAfc(bundleId: String, ipaBytes: Data) async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncsendIpaAfc(bundleId: bundleId, ipaBytes: ipaBytes)
+         }
+     }
+ 
+     public func sendAppBundleAfc(bundleId: String, appURL: URL) async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncsendAppBundleAfc(bundleId: bundleId, appURL: appURL)
+         }
+     }
+ 
+     public func installIpa(bundleId: String) async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncInstallIpa(bundleId: bundleId)
+         }
+     }
+ 
+     public func installAppBundle(bundleId: String, appName: String) async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncInstallAppBundle(bundleId: bundleId, appName: appName)
+         }
+     }
+ 
+     public func debugApp(appId: String) async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncDebugApp(appId: appId)
+         }
+     }
+ 
+     public func debugProcess(pid: UInt32) async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncDebugProcess(pid: pid)
+         }
+     }
+ 
+     public func dumpProfiles(docsPath: String) async throws -> String {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncDumpProfiles(docsPath: docsPath)
+         }
+     }
+ 
+     public func performHeartbeat(interval: UInt64) async throws -> UInt64 {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             var newInterval: UInt64 = 0
+             try self.syncPerformHeartbeat(interval: interval, newInterval: &newInterval)
+             return newInterval > 0 ? newInterval : 1000
+@@ -1485,19 +1640,19 @@ extension LibimobiledeviceGateway {
+     }
+ 
+     public func mountPersonalizedDdi(image: Data, trustcache: Data, manifest: Data) async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncMountPersonalizedDdi(image: image, trustcache: trustcache, manifest: manifest)
+         }
+     }
+ 
+     public func isDDIMounted() async throws -> Bool {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncIsDDIMounted()
+         }
+     }
+ 
+     public func mountDeveloperImage(image: Data, signature: Data) async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncMountDeveloperImage(image: image, signature: signature)
+         }
+     }
+@@ -1506,6 +1661,7 @@ extension LibimobiledeviceGateway {
+         hostName: String,
+         hostModel: String,
+         outPath: String,
++        cancellation: TCPAcceptorCancellation,
+         resolveFileName: (@Sendable (String, String) -> String)?,
+         onReady: @escaping @Sendable (String, UInt16, [String: String]) -> Void,
+         onPin: @escaping @Sendable (String) -> Void
+@@ -1526,25 +1682,25 @@ extension LibimobiledeviceGateway {
+     }
+ 
+     public func afcListDirectory(bundleId: String, path: String) async throws -> [String] {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncAfcListDirectory(bundleId: bundleId, path: path)
+         }
+     }
+ 
+     public func afcReadFile(bundleId: String, path: String) async throws -> Data {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncAfcReadFile(bundleId: bundleId, path: path)
+         }
+     }
+ 
+     public func afcGetFileInfo(bundleId: String, path: String) async throws -> (isDirectory: Bool, fileSize: Int64) {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncAfcGetFileInfo(bundleId: bundleId, path: path)
+         }
+     }
+ 
+     public func wipeContainer(identifier: String) async throws {
+-        try await withFFIDispatch {
++        try await withFFIDispatch(on: nativeOperations.queue) {
+             try self.syncWipeContainer(identifier: identifier)
+         }
+     }
+diff --git a/Sources/MinimuxerImpl.swift b/Sources/MinimuxerImpl.swift
+index 4c05971..340152b 100644
+--- a/Sources/MinimuxerImpl.swift
++++ b/Sources/MinimuxerImpl.swift
+@@ -114,21 +114,21 @@ final internal class MinimuxerImpl: MinimuxerAPI {
+             return .failure(.notStarted("Minimuxer has not been started"))
+         }
+ 
+-        // check connection status first
+-        if withNetworkCheck && !(
+-            self.network.isWifiSatisfied   /* ||
+-            self.network.isWiredSatisfied     ||
+-            self.network.isUsbSatisfied       ||
+-            self.network.isBridgeSatisfied */
+-        ){
+-            debugLog("[minimuxer] minimuxer not ready: no network connection")
+-            return .failure(.noConnection("No wifi interface satisfied"))
+-        }
+-
+-        // check connection mode
+         let connectionMode = await getConnectionMode()
+         let net = self.network
+ 
++        if case .notConfigured = connectionMode {
++            return .failure(connectionNotConfiguredError())
++        }
++
++        // Refresh the selected mode's endpoint using a TCP probe through the
++        // system routing table. Remote-server connections may work over
++        // Ethernet, cellular, or an external VPN, so Wi-Fi is not a readiness
++        // prerequisite. Local VPN requirements are checked explicitly below.
++        if withNetworkCheck {
++            await self.network.refreshEndpoint()
++        }
++
+         switch connectionMode {
+             case .notConfigured:
+                 return .failure(connectionNotConfiguredError())
+@@ -313,9 +313,11 @@ final internal class MinimuxerImpl: MinimuxerAPI {
+         await state.with{
+             $0.status = .started
+         }
++        await self.heartbeat.start()
+     }
+ 
+     func stop() async throws(MinimuxerError) {
++        await self.heartbeat.stop()
+         // actor serialization scope
+         let oldTask = await state.with { state -> Task<Bool, Error>? in
+             state.status = .inprogress  // mark inprogress
+diff --git a/Sources/Services/HeartbeatService.swift b/Sources/Services/HeartbeatService.swift
+index 690665a..9b8f387 100644
+--- a/Sources/Services/HeartbeatService.swift
++++ b/Sources/Services/HeartbeatService.swift
+@@ -32,7 +32,6 @@ final internal class HeartbeatService {
+ 
+         func tryStart() -> Bool {
+             if taskActive {
+-                running = true
+                 return false
+             }
+             running = true
+@@ -44,6 +43,10 @@ final internal class HeartbeatService {
+             running = false
+         }
+ 
++        func isTaskActive() -> Bool {
++            taskActive
++        }
++
+         func terminate() {
+             taskActive = false
+             running = false
+@@ -77,6 +80,9 @@ final internal class HeartbeatService {
+     // Signal the heartbeat task to stop. will exit on next iteration.
+     func stop() async {
+         await state.stop()
++        while await state.isTaskActive() {
++            try? await Task.sleep(nanoseconds: 10_000_000)
++        }
+         lastBeatSuccessful = false
+         verboseLog("[minimuxer] HeartbeatService stop requested")
+     }
+@@ -92,13 +98,26 @@ final internal class HeartbeatService {
+         }
+     }
+ 
++    private func sleepWhileRunning() async {
++        let maxSlice: UInt64 = 100_000_000
++        var remaining = sleepNs
++        while remaining > 0 {
++            guard await state.running else { break }
++            let slice = min(remaining, maxSlice)
++            try? await Task.sleep(nanoseconds: slice)
++            remaining -= slice
++        }
++    }
++
+     private func heartbeatLoop() async {
+         if self.gateway.requiresUsbmuxd {
+-            while !self.proxyServer.isListening {
++            while await state.running && !self.proxyServer.isListening {
+                 logIfNeeded("Waiting for usbmuxd to be ready...", isVerbose: true)
+-                try? await Task.sleep(nanoseconds: sleepNs)
++                await sleepWhileRunning()
++            }
++            if await state.running {
++                verboseLog("[minimuxer] heartbeat-task: usbmuxd is ready")
+             }
+-            verboseLog("[minimuxer] heartbeat-task: usbmuxd is ready")
+         }
+ 
+         var currentInterval: UInt64 = MinimuxerConstants.heartbeatInterval
+@@ -110,7 +129,7 @@ final internal class HeartbeatService {
+             } catch {
+                 logIfNeeded("device IP unavailable", isVerbose: true)
+                 lastBeatSuccessful = false
+-                try? await Task.sleep(nanoseconds: sleepNs)
++                await sleepWhileRunning()
+                 continue
+             }
+             
+@@ -119,7 +138,7 @@ final internal class HeartbeatService {
+             if !NetworkUtils.testTCP(ip: tunnelPeerIp, port: targetPort) {
+                 logIfNeeded("device IP not reachable, waiting...", isVerbose: true)
+                 lastBeatSuccessful = false
+-                try? await Task.sleep(nanoseconds: sleepNs)
++                await sleepWhileRunning()
+                 continue
+             }
+ 
+@@ -130,7 +149,7 @@ final internal class HeartbeatService {
+             } catch {
+                 logIfNeeded("Heartbeat failed: \(error)")
+                 lastBeatSuccessful = false
+-                try? await Task.sleep(nanoseconds: sleepNs)
++                await sleepWhileRunning()
+             }
+         }
+     }
+diff --git a/Sources/Services/NetworkIfaceScanner.swift b/Sources/Services/NetworkIfaceScanner.swift
+index aebf5b2..4d6edd9 100644
+--- a/Sources/Services/NetworkIfaceScanner.swift
++++ b/Sources/Services/NetworkIfaceScanner.swift
+@@ -20,19 +20,42 @@ private func ipv4String(_ value: UInt32) -> String? {
+     return String(cString: buf)
+ }
+ 
+-private func sockaddrIPv4(_ sa: inout sockaddr) -> UInt32? {
++private func validatedSockaddrLength(_ sa: UnsafePointer<sockaddr>, suppliedLength: Int? = nil) -> socklen_t? {
++    let expectedLength: Int
++    switch Int32(sa.pointee.sa_family) {
++        case AF_INET:
++            expectedLength = MemoryLayout<sockaddr_in>.size
++        case AF_INET6:
++            expectedLength = MemoryLayout<sockaddr_in6>.size
++        default:
++            return nil
++    }
++
++    let declaredLength = Int(sa.pointee.sa_len)
++    let length = suppliedLength ?? declaredLength
++    guard length >= expectedLength,
++          length <= MemoryLayout<sockaddr_storage>.size,
++          declaredLength == length else { return nil }
++    return socklen_t(length)
++}
++
++private func sockaddrIPv4(_ sa: UnsafePointer<sockaddr>, length: Int? = nil) -> UInt32? {
+     var buf = [CChar](repeating: 0, count: Int(NI_MAXHOST))
+-    guard getnameinfo(&sa, socklen_t(sa.sa_len), &buf, socklen_t(buf.count), nil, 0, NI_NUMERICHOST) == 0,
++    guard let saLength = validatedSockaddrLength(sa, suppliedLength: length),
++          sa.pointee.sa_family == UInt8(AF_INET),
++          getnameinfo(sa, saLength, &buf, socklen_t(buf.count), nil, 0, NI_NUMERICHOST) == 0,
+           let s = String(validatingUTF8: buf) else { return nil }
+     var a = in_addr()
+     return inet_pton(AF_INET, s, &a) == 1 ? a.s_addr.bigEndian : nil
+ }
+ 
+-private func sockaddrIPv6(_ sa: inout sockaddr) -> String? {
+-    var buf = [CChar](repeating: 0, count: Int(INET6_ADDRSTRLEN))
+-    guard getnameinfo(&sa, socklen_t(sa.sa_len), &buf, socklen_t(buf.count), nil, 0, NI_NUMERICHOST) == 0,
++private func sockaddrIPv6(_ sa: UnsafePointer<sockaddr>, length: Int? = nil) -> String? {
++    var buf = [CChar](repeating: 0, count: Int(NI_MAXHOST))
++    guard let saLength = validatedSockaddrLength(sa, suppliedLength: length),
++          sa.pointee.sa_family == UInt8(AF_INET6),
++          getnameinfo(sa, saLength, &buf, socklen_t(buf.count), nil, 0, NI_NUMERICHOST) == 0,
+           let s = String(validatingUTF8: buf) else { return nil }
+-    return s.components(separatedBy: "%").first ?? s
++    return s
+ }
+ 
+ internal struct IPv4Info: Hashable, Sendable {
+@@ -44,10 +67,10 @@ internal struct IPv4Info: Hashable, Sendable {
+ 
+     init?(ifa: ifaddrs) {
+         guard
+-            var addr = ifa.ifa_addr?.pointee,
+-            var mask = ifa.ifa_netmask?.pointee,
+-            let hostRaw = sockaddrIPv4(&addr),
+-            let maskRaw = sockaddrIPv4(&mask),
++            let addr = ifa.ifa_addr,
++            let mask = ifa.ifa_netmask,
++            let hostRaw = sockaddrIPv4(UnsafePointer(addr)),
++            let maskRaw = sockaddrIPv4(UnsafePointer(mask)),
+             let hostStr = ipv4String(hostRaw),
+             let maskStr = ipv4String(maskRaw)
+         else { return nil }
+@@ -282,8 +305,9 @@ internal final class RouteSnapshot: Sendable {
+                             ifaceIPv4Mask = ipv4String(raw)
+                         }
+                     } else if i == Int(RTAX_DST) || i == Int(RTAX_IFA) || i == Int(RTAX_GATEWAY) {
+-                        var sa = cursor.assumingMemoryBound(to: sockaddr.self).pointee
+-                        if sa.sa_family == UInt8(AF_INET), let raw = sockaddrIPv4(&sa) {
++                        let sa = cursor.assumingMemoryBound(to: sockaddr.self)
++                        let addressLength = Int(sa.pointee.sa_len)
++                        if sa.pointee.sa_family == UInt8(AF_INET), let raw = sockaddrIPv4(UnsafePointer(sa), length: addressLength) {
+                             let str = ipv4String(raw)
+                             if i == Int(RTAX_DST) {
+                                 destIPv4 = str
+@@ -295,7 +319,7 @@ internal final class RouteSnapshot: Sendable {
+                                 gwIPv4 = str
+                                 gwIPv4Raw = raw
+                             }
+-                        } else if sa.sa_family == UInt8(AF_INET6), let str = sockaddrIPv6(&sa) {
++                        } else if sa.pointee.sa_family == UInt8(AF_INET6), let str = sockaddrIPv6(UnsafePointer(sa), length: addressLength) {
+                             if i == Int(RTAX_DST) {
+                                 destIPv6 = str
+                             } else if i == Int(RTAX_IFA) {
+@@ -629,8 +653,7 @@ internal enum NetworkIfaceScanner {
+                             ifaceAddressesMap[lowerName] = IPAddresses(v4: cur.v4 + [v4], v6: cur.v6)
+ 
+                             if (flags & IFF_POINTOPOINT) != 0, let dstAddr = e.ifa_dstaddr {
+-                                var dst = dstAddr.pointee
+-                                if let dstHost = sockaddrIPv4(&dst), let dstStr = ipv4String(dstHost) {
++                                if let dstHost = sockaddrIPv4(UnsafePointer(dstAddr)), let dstStr = ipv4String(dstHost) {
+                                     let dstV4 = IPv4Info(host: dstStr, mask: v4.mask, hostRaw: dstHost, maskRaw: v4.maskRaw)
+                                     let prev = linkLayerDestinationIPMap[lowerName]
+                                     linkLayerDestinationIPMap[lowerName] = IP(v4: dstV4, v6: prev?.v6)
+@@ -638,15 +661,13 @@ internal enum NetworkIfaceScanner {
+                             }
+                         }
+                     } else if family == UInt8(AF_INET6) {
+-                        var sa6 = addr.pointee
+-                        if let ip6 = sockaddrIPv6(&sa6) {
++                        if let ip6 = sockaddrIPv6(UnsafePointer(addr)) {
+                             let cur = ifaceAddressesMap[lowerName] ?? IPAddresses()
+                             ifaceAddressesMap[lowerName] = IPAddresses(v4: cur.v4, v6: cur.v6 + [ip6])
+                         }
+ 
+                         if (flags & IFF_POINTOPOINT) != 0, let dstAddr = e.ifa_dstaddr {
+-                            var dst6 = dstAddr.pointee
+-                            if let dstStr6 = sockaddrIPv6(&dst6) {
++                            if let dstStr6 = sockaddrIPv6(UnsafePointer(dstAddr)) {
+                                 let prev = linkLayerDestinationIPMap[lowerName]
+                                 linkLayerDestinationIPMap[lowerName] = IP(v4: prev?.v4, v6: dstStr6)
+                             }
+diff --git a/Sources/Services/NetworkObserverService.swift b/Sources/Services/NetworkObserverService.swift
+index f84590e..2efe4ce 100644
+--- a/Sources/Services/NetworkObserverService.swift
++++ b/Sources/Services/NetworkObserverService.swift
+@@ -22,9 +22,10 @@ final internal class NetworkObserverService: NetworkObserverAPI, @unchecked Send
+     let endpoint: DeviceEndpoint
+     let proxyServer: UsbmuxdProxyServer
+ 
+-    private let monitor = NWPathMonitor()
+     private let queue = DispatchQueue(label: "net.monitor")
+     private let state = State()
++    private let pathLock = NSLock()
++    private var latestPath: NWPath?
+ 
+     init(
+         connectionManager: DeviceConnectionManager,
+@@ -37,46 +38,99 @@ final internal class NetworkObserverService: NetworkObserverAPI, @unchecked Send
+     }
+     
+     private actor State {
+-        var started = false
+-        var observationTask: Task<Void, Never>? = nil
+-        
+-        func with<T>(_ body: (isolated State) throws -> T) rethrows -> T {
+-            try body(self)
+-        }
+-    }
+-
+-    @discardableResult
+-    func start() async -> Bool {
+-        let alreadyStarted = await state.with { $0.started }
+-        guard !alreadyStarted else {
+-            verboseLog("[minimuxer] [net] monitor already started")
+-            return false
++        private struct Session {
++            let id: UUID
++            let monitor: NWPathMonitor
++            let continuation: AsyncStream<NWPath>.Continuation
++            let observationTask: Task<Void, Never>
+         }
+ 
+-        await state.with { $0.started = true }
+-        verboseLog("[minimuxer] [net] monitor started")
++        private var session: Session?
++        private var isStopping = false
++        private var startWaiters: [CheckedContinuation<Void, Never>] = []
++        private var stopWaiters: [CheckedContinuation<Void, Never>] = []
+ 
+-        let paths = AsyncStream<NWPath> { [weak self] continuation in
+-            guard let self = self else {
+-                continuation.finish()
+-                return
++        func start(
++            on queue: DispatchQueue,
++            handlePath: @escaping @Sendable (NWPath) async -> Void
++        ) async -> Bool {
++            if isStopping {
++                await withCheckedContinuation { startWaiters.append($0) }
+             }
+-            self.monitor.pathUpdateHandler = { path in
+-                self.pathSubject.send(path)
++            guard session == nil else { return false }
++
++            let id = UUID()
++            let monitor = NWPathMonitor()
++            let (paths, continuation) = AsyncStream<NWPath>.makeStream()
++            monitor.pathUpdateHandler = { path in
+                 continuation.yield(path)
+             }
+-        }
+ 
+-        self.monitor.start(queue: self.queue)
++            let observationTask = Task.detached { [weak self] in
++                for await path in paths {
++                    guard !Task.isCancelled,
++                          await self?.isCurrent(id) == true else { break }
++                    await handlePath(path)
++                }
++            }
++
++            session = Session(
++                id: id,
++                monitor: monitor,
++                continuation: continuation,
++                observationTask: observationTask
++            )
++            monitor.start(queue: queue)
++            return true
++        }
+ 
+-        let task = Task.detached { [weak self] in
+-            for await path in paths {
+-                verboseLog("[minimuxer] [net] path changed, status: \(path.status)")
+-                await self?.handleNetworkChange()
++        func stop() async -> Bool {
++            if isStopping {
++                await withCheckedContinuation { stopWaiters.append($0) }
++                return false
+             }
++            guard let oldSession = session else { return false }
++            isStopping = true
++            session = nil
++            oldSession.monitor.pathUpdateHandler = nil
++            oldSession.continuation.finish()
++            oldSession.monitor.cancel()
++            oldSession.observationTask.cancel()
++
++            // Drain an in-flight path delivery before allowing a replacement session
++            // to start, so the old session cannot publish endpoint changes afterward.
++            await oldSession.observationTask.value
++
++            isStopping = false
++            let waitingStops = stopWaiters
++            let waitingStarts = startWaiters
++            stopWaiters.removeAll()
++            startWaiters.removeAll()
++            waitingStops.forEach { $0.resume() }
++            waitingStarts.forEach { $0.resume() }
++            return true
+         }
+-        await state.with { $0.observationTask = task }
+ 
++        private func isCurrent(_ id: UUID) -> Bool {
++            session?.id == id
++        }
++    }
++
++    @discardableResult
++    func start() async -> Bool {
++        let didStart = await state.start(on: queue) { [weak self] path in
++            guard let self = self else { return }
++            self.updateCurrentPath(path)
++            self.pathSubject.send(path)
++            verboseLog("[minimuxer] [net] path changed, status: \(path.status)")
++            await self.handleNetworkChange()
++        }
++        guard didStart else {
++            verboseLog("[minimuxer] [net] monitor already started")
++            return false
++        }
++
++        verboseLog("[minimuxer] [net] monitor started")
+         return true
+     }
+     
+@@ -166,30 +220,33 @@ final internal class NetworkObserverService: NetworkObserverAPI, @unchecked Send
+     
+     @discardableResult
+     func stop() async -> Bool {
+-        let isStarted = await state.with { $0.started }
+-        guard isStarted else {
++        guard await state.stop() else {
+             verboseLog("[minimuxer] [net] monitor already stopped")
+             return false
+         }
+-
+-        self.monitor.cancel()
+-        await state.with {
+-            $0.observationTask?.cancel()
+-            $0.observationTask = nil
+-            $0.started = false
+-        }
+-        
+         verboseLog("[minimuxer] [net] monitor stopped")
+         return true
+     }
++
++    private var currentPath: NWPath? {
++        pathLock.lock()
++        defer { pathLock.unlock() }
++        return latestPath
++    }
++
++    private func updateCurrentPath(_ path: NWPath) {
++        pathLock.lock()
++        latestPath = path
++        pathLock.unlock()
++    }
+     
+     var isWifiSatisfied: Bool {
+-        let path = monitor.currentPath
++        guard let path = currentPath else { return false }
+         return path.status == .satisfied && path.usesInterfaceType(.wifi)
+     }
+     
+     var isWiredSatisfied: Bool {
+-        let path = monitor.currentPath
++        guard let path = currentPath else { return false }
+         return path.status == .satisfied && path.usesInterfaceType(.wiredEthernet)
+     }
+     
+@@ -201,8 +258,8 @@ final internal class NetworkObserverService: NetworkObserverAPI, @unchecked Send
+     }
+     
+     var isBridgeSatisfied: Bool {
+-        let path = monitor.currentPath
+-        if path.status == .satisfied && path.usesInterfaceType(.other) {
++        if let path = currentPath,
++           path.status == .satisfied && path.usesInterfaceType(.other) {
+             return true
+         }
+         
+diff --git a/Sources/Services/UsbmuxdProxyServer.swift b/Sources/Services/UsbmuxdProxyServer.swift
+index db53f60..5d7630d 100644
+--- a/Sources/Services/UsbmuxdProxyServer.swift
++++ b/Sources/Services/UsbmuxdProxyServer.swift
+@@ -63,6 +63,7 @@ final internal class UsbmuxdProxyServer {
+         }
+         let params = NWParameters.tcp
+         params.allowLocalEndpointReuse = true
++        params.requiredLocalEndpoint = .hostPort(host: .ipv4(.loopback), port: port)
+ 
+         let newListener = try NWListener(using: params, on: port)
+ 
+@@ -130,8 +131,42 @@ final internal class UsbmuxdProxyServer {
+     }
+ 
+     private func handleConnection(_ connection: NWConnection) {
++        nonisolated(unsafe) var didStartReading = false
++        connection.stateUpdateHandler = { [weak self] state in
++            guard let self = self else {
++                connection.cancel()
++                return
++            }
++
++            switch state {
++            case .ready:
++                guard !didStartReading else { return }
++                didStartReading = true
++                guard self.isLoopbackPeer(connection.currentPath?.remoteEndpoint) else {
++                    debugLog("[minimuxer] Rejected non-loopback usbmuxd client")
++                    connection.cancel()
++                    return
++                }
++                self.readNextPacket(on: connection)
++            case .failed, .cancelled:
++                connection.cancel()
++            default:
++                break
++            }
++        }
+         connection.start(queue: queue)
+-        readNextPacket(on: connection)
++    }
++
++    private func isLoopbackPeer(_ endpoint: NWEndpoint?) -> Bool {
++        guard case .hostPort(let host, _) = endpoint else { return false }
++        switch host {
++        case .ipv4(let address):
++            return address == .loopback
++        case .ipv6(let address):
++            return address == .loopback
++        default:
++            return false
++        }
+     }
+ 
+     private func readNextPacket(on connection: NWConnection) {
+@@ -178,6 +213,12 @@ final internal class UsbmuxdProxyServer {
+     }
+ 
+     private func processPacketData(_ data: Data, on connection: NWConnection) {
++        guard isLoopbackPeer(connection.currentPath?.remoteEndpoint) else {
++            debugLog("[minimuxer] Rejected usbmuxd packet from a non-loopback client")
++            connection.cancel()
++            return
++        }
++
+         defer {
+             readNextPacket(on: connection)
+         }
+@@ -234,6 +275,13 @@ final internal class UsbmuxdProxyServer {
+                 let buid = (self.gateway.pairingDataDict?["SystemBUID"] as? String) ?? "00000000-0000-0000-0000-000000000000"
+                 return ["BUID": buid]
+             case "ReadPairRecord":
++                guard let expectedPairRecordID = deviceUDID,
++                      packet.plist["PairRecordID"] as? String == expectedPairRecordID else {
++                    throw MinimuxerError.invalidPairing(
++                        protocol: .lockdown,
++                        reason: "ReadPairRecord requested an unknown device record"
++                    )
++                }
+                 guard let pairingData = self.gateway.pairingFileData else {
+                     throw MinimuxerError.pairingNotLoaded("No pairing file data available for ReadPairRecord")
+                 }
+diff --git a/Sources/Services/WirelessPairService.swift b/Sources/Services/WirelessPairService.swift
+index 1a24b36..23ecd96 100644
+--- a/Sources/Services/WirelessPairService.swift
++++ b/Sources/Services/WirelessPairService.swift
+@@ -10,6 +10,35 @@ import Foundation
+ internal import MinimuxerCommon
+ internal import DeviceGatewayAPI
+ 
++private final class WirelessPairStartGate: @unchecked Sendable {
++    private let lock = NSLock()
++    private var isOpen = false
++    private var continuation: CheckedContinuation<Void, Never>?
++
++    func wait() async {
++        await withCheckedContinuation { continuation in
++            let resumeImmediately = lock.withLock { () -> Bool in
++                guard !isOpen else { return true }
++                self.continuation = continuation
++                return false
++            }
++            if resumeImmediately {
++                continuation.resume()
++            }
++        }
++    }
++
++    func open() {
++        let waitingContinuation = lock.withLock { () -> CheckedContinuation<Void, Never>? in
++            isOpen = true
++            let continuation = self.continuation
++            self.continuation = nil
++            return continuation
++        }
++        waitingContinuation?.resume()
++    }
++}
++
+ // MARK: - Wireless Pair API
+ 
+ final internal class WirelessPairService: WirelessPairAPI {
+@@ -19,11 +48,16 @@ final internal class WirelessPairService: WirelessPairAPI {
+     }
+     
+     private var netService: NetService?
++    private var advertisingOwnerID: UUID?
++    private let advertisingLock = NSRecursiveLock()
+     
+     private var activeStartTask: Task<Void, Never>?
++    private var startTeardownTask: Task<Void, Never>?
++    private var activeStartID: UUID?
++    private var activeStartCancellation: TCPAcceptorCancellation?
+     private let startLock = NSLock()
+     
+-    private var activeTriggerTasks: [String: Task<Void, Never>] = [:]
++    private var activeTriggerTasks: [String: (id: UUID, task: Task<Void, Never>?)] = [:]
+     private let triggerLock = NSLock()
+     
+     var onPinReceived: ((String) -> Void)?
+@@ -42,16 +76,40 @@ final internal class WirelessPairService: WirelessPairAPI {
+         completion: @escaping (Result<PairedDeviceRecord, Swift.Error>) -> Void
+     ) {
+         debugLog("[WirelessPairService] start() invoked (hostName='\(hostName)', hostModel='\(hostModel)', outPath='\(outPath)')")
+-        startLock.withLock {
++        let operationID = UUID()
++        let cancellation = TCPAcceptorCancellation()
++        let startGate = WirelessPairStartGate()
++        let (supersededOperationID, supersededCancellation, priorStartTask) = startLock.withLock { () -> (UUID?, TCPAcceptorCancellation?, Task<Void, Never>?) in
++            let previousID = activeStartID
++            let previousTask = activeStartTask ?? startTeardownTask
+             if activeStartTask != nil {
+                 debugLog("[WirelessPairService] start() cancelling existing activeStartTask")
+                 activeStartTask?.cancel()
+-                activeStartTask = nil
++            }
++            let previousCancellation = activeStartCancellation
++            startTeardownTask = previousTask
++            activeStartID = operationID
++            activeStartTask = nil
++            activeStartCancellation = cancellation
++            return (previousID, previousCancellation, previousTask)
++        }
++        supersededCancellation?.cancel()
++        if let supersededOperationID {
++            Task { @MainActor in
++                self.stopAdvertising(ownerID: supersededOperationID)
+             }
+         }
+         
+         let task = Task.detached { [weak self] in
+             guard let self = self else { return }
++            await startGate.wait()
++            await priorStartTask?.value
++            let mayStart = self.startLock.withLock { () -> Bool in
++                guard self.activeStartID == operationID else { return false }
++                self.startTeardownTask = nil
++                return true
++            }
++            guard mayStart else { return }
+             
+             let outcome: Result<PairedDeviceRecord, Swift.Error>
+             do {
+@@ -60,22 +118,27 @@ final internal class WirelessPairService: WirelessPairAPI {
+                     hostName: hostName,
+                     hostModel: hostModel,
+                     outPath: outPath,
++                    cancellation: cancellation,
+                     resolveFileName: resolveFileName,
+                     onReady: { [weak self] serviceID, port, txtRecords in
+                         guard let self = self else { return }
++                        guard self.isCurrentStart(operationID) else { return }
+                         debugLog("[WirelessPairService] gateway onReady callback (serviceID='\(serviceID)', port=\(port), txtCount=\(txtRecords.count))")
+                         var txt: [String: Data] = [:]
+                         for (k, v) in txtRecords {
+                             txt[k] = Data(v.utf8)
+                         }
+                         Task { @MainActor in
+-                            self.startAdvertising(serviceID: serviceID, port: Int(port), txt: txt)
++                            guard self.isCurrentStart(operationID) else { return }
++                            self.startAdvertising(serviceID: serviceID, port: Int(port), txt: txt, ownerID: operationID)
+                         }
+                     },
+                     onPin: { [weak self] pinString in
+                         guard let self = self else { return }
++                        guard self.isCurrentStart(operationID) else { return }
+                         debugLog("[WirelessPairService] gateway onPin callback (pin='\(pinString)')")
+                         Task { @MainActor in
++                            guard self.isCurrentStart(operationID) else { return }
+                             self.onPinReceived?(pinString)
+                         }
+                     }
+@@ -88,17 +151,29 @@ final internal class WirelessPairService: WirelessPairAPI {
+             }
+             
+             await MainActor.run {
+-                self.startLock.withLock {
++                let ownsSession = self.startLock.withLock { () -> Bool in
++                    guard self.activeStartID == operationID else { return false }
++                    self.activeStartID = nil
+                     self.activeStartTask = nil
++                    self.activeStartCancellation = nil
++                    return true
++                }
++                if ownsSession {
++                    self.stopAdvertising(ownerID: operationID)
++                    completion(outcome)
+                 }
+-                self.stopAdvertising()
+-                completion(outcome)
+             }
+         }
+         
+         startLock.withLock {
+-            activeStartTask = task
++            if activeStartID == operationID {
++                activeStartTask = task
++            } else {
++                task.cancel()
++                cancellation.cancel()
++            }
+         }
++        startGate.open()
+     }
+ 
+     func trigger(
+@@ -111,14 +186,15 @@ final internal class WirelessPairService: WirelessPairAPI {
+         completion: @escaping (Result<PairedDeviceRecord, Swift.Error>) -> Void
+     ) {
+         let socketKey = "\(targetIp):\(targetPort)"
++        let operationID = UUID()
+         debugLog("[WirelessPairService] trigger() invoked for \(socketKey) (outPath='\(outPath)')")
+         
+         triggerLock.withLock {
+             if let existing = activeTriggerTasks[socketKey] {
+                 debugLog("[WirelessPairService] trigger() cancelling existing activeTriggerTask for \(socketKey)")
+-                existing.cancel()
+-                activeTriggerTasks.removeValue(forKey: socketKey)
++                existing.task?.cancel()
+             }
++            activeTriggerTasks[socketKey] = (id: operationID, task: nil)
+         }
+         
+         let task = Task.detached { [weak self] in
+@@ -136,8 +212,10 @@ final internal class WirelessPairService: WirelessPairAPI {
+                     resolveFileName: resolveFileName,
+                     onRequestPin: { [weak self] submitPin in
+                         guard let self = self else { return }
++                        guard self.isCurrentTrigger(socketKey, operationID) else { return }
+                         debugLog("[WirelessPairService] gateway trigger onRequestPin callback invoked")
+                         Task { @MainActor in
++                            guard self.isCurrentTrigger(socketKey, operationID) else { return }
+                             if let onRequestPin = self.onRequestPin {
+                                 onRequestPin(submitPin)
+                             } else {
+@@ -154,56 +232,98 @@ final internal class WirelessPairService: WirelessPairAPI {
+             }
+             
+             await MainActor.run {
+-                self.triggerLock.withLock {
+-                    _ = self.activeTriggerTasks.removeValue(forKey: socketKey)
++                let ownsRequest = self.triggerLock.withLock { () -> Bool in
++                    if self.activeTriggerTasks[socketKey]?.id == operationID {
++                        _ = self.activeTriggerTasks.removeValue(forKey: socketKey)
++                        return true
++                    }
++                    return false
++                }
++                if ownsRequest {
++                    completion(outcome)
+                 }
+-                completion(outcome)
+             }
+         }
+         
+         triggerLock.withLock {
+-            activeTriggerTasks[socketKey] = task
++            if activeTriggerTasks[socketKey]?.id == operationID {
++                activeTriggerTasks[socketKey] = (id: operationID, task: task)
++            } else {
++                task.cancel()
++            }
+         }
+     }
+     
+     func stop() {
+         debugLog("[WirelessPairService] stop() invoked")
+-        startLock.withLock {
++        let (stoppedOperationID, cancellation) = startLock.withLock { () -> (UUID?, TCPAcceptorCancellation?) in
++            let operationID = activeStartID
++            if activeStartTask != nil {
++                startTeardownTask = activeStartTask
++            }
++            activeStartID = nil
+             activeStartTask?.cancel()
+             activeStartTask = nil
++            let cancellation = activeStartCancellation
++            activeStartCancellation = nil
++            return (operationID, cancellation)
+         }
++        cancellation?.cancel()
+         
+         triggerLock.withLock {
+-            for (key, task) in activeTriggerTasks {
++            for (key, entry) in activeTriggerTasks {
+                 debugLog("[WirelessPairService] stop() cancelling active trigger task for \(key)")
+-                task.cancel()
++                entry.task?.cancel()
+             }
+             activeTriggerTasks.removeAll()
+         }
+         
+-        stopAdvertising()
++        if let stoppedOperationID {
++            stopAdvertising(ownerID: stoppedOperationID)
++        }
++    }
++
++    private func isCurrentStart(_ operationID: UUID) -> Bool {
++        startLock.withLock { activeStartID == operationID }
++    }
++
++    private func isCurrentTrigger(_ socketKey: String, _ operationID: UUID) -> Bool {
++        triggerLock.withLock { activeTriggerTasks[socketKey]?.id == operationID }
+     }
+     
+-    fileprivate func startAdvertising(serviceID: String, port: Int, txt: [String: Data]) {
++    fileprivate func startAdvertising(serviceID: String, port: Int, txt: [String: Data], ownerID: UUID) {
+         debugLog("[WirelessPairService] startAdvertising() serviceID='\(serviceID)', port=\(port), domain='\(MinimuxerConstants.defaultAdDomain)', type='\(MinimuxerConstants.remotePairingPairableHostServiceType)'")
+-        stopAdvertising()
+-        let service = NetService(
+-            domain: MinimuxerConstants.defaultAdDomain,
+-            type: MinimuxerConstants.remotePairingPairableHostServiceType,
+-            name: serviceID,
+-            port: Int32(port)
+-        )
+-        service.setTXTRecord(NetService.data(fromTXTRecord: txt))
+-        service.publish()
+-        netService = service
+-        onReadyToPair?(serviceID, port)
++        let started = startLock.withLock { () -> Bool in
++            guard activeStartID == ownerID else { return false }
++            advertisingLock.lock()
++            defer { advertisingLock.unlock() }
++            stopAdvertising()
++            let service = NetService(
++                domain: MinimuxerConstants.defaultAdDomain,
++                type: MinimuxerConstants.remotePairingPairableHostServiceType,
++                name: serviceID,
++                port: Int32(port)
++            )
++            service.setTXTRecord(NetService.data(fromTXTRecord: txt))
++            service.publish()
++            netService = service
++            advertisingOwnerID = ownerID
++            return true
++        }
++        if started && isCurrentStart(ownerID) {
++            onReadyToPair?(serviceID, port)
++        }
+     }
+     
+-    private func stopAdvertising() {
++    private func stopAdvertising(ownerID: UUID? = nil) {
++        advertisingLock.lock()
++        defer { advertisingLock.unlock() }
++        if let ownerID, advertisingOwnerID != ownerID { return }
+         if let ns = netService {
+             debugLog("[WirelessPairService] stopAdvertising() stopping NetService '\(ns.name)'")
+             ns.stop()
+             netService = nil
+         }
++        advertisingOwnerID = nil
+     }
+ }

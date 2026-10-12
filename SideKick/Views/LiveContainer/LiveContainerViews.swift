@@ -17,11 +17,12 @@ struct LiveContainerLibrarySection: View {
                 NavigationLink {
                     LiveContainerGuestDetailView(guestID: app.id)
                 } label: {
-                    HStack(spacing: 12) {
-                        LiveContainerGuestIcon(data: app.iconData).frame(width: 50, height: 50)
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(app.name).font(.body.weight(.semibold))
-                            Text("\(app.version) · Build \(app.build)").font(.subheadline).foregroundStyle(.secondary)
+                    SideKickLibraryAppRow(
+                        name: app.name,
+                        versionText: "Version \(app.version)",
+                        iconData: app.iconData,
+                        metadata: {
+                            Text("Build \(app.build)").font(.caption).foregroundStyle(.secondary)
                             if let connection = state.connections.first(where: { $0.id == app.connectionID }) {
                                 Text(connection.storageKind == .snapshot ? "Snapshot · \(connection.name)" : connection.name)
                                     .font(.caption).foregroundStyle(.secondary)
@@ -30,10 +31,9 @@ struct LiveContainerLibrarySection: View {
                                 }
                             }
                             if !app.isAvailable { Text("Unavailable · previous metadata").font(.caption).foregroundStyle(.orange) }
-                        }
-                        Spacer()
-                    }
-                    .padding(.vertical, 4)
+                        },
+                        status: { EmptyView() }
+                    )
                 }
                 .contextMenu {
                     SwiftUI.Button {
@@ -45,17 +45,18 @@ struct LiveContainerLibrarySection: View {
                     SwiftUI.Button {
                         Task { await launch(app) }
                     } label: {
-                        Label("Launch", systemImage: "play.circle")
+                        Label("Open", systemImage: "arrow.up.forward.app")
                     }
                     .disabled(workingGuestID != nil || !canLaunch(app))
                     SwiftUI.Button {
                         Task { await refresh(app) }
                     } label: {
-                        Label("Refresh", systemImage: "arrow.clockwise")
+                        Label("Rescan", systemImage: "arrow.clockwise")
                     }
                     .disabled(workingGuestID != nil || connection(for: app)?.isConnected != true)
                 }
                 .fullWidthListSeparators()
+                .sideKickNavigationLinkIndicator()
             }
             if let message {
                 Label(state.apps.isEmpty ? "Couldn’t Load LiveContainer Apps" : "Some LiveContainer Apps May Be Outdated", systemImage: "exclamationmark.circle")
@@ -69,10 +70,16 @@ struct LiveContainerLibrarySection: View {
                     Spacer()
                 }
             } else if state.apps.isEmpty {
-                Text("No cached guest apps were found.")
+                Text("No apps in this folder.")
                     .foregroundStyle(.secondary)
+                SwiftUI.Button {
+                    Task { await rescanFolders() }
+                } label: {
+                    Label("Rescan", systemImage: "arrow.clockwise")
+                }
+                .disabled(workingGuestID != nil || !state.connections.contains(where: \.isConnected))
                 NavigationLink { LiveContainerConnectionsView() } label: {
-                    Label("Manage Connections", systemImage: "folder")
+                    Label("Choose Folder", systemImage: "folder")
                 }
             }
         } header: { Text("LiveContainer") }
@@ -88,6 +95,22 @@ struct LiveContainerLibrarySection: View {
 
     private func connection(for app: LiveContainerGuest) -> LiveContainerConnection? {
         state.connections.first(where: { $0.id == app.connectionID })
+    }
+
+    @MainActor private func rescanFolders() async {
+        guard workingGuestID == nil else { return }
+        workingGuestID = "catalogue-rescan"
+        defer { workingGuestID = nil }
+        var failures: [String] = []
+        for connection in state.connections where connection.isConnected {
+            do {
+                try await environment.liveContainerStore.rescan(connection.id)
+            } catch {
+                failures.append("\(connection.name): \(error.localizedDescription)")
+            }
+        }
+        await environment.reloadLiveContainerCatalogue()
+        if !failures.isEmpty { actionError = failures.joined(separator: "\n") }
     }
 
     private func canLaunch(_ app: LiveContainerGuest) -> Bool {
@@ -143,21 +166,26 @@ struct LiveContainerConnectionsView: View {
     @State private var isWorking = false
     @State private var error: String?
     @State private var forgetting: LiveContainerConnection?
+    @State private var replacingConnection: LiveContainerConnection?
 
     var body: some View {
         List {
             Section {
-                TextField("Connection name", text: $name)
-                Picker("Directory type", selection: $kind) {
-                    ForEach(LiveContainerStorageKind.allCases) { Text($0.title).tag($0) }
-                }
-                TextField("URL scheme", text: $scheme).textInputAutocapitalization(.never).autocorrectionDisabled()
                 SwiftUI.Button { reconnectID = nil; picker = true } label: {
-                    Label("Link Applications Directory", systemImage: "folder.badge.plus")
+                    Label("Choose LiveContainer Folder", systemImage: "folder.badge.plus")
                 }
                 .disabled(isWorking)
+                DisclosureGroup("Advanced Settings") {
+                    TextField("Connection name", text: $name)
+                    Picker("Storage type", selection: $kind) {
+                        ForEach(LiveContainerStorageKind.allCases) { Text($0.title).tag($0) }
+                    }
+                    TextField("Launch scheme", text: $scheme).textInputAutocapitalization(.never).autocorrectionDisabled()
+                    Text("Change these only if your LiveContainer setup requires it. Exported snapshots cannot verify installed versions or launch apps.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
             } header: { Text("Link LiveContainer") } footer: {
-                Text("Select the actual Applications directory under Files → On My iPhone → LiveContainer. Shared App Group storage works only if it is exposed by a file provider. SideKick cannot unlock private storage. Use livecontainer, livecontainer2, or the scheme configured for your installation. An exported copy is a snapshot; it cannot verify installed versions or launch guests.")
+                Text("Choose the Applications folder exposed by LiveContainer in Files. SideKick reads app metadata from this folder; it never changes guest files.")
             }
             if isWorking { Section { ProgressView("Reading directory…") } }
             if state.connections.isEmpty { Section { ContentUnavailableView("No Linked Directories", systemImage: "folder") } }
@@ -169,23 +197,31 @@ struct LiveContainerConnectionsView: View {
                     if let date = connection.lastSuccessfulScan { LabeledContent("Last successful scan", value: date.formatted()) }
                     if let error = connection.error { Label(error, systemImage: "exclamationmark.triangle").font(.footnote).foregroundStyle(.orange) }
                     ForEach(Array(connection.warnings.enumerated()), id: \.offset) { _, warning in Text(warning).font(.footnote).foregroundStyle(.secondary) }
+                    if state.pendingForgetGuestIDs[connection.id] != nil {
+                        Label("Forget is incomplete. Retry to remove remaining sources and queued downloads.", systemImage: "exclamationmark.triangle")
+                            .font(.footnote).foregroundStyle(.orange)
+                    }
                     SwiftUI.Button { Task { await run { try await environment.liveContainerStore.rescan(connection.id) } } } label: {
                         Label("Rescan", systemImage: "arrow.clockwise")
                     }
-                    .disabled(isWorking || !connection.isConnected)
+                    .disabled(isWorking || !connection.isConnected || state.pendingForgetGuestIDs[connection.id] != nil)
                     SwiftUI.Button {
                         reconnectID = connection.id; name = connection.name; scheme = connection.scheme; kind = connection.storageKind; picker = true
                     } label: { Label("Reconnect Directory", systemImage: "folder") }
                     .disabled(isWorking)
                     SwiftUI.Button {
-                        reconnectID = nil; name = connection.name; scheme = connection.scheme; kind = connection.storageKind; picker = true
-                    } label: { Label("Select a Different Directory", systemImage: "folder.badge.plus") }
+                        reconnectID = nil; name = "LiveContainer \(state.connections.count + 1)"; scheme = connection.scheme; kind = connection.storageKind; picker = true
+                    } label: { Label("Add Another Directory", systemImage: "folder.badge.plus") }
                     .disabled(isWorking)
+                    SwiftUI.Button {
+                        replacingConnection = connection
+                    } label: { Label("Replace Directory", systemImage: "arrow.triangle.2.circlepath") }
+                    .disabled(isWorking || state.pendingForgetGuestIDs[connection.id] != nil)
                     if connection.isConnected {
                         SwiftUI.Button("Disconnect") { Task { await run { try await environment.liveContainerStore.disconnect(connection.id) } } }
                             .disabled(isWorking)
                     }
-                    SwiftUI.Button("Forget Connection", role: .destructive) { forgetting = connection }.disabled(isWorking)
+                    SwiftUI.Button(state.pendingForgetGuestIDs[connection.id] == nil ? "Forget Connection" : "Retry Forget", role: .destructive) { forgetting = connection }.disabled(isWorking)
                 } header: { Text(connection.name) } footer: {
                     Text("Disconnect keeps discovered metadata and GitHub sources. Selecting a different directory adds a separate connection; disconnect the old one when finished. Forget removes SideKick’s catalogue and source settings only. Guest files are never changed.")
                 }
@@ -212,12 +248,45 @@ struct LiveContainerConnectionsView: View {
                 guard let connection = forgetting else { return }
                 forgetting = nil
                 Task { await run {
-                    let ids = try await environment.liveContainerStore.forget(connection.id)
-                    for id in ids { try await GitHubUpdateConfigurationStore.shared.remove(bundleIdentifier: id) }
+                    let guestPrefix = "livecontainer:\(connection.id.uuidString):"
+                    let configurations = try await GitHubUpdateConfigurationStore.shared.all()
+                    let imports = try await environment.ipaImportStore.importedApps()
+                    let configuredGuestIDs = configurations.map(\.bundleIdentifier)
+                        .filter { $0.hasPrefix(guestPrefix) }
+                    let queuedGuestIDs = imports.compactMap(\.queuedForInstalledAppID)
+                        .filter { $0.hasPrefix(guestPrefix) }
+                    let ids = try await environment.liveContainerStore.beginForget(
+                        connection.id,
+                        additionalGuestIDs: configuredGuestIDs + queuedGuestIDs
+                    )
+                    for id in ids {
+                        try await environment.githubUpdateDownloads.prepareForgettingGuest(
+                            targetID: id,
+                            ipaImportStore: environment.ipaImportStore
+                        )
+                        try await GitHubUpdateConfigurationStore.shared.remove(bundleIdentifier: id)
+                        try await environment.liveContainerStore.completeForgetSource(id, connectionID: connection.id)
+                    }
                 } }
             }
             SwiftUI.Button("Cancel", role: .cancel) { forgetting = nil }
-        } message: { Text("Cached guest metadata and GitHub associations will be removed from SideKick. LiveContainer’s files remain in place.") }
+        } message: {
+            Text("Cached guest metadata and GitHub associations will be removed from SideKick. Active downloads and queued guest update IPA copies saved by SideKick will also be canceled and deleted. LiveContainer’s files remain in place.")
+        }
+        .confirmationDialog("Replace LiveContainer folder?", isPresented: Binding(get: { replacingConnection != nil }, set: { if !$0 { replacingConnection = nil } })) {
+            SwiftUI.Button("Choose Replacement Folder") {
+                guard let connection = replacingConnection else { return }
+                replacingConnection = nil
+                reconnectID = connection.id
+                name = connection.name
+                scheme = connection.scheme
+                kind = connection.storageKind
+                picker = true
+            }
+            SwiftUI.Button("Cancel", role: .cancel) { replacingConnection = nil }
+        } message: {
+            Text("This changes folder access for this connection. Cached guest metadata and GitHub source settings stay attached to it, so matching folder names can retain their associations. LiveContainer files are never changed.")
+        }
     }
 
     @MainActor private func reload() async {
@@ -237,6 +306,7 @@ struct LiveContainerGuestDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var guest: LiveContainerGuest?
     @State private var connection: LiveContainerConnection?
+    @State private var isBeingForgotten = false
     @State private var hasChecked = false
     @State private var checkFailed = false
     @State private var candidate: GitHubUpdateCandidate?
@@ -259,11 +329,12 @@ struct LiveContainerGuestDetailView: View {
 
     private var canCheckUpdates: Bool {
         guard let guest = self.guest else { return false }
-        return connection?.isConnected == true && connection?.error == nil
+        return !isBeingForgotten && connection?.isConnected == true && connection?.error == nil
             && connection?.storageKind != .snapshot && guest.isAvailable && guest.warning == nil
     }
 
     private var updateEligibilityMessage: String {
+        if isBeingForgotten { return "This guest is being forgotten. Retry Forget in Connection & Rescan if cleanup needs attention." }
         guard let connection else { return "Reconnect LiveContainer before updating this guest." }
         if !connection.isConnected || connection.error != nil {
             return "Reconnect the LiveContainer Applications folder and rescan before updating this guest."
@@ -300,33 +371,49 @@ struct LiveContainerGuestDetailView: View {
                     NavigationLink { GitHubUpdateSettingsView(target: guest.updateTarget) } label: {
                         Label("Update Source & Installed Build", systemImage: "chevron.left.forwardslash.chevron.right")
                     }
+                    .disabled(isBeingForgotten)
                     SwiftUI.Button { Task { await checkUpdates() } } label: { Label("Check for Updates", systemImage: "arrow.clockwise") }
-                        .disabled(working || isCheckingUpdates || connection?.isConnected != true || connection?.error != nil || connection?.storageKind == .snapshot || !guest.isAvailable || guest.warning != nil)
+                        .disabled(working || isCheckingUpdates || !canCheckUpdates)
+                    if isBeingForgotten {
+                        Label(updateEligibilityMessage, systemImage: "exclamationmark.triangle")
+                            .font(.footnote)
+                            .foregroundStyle(.orange)
+                    }
                     if let configuration {
                         LiveContainerInstalledBuildDisclosure(configuration: configuration)
                             .id(configuration.sourceIdentity + "\n" + (configuration.effectiveBaselineKey ?? ""))
+                        if configuration.source == .actionsArtifact {
+                            Text("Actions builds require a GitHub token with Actions: read access to this repository. For private repositories, include the repository and ensure the organization has approved the token. Choose or add a token in Update Source & Installed Build.")
+                                .font(.footnote).foregroundStyle(.secondary)
+                        }
                     }
                     if let candidate {
-                        SwiftUI.Button { Task { await updateInLiveContainer(candidate) } } label: {
-                            Label(downloadJob?.isDownloading == true ? "Downloading IPA…" : "Update in LiveContainer", systemImage: "arrow.down.app")
+                        GitHubUpdateDownloadControls(
+                            job: downloadJob,
+                            onDownload: { Task { await updateInLiveContainer(candidate, handoffIfQueued: false) } },
+                            onCancel: { environment.githubUpdateDownloads.cancelDownload(for: candidate) },
+                            onSkip: { Task { await resolve(markInstalled: false) } },
+                            isDisabled: working || isCheckingUpdates || !canCheckUpdates,
+                            isSkipDisabled: working || isCheckingUpdates
+                        ) {
+                            SwiftUI.Button { Task { await updateInLiveContainer(candidate) } } label: {
+                                Label("Send to LiveContainer", systemImage: "square.and.arrow.up")
+                                    .fontWeight(.semibold)
+                            }
+                            .buttonStyle(.plain)
                         }
-                        .disabled(working || isCheckingUpdates || !canCheckUpdates || downloadJob?.isDownloading == true)
                         if !canCheckUpdates {
                             Label(updateEligibilityMessage, systemImage: "exclamationmark.triangle")
                                 .font(.footnote)
                                 .foregroundStyle(.orange)
                         }
-                        if let progress = downloadJob?.progress, downloadJob?.isDownloading == true { ProgressView(value: progress) }
-                        if let error = downloadJob?.errorMessage { Text(error).foregroundStyle(.orange) }
                         LabeledContent("Available", value: candidate.newVersion)
                         if let url = URL(string: candidate.repositoryURL ?? "https://github.com") {
                             Link(destination: url) { Label("View on GitHub", systemImage: "arrow.up.right.square") }
                         }
                         SwiftUI.Button { markingInstalled = true } label: { Label("Already Installed This Build", systemImage: "checkmark.circle") }
                             .disabled(working || isCheckingUpdates)
-                        SwiftUI.Button { Task { await resolve(markInstalled: false) } } label: { Label("Skip This Build", systemImage: "forward.end") }
-                            .disabled(working || isCheckingUpdates)
-                        Text("Update downloads the IPA, then opens the share sheet. Choose LiveContainer to start installing it. Confirm this build after installation finishes.").font(.footnote).foregroundStyle(.secondary)
+                        Text("Download the IPA, then send it through the share sheet and choose LiveContainer to start installing it. Confirm this build after installation finishes.").font(.footnote).foregroundStyle(.secondary)
                     } else if configuration != nil { Text(hasChecked ? checkState.message : "Check this source for newer builds.").foregroundStyle(.secondary) }
                     if isCheckingUpdates { ProgressView("Checking for updates…") }
                     else if working { ProgressView() }
@@ -387,6 +474,11 @@ struct LiveContainerGuestDetailView: View {
     @MainActor private func reload() async -> Bool {
         do {
             let state = try await environment.liveContainerStore.snapshot()
+            isBeingForgotten = state.pendingForgetGuestIDs.values.contains { $0.contains(guestID) }
+            if isBeingForgotten {
+                candidate = nil
+                awaitingHandoff = nil
+            }
             guest = state.apps.first { $0.id == guestID }
             connection = state.connections.first { $0.id == guest?.connectionID }
             let currentConfiguration = try await GitHubUpdateConfigurationStore.shared.configuration(for: guestID)
@@ -409,7 +501,8 @@ struct LiveContainerGuestDetailView: View {
         return [target.id, target.name, target.version, target.observation ?? "",
             connection?.id.uuidString ?? "", connection?.isConnected == true ? "connected" : "disconnected",
             connection?.storageKind.rawValue ?? "", connection?.error ?? "",
-            guest.isAvailable ? "available" : "unavailable", guest.warning ?? ""].joined(separator: "\n")
+            guest.isAvailable ? "available" : "unavailable", guest.warning ?? "",
+            isBeingForgotten ? "forgetting" : "retained"].joined(separator: "\n")
     }
 
     private func candidateMatchesCurrentGuest(_ candidate: GitHubUpdateCandidate) -> Bool {
@@ -610,7 +703,7 @@ struct LiveContainerGuestDetailView: View {
             if !(await UIApplication.shared.open(url)) { message = "LiveContainer is unavailable for this scheme. Verify the installation and URL scheme." }
         } catch { message = error.localizedDescription }
     }
-    @MainActor private func updateInLiveContainer(_ candidate: GitHubUpdateCandidate) async {
+    @MainActor private func updateInLiveContainer(_ candidate: GitHubUpdateCandidate, handoffIfQueued: Bool = true) async {
         guard !working, !isCheckingUpdates else { return }
         guard await reload() else {
             message = "Could not verify the LiveContainer guest. Reconnect its folder and try again."
@@ -622,7 +715,7 @@ struct LiveContainerGuestDetailView: View {
             message = "The guest or update source changed. Check for updates again before handing off this IPA."
             return
         }
-        if let ipa = downloadJob?.queuedIPA { await handoff(ipa, candidate: candidate); return }
+        if handoffIfQueued, let ipa = downloadJob?.queuedIPA { await handoff(ipa, candidate: candidate); return }
         do {
             let token = try GitHubCredentialStore().load(id: expectedConfiguration.tokenID)
             guard await revalidateUpdateHandoff(candidate, identity: identity, expectedConfiguration: expectedConfiguration) else { return }
@@ -659,6 +752,7 @@ struct LiveContainerGuestDetailView: View {
 
     @MainActor private func resolve(markInstalled: Bool) async {
         guard !working, !isCheckingUpdates, let candidate, let source = candidate.sourceIdentity else { return }
+        guard canCheckUpdates else { message = updateEligibilityMessage; return }
         working = true
         defer { working = false }
         do {
@@ -670,7 +764,13 @@ struct LiveContainerGuestDetailView: View {
                 guard let guest, guest.isAvailable else { return }
                 applied = try await store.recordInstalled(key: candidate.updateKey, for: guest.updateTarget, expectedSource: source)
             } else {
-                applied = try await store.skip(key: candidate.updateKey, targetID: guestID, expectedSource: source)
+                applied = try await store.skip(
+                    key: candidate.updateKey,
+                    title: candidate.title,
+                    date: candidate.buildDate,
+                    targetID: guestID,
+                    expectedSource: source
+                )
             }
             guard applied else { message = "The update source changed. Check for updates again."; return }
             if let ipa = downloadJob?.queuedIPA { try await environment.ipaImportStore.delete(ipa) }

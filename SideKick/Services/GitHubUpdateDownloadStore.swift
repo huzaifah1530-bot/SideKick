@@ -16,6 +16,7 @@ final class GitHubUpdateDownloadStore {
     private(set) var jobs: [String: GitHubUpdateDownloadJob] = [:]
     @ObservationIgnored private var generations: [String: UUID] = [:]
     @ObservationIgnored private var tasks: [String: Task<Void, Never>] = [:]
+    @ObservationIgnored private var forgettingGuestTargets: Set<String> = []
 
     func start(
         candidate: GitHubUpdateCandidate,
@@ -23,21 +24,27 @@ final class GitHubUpdateDownloadStore {
         ipaImportStore: IPAImportStore,
         token: String?
     ) {
-        guard tasks[candidate.id] == nil, !SideKickStorageCleanup.isRemovingFiles else { return }
+        guard tasks[candidate.id] == nil,
+              !forgettingGuestTargets.contains(candidate.bundleIdentifier),
+              !SideKickStorageCleanup.isRemovingFiles else { return }
         let generation = UUID()
+        let previousQueuedIPA = jobs[candidate.id]?.queuedIPA
         generations[candidate.id] = generation
         jobs[candidate.id] = GitHubUpdateDownloadJob(
             progress: nil,
             bytesWritten: 0,
             totalBytesExpected: nil,
             isDownloading: true,
-            queuedIPA: nil,
+            queuedIPA: previousQueuedIPA,
             errorMessage: nil
         )
 
         tasks[candidate.id] = Task { [weak self] in
             guard let self else { return }
             var temporaryURL: URL?
+            defer {
+                if let temporaryURL { try? FileManager.default.removeItem(at: temporaryURL) }
+            }
             do {
                 let downloaded = try await GitHubUpdateService().downloadIPA(for: candidate, token: token) { progress in
                     Task { @MainActor in
@@ -45,7 +52,6 @@ final class GitHubUpdateDownloadStore {
                     }
                 }
                 temporaryURL = downloaded
-                defer { try? FileManager.default.removeItem(at: downloaded) }
                 try Task.checkCancellation()
                 let queuedIPA = try await ipaImportStore.importManagedIPA(
                     from: downloaded,
@@ -55,10 +61,18 @@ final class GitHubUpdateDownloadStore {
                     targetID: candidate.bundleIdentifier,
                     sourceIdentity: candidate.sourceIdentity
                 )
-                guard !Task.isCancelled, self.generations[candidate.id] == generation else {
+                guard self.generations[candidate.id] == generation else {
                     do { try await ipaImportStore.delete(queuedIPA) }
                     catch { debugLog("[SideKick] Could not remove a canceled GitHub update download: \(error.localizedDescription)") }
                     return
+                }
+                // Cancellation can arrive while importManagedIPA is suspended. Delete the
+                // just-imported IPA and route through the normal cancellation cleanup so the
+                // job becomes retryable instead of remaining stuck in its downloading state.
+                if Task.isCancelled {
+                    do { try await ipaImportStore.delete(queuedIPA) }
+                    catch { debugLog("[SideKick] Could not remove a canceled GitHub update download: \(error.localizedDescription)") }
+                    throw CancellationError()
                 }
                 self.jobs[candidate.id] = GitHubUpdateDownloadJob(
                     progress: 1,
@@ -70,16 +84,21 @@ final class GitHubUpdateDownloadStore {
                 )
             } catch {
                 guard self.generations[candidate.id] == generation else { return }
+                let message: String
+                if Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled {
+                    message = "Download canceled. Tap Try Again to restart."
+                } else {
+                    message = error.localizedDescription
+                }
                 self.jobs[candidate.id] = GitHubUpdateDownloadJob(
                     progress: nil,
                     bytesWritten: self.jobs[candidate.id]?.bytesWritten ?? 0,
                     totalBytesExpected: self.jobs[candidate.id]?.totalBytesExpected,
                     isDownloading: false,
-                    queuedIPA: nil,
-                    errorMessage: error.localizedDescription
+                    queuedIPA: self.jobs[candidate.id]?.queuedIPA,
+                    errorMessage: message
                 )
             }
-            if let temporaryURL { try? FileManager.default.removeItem(at: temporaryURL) }
             if self.generations[candidate.id] == generation {
                 self.tasks[candidate.id] = nil
                 self.generations[candidate.id] = nil
@@ -92,6 +111,29 @@ final class GitHubUpdateDownloadStore {
         tasks[candidate.id]?.cancel()
         tasks[candidate.id] = nil
         jobs[candidate.id] = nil
+    }
+
+    /// Blocks new work, cancels and joins in-flight downloads, then removes
+    /// their queued IPA records. A failed cleanup remains blocked for retry.
+    func prepareForgettingGuest(targetID: String, ipaImportStore: IPAImportStore) async throws {
+        forgettingGuestTargets.insert(targetID)
+        let prefix = targetID + ":"
+        let identifiers = Set(tasks.keys).union(jobs.keys).filter { $0.hasPrefix(prefix) }
+        for identifier in identifiers {
+            generations[identifier] = nil
+            let task = tasks[identifier]
+            if let task {
+                task.cancel()
+                await task.value
+            }
+            tasks[identifier] = nil
+            jobs[identifier] = nil
+        }
+        try await ipaImportStore.deleteQueuedUpdates(forGuestTargetID: targetID)
+    }
+
+    func cancelDownload(for candidate: GitHubUpdateCandidate) {
+        tasks[candidate.id]?.cancel()
     }
 
     func validateQueuedFiles(ipaImportStore: IPAImportStore) async {

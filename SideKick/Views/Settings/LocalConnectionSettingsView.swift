@@ -122,6 +122,8 @@ private enum PairingSetupErrorForVPN: LocalizedError {
 }
 
 private struct LocalConnectionHelpView: View {
+    @State private var vpn = LocalVPNService.shared
+
     var body: some View {
         List {
             Section {
@@ -129,9 +131,19 @@ private struct LocalConnectionHelpView: View {
                 Text("Use the standard SideKick IPA and LocalDevVPN from the App Store. Connect LocalDevVPN before installing, refreshing or enabling JIT. SideKick cannot control or disconnect another app’s tunnel.")
             } header: { Text("LocalDevVPN") }
             Section {
-                Label("Approve the iOS VPN alert", systemImage: "checkmark.shield")
-                Text("Choose Allow Local Connection in SideKick. iOS asks to add a VPN configuration and may require your passcode. This permission is needed once per installation or after removing the configuration.")
-            } header: { Text("VPN Permission") }
+                if vpn.mode == .builtIn {
+                    Label("Approve the iOS VPN alert", systemImage: "checkmark.shield")
+                    Text("Choose Allow Built-in VPN in SideKick. iOS asks to add a VPN configuration and may require your passcode. This permission is needed once per installation or after removing the configuration.")
+                } else {
+                    Label("Connect LocalDevVPN", systemImage: "arrow.up.forward.app")
+                    Text("Connect LocalDevVPN before checking the pairing file. The external tunnel is managed in LocalDevVPN and does not require SideKick VPN permission.")
+                }
+                NavigationLink {
+                    LocalConnectionSettingsView()
+                } label: {
+                    Label(recoveryControlTitle, systemImage: vpn.mode == .external ? "arrow.up.forward.app" : "checkmark.shield")
+                }.fullWidthListSeparators()
+            } header: { Text(vpn.mode == .builtIn ? "VPN Permission" : "Local Connection") }
             Section {
                 Label("Sign the app and extension", systemImage: "signature")
                 Text("Use the optional SideKick-vpn-unsigned IPA and keep SideKickVPN enabled when signing it. Both SideKick and its extension need provisioning profiles containing the Network Extension packet-tunnel-provider capability. Free Apple ID provisioning does not support this capability. Use an eligible Apple Developer signing profile and preserve the extension’s entitlements.")
@@ -148,6 +160,12 @@ private struct LocalConnectionHelpView: View {
         }
         .navigationTitle("Connection Help")
         .navigationBarTitleDisplayMode(.inline)
+        .task { await vpn.refreshStatus() }
+    }
+
+    private var recoveryControlTitle: String {
+        if vpn.mode == .external { return vpn.externalInstalled ? "Connect LocalDevVPN" : "Get LocalDevVPN" }
+        return vpn.isConfigured ? "Verify Device Connection" : "Allow Built-in VPN"
     }
 }
 

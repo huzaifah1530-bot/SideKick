@@ -7,8 +7,6 @@ struct ContentView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var selectedTab = 0
     @State private var setupStatus = SetupStatus()
-    @State private var connectionWarning: LocalVPNService.ConnectionWarning?
-    @State private var showingConnectionSettings = false
 
     var body: some View {
         Group {
@@ -36,14 +34,12 @@ struct ContentView: View {
             if scenePhase == .background { environment.pauseGitHubChecks() }
             else { environment.resumeGitHubChecks() }
             await environment.startDatabase()
-            await setupStatus.refresh()
+            if case .ready = environment.databaseState { await setupStatus.refresh() }
         }
-        .task { await checkConnectionWarning() }
         .onChange(of: scenePhase) { _, phase in
             if phase == .background { environment.pauseGitHubChecks() }
             guard phase == .active else { return }
             environment.resumeGitHubChecks()
-            Task { await checkConnectionWarning() }
             guard case .ready = environment.databaseState else { return }
             Task {
                 await environment.reloadLocalCatalogues(checkForUpdates: true)
@@ -66,6 +62,9 @@ struct ContentView: View {
         .onReceive(NotificationCenter.default.publisher(for: .sideKickLiveContainerCheckRequested)) { _ in
             environment.rescanLiveContainerApps()
         }
+        .onReceive(NotificationCenter.default.publisher(for: GitHubUpdateNotificationRouteStore.tappedNotification)) { _ in
+            selectedTab = 0
+        }
         .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange)
             .filter { notification in
                 guard let context = notification.object as? NSManagedObjectContext,
@@ -78,40 +77,6 @@ struct ContentView: View {
             .debounce(for: .milliseconds(150), scheduler: RunLoop.main)) { _ in
                 Task { await environment.reloadLocalCatalogues() }
             }
-        .alert(connectionWarning?.title ?? "Local Connection", isPresented: Binding(
-            get: { connectionWarning != nil },
-            set: { if !$0 { connectionWarning = nil } }
-        )) {
-            SwiftUI.Button("Connection Settings") {
-                LocalVPNService.shared.acknowledgeConnectionWarning()
-                connectionWarning = nil
-                showingConnectionSettings = true
-            }
-            SwiftUI.Button("Not Now", role: .cancel) {
-                LocalVPNService.shared.acknowledgeConnectionWarning()
-                connectionWarning = nil
-            }
-        } message: {
-            Text(connectionWarning?.message ?? "")
-        }
-        .sheet(isPresented: $showingConnectionSettings) {
-            NavigationStack {
-                LocalConnectionSettingsView()
-                    .toolbar {
-                        ToolbarItem(placement: .confirmationAction) {
-                            SwiftUI.Button("Done") { showingConnectionSettings = false }
-                        }
-                    }
-            }
-        }
-    }
-
-    @MainActor private func checkConnectionWarning() async {
-        guard scenePhase == .active, connectionWarning == nil, !showingConnectionSettings else { return }
-        let warning = await LocalVPNService.shared.connectionWarningIfNeeded()
-        guard !Task.isCancelled, scenePhase == .active, connectionWarning == nil,
-              !showingConnectionSettings else { return }
-        connectionWarning = warning
     }
 
     @ViewBuilder
@@ -132,7 +97,10 @@ struct ContentView: View {
                     .foregroundStyle(.secondary)
                     .textSelection(.enabled)
                 SwiftUI.Button("Try Again") {
-                    Task { await environment.startDatabase() }
+                    Task {
+                        await environment.startDatabase()
+                        if case .ready = environment.databaseState { await setupStatus.refresh() }
+                    }
                 }
                 .buttonStyle(.bordered)
             case .ready:

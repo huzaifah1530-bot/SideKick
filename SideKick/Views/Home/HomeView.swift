@@ -84,6 +84,34 @@ private struct UnresolvedQueuedManualUpdateRow: View {
     }
 }
 
+private struct GitHubUpdateAttentionDetailView: View {
+    let target: GitHubUpdateTarget
+    let result: GitHubCheckResult
+
+    var body: some View {
+        Form {
+            Section(target.name) {
+                Text(result.state.message)
+            }
+            if let detail = result.detail, !detail.isEmpty {
+                Section("Technical Details") {
+                    Text(detail)
+                        .font(.footnote)
+                        .textSelection(.enabled)
+                }
+            }
+            Section {
+                NavigationLink {
+                    GitHubUpdateSettingsView(target: target)
+                } label: {
+                    Label("Review GitHub Update Settings", systemImage: "chevron.left.forwardslash.chevron.right")
+                }
+            }
+        }
+        .navigationTitle(target.name)
+    }
+}
+
 struct HomeView: View {
     @State var viewModel: HomeViewModel
     @State private var showingImporter = false
@@ -96,13 +124,18 @@ struct HomeView: View {
     @State private var remainingAppIDs: Int?
     @State private var isRefreshingAll = false
     @State private var refreshAllProgress: (completed: Int, total: Int)?
-    @State private var refreshAllResultMessage: String?
+    @State private var refreshAllOutcome: QuietRefreshOutcome?
+    @State private var showingRefreshAllResults = false
+    @State private var isRetryingRefreshFailures = false
+    @State private var retryRefreshProgress: (completed: Int, total: Int)?
     @State private var appRefreshErrorMessage: String?
     @State private var refreshingAppID: String?
     @State private var managementApp: InstalledAppSummary?
     @State private var showingManagementApp = false
     @State private var managementImportedApp: ImportedIPA?
     @State private var showingImportedManagement = false
+    @State private var notificationNavigationPath: [GitHubUpdateNotificationRoute] = []
+    @State private var isRoutingUpdateNotification = false
     @State private var appIDCapacityTask: Task<Void, Never>?
     @State private var capacityGeneration = UUID()
     @State private var expirationClock = Date.now
@@ -114,19 +147,21 @@ struct HomeView: View {
     private var githubChecks: [GitHubCheckResult] { environment.githubChecks }
     private var githubUpdates: [GitHubUpdateCandidate] { environment.githubUpdates }
     private var isCheckingGitHubUpdates: Bool { environment.isCheckingGitHubUpdates }
-    private var githubUpdateCheckFailed: Bool { environment.githubUpdateCheckFailed }
+    private var configuredGitHubChecks: [GitHubCheckResult] {
+        githubChecks.filter { $0.checkedConfiguration != nil || $0.state == .failed }
+    }
+    private var configuredGitHubAttentionChecks: [GitHubCheckResult] {
+        configuredGitHubChecks.filter { $0.state.needsAttention }
+    }
+    private var hasConfiguredGitHubSources: Bool { !configuredGitHubChecks.isEmpty }
+    private var githubUpdateCheckFailed: Bool {
+        configuredGitHubChecks.contains { $0.state == .failed }
+    }
     private var hasLoadedLocalApps: Bool { environment.hasLoadedLocalApps }
     private var isLoadingLocalApps: Bool { environment.isLoadingLocalApps }
     private var localLoadError: String? { environment.localLoadError }
-
-    private var runningSideKickApp: InstalledAppSummary? {
-        guard let bundleIdentifier = Bundle.main.bundleIdentifier else { return nil }
-        return installedApps.first { $0.id == bundleIdentifier }
-    }
-
-    private var runningSideKickGitHubCheckIsUnconfigured: Bool {
-        guard let app = runningSideKickApp else { return false }
-        return githubChecks.contains { $0.targetID == app.id && $0.state == .notConfigured }
+    private var isImportReviewActive: Bool {
+        viewModel.isImporting || ipaAwaitingUpdateChoice != nil || isQueueingSelectedIPA
     }
 
     private var installedBundleIdentifiers: Set<String> {
@@ -202,8 +237,17 @@ struct HomeView: View {
     }
 
     var body: some View {
-        NavigationStack {
+        NavigationStack(path: $notificationNavigationPath) {
             List {
+                if viewModel.isImporting {
+                    HStack(spacing: 12) {
+                        ProgressView()
+                        Text("Reading IPA…")
+                            .font(.subheadline.weight(.medium))
+                    }
+                    .padding(.vertical, 8)
+                    .listRowBackground(Color.clear)
+                }
                 if !githubUpdates.isEmpty || !queuedManualUpdates.isEmpty || !unresolvedQueuedManualUpdates.isEmpty {
                     SwiftUI.Section("Updates") {
                         ForEach(queuedManualUpdates) { queuedUpdate in
@@ -224,7 +268,7 @@ struct HomeView: View {
                             .fullWidthListSeparators()
                             .sideKickNavigationLinkIndicator()
                         }
-                        ForEach(filteredGitHubUpdates) { update in
+                        ForEach(githubUpdates) { update in
                             if update.targetKind == .liveContainer {
                                 NavigationLink { LiveContainerGuestDetailView(guestID: update.bundleIdentifier) } label: {
                                     GitHubUpdateRow(candidate: update, iconData: guestApps.first { $0.id == update.bundleIdentifier }?.iconData)
@@ -242,53 +286,55 @@ struct HomeView: View {
                     }
                 }
 
-                SwiftUI.Section("GitHub Updates") {
-                    HStack(spacing: 9) {
-                        if isCheckingGitHubUpdates { ProgressView() }
-                        else if githubUpdateCheckFailed {
-                            Image(systemName: "exclamationmark.circle").foregroundStyle(.orange)
-                        } else if githubChecks.contains(where: { $0.state == .notConfigured }) {
-                            Image(systemName: "gearshape.2").foregroundStyle(.secondary)
-                        } else {
-                            Image(systemName: "arrow.down.circle").foregroundStyle(Color.sideKickAccentGradient)
-                        }
-                        Text(updateCheckStatus)
-                            .font(.subheadline.weight(.medium))
-                        Spacer()
-                        if shouldOfferGitHubCheckAction {
-                            SwiftUI.Button(githubUpdateCheckFailed ? "Retry" : "Check Now") {
-                                Task { await checkGitHubUpdatesNow() }
+                if hasConfiguredGitHubSources {
+                    SwiftUI.Section("GitHub Updates") {
+                        HStack(spacing: 9) {
+                            if isCheckingGitHubUpdates { ProgressView() }
+                            else if configuredGitHubChecks.contains(where: { $0.state.needsAttention }) {
+                                Image(systemName: "exclamationmark.circle").foregroundStyle(.orange)
+                            } else {
+                                Image(systemName: "arrow.down.circle").foregroundStyle(Color.sideKickAccentGradient)
                             }
-                            .font(.caption.weight(.semibold))
+                            Text(updateCheckStatus)
+                                .font(.subheadline.weight(.medium))
+                            Spacer()
+                            if shouldOfferGitHubCheckAction {
+                                SwiftUI.Button(githubUpdateCheckFailed ? "Retry" : "Check Now") {
+                                    Task { await checkGitHubUpdatesNow() }
+                                }
+                                .font(.caption.weight(.semibold))
+                            }
                         }
-                    }
-                    .padding(.horizontal, 16)
-                    .padding(.vertical, 13)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .background(Color(uiColor: .secondarySystemGroupedBackground), in: .rect(cornerRadius: 18))
-                    .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
-                    .listRowBackground(Color.clear)
-                    .listRowSeparator(.hidden)
-                    if isCheckingGitHubUpdates {
-                        ProgressView()
-                            .progressViewStyle(.linear)
-                            .padding(.horizontal, 10)
-                            .padding(.bottom, 8)
-                            .listRowBackground(Color.clear)
-                            .listRowSeparator(.hidden)
-                    }
-                    if runningSideKickGitHubCheckIsUnconfigured, let runningSideKickApp {
-                        NavigationLink {
-                            GitHubUpdateSettingsView(app: runningSideKickApp)
-                        } label: {
-                            Label("Set up GitHub updates for SideKick", systemImage: "chevron.left.forwardslash.chevron.right")
+                        .padding(.horizontal, 16)
+                        .padding(.vertical, 13)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .background(Color(uiColor: .secondarySystemGroupedBackground), in: .rect(cornerRadius: 18))
+                        .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
+                        .listRowBackground(Color.clear)
+                        .listRowSeparator(.hidden)
+                        if isCheckingGitHubUpdates {
+                            ProgressView()
+                                .progressViewStyle(.linear)
+                                .padding(.horizontal, 10)
+                                .padding(.bottom, 8)
+                                .listRowBackground(Color.clear)
+                                .listRowSeparator(.hidden)
                         }
-                        .fullWidthListSeparators()
-                    }
-                    if let attention = githubChecks.first(where: { $0.state.needsAttention }) {
-                        Text(attention.detail ?? attention.state.message)
-                            .font(.footnote)
-                            .foregroundStyle(.secondary)
+                        ForEach(configuredGitHubAttentionChecks, id: \.targetID) { check in
+                            if let target = attentionTarget(for: check) {
+                                NavigationLink {
+                                    GitHubUpdateAttentionDetailView(target: target, result: check)
+                                } label: {
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(target.name).font(.subheadline.weight(.medium))
+                                        Text(check.state.message)
+                                            .font(.footnote)
+                                            .foregroundStyle(.secondary)
+                                    }
+                                }
+                                .fullWidthListSeparators()
+                            }
+                        }
                     }
                 }
 
@@ -330,12 +376,12 @@ struct HomeView: View {
                                 SwiftUI.Button {
                                     UIApplication.shared.open(InstalledApp.openAppURL(targetBundleIdentifier: app.resignedBundleIdentifier))
                                 } label: {
-                                    Label("Launch", systemImage: "arrow.up.forward.app")
+                                    Label("Open", systemImage: "arrow.up.forward.app")
                                 }
                                 SwiftUI.Button {
                                     Task { await refreshInstalledApp(app) }
                                 } label: {
-                                    Label("Refresh", systemImage: "arrow.clockwise")
+                                    Label("Refresh Signing", systemImage: "arrow.clockwise")
                                 }
                                 .disabled(isRefreshingAll || refreshingAppID != nil)
                                 Divider()
@@ -374,7 +420,9 @@ struct HomeView: View {
                     }
                 }
 
-                LiveContainerLibrarySection()
+                if !environment.liveContainerState.connections.isEmpty || !guestApps.isEmpty {
+                    LiveContainerLibrarySection()
+                }
 
                 if !filteredImportedApps.isEmpty {
                     SwiftUI.Section("Ready to Install") {
@@ -408,6 +456,9 @@ struct HomeView: View {
             .listStyle(.insetGrouped)
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("My Apps")
+            .navigationDestination(for: GitHubUpdateNotificationRoute.self) { route in
+                notificationUpdateDestination(for: route)
+            }
             .task {
                 environment.rescanLiveContainerApps()
                 await environment.reloadLocalCatalogues()
@@ -437,6 +488,7 @@ struct HomeView: View {
                         Image(systemName: "plus")
                     }
                     .accessibilityLabel("Add App")
+                    .disabled(isImportReviewActive)
                 }
             }
             .navigationDestination(isPresented: $showingURLImport) {
@@ -470,9 +522,13 @@ struct HomeView: View {
                 }
             }
             .task { await viewModel.load(); startAppIDCapacityCheck() }
+            .task { await openPendingUpdateNotification() }
             .onChange(of: scenePhase) { _, phase in
                 if phase == .background { cancelBackgroundChecks() }
-                else if phase == .active { startAppIDCapacityCheck() }
+                else if phase == .active {
+                    startAppIDCapacityCheck()
+                    Task { await openPendingUpdateNotification() }
+                }
             }
             .onDisappear {
                 cancelBackgroundChecks()
@@ -492,6 +548,12 @@ struct HomeView: View {
             }
             .onReceive(NotificationCenter.default.publisher(for: SideKickIncomingIPA.importNotification)) { _ in
                 Task { await importPendingIPA() }
+            }
+            .onChange(of: isImportReviewActive) { _, active in
+                if !active { Task { await importPendingIPA() } }
+            }
+            .onReceive(NotificationCenter.default.publisher(for: GitHubUpdateNotificationRouteStore.tappedNotification)) { _ in
+                Task { await openPendingUpdateNotification() }
             }
             .onReceive(NotificationCenter.default.publisher(for: .sideKickImportedIPAsDidChange)) { _ in
                 Task {
@@ -535,14 +597,12 @@ struct HomeView: View {
             } message: {
                 Text("Queue this IPA as the update for the installed app?")
             }
-            .alert(appRefreshErrorMessage != nil ? "Couldn’t refresh app" : refreshAllResultMessage == nil
-                ? (viewModel.errorMessage == nil ? "IPA imported" : "Couldn’t import IPA")
-                : "Refresh All", isPresented: Binding(
-                get: { appRefreshErrorMessage != nil || refreshAllResultMessage != nil || viewModel.errorMessage != nil || viewModel.noticeMessage != nil },
+            .alert(appRefreshErrorMessage != nil ? "Couldn’t refresh app"
+                : (viewModel.errorMessage == nil ? "IPA imported" : "Couldn’t import IPA"), isPresented: Binding(
+                get: { appRefreshErrorMessage != nil || viewModel.errorMessage != nil || viewModel.noticeMessage != nil },
                 set: {
                     if !$0 {
                         appRefreshErrorMessage = nil
-                        refreshAllResultMessage = nil
                         viewModel.errorMessage = nil
                         viewModel.noticeMessage = nil
                     }
@@ -550,51 +610,47 @@ struct HomeView: View {
             )) {
                 SwiftUI.Button("OK", role: .cancel) { }
             } message: {
-                Text(appRefreshErrorMessage ?? refreshAllResultMessage ?? viewModel.errorMessage ?? viewModel.noticeMessage ?? "")
+                Text(appRefreshErrorMessage ?? viewModel.errorMessage ?? viewModel.noticeMessage ?? "")
+            }
+            .sheet(isPresented: $showingRefreshAllResults, onDismiss: { refreshAllOutcome = nil }) {
+                NavigationStack {
+                    if let refreshAllOutcome {
+                        RefreshAllResultsView(
+                            outcome: refreshAllOutcome,
+                            accountStore: accountStore,
+                            isRetrying: isRetryingRefreshFailures || isRefreshingAll,
+                            progress: retryRefreshProgress ?? refreshAllProgress,
+                            retry: { Task { await retryRefreshFailuresOrAll() } }
+                        )
+                    } else {
+                        ContentUnavailableView("No Refresh Results", systemImage: "arrow.clockwise")
+                    }
+                }
             }
         }
     }
 
     @ViewBuilder
     private func installedAppRow(_ app: InstalledAppSummary) -> some View {
-        HStack(spacing: 12) {
-            if let data = app.iconData, let icon = UIImage(data: data) {
-                Image(uiImage: icon)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 56, height: 56)
-                    .clipShape(.rect(cornerRadius: 12))
-            } else {
-                Image(systemName: "app.fill")
-                    .font(.system(size: 28))
-                    .foregroundStyle(.white)
-                    .frame(width: 56, height: 56)
-                    .background(.blue.gradient, in: .rect(cornerRadius: 12))
+        SideKickLibraryAppRow(
+            name: app.name,
+            versionText: "Version \(app.version)",
+            iconData: app.iconData,
+            metadata: { EmptyView() },
+            status: {
+                VStack(alignment: .center, spacing: 4) {
+                    Text("Expires in")
+                        .font(.caption2)
+                        .foregroundStyle(.secondary)
+                        .frame(width: 82, alignment: .center)
+                    Text("\(daysRemaining(for: app.expirationDate, now: expirationClock)) DAYS")
+                        .font(.subheadline.weight(.semibold))
+                        .foregroundStyle(.white)
+                        .frame(width: 82, height: 34)
+                        .background(expirationColor(for: app.expirationDate, now: expirationClock).opacity(0.84), in: .capsule)
+                }
             }
-            VStack(alignment: .leading, spacing: 4) {
-                Text(app.name).font(.body.weight(.semibold))
-                Text("Version \(app.version)")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            .frame(maxWidth: .infinity, alignment: .leading)
-            Spacer(minLength: 8)
-            VStack(alignment: .center, spacing: 4) {
-                Text("Expires in")
-                    .font(.caption2)
-                    .foregroundStyle(.secondary)
-                    .frame(width: 82, alignment: .center)
-                Text("\(daysRemaining(for: app.expirationDate, now: expirationClock)) DAYS")
-                    .font(.subheadline.weight(.semibold))
-                    .foregroundStyle(.white)
-                    .frame(width: 82, height: 34)
-                    .background(expirationColor(for: app.expirationDate, now: expirationClock).opacity(0.84), in: .capsule)
-            }
-        }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 6)
-        .listRowBackground(Color(uiColor: .secondarySystemGroupedBackground))
+        )
     }
 
     private func load() async {
@@ -621,33 +677,23 @@ struct HomeView: View {
     }
 
     private var updateCheckStatus: String {
-        if localLoadError != nil { return "Couldn’t Load Your Apps" }
-        if !hasLoadedLocalApps { return "Loading Your Apps" }
-        if isCheckingGitHubUpdates { return "Checking GitHub for updates…" }
-        if runningSideKickGitHubCheckIsUnconfigured { return "GitHub updates aren’t configured for SideKick." }
-
-        let availableCount = githubChecks.filter { $0.state == .updateAvailable }.count
+        let availableCount = configuredGitHubChecks.filter { $0.state == .updateAvailable }.count
         if availableCount > 0 {
             return availableCount == 1 ? "A GitHub update is available." : "\(availableCount) GitHub updates are available."
         }
-        if githubUpdateCheckFailed { return "One or more GitHub update checks failed. Retry the check." }
-        if githubChecks.contains(where: { $0.state.needsAttention }) { return "GitHub update tracking needs attention." }
-
-        let unconfiguredCount = githubChecks.filter { $0.state == .notConfigured }.count
-        if unconfiguredCount > 0 {
-            let configuredCount = githubChecks.count - unconfiguredCount
-            return configuredCount == 0
-                ? "GitHub updates aren’t configured for the checked apps."
-                : "GitHub checks finished; \(unconfiguredCount) app(s) aren’t configured."
+        let failureCount = configuredGitHubChecks.filter { $0.state == .failed }.count
+        if failureCount > 0 {
+            return failureCount == 1
+                ? "One GitHub update check failed. Retry the check."
+                : "\(failureCount) GitHub update checks failed. Retry the checks."
         }
-        if githubChecks.contains(where: { $0.state == .skipped }) { return "The latest GitHub build was skipped." }
-        if githubChecks.contains(where: { $0.state == .current }) { return "Confirmed GitHub builds are current." }
-        if githubChecks.contains(where: { $0.state == .installedAhead }) { return "Installed builds are ahead of GitHub releases." }
-        if githubChecks.isEmpty {
-            return environment.hasGitHubUpdateTargets
-                ? "No GitHub update check is running."
-                : "No eligible apps are available for GitHub update checks."
+        if configuredGitHubAttentionChecks.count > 0 {
+            return "GitHub update tracking needs attention for \(configuredGitHubAttentionChecks.count) app(s)."
         }
+        if isCheckingGitHubUpdates { return "Checking GitHub for updates…" }
+        if configuredGitHubChecks.contains(where: { $0.state == .skipped }) { return "The latest GitHub build was skipped." }
+        if configuredGitHubChecks.contains(where: { $0.state == .current }) { return "Confirmed GitHub builds are current." }
+        if configuredGitHubChecks.contains(where: { $0.state == .installedAhead }) { return "Installed builds are ahead of GitHub releases." }
         return "No confirmed GitHub updates are available."
     }
 
@@ -660,8 +706,70 @@ struct HomeView: View {
         await environment.awaitPendingGitHubChecks()
     }
 
-    private var filteredGitHubUpdates: [GitHubUpdateCandidate] {
-        githubUpdates
+    private func attentionTarget(for check: GitHubCheckResult) -> GitHubUpdateTarget? {
+        if let app = installedApps.first(where: { $0.id == check.targetID }) { return app.updateTarget }
+        if let guest = guestApps.first(where: { $0.id == check.targetID }) { return guest.updateTarget }
+        return nil
+    }
+
+    private func openPendingUpdateNotification() async {
+        guard scenePhase == .active,
+              !isRoutingUpdateNotification,
+              let route = GitHubUpdateNotificationRouteStore.pendingRoute() else { return }
+        isRoutingUpdateNotification = true
+        defer { isRoutingUpdateNotification = false }
+
+        await environment.reloadLocalCatalogues()
+        guard scenePhase == .active else { return }
+        await environment.rescanLiveContainerAppsAndWait()
+        environment.requestGitHubUpdateCheck(force: true)
+        await environment.awaitPendingGitHubChecks()
+        guard !Task.isCancelled else { return }
+
+        notificationNavigationPath = [route]
+        GitHubUpdateNotificationRouteStore.clearPendingRoute(route)
+    }
+
+    @ViewBuilder
+    private func notificationUpdateDestination(for route: GitHubUpdateNotificationRoute) -> some View {
+        if let check = githubChecks.first(where: { $0.targetID == route.bundleIdentifier }),
+           check.state == .updateAvailable,
+           githubUpdates.contains(where: {
+               notificationCandidate($0, matches: route)
+           }),
+           route.targetKind == .liveContainer,
+           let guest = guestApps.first(where: { $0.id == route.bundleIdentifier }),
+           guest.isAvailable, guest.warning == nil,
+           environment.liveContainerState.connections.contains(where: {
+               $0.id == guest.connectionID && $0.isConnected && $0.storageKind != .snapshot && $0.error == nil
+           }) {
+            LiveContainerGuestDetailView(guestID: guest.id)
+        } else if let check = githubChecks.first(where: { $0.targetID == route.bundleIdentifier }),
+                  check.state == .updateAvailable,
+                  let candidate = githubUpdates.first(where: {
+                      notificationCandidate($0, matches: route)
+                  }),
+                  route.targetKind == .installed,
+                  let app = installedApps.first(where: { $0.id == route.bundleIdentifier }) {
+            GitHubUpdateDetailView(candidate: candidate, app: app)
+        } else {
+            ContentUnavailableView(
+                "This update can’t be opened",
+                systemImage: "checkmark.circle",
+                description: Text("SideKick couldn’t confirm that this build is still available. The app may have been updated, removed, or its GitHub source may have changed. Return to My Apps and check again.")
+            )
+        }
+    }
+
+    private func notificationCandidate(_ candidate: GitHubUpdateCandidate, matches route: GitHubUpdateNotificationRoute) -> Bool {
+        guard candidate.bundleIdentifier == route.bundleIdentifier,
+              candidate.targetKind == route.targetKind else { return false }
+        if let sourceIdentity = route.sourceIdentity {
+            return candidate.sourceIdentity == sourceIdentity
+        }
+        // Notifications delivered by an earlier build lacked sourceIdentity;
+        // only route those when the exact notified build remains current.
+        return candidate.updateKey == route.updateKey
     }
 
     private func loadAppIDCapacity(generation: UUID) async {
@@ -696,7 +804,6 @@ struct HomeView: View {
 
     private func refreshAllApps() async {
         guard !isRefreshingAll, refreshingAppID == nil else { return }
-        refreshAllResultMessage = nil
         viewModel.errorMessage = nil
         viewModel.noticeMessage = nil
         isRefreshingAll = true
@@ -710,16 +817,39 @@ struct HomeView: View {
             refreshAllProgress = (completed, total)
         }
         await load()
-        if result.attempted == 0 {
-            refreshAllResultMessage = "No apps were attempted. The app list may be empty or unavailable; refresh your apps and try again."
-        } else if result.succeeded == result.attempted {
-            refreshAllResultMessage = "Refresh All succeeded for all \(result.attempted) apps."
-        } else if result.succeeded == 0 {
-            refreshAllResultMessage = "Refresh All failed for all \(result.attempted) apps."
-        } else {
-            let failed = result.attempted - result.succeeded
-            refreshAllResultMessage = "Refresh All succeeded for \(result.succeeded) of \(result.attempted) apps; \(failed) failed."
+        refreshAllOutcome = result
+        if result.succeeded != result.attempted || result.attempted == 0 {
+            showingRefreshAllResults = true
         }
+    }
+
+    private func retryRefreshFailuresOrAll() async {
+        guard !isRetryingRefreshFailures, !isRefreshingAll, refreshingAppID == nil,
+              let current = refreshAllOutcome else { return }
+        let failures = current.appResults.filter { !$0.succeeded }
+        if failures.isEmpty {
+            await refreshAllApps()
+            return
+        }
+        isRetryingRefreshFailures = true
+        retryRefreshProgress = nil
+        defer {
+            isRetryingRefreshFailures = false
+            retryRefreshProgress = nil
+        }
+        let retried = await SideStoreOperationService(accountStore: accountStore, ipaStore: environment.ipaImportStore)
+            .retryFailedManagedApps(failures) { completed, total in
+                retryRefreshProgress = (completed, total)
+            }
+        var updated = current
+        let retriedByID = Dictionary(uniqueKeysWithValues: retried.map { ($0.id, $0) })
+        updated.appResults = current.appResults.map { retriedByID[$0.id] ?? $0 }
+        updated.succeeded = updated.appResults.filter(\.succeeded).count
+        updated.attempted = updated.appResults.count
+        updated.failure = updated.succeeded == updated.attempted ? nil : .appRefreshFailed
+        updated.failureMessage = nil
+        refreshAllOutcome = updated
+        await load()
     }
 
     private func refreshInstalledApp(_ app: InstalledAppSummary) async {
@@ -747,11 +877,14 @@ struct HomeView: View {
     }
 
     private func importPendingIPA() async {
+        guard !isImportReviewActive else { return }
         if let error = SideKickIncomingIPA.consumePendingError() {
             viewModel.errorMessage = error
             return
         }
         guard let bookmark = SideKickIncomingIPA.consumePendingBookmark() else { return }
+        viewModel.isImporting = true
+        defer { viewModel.isImporting = false }
         do {
             let app = try await environment.ipaImportStore.prepareIPA(bookmarkData: bookmark)
             await handlePreparedIPA(app)
@@ -762,6 +895,7 @@ struct HomeView: View {
     }
 
     private func prepareImport(from url: URL) async {
+        guard !isImportReviewActive else { return }
         viewModel.isImporting = true
         defer { viewModel.isImporting = false }
         do {
@@ -814,6 +948,152 @@ struct HomeView: View {
         } catch {
             await environment.ipaImportStore.discardPreparedIPA(app)
             viewModel.errorMessage = error.localizedDescription
+        }
+    }
+}
+
+private struct RefreshAllResultsView: View {
+    let outcome: QuietRefreshOutcome
+    let accountStore: SigningAccountStore
+    let isRetrying: Bool
+    let progress: (completed: Int, total: Int)?
+    let retry: () -> Void
+    @Environment(\.dismiss) private var dismiss
+
+    private var failedResults: [ManagedAppRefreshResult] {
+        outcome.appResults.filter { !$0.succeeded }
+    }
+
+    private var canRetry: Bool {
+        if !failedResults.isEmpty { return true }
+        if outcome.attempted == 0, case .noEligibleApps? = outcome.failure { return false }
+        return outcome.failure != nil
+    }
+
+    private var summary: String {
+        guard outcome.attempted > 0 else {
+            switch outcome.failure {
+            case .some(.noEligibleApps): return "No installed apps were available to refresh."
+            case .some(.appListUnavailable): return "SideKick couldn’t load the installed apps."
+            case .some(.operationUnavailable): return "Refresh couldn’t start."
+            case .some(.connectionUnavailable): return "SideKick couldn’t connect to refresh the apps."
+            case .some(.appRefreshFailed): return "No apps were refreshed."
+            case .none: return "No apps were attempted."
+            }
+        }
+        if outcome.succeeded == outcome.attempted {
+            return "All \(outcome.attempted) apps refreshed successfully."
+        }
+        if outcome.succeeded == 0 {
+            return "None of the \(outcome.attempted) apps refreshed successfully."
+        }
+        return "\(outcome.succeeded) of \(outcome.attempted) apps refreshed. Review the failures below."
+    }
+
+    var body: some View {
+        List {
+            Section {
+                Text(summary)
+                if outcome.appResults.isEmpty, let failureMessage = outcome.failureMessage {
+                    Text(failureMessage)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+                if isRetrying {
+                    if let progress {
+                        ProgressView("Retrying \(progress.completed) of \(progress.total)…")
+                    } else {
+                        ProgressView("Retrying failed apps…")
+                    }
+                }
+            }
+
+            if !outcome.appResults.isEmpty {
+                Section("App Results") {
+                    ForEach(outcome.appResults) { result in
+                        VStack(alignment: .leading, spacing: 8) {
+                            Label(result.appName,
+                                systemImage: result.succeeded ? "checkmark.circle.fill" : "exclamationmark.triangle.fill")
+                                .foregroundStyle(result.succeeded ? .green : .orange)
+                            if let failureMessage = result.failureMessage, !result.succeeded {
+                                Text(failureMessage)
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
+                                    .textSelection(.enabled)
+                                Text("Apple Account \(result.accountEmail) · Team \(result.teamIdentifier)")
+                                    .font(.caption)
+                                    .foregroundStyle(.secondary)
+                                accountRecovery(for: result)
+                            }
+                        }
+                        .padding(.vertical, 3)
+                    }
+                }
+            }
+
+            if canRetry {
+                Section {
+                    SwiftUI.Button {
+                        retry()
+                    } label: {
+                        if isRetrying {
+                            HStack {
+                                Text("Retrying…")
+                                Spacer()
+                                ProgressView()
+                            }
+                        } else {
+                            Label(failedResults.isEmpty ? "Try Again" : "Retry Failed (\(failedResults.count))",
+                                systemImage: "arrow.clockwise")
+                        }
+                    }
+                    .disabled(isRetrying)
+                } footer: {
+                    if !failedResults.isEmpty {
+                        Text("Only the apps that failed will be retried.")
+                    }
+                }
+            }
+        }
+        .navigationTitle("Refresh Results")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                SwiftUI.Button("Done") { dismiss() }
+            }
+        }
+        .task { await accountStore.reload() }
+    }
+
+    @ViewBuilder
+    private func accountRecovery(for result: ManagedAppRefreshResult) -> some View {
+        if result.recovery == .localConnection {
+            NavigationLink {
+                LocalConnectionSettingsView()
+            } label: {
+                Label("Open Local Connection Settings", systemImage: "network")
+            }
+            .font(.footnote)
+        } else if result.recovery == .account,
+                  let account = accountStore.accounts.first(where: {
+            $0.accountIdentifier == result.accountIdentifier && $0.teamIdentifier == result.teamIdentifier
+        }) {
+            NavigationLink {
+                SigningAccountDetailView(account: account, accountStore: accountStore)
+            } label: {
+                Label(!account.hasSavedSession || account.rawTeamType == nil
+                    ? "Reconnect Apple Account"
+                    : "Account & Team Details", systemImage: "person.crop.circle.badge.exclamationmark")
+            }
+            .font(.footnote)
+        } else if result.recovery == .account {
+            NavigationLink {
+                AccountsView()
+            } label: {
+                Label("Manage Apple Accounts", systemImage: "person.crop.circle.badge.plus")
+            }
+            .font(.footnote)
         }
     }
 }

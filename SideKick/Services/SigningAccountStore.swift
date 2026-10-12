@@ -5,6 +5,10 @@ import Security
 import SideSign
 import UIKit
 
+extension Notification.Name {
+    static let sideKickSigningAccountsDidChange = Notification.Name("SideKick.SigningAccountsDidChange")
+}
+
 struct SigningAccountSummary: Identifiable, Equatable, Codable, Sendable {
     let accountIdentifier: String
     let teamIdentifier: String
@@ -17,6 +21,18 @@ struct SigningAccountSummary: Identifiable, Equatable, Codable, Sendable {
     var rawTeamType: Int? = nil
 
     var id: String { "\(accountIdentifier)|\(teamIdentifier)" }
+}
+
+struct LiveContainerCertificateRecipient: Identifiable, Equatable, Sendable {
+    let installationIdentifier: String
+    let bundleIdentifier: String
+    let name: String
+    let accountIdentifier: String
+    let accountEmail: String
+    let teamIdentifier: String
+    let teamName: String
+
+    var id: String { "\(installationIdentifier)|\(accountIdentifier)|\(teamIdentifier)" }
 }
 
 @MainActor
@@ -211,6 +227,7 @@ final class SigningAccountStore {
             try archive.save()
             setSignInCheckpoint("Session saved; refreshing the account list")
             await reload()
+            NotificationCenter.default.post(name: .sideKickSigningAccountsDidChange, object: nil)
             setSignInCheckpoint("Account saved successfully")
         } catch {
             if let previousCredentials {
@@ -283,6 +300,7 @@ final class SigningAccountStore {
             ))
         }
         await reload()
+        NotificationCenter.default.post(name: .sideKickSigningAccountsDidChange, object: nil)
     }
 
     func withAccount<T>(
@@ -426,9 +444,54 @@ final class SigningAccountStore {
         }
     }
 
-    /// Capture the LiveContainer certificate from its saved session without
-    /// changing SideStore's process-global active signing certificate.
-    func liveContainerCertificateForExport() async throws -> (encodedBase64Certificate: String, password: String) {
+    /// Return explicit installed-app/account identities for certificate export.
+    /// Prefer LiveContainer's known bundle identifiers; retain a name fallback
+    /// for customized builds, but let the caller present every candidate.
+    func liveContainerCertificateRecipients() async throws -> [LiveContainerCertificateRecipient] {
+        guard DatabaseManager.shared.isStarted else {
+            throw SigningAccountError.databaseUnavailable
+        }
+
+        let context = DatabaseManager.shared.viewContext
+        return try await context.perform {
+            let apps = try context.fetch(InstalledApp.fetchRequest())
+            let stableMatches = apps.filter {
+                Self.isLiveContainerBundleIdentifier($0.bundleIdentifier) ||
+                    Self.isLiveContainerBundleIdentifier($0.resignedBundleIdentifier)
+            }
+            let matches = stableMatches.isEmpty
+                ? apps.filter { $0.name.localizedCaseInsensitiveContains("LiveContainer") }
+                : stableMatches
+
+            return matches.compactMap { app in
+                guard let team = app.team, let account = team.account else { return nil }
+                return LiveContainerCertificateRecipient(
+                    installationIdentifier: app.resignedBundleIdentifier,
+                    bundleIdentifier: app.bundleIdentifier,
+                    name: app.name,
+                    accountIdentifier: account.identifier,
+                    accountEmail: account.appleID,
+                    teamIdentifier: team.identifier,
+                    teamName: team.name
+                )
+            }
+            .sorted {
+                if $0.name.localizedCaseInsensitiveCompare($1.name) != .orderedSame {
+                    return $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending
+                }
+                if $0.accountEmail.localizedCaseInsensitiveCompare($1.accountEmail) != .orderedSame {
+                    return $0.accountEmail.localizedCaseInsensitiveCompare($1.accountEmail) == .orderedAscending
+                }
+                return $0.teamIdentifier < $1.teamIdentifier
+            }
+        }
+    }
+
+    /// Capture the selected LiveContainer installation's saved certificate
+    /// without changing SideStore's process-global active signing certificate.
+    func liveContainerCertificateForExport(
+        to recipient: LiveContainerCertificateRecipient
+    ) async throws -> (encodedBase64Certificate: String, password: String) {
         guard SigningAccountOperationCoordinator.acquire() else { throw SigningAccountError.engineBusy }
         defer { SigningAccountOperationCoordinator.release() }
         guard DatabaseManager.shared.isStarted else {
@@ -438,14 +501,14 @@ final class SigningAccountStore {
         let context = DatabaseManager.shared.viewContext
         let target = try await context.perform {
             let apps = try context.fetch(InstalledApp.fetchRequest())
-            let liveContainer = apps.first {
-                $0.name.localizedCaseInsensitiveContains("LiveContainer") ||
-                    $0.bundleIdentifier.localizedCaseInsensitiveContains("livecontainer") ||
-                    $0.resignedBundleIdentifier.localizedCaseInsensitiveContains("livecontainer")
-            }
-            guard let liveContainer,
+            guard let liveContainer = apps.first(where: {
+                $0.resignedBundleIdentifier == recipient.installationIdentifier
+            }),
                   let team = liveContainer.team,
-                  let account = team.account else {
+                  let account = team.account,
+                  liveContainer.bundleIdentifier == recipient.bundleIdentifier,
+                  account.identifier == recipient.accountIdentifier,
+                  team.identifier == recipient.teamIdentifier else {
                 throw SigningAccountError.savedAccountMissing
             }
             return (account.identifier, team.identifier)
@@ -469,6 +532,17 @@ final class SigningAccountStore {
             throw SigningAccountError.certificateUnavailable
         }
         return (encodedCertificate, password)
+    }
+
+    nonisolated private static func isLiveContainerBundleIdentifier(_ value: String) -> Bool {
+        let identifier = value.lowercased()
+        for base in ["com.kdt.livecontainer", "com.kdt.livecontainer2"] {
+            if identifier == base { return true }
+            guard identifier.hasPrefix(base + ".") else { continue }
+            let suffix = identifier.dropFirst(base.count + 1)
+            if suffix.range(of: "^[a-z0-9]{10}$", options: .regularExpression) != nil { return true }
+        }
+        return false
     }
 
     /// Completes the device registration and certificate setup deferred by the

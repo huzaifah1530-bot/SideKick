@@ -56,7 +56,14 @@ enum ExpirationNotificationScheduler {
             let secondsUntilWarning = expirationDate.timeIntervalSinceNow - twoDays
             let trigger = UNTimeIntervalNotificationTrigger(timeInterval: max(1, secondsUntilWarning), repeats: false)
             let content = UNMutableNotificationContent()
-            content.title = "\(appName) expires in 2 days"
+            if secondsUntilWarning < 0 {
+                let deadline = Calendar.current.isDateInToday(expirationDate)
+                    ? "today"
+                    : "at \(expirationDate.formatted(date: .abbreviated, time: .shortened))"
+                content.title = "\(appName) expires \(deadline)"
+            } else {
+                content.title = "\(appName) expires in 2 days"
+            }
             content.body = "Open SideKick to refresh it before its signing expires."
             content.sound = .default
             content.userInfo = ["expirationTimestamp": expirationDate.timeIntervalSince1970]

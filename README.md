@@ -2,7 +2,7 @@
 
 SideKick is a native SwiftUI iOS sideloading app. The existing SwiftUI screens and IPA library are being integrated with SideStore's on-device signing and installation engine.
 
-The deployment target is iOS 18. Native controls use the system appearance; custom Liquid Glass effects and hidden navigation indicators are gated to iOS 26, with regular material and standard disclosure indicators on iOS 18. These compatibility paths still need device validation.
+The deployment target is iOS 18. Native controls use the system appearance, and hidden navigation indicators are gated to iOS 26; iOS 18 keeps standard disclosure indicators. These compatibility paths still need device validation.
 
 ## SideStore credit and derived components
 
@@ -20,7 +20,7 @@ SideKick uses code from [LocalDevVPN by seomin0610](https://github.com/seomin061
 
 - **LiveContainer:** My Apps has a separate guest library with bookmarked read-only directory scanning, version/build metadata, connection recovery, launch requests, and existing GitHub source/token/update notifications. Link an actual Applications directory exposed in Files. Private App Group access is not assumed; snapshots are labelled and excluded from automatic checks/guest launches. Guest IPAs never enter SideKick's signing/install queue. See [integration behavior and validation limits](docs/livecontainer-integration.md).
 - Storage offers **Manage Cached & Temporary Files** with ownership explanations and explicit retained-source removal. Deleting a current extracted source can require reimporting an IPA before refresh. Recent/current-process temporary files are protected. Update options show all saved accounts: another team requires a separate source-based installation with separate data/credentials.
-- GitHub installed-build selection preserves manual overrides and saved baselines absent from the current history page; suggestions are optional. The root `swift test` suite covers the production scanner, stores, build comparison, and filesystem boundaries; it was not run for this source-only review.
+- GitHub installed-build selection preserves manual overrides and saved baselines absent from the current history page. The root `swift test` suite covers the production scanner, stores, build comparison, and filesystem boundaries; it was not run for this source-only review.
 
 - The SideStore source is pinned as a recursive Git submodule at `Vendor/SideStore`.
 - The build uses SideStore's Xcode project and runtime bootstrap, while the app scene presents SideKick's SwiftUI UI.
@@ -28,7 +28,7 @@ SideKick uses code from [LocalDevVPN by seomin0610](https://github.com/seomin061
 - When an imported IPA matches an installed app, choosing **Queue for Update** marks it as a pending update. It appears in the Home screen’s **Updates** section, and the installed app’s detail page offers **Update** instead of **Open** until the queued IPA is installed or removed. URL imports use the same flow.
 - **Import from URL** accepts GitHub repository links as well as direct IPA links. Browse release IPAs or choose an Actions workflow and branch, load more downloads, then review and download with progress and cancellation. After successful installation, the selected release/build becomes the update baseline automatically. Version numbers in release asset filenames use a wildcard filter so later releases can still match.
 - **Settings → GitHub Tokens** supports multiple named tokens, editing/replacement, deletion, and a default token. Each app’s **GitHub Update Source** can override that default, and GitHub download pages offer a token picker. Existing single-token installations migrate automatically; tokens and their labels stay in iOS Keychain. Removing a token explicitly selected by an app requires choosing another token for that app.
-- GitHub update sources use release or workflow-artifact history to track new builds. During setup, choose the version already installed; SideKick can suggest one from the original IPA’s file date, so connecting a repository does not require reinstalling the app.
+- GitHub update sources use release or workflow-artifact history to track new builds. During setup, choose the version already installed; connecting a repository does not require reinstalling the app.
 - Setup uses scrollable pages, consistent spacing, fixed navigation, loading indicators, optional notification/background permissions and a persisted completion state.
 - Download progress comes from the session download delegate; unknown-size transfers display bytes and activity instead of a frozen 0%. Token selection and token management have separate pages.
 - Apple ID sign-in is connected to SideStore's native authentication flow. SideKick stores each account/team session and its signing certificate separately in the iOS Keychain and can switch the active SideStore identity.
@@ -56,7 +56,7 @@ The upstream SideStore scheme also builds a widget extension. SideKick removes t
 
 ## Build and source distribution
 
-GitHub Actions recursively checks out the pinned SideStore source and builds the integrated target. Each build uploads the standard `SideKick-unsigned-ipa` artifact (`SideKick-unsigned.ipa`), an optional `SideKick-vpn-unsigned-ipa` artifact (`SideKick-vpn-unsigned.ipa`) for eligible profiles, and a matching `SideKick-corresponding-source.tar.gz` artifact. Distribute those together, and keep source access available to anyone who receives the IPA.
+GitHub Actions recursively checks out the pinned SideStore source and builds the integrated target. Each build uploads the standard `SideKick-unsigned-ipa` artifact (`SideKick-unsigned.ipa`), an optional `SideKick-vpn-unsigned-ipa` artifact (`SideKick-vpn-unsigned.ipa`), a matching `SideKick-corresponding-source.tar.gz`, and a `SideKick-release-manifest` artifact. The manifest validates the embedded app version, build number, and bundle ID against the integrated build configuration, then records the workflow run, source revisions, and package hashes. Treat packages as current only when they match the manifest from the same workflow run and attempt. The historical package in [`dist/SideKick-72500e3`](dist/SideKick-72500e3/README.md) remains preserved and is not the current release. Distribute the matching source archive with each IPA and keep source access available to anyone who receives it.
 
 SideStore and Minimuxer are AGPL-3.0; SideSign is identified upstream as GPL-3.0. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md). A license file is absent from the pinned SideSign checkout, and the transitive package license set still needs a final audit before distributing builds beyond this private project. The corresponding-source artifact is intended to accompany each IPA.
 
@@ -68,7 +68,7 @@ SideKick/
 ├── Assets.xcassets/  App icon
 ├── Brand/            Layered icon source
 ├── Components/       Reusable SwiftUI components
-├── DesignSystem/     Colors and Liquid Glass helpers
+├── DesignSystem/     Colors and navigation helpers
 ├── Models/           Imported IPA metadata
 ├── Services/         IPA archive parsing and local persistence
 ├── ViewModels/       Screen state and orchestration
@@ -84,3 +84,9 @@ The canonical build is the GitHub Actions workflow in `.github/workflows/ios-bui
 - [Apple Human Interface Guidelines](https://developer.apple.com/design/human-interface-guidelines/)
 - [Apple Liquid Glass](https://developer.apple.com/documentation/TechnologyOverviews/liquid-glass)
 - [SideStore](https://github.com/SideStore/SideStore)
+
+## Audit fixes and reproducible vendor build
+
+The 12 October audit checklist and targeted verification evidence are in `docs/reviews/2026-10-12-project-audit.md`. CI applies the integration patches and `embed-local-vpn.py`, then the three `*-audit-fixes.patch` files for SideStore, SideSign and minimuxer. These patches capture local vendor fixes without changing upstream Git pins. Apply them in the workflow's order when building locally. The regression fixture checks this sequence against the pinned revisions; do not apply them to an already modified vendor checkout.
+
+Run `python -m unittest discover -s Tests/ReleaseManifest -v` for integration/release fixtures. macOS CI additionally runs the core Swift suite and prefetch registry concurrency fixture. Static checks on Windows do not establish iOS device acceptance.

@@ -1,3 +1,10 @@
+# OBSOLETE standalone XcodeGen scaffold; this does not build the shipped product.
+# Its source tree omits SideStore/SideSign/Minimuxer dependencies and its 1.0.0
+# version is not authoritative. Use .github/workflows/ios-build.yml: CI applies
+# the SideStore integration patch, embeds SideKickVPN, then builds the SideStore
+# scheme from Vendor/SideStore/AltStore.xcodeproj. The integration script stamps
+# marketing version 0.8.0; CI sets CURRENT_PROJECT_VERSION from the run number.
+# Product startup belongs to the patched SideStore SceneDelegate/AppDelegate.
 name: SideKick
 options:
   deploymentTarget:

@@ -88,8 +88,21 @@ class PacketTunnelProvider: NEPacketTunnelProvider {
             tunnelPeerIP = peerIp
         }
 
-        let ifaceEndpoint = CIDREndpoint(tunnelIfaceIP, defaultPrefix: 24)
-        let peerEndpoint = CIDREndpoint(tunnelPeerIP, defaultPrefix: 32)
+        let ifaceEndpoint: CIDREndpoint
+        let peerEndpoint: CIDREndpoint
+        do {
+            let endpoints = try CIDRValidator.shared.validatePair(
+                tunnelIfaceInput: tunnelIfaceIP,
+                tunnelPeerInput: tunnelPeerIP,
+                allowIntermediateAddresses: TunnelConstants.defaultAllowIntermediateAddresses,
+                requireExplicitCIDR: true
+            )
+            ifaceEndpoint = endpoints.iface.endpoint
+            peerEndpoint = endpoints.peer.endpoint
+        } catch {
+            tunnelLog("Invalid tunnel address configuration: \(error.localizedDescription)")
+            return completionHandler(error)
+        }
 
         tunnelLog("Configuring P2P settings: peer=\(peerEndpoint.ip)/\(peerEndpoint.prefix) (\(peerEndpoint.subnetMask)), iface=\(ifaceEndpoint.ip)/\(ifaceEndpoint.prefix) (\(ifaceEndpoint.subnetMask))")
 

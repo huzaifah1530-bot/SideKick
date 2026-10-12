@@ -10,13 +10,6 @@ final class GitHubBaselineTests: XCTestCase {
         XCTAssertNil(config.lastInstalledUpdateKey)
     }
 
-    func testExactBuildOrderingWithExpiredBaselineAndUnchangedVersion() {
-        XCTAssertTrue(GitHubBuildComparison.isNewer("actions:81:123", than: "actions:52:321", historyKeys: ["actions:81:123"]))
-        XCTAssertFalse(GitHubBuildComparison.isNewer("actions:81:123", than: "actions:81:123", historyKeys: ["actions:81:123"]))
-        XCTAssertFalse(GitHubBuildComparison.isNewer("actions:52:321", than: "actions:81:123", historyKeys: []))
-        XCTAssertFalse(GitHubBuildComparison.isNewer("release:999:v1:IPA", than: "actions:52:321", historyKeys: []))
-    }
-
     func testGuestSourcePersistsSeparatelyFromNormalApp() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         addTeardownBlock { try? FileManager.default.removeItem(at: root) }

@@ -3,7 +3,7 @@
 ## User flows
 
 - My Apps has a separate LiveContainer section. Link the actual `Applications` directory exposed in Files, then choose the installation's scheme (`livecontainer`, `livecontainer2`, or a known custom scheme).
-- Connections support rescan, reconnect, another directory, disconnect, and forget. Disconnect keeps metadata and GitHub sources. Forget removes SideKick's records and sources; neither action changes guest files.
+- Connections support rescan, reconnect, another directory, disconnect, and forget. Disconnect keeps metadata and GitHub sources. Forget records a retryable cleanup before removing sources, cancels active guest downloads, and deletes queued guest IPA records saved by SideKick; if any step fails, Retry Forget resumes from the remaining guest IDs. Neither action changes LiveContainer files.
 - Guest details show real Info.plist version/build, bundle identity, location, last-seen time, connection issues, GitHub settings, and launch actions. Malformed/inaccessible bundles retain prior metadata with a warning.
 - Guest update sources use the existing named GitHub tokens and release/workflow history. Pick an exact installed baseline; matching names or unchanged version labels do not prove which build was installed.
 - Foreground, manual, background, and shortcut checks include connected accessible guests. Notifications use the existing exact-build deduplication. Snapshot and disconnected connections are excluded.

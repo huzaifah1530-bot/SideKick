@@ -37,55 +37,6 @@ final class LocalVPNService {
     private var connectionTask: Task<Void, Error>?
     private var heartbeatTask: Task<Void, Never>?
     private var statusObserver: NSObjectProtocol?
-    private var hasAcknowledgedConnectionWarning = false
-    private var isCheckingConnectionWarning = false
-
-    enum ConnectionWarning: String, Identifiable {
-        case externalDisconnected, builtInPermissionNeeded
-        var id: String { rawValue }
-        var title: String {
-            self == .externalDisconnected ? "Connect LocalDevVPN" : "Allow Local Connection"
-        }
-        var message: String {
-            self == .externalDisconnected
-                ? "LocalDevVPN is disconnected. Connect it before installing, refreshing, or enabling JIT. You can keep browsing SideKick."
-                : "SideKick needs permission for its built-in VPN before device operations. Once allowed, it connects automatically for each operation and disconnects afterward. You can keep browsing SideKick."
-        }
-    }
-
-    func acknowledgeConnectionWarning() {
-        hasAcknowledgedConnectionWarning = true
-    }
-
-    // Observe availability without refreshStatus's interrupted-operation cleanup.
-    // A disconnected, authorized built-in tunnel is intentionally ready to use.
-    func connectionWarningIfNeeded() async -> ConnectionWarning? {
-        guard !hasAcknowledgedConnectionWarning, !isCheckingConnectionWarning else { return nil }
-        isCheckingConnectionWarning = true
-        defer { isCheckingConnectionWarning = false }
-        if mode == .external {
-            externalTunnelConnected = externalConnected
-            return externalTunnelConnected ? nil : .externalDisconnected
-        }
-        guard let identifier = extensionBundleIdentifier else { return .builtInPermissionNeeded }
-        do {
-            let configurations = try await NETunnelProviderManager.loadAllFromPreferences()
-            guard !Task.isCancelled, !hasAcknowledgedConnectionWarning else { return nil }
-            // Re-evaluate if the user changed methods while preferences loaded.
-            if mode == .external {
-                externalTunnelConnected = externalConnected
-                return externalTunnelConnected ? nil : .externalDisconnected
-            }
-            let configuration = configurations.first {
-                ($0.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier == identifier
-            }
-            return configuration?.isEnabled == true ? nil : .builtInPermissionNeeded
-        } catch {
-            // A preference read failure does not prove that permission is missing.
-            return nil
-        }
-    }
-
     var isBusy: Bool { !leases.isEmpty || isMutatingConfiguration }
     var extensionURL: URL {
         Bundle.Info.activeBundleURL.appendingPathComponent("PlugIns/SideKickVPN.appex")
@@ -315,7 +266,7 @@ enum LocalVPNError: LocalizedError {
         case .missingExtension: "This SideKick installation is missing its VPN extension. Reinstall the complete IPA and keep SideKickVPN enabled during signing."
         case .unsupportedSignature: "This signing profile does not support SideKick’s built-in VPN. Re-sign the app and its SideKickVPN extension with profiles that include the Network Extension capability. A free Apple ID profile cannot provide this capability."
         case .pairingRequired: "Import a pairing file for this iPhone in Settings → Connection & Pairing before using the local connection."
-        case .permissionRequired: "Allow SideKick’s local VPN in Settings → Local Connection before installing or refreshing."
+        case .permissionRequired: "In Settings → Connection & Pairing → Local Connection, choose Allow Built-in VPN before installing or refreshing."
         case .timeout: "SideKick’s local VPN did not connect in time. Check VPN permission and disconnect any conflicting VPN, then try again."
         case .inUse: "A SideKick operation is using the local connection. Wait for it to finish before removing VPN permission."
         case .connection(let message): message

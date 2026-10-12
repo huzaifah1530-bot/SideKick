@@ -15,7 +15,7 @@ final class SetupStatus {
     private(set) var backgroundRefreshRestricted = false
     private(set) var vpnAuthorized = false
     private(set) var pairingVerified = false
-    private(set) var refreshAutomationsConfigured = UserDefaults.standard.bool(forKey: "sidekick.setup.refresh-automations-configured")
+    private(set) var refreshShortcutAdded = UserDefaults.standard.bool(forKey: "sidekick.setup.refresh-shortcut-added")
     private(set) var isRefreshing = false
     private(set) var isRequestingNotifications = false
     private(set) var isImportingPairing = false
@@ -101,12 +101,11 @@ final class SetupStatus {
     }
 
     private static let pairingVerifiedKey = "sidekick.setup.pairing-verified"
-    private static let refreshAutomationsConfiguredKey = "sidekick.setup.refresh-automations-configured"
+    private static let refreshShortcutAddedKey = "sidekick.setup.refresh-shortcut-added"
 
-    func confirmRefreshAutomationsConfigured() {
-        refreshAutomationsConfigured = true
-        UserDefaults.standard.set(true, forKey: Self.refreshAutomationsConfiguredKey)
-        updateReadyState()
+    func confirmRefreshShortcutAdded() {
+        refreshShortcutAdded = true
+        UserDefaults.standard.set(true, forKey: Self.refreshShortcutAddedKey)
     }
 
     func updateReadyState() {
@@ -115,10 +114,6 @@ final class SetupStatus {
 
     func completeSetup() async {
         await refresh()
-        guard isDeviceReady && refreshAutomationsConfigured else {
-            message = "Finish the signing account, pairing, local connection and shortcut steps first."
-            return
-        }
         UserDefaults.standard.set(true, forKey: "sidekick.setup.completed")
         updateReadyState()
     }
@@ -164,7 +159,15 @@ final class SetupStatus {
     func verifyPairing() async {
         await refresh(reportConnectionErrors: true)
         if !pairingVerified, message == nil {
-            message = LocalVPNService.shared.mode == .external ? "Connect LocalDevVPN, return here, then verify this iPhone." : "Allow SideKick’s built-in VPN, then verify the pairing file again."
+            let vpn = LocalVPNService.shared
+            if vpn.mode == .external {
+                let action = vpn.externalInstalled ? "Connect LocalDevVPN" : "Get LocalDevVPN"
+                message = "Choose \(action), return here, then choose Verify This iPhone."
+            } else if vpn.isConfigured {
+                message = "Choose Verify This iPhone again."
+            } else {
+                message = "Choose Allow Built-in VPN, then choose Verify This iPhone."
+            }
         }
     }
 }
@@ -231,6 +234,12 @@ struct RequiredSetupView: View {
                         }
                         .frame(minHeight: 44)
                         .disabled(status.isBusy)
+                    } else if step == lastStep {
+                        SwiftUI.Button("Do Later") {
+                            Task { await status.completeSetup() }
+                        }
+                        .frame(minHeight: 44)
+                        .disabled(status.isBusy)
                     }
                 }
                 .frame(maxWidth: 500)
@@ -290,10 +299,7 @@ struct RequiredSetupView: View {
         case 0: true
         case 1: status.notificationsEnabled
         case 2: status.backgroundRefreshEnabled
-        case 3: status.selfSigningAccount != nil
-        case 4: status.hasPairingFile
-        case 5: status.isDeviceReady
-        case 6: status.refreshAutomationsConfigured
+        case 3, 4, 5, 6: true
         default: false
         }
     }
@@ -349,7 +355,7 @@ struct RequiredSetupView: View {
         onboardingPage(
             symbol: "person.crop.circle",
             title: "Choose a signing account",
-            message: "SideKick uses the Apple Account that signed this copy of SideKick to refresh it. You’ll choose an account for each app you install."
+            message: "SideKick uses the Apple Account that signed this copy of SideKick to refresh it. You’ll choose an account for each app you install. You can add this account later when an install or refresh needs it."
         ) {
             if let account = status.selfSigningAccount {
                 Label(account.email, systemImage: "checkmark.circle.fill")
@@ -374,8 +380,8 @@ struct RequiredSetupView: View {
             symbol: "iphone.gen3.radiowaves.left.and.right",
             title: "Pair this iPhone",
             message: status.hasPairingFile
-                ? "Pairing file imported. Next, connect to this iPhone using your chosen connection method."
-                : "iLoader can’t place the file because SideKick isn’t in its supported-app list yet. In iLoader choose Export, then AirDrop the file to this iPhone or save it in Files and import it here. Pairing files are sensitive; keep the transfer private."
+                ? "Pairing file imported. Connect to this iPhone when an install or refresh operation needs it. You can finish setup now and verify later."
+                : "Import a pairing file when an install or refresh operation needs device access. iLoader can’t place the file because SideKick isn’t in its supported-app list yet. In iLoader choose Export, then AirDrop the file to this iPhone or save it in Files and import it here. Pairing files are sensitive; keep the transfer private."
         ) {
             SwiftUI.Button(status.hasPairingFile ? "Choose Pairing File Again" : "Import Pairing File") {
                 isChoosingPairingFile = true
@@ -393,8 +399,8 @@ struct RequiredSetupView: View {
             symbol: "network.badge.shield.half.filled",
             title: "Connect to this iPhone",
             message: LocalVPNService.shared.mode == .external
-                ? "Connect LocalDevVPN, then return here to verify this iPhone. This works with free Apple Accounts. SideKick cannot disconnect another app’s VPN; turn it off in LocalDevVPN when finished."
-                : "Allow SideKick’s built-in VPN once. It connects for device operations and disconnects when they finish. Your internet traffic stays on its regular connection."
+                ? "Connect LocalDevVPN and verify this iPhone when an install or refresh operation needs device access. This works with free Apple Accounts. SideKick cannot disconnect another app’s VPN; turn it off in LocalDevVPN when finished."
+                : "Allow SideKick’s built-in VPN when a device operation needs it. It connects for that operation and disconnects when it finishes. Your internet traffic stays on its regular connection."
         ) {
             if LocalVPNService.shared.mode == .external {
                 SwiftUI.Button {
@@ -440,20 +446,21 @@ struct RequiredSetupView: View {
     private var refreshAutomationPage: some View {
         onboardingPage(
             symbol: "clock.arrow.circlepath",
-            title: "Add the refresh shortcut",
-            message: "Add the shortcut, then create a daily automation in Shortcuts using Run Immediately. Each run checks GitHub for new versions and refreshes your apps. iOS controls whether background work can run.") {
+            title: "Optional daily refresh",
+            message: "The shortcut and a daily automation are separate. The button below only records that you added the shortcut; SideKick cannot confirm whether a daily automation exists. Scheduling is optional, and the guide is available later in Settings → App Refresh. Manual refresh is always available, and iOS controls when background work can run.") {
             VStack(spacing: 12) {
                 Link("Get Shortcut", destination: URL(string: "https://www.icloud.com/shortcuts/2af57f665d434568a589f1e9b7d7f4d1")!)
                 .buttonStyle(.borderedProminent)
+                Link("Open Shortcuts", destination: URL(string: "shortcuts://")!)
 
                 SwiftUI.Button {
-                    status.confirmRefreshAutomationsConfigured()
+                    status.confirmRefreshShortcutAdded()
                 } label: {
-                    Label(status.refreshAutomationsConfigured ? "Shortcut Added" : "I’ve Added the Shortcut",
-                          systemImage: status.refreshAutomationsConfigured ? "checkmark.circle.fill" : "checkmark.circle")
+                    Label(status.refreshShortcutAdded ? "Shortcut Added" : "I’ve Added the Shortcut",
+                          systemImage: status.refreshShortcutAdded ? "checkmark.circle.fill" : "checkmark.circle")
                 }
                 .buttonStyle(.bordered)
-                .disabled(status.refreshAutomationsConfigured)
+                .disabled(status.refreshShortcutAdded)
             }
         }
     }

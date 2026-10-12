@@ -205,12 +205,35 @@ enum SideKickStorageCleanup {
 
     static func cleanUnused(downloads: GitHubUpdateDownloadStore) async throws -> String {
         guard !isRemovingFiles, !hasActiveOperations, !AppManager.shared.isActivelyManagingAnyApp, !downloads.jobs.values.contains(where: \.isDownloading) else { throw StorageCleanupError.operationRunning }
+        isRemovingFiles = true
+        defer { isRemovingFiles = false }
         let candidates = try await items()
         var removed: Int64 = 0
         var count = 0
         var failures: [String] = []
         for item in candidates where item.protectedReason == nil && !item.policy.requiresSourceConfirmation && !item.name.hasPrefix("Export") {
-            do { try await remove(item, downloads: downloads, allowRetainedSource: false); removed += item.bytes; count += 1 }
+            do {
+                guard !hasActiveOperations, !AppManager.shared.isActivelyManagingAnyApp,
+                      !downloads.jobs.values.contains(where: \.isDownloading) else { throw StorageCleanupError.operationRunning }
+                let owners = try await payloadOwners()
+                guard try isCurrentlyRemovable(item, owners: owners, consent: item.policy) else {
+                    throw StorageCleanupError.protectedFile
+                }
+                guard !hasActiveOperations, !AppManager.shared.isActivelyManagingAnyApp,
+                      !downloads.jobs.values.contains(where: \.isDownloading) else { throw StorageCleanupError.operationRunning }
+                let payloads = InstalledApp.appsDirectoryURL.appendingPathComponent("Payloads", isDirectory: true)
+                let temporary = FileManager.default.temporaryDirectory
+                guard let root = [payloads, temporary].first(where: {
+                    item.url.deletingLastPathComponent().standardizedFileURL == $0.standardizedFileURL
+                }) else { throw StorageCleanupError.unsafePath }
+                try await Task.detached(priority: .utility) {
+                    try OwnedStoragePath.validate(item.url, inside: root)
+                    try validateContentsForRemoval(item.url)
+                    try FileManager.default.removeItem(at: item.url)
+                }.value
+                removed += item.bytes
+                count += 1
+            }
             catch { failures.append("\(item.name): \(error.localizedDescription)") }
         }
         // Clear HTTP response caches only after the active-work checks above.
@@ -222,6 +245,53 @@ enum SideKickStorageCleanup {
         let kept = candidates.filter { $0.policy.requiresSourceConfirmation || $0.protectedReason != nil }.count
         return "Removed \(count) items (\(ByteCountFormatter.string(fromByteCount: removed, countStyle: .file))). Kept \(kept) protected or required sources. Exports are kept."
             + (failures.isEmpty ? "" : "\n\n" + failures.joined(separator: "\n"))
+    }
+
+    private static func isCurrentlyRemovable(
+        _ item: RemovableStorageItem,
+        owners: (names: [String: String], identities: [String: Set<String>], instanceIDs: Set<String>),
+        consent: StorageRemovalPolicy
+    ) throws -> Bool {
+        let payloads = InstalledApp.appsDirectoryURL.appendingPathComponent("Payloads", isDirectory: true)
+        let temporary = FileManager.default.temporaryDirectory
+        let parent = item.url.deletingLastPathComponent().standardizedFileURL
+        let category: String
+        let root: URL
+        if parent == payloads.standardizedFileURL {
+            category = "Signing source"
+            root = payloads
+        } else if parent == temporary.standardizedFileURL {
+            category = "Temporary"
+            root = temporary
+        } else {
+            throw StorageCleanupError.unsafePath
+        }
+        try OwnedStoragePath.validate(item.url, inside: root)
+        let values = try item.url.resourceValues(forKeys: [.contentModificationDateKey])
+        let modified = values.contentModificationDate ?? .now
+        let completedPaths = completedTemporaryPaths
+        let finishedPipeline = category == "Temporary" && isStagedPipelineDirectory(item.url)
+            && (completedPaths.contains(item.url.path) || isCompletedPipelineDirectory(item.url))
+        let policy = category == "Signing source"
+            ? StorageRemovalPolicy.payload(signature: item.url.lastPathComponent, retainedSignatures: owners.names, retainedIdentities: owners.identities)
+            : StorageRemovalPolicy(owner: nil, requiresSourceConfirmation: false)
+        guard policy.canRemove(consent: consent, allowRetainedSource: false) else { return false }
+
+        if category == "Signing source" {
+            guard item.url.lastPathComponent.count == 64,
+                  item.url.lastPathComponent.allSatisfy(\.isHexDigit),
+                  modified <= Date.now.addingTimeInterval(-24 * 60 * 60) else { return false }
+        } else {
+            guard isOwnedTemporaryFile(item.url) || finishedPipeline else { return false }
+            let owner = try? String(contentsOf: item.url.appendingPathComponent(".sidekick-process"), encoding: .utf8)
+            let currentProcess = "\(ProcessInfo.processInfo.processIdentifier)"
+            let namedByCurrentProcess = item.url.lastPathComponent.hasPrefix("sidekick-import-\(currentProcess)-")
+                || item.url.lastPathComponent.hasPrefix("sidekick-github-\(currentProcess)-")
+            guard finishedPipeline || (!namedByCurrentProcess && owner != currentProcess
+                && modified <= Date.now.addingTimeInterval(-24 * 60 * 60)) else { return false }
+        }
+        try validateContentsForRemoval(item.url)
+        return true
     }
 
     static func performAutomaticMaintenance() async {

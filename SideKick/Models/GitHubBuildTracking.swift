@@ -92,7 +92,8 @@ enum GitHubTrackingPolicy {
         let candidate = GitHubUpdateCandidate(bundleIdentifier: target.id, appName: target.name, currentVersion: target.version,
             newVersion: latest.version, title: latest.title, assetName: latest.assetName, downloadURL: latest.downloadURL,
             updateKey: latest.key, source: configuration.source, repositoryURL: configuration.repositoryURL,
-            targetKind: target.kind, sourceIdentity: configuration.sourceIdentity, isKnownNewer: state == .updateAvailable)
+            targetKind: target.kind, sourceIdentity: configuration.sourceIdentity, isKnownNewer: state == .updateAvailable,
+            buildDate: latest.date)
         return GitHubCheckResult(targetID: target.id, state: state, candidate: candidate)
     }
 }
@@ -106,18 +107,30 @@ struct GitHubPendingSelfUpdate: Codable, Hashable, Sendable {
 // LC_UUID identifies a linked binary and survives re-signing. Unsupported or
 // malformed binaries remain unverified rather than falling back to a version label.
 enum GitHubExecutableIdentity {
+    static func metadataRegionSize(_ data: Data, maximumSize: Int) -> Int? {
+        guard maximumSize >= 32, data.count >= 32,
+              Array(data.prefix(4)) == [0xcf, 0xfa, 0xed, 0xfe] else { return nil }
+        func word(_ offset: Int) -> UInt32 {
+            (0..<4).reduce(UInt32(0)) { $0 | UInt32(data[offset + $1]) << (8 * $1) }
+        }
+        let commandCount = Int(word(16))
+        let commandsSize = Int(word(20))
+        guard commandsSize <= maximumSize - 32,
+              commandCount <= commandsSize / 8 else { return nil }
+        return 32 + commandsSize
+    }
+
     static func read(_ data: Data) -> String? {
-        guard data.count >= 32 else { return nil }
+        guard let metadataSize = metadataRegionSize(data, maximumSize: Int.max),
+              data.count >= metadataSize else { return nil }
         var bytes = Array(data.prefix(32))
-        guard Array(bytes.prefix(4)) == [0xcf, 0xfa, 0xed, 0xfe] else { return nil }
         func word(_ offset: Int) -> UInt32 {
             (0..<4).reduce(UInt32(0)) { $0 | UInt32(bytes[offset + $1]) << (8 * $1) }
         }
-        let count = Int(word(16)), size = Int(word(20))
-        guard size <= data.count - 32, count <= size / 8 else { return nil }
+        let count = Int(word(16))
         // Only load commands are needed, not the executable or signature bytes.
-        bytes = Array(data.prefix(32 + size))
-        let end = 32 + size
+        bytes = Array(data.prefix(metadataSize))
+        let end = metadataSize
         var offset = 32
         for _ in 0..<count {
             guard offset <= end - 8 else { return nil }

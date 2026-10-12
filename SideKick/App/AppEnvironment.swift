@@ -54,6 +54,7 @@ final class AppEnvironment {
         let task = Task { @MainActor in
             databaseState = .starting
             do {
+                try SideKickDataDirectory.prepareBeforeDatabaseStart()
                 try await DatabaseManager.shared.start()
                 // Populate app-owned catalogues before Home is constructed. A
                 // conditional List section is never responsible for bootstrapping.
@@ -166,12 +167,22 @@ final class AppEnvironment {
         }
     }
 
+    /// Reuses an in-flight app-owned discovery scan or starts one, then waits
+    /// for its catalogue publications before a caller validates guest targets.
+    func rescanLiveContainerAppsAndWait() async {
+        rescanLiveContainerApps()
+        guard let scan = liveContainerScanTask else { return }
+        await scan.value
+    }
+
     private var updateTargets: [GitHubUpdateTarget] {
+        let pendingForgetGuestIDs = Set(liveContainerState.pendingForgetGuestIDs.values.flatMap { $0 })
         let eligible = Set(liveContainerState.connections.filter {
             $0.isConnected && $0.storageKind != .snapshot && $0.error == nil
         }.map(\.id))
         let guests = liveContainerState.apps.filter {
-            eligible.contains($0.connectionID) && $0.isAvailable && $0.warning == nil
+            eligible.contains($0.connectionID) && !pendingForgetGuestIDs.contains($0.id)
+                && $0.isAvailable && $0.warning == nil
         }.map(\.updateTarget)
         var seen = Set<String>()
         return (installedApps.map(\.updateTarget) + guests).filter { seen.insert($0.id).inserted }
@@ -239,13 +250,16 @@ final class AppEnvironment {
     /// source and target against the current app-owned catalogue. A per-target
     /// generation prevents an older overlapping scan from replacing it.
     func publishDetailGitHubCheck(_ check: GitHubCheckResult, target: GitHubUpdateTarget) async -> Bool {
-        guard check.targetID == target.id,
-              !(check.state == .failed && check.checkedConfiguration == nil) else { return false }
+        guard check.targetID == target.id else { return false }
         let generation = githubGeneration
-        do {
-            guard try await GitHubUpdateConfigurationStore.shared.configuration(for: target.id)
-                    == check.checkedConfiguration else { return false }
-        } catch { return false }
+        // A failed read has no configuration to compare; publish it only as a
+        // status, and let the shared publisher verify that storage is still unavailable.
+        if check.state != .failed || check.checkedConfiguration != nil {
+            do {
+                guard try await GitHubUpdateConfigurationStore.shared.configuration(for: target.id)
+                        == check.checkedConfiguration else { return false }
+            } catch { return false }
+        }
         guard githubGeneration == generation,
               let current = updateTargets.first(where: { $0.id == target.id }),
               signatures([target]) == signatures([current]) else { return false }
@@ -267,12 +281,15 @@ final class AppEnvironment {
         targetGeneration: UUID,
         targets: [GitHubUpdateTarget]
     ) async -> Bool {
+        var configurationReadFailed = false
         do {
             let configuration = try await GitHubUpdateConfigurationStore.shared.configuration(for: check.targetID)
             guard configuration == check.checkedConfiguration else { return false }
         } catch {
-            // Without a fresh source read, the result cannot be trusted.
-            return false
+            // A source-read failure is safe to publish as a failed status only;
+            // it cannot authorize or replace an update candidate.
+            guard check.state == .failed, check.checkedConfiguration == nil else { return false }
+            configurationReadFailed = true
         }
         guard githubGeneration == generation,
               githubTargetGenerations[check.targetID] == targetGeneration,
@@ -282,7 +299,7 @@ final class AppEnvironment {
               signatures([checked]) == signatures([current]) else { return false }
         githubChecks.removeAll { $0.targetID == check.targetID }
         githubChecks.append(check)
-        if check.state != .failed {
+        if check.state != .failed && !configurationReadFailed {
             githubUpdates.removeAll { $0.bundleIdentifier == check.targetID }
             if let candidate = check.candidate { githubUpdates.append(candidate) }
         }

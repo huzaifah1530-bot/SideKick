@@ -51,6 +51,19 @@ struct LiveContainerState: Codable, Sendable {
     var schemaVersion = 1
     var connections: [LiveContainerConnection] = []
     var apps: [LiveContainerGuest] = []
+    var pendingForgetGuestIDs: [UUID: [String]] = [:]
+
+    private enum CodingKeys: String, CodingKey { case schemaVersion, connections, apps, pendingForgetGuestIDs }
+
+    init() {}
+
+    init(from decoder: Decoder) throws {
+        let values = try decoder.container(keyedBy: CodingKeys.self)
+        schemaVersion = try values.decode(Int.self, forKey: .schemaVersion)
+        connections = try values.decode([LiveContainerConnection].self, forKey: .connections)
+        apps = try values.decode([LiveContainerGuest].self, forKey: .apps)
+        pendingForgetGuestIDs = try values.decodeIfPresent([UUID: [String]].self, forKey: .pendingForgetGuestIDs) ?? [:]
+    }
 }
 
 struct LiveContainerScan: Sendable {
