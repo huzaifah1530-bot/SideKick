@@ -626,7 +626,7 @@ index 13da156..962a74e 100644
      }
  }
 diff --git a/Sources/Anisette/AnisetteDataManager.swift b/Sources/Anisette/AnisetteDataManager.swift
-index 8c64485..5f47041 100644
+index 8c64485..bf6273d 100644
 --- a/Sources/Anisette/AnisetteDataManager.swift
 +++ b/Sources/Anisette/AnisetteDataManager.swift
 @@ -175,6 +175,7 @@ public enum AnisetteError: LocalizedError, Sendable {
@@ -970,7 +970,7 @@ index 8c64485..5f47041 100644
      }
  
      private func resolveZipData(from oda: ODAInfo) async throws -> Data {
-@@ -688,12 +872,17 @@ public final class AnisetteDataManager: @unchecked Sendable {
+@@ -688,12 +872,18 @@ public final class AnisetteDataManager: @unchecked Sendable {
      }
  
      public func ensureProviderLoaded(clientInfo: String = Constants.Anisette.defaultClientInfo) async throws -> AnisetteClient {
@@ -980,19 +980,20 @@ index 8c64485..5f47041 100644
 -
          let libDir = libsDir
          let prov = provisioningDir
-+        if let existing = withStateLock({
++        let existing = withStateLock { () -> AnisetteClient? in
 +            guard let cached = localProvider,
 +                  cached.libraryDirectory.standardizedFileURL == libDir.standardizedFileURL,
 +                  cached.provisioningDirectory.standardizedFileURL == prov.standardizedFileURL,
 +                  cached.clientInfo == clientInfo else { return nil }
 +            return cached.provider
-+        }) {
++        }
++        if let existing {
 +            return existing
 +        }
  
          if AnisetteClient.validateLibrariesExist(at: libDir, requiredLibraries: Constants.Anisette.Libraries.requiredNames) {
              let provider = try AnisetteClient(
-@@ -704,13 +893,32 @@ public final class AnisetteDataManager: @unchecked Sendable {
+@@ -704,13 +894,32 @@ public final class AnisetteDataManager: @unchecked Sendable {
                  requiredLibraries: Constants.Anisette.Libraries.requiredNames,
                  libraryDirectoryResolver: { libDir }
              )
