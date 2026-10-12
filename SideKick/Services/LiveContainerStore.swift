@@ -79,7 +79,7 @@ private enum LiveContainerReadContext {
     @TaskLocal static var operation: LiveContainerReadOperation?
 
     static func scan(access: any LiveContainerDirectoryAccess, bookmark: Data, id: UUID) async throws -> (LiveContainerScan, Data?) {
-        guard case .scan(let value, let renewed) = try await read(access: access, bookmark: bookmark, id: id) {
+        guard case .scan(let value, let renewed) = try await read(access: access, bookmark: bookmark, id: id) else {
             throw LiveContainerError.accessRevoked
         }
         return (value, renewed)
@@ -101,9 +101,9 @@ private enum LiveContainerReadContext {
                     let result = Result {
                         try $operation.withValue(operation) {
                             try Task.checkCancellation()
-                            if let folder { return .guest(try access.guest(bookmark: bookmark, connectionID: id, folder: folder)) }
+                            if let folder { return LiveContainerReadResult.guest(try access.guest(bookmark: bookmark, connectionID: id, folder: folder)) }
                             let (scan, renewed) = try access.scan(bookmark: bookmark, connectionID: id)
-                            return .scan(scan, renewed)
+                            return LiveContainerReadResult.scan(scan, renewed)
                         }
                     }
                     operation.finish(result)
