@@ -1908,7 +1908,7 @@ index 192935c..30da4ea 100644
              return try PKCS12Builder.build(certificateDER: certDER, privateKeyDER: keyDER, password: password)
          } catch {
 diff --git a/Sources/Compatibility.swift b/Sources/Compatibility.swift
-index 545c4be..26ea356 100644
+index 545c4be..ab30a16 100644
 --- a/Sources/Compatibility.swift
 +++ b/Sources/Compatibility.swift
 @@ -153,7 +153,188 @@ public extension AppGroup {
@@ -2034,7 +2034,7 @@ index 545c4be..26ea356 100644
 +        guard let digestInfo = read(bytes, at: sequence.content.lowerBound, limit: sequence.content.upperBound),
 +              digestInfo.tag == 0x30,
 +              let salt = read(bytes, at: digestInfo.end, limit: sequence.content.upperBound), salt.tag == 0x04 else { return false }
-+        guard salt.end == sequence.content.upperBound else {
++        if salt.end != sequence.content.upperBound {
 +            guard let iterations = read(bytes, at: salt.end, limit: sequence.content.upperBound),
 +                  iterations.tag == 0x02, isNonNegativeInteger(bytes, iterations),
 +                  iterations.end == sequence.content.upperBound else { return false }
