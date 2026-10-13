@@ -282,6 +282,13 @@ struct GitHubUpdateSettingsView: View {
             }
             message = error.localizedDescription
             showingMessage = true
+            if let saved = try? await store.configuration(for: target.id),
+               saved.hasSameSource(as: configuration), saved.tokenID == credentialID,
+               queryGeneration == generation, sourceIdentity == identity, tokenID == credentialID {
+                let check = GitHubCheckResult(targetID: target.id, state: .failed,
+                    detail: error.localizedDescription, checkedConfiguration: saved, checkedAt: .now)
+                _ = await environment.publishDetailGitHubCheck(check, target: target)
+            }
         }
     }
 

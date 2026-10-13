@@ -140,7 +140,10 @@ struct GitHubUpdatesView: View {
     }
 
     private func check(for configuration: GitHubUpdateConfiguration) -> GitHubCheckResult? {
-        environment.githubChecks.first { $0.targetID == configuration.id && $0.checkedConfiguration == configuration }
+        environment.githubChecks.first {
+            $0.targetID == configuration.id && ($0.checkedConfiguration == configuration
+                || ($0.state == .failed && $0.checkedConfiguration == nil))
+        }
     }
     private func name(for configuration: GitHubUpdateConfiguration) -> String {
         environment.installedApps.first { $0.id == configuration.id }?.name
@@ -174,7 +177,10 @@ private struct GitHubAppUpdateStatusView: View {
             ?? environment.liveContainerState.apps.first { $0.id == configuration.id }?.updateTarget
     }
     private var check: GitHubCheckResult? {
-        environment.githubChecks.first { $0.targetID == configuration.id && $0.checkedConfiguration == currentConfiguration }
+        environment.githubChecks.first {
+            $0.targetID == configuration.id && ($0.checkedConfiguration == currentConfiguration
+                || ($0.state == .failed && $0.checkedConfiguration == nil))
+        }
     }
     var body: some View {
         List {
