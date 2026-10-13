@@ -43,6 +43,11 @@ final class AppEnvironment {
 
     init(ipaImportStore: IPAImportStore = IPAImportStore.shared) {
         self.ipaImportStore = ipaImportStore
+        // An interrupted helper request is recovered explicitly from its journal;
+        // it must not turn an unrelated later backup into a Files transfer.
+        if !NativeAppTransferService.isRunning {
+            UserDefaults.standard.removeObject(forKey: "SideKickFileTransferRequest")
+        }
     }
 
     func startDatabase() async {

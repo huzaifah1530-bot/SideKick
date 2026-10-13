@@ -9,7 +9,7 @@ enum ExpirationNotificationScheduler {
 
     static func update() async {
         let context = DatabaseManager.shared.viewContext
-        let apps: [(String, String, Date)]
+        var apps: [(String, String, Date)]
         do {
             apps = try await context.perform {
                 var installedApps = try context.fetch(InstalledApp.fetchRequest())
@@ -24,6 +24,7 @@ enum ExpirationNotificationScheduler {
             return
         }
 
+        apps = apps.filter { !NativeAppTransferService.hasUnfinishedTransfer($0.0) }
         let center = UNUserNotificationCenter.current()
         let pending = await center.pendingNotificationRequests()
         let delivered = await center.deliveredNotifications()

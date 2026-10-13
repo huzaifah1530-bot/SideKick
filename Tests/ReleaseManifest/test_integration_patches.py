@@ -1,5 +1,6 @@
 """Check the CI patch sequence against the pinned vendor revision, without editing it."""
 import re
+import shutil
 import subprocess
 import tempfile
 import unittest
@@ -25,6 +26,8 @@ class IntegrationPatchTests(unittest.TestCase):
             audit_patch = (ROOT / "patches/sidestore-audit-fixes.patch").read_text(encoding="utf-8")
             paths.update(path.rstrip("\t\r") for path in re.findall(r"^--- a/(.+)$", audit_patch, re.M))
             paths.update([
+                "SideBackup/SideBackupApp.swift", "SideStore/Core/Operations/PipelineOperations/StageBackupAppOperation.swift",
+                "SideStore/Core/Operations/PipelineOperations/RemoveBackupDataOperation.swift",
                 "AltWidget/Info.plist", "SideBackup/Info.plist",
                 "AltStore/Resources/ReleaseEntitlements.plist",
                 "SideStore/Core/Operations/PipelineOperations/RemoveAppExtensionsOperation.swift",
@@ -57,6 +60,16 @@ class IntegrationPatchTests(unittest.TestCase):
             patch_path.write_bytes(audit_patch.encode("utf-8"))
             result = subprocess.run(["git", "-C", str(checkout), "apply", str(patch_path)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
+            result = subprocess.run([sys.executable, str(ROOT / "scripts/embed-file-transfer.py"), str(checkout)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            helper = (checkout / "SideBackup/SideBackupApp.swift").read_text(encoding="utf-8")
+            self.assertIn("enum AppDataTransfer", helper)
+            self.assertIn("performSideKickFileTransfer(restoring: true)", helper)
+            stage = (checkout / "SideStore/Core/Operations/PipelineOperations/StageBackupAppOperation.swift").read_text(encoding="utf-8")
+            self.assertIn('updates["CFBundleVersion"] = targetApp.buildVersion', stage)
+            if compiler := shutil.which("swiftc"):
+                parsed = subprocess.run([compiler, "-frontend", "-parse", str(checkout / "SideBackup/SideBackupApp.swift")], capture_output=True, text=True)
+                self.assertEqual(parsed.returncode, 0, parsed.stderr)
             for relative, patch_name in [
                 ("Dependencies/SideSign", "sidesign-audit-fixes.patch"),
                 ("Dependencies/minimuxer", "minimuxer-audit-fixes.patch"),

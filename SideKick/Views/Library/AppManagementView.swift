@@ -159,6 +159,13 @@ struct AppManagementView: View {
                 }
 
                 Section("Refresh") {
+                    if NativeAppTransferService.hasUnfinishedTransfer(installedApp.id) {
+                        NavigationLink {
+                            NativeAppTransferView(app: installedApp, accountStore: accountStore)
+                        } label: {
+                            Label("Restore or Recover Native App", systemImage: "arrow.uturn.backward")
+                        }
+                    }
                     SwiftUI.Button {
                         isShowingRefreshConsole = true
                     } label: {
@@ -168,6 +175,7 @@ struct AppManagementView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .buttonBorderShape(.capsule)
+                    .disabled(NativeAppTransferService.hasUnfinishedTransfer(installedApp.id))
                     .fullWidthListSeparators()
 
                     NavigationLink {
@@ -229,6 +237,13 @@ struct AppManagementView: View {
                         } label: {
                             Label("Re-sign", systemImage: "arrow.clockwise")
                                 .frame(maxWidth: .infinity, alignment: .leading)
+                        }
+                        .fullWidthListSeparators()
+
+                        NavigationLink {
+                            NativeAppTransferView(app: installedApp, accountStore: accountStore)
+                        } label: {
+                            Label("Move to LiveContainer", systemImage: "arrow.left.arrow.right")
                         }
                         .fullWidthListSeparators()
 

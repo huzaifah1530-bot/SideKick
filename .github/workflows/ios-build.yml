@@ -76,6 +76,9 @@ jobs:
           git -C Vendor/SideStore/Dependencies/SideSign apply ../../../../patches/sidesign-audit-fixes.patch
           git -C Vendor/SideStore/Dependencies/minimuxer apply ../../../../patches/minimuxer-audit-fixes.patch
 
+      - name: Add native Files transfer helper
+        run: python3 scripts/embed-file-transfer.py Vendor/SideStore
+
       - name: Test vendor audit regressions
         run: |
           python3 scripts/verify-sidestore-regressions.py
