@@ -123,12 +123,15 @@ enum AppDataTransfer {
     private static func tree(_ root: URL) throws -> [String] {
         try validateTreeRoot(root)
         var result: [String] = []
-        var pending = [root]
-        while let folder = pending.popLast() {
+        // Track relative components during traversal. On Apple platforms the
+        // enumerator may return /private/var URLs for a /var input root.
+        var pending: [(URL, String)] = [(root, "")]
+        while let (folder, prefix) = pending.popLast() {
             for item in try FileManager.default.contentsOfDirectory(at: folder, includingPropertiesForKeys: [.isDirectoryKey], options: []) {
                 try validateNode(item)
-                result.append(String(item.path.dropFirst(root.path.count + 1)))
-                if try item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true { pending.append(item) }
+                let relative = prefix.isEmpty ? item.lastPathComponent : prefix + "/" + item.lastPathComponent
+                result.append(relative)
+                if try item.resourceValues(forKeys: [.isDirectoryKey]).isDirectory == true { pending.append((item, relative)) }
             }
         }
         return result.sorted()
