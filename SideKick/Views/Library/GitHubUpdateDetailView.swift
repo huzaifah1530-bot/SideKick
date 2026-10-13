@@ -1,71 +1,12 @@
 import SwiftUI
 import UIKit
 
-struct GitHubUpdateRow: View {
-    let candidate: GitHubUpdateCandidate
-    let iconData: Data?
-    init(candidate: GitHubUpdateCandidate, app: InstalledAppSummary) { self.candidate = candidate; iconData = app.iconData }
-    init(candidate: GitHubUpdateCandidate, iconData: Data?) { self.candidate = candidate; self.iconData = iconData }
-    @Environment(AppEnvironment.self) private var environment
-
-    private var downloadJob: GitHubUpdateDownloadJob? { environment.githubUpdateDownloads.jobs[candidate.id] }
-
-    var body: some View {
-        VStack(spacing: 9) {
-            HStack(spacing: 12) {
-                if let data = iconData, let image = UIImage(data: data) {
-                    Image(uiImage: image).resizable().scaledToFit().frame(width: 50, height: 50)
-                        .clipShape(.rect(cornerRadius: 11))
-                } else {
-                    Image(systemName: "arrow.down.app.fill")
-                        .font(.system(size: 24)).foregroundStyle(.white)
-                        .frame(width: 50, height: 50).background(.blue.gradient, in: .rect(cornerRadius: 11))
-                }
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(candidate.appName).font(.body.weight(.semibold))
-                    Text(updateStatus)
-                        .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
-                }
-                Spacer()
-                Text(downloadJob?.isDownloading == true ? "DOWNLOADING" : candidate.isKnownNewer ? "UPDATE" : "REVIEW")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(downloadJob?.isDownloading == true ? Color.sideKickAccent : .blue)
-            }
-            if let job = downloadJob, job.isDownloading {
-                if let progress = job.progress {
-                    DownloadProgressBar(progress: progress).frame(height: 3)
-                } else {
-                    ProgressView().progressViewStyle(.linear)
-                }
-            }
-        }
-        .padding(.vertical, 5)
-    }
-
-    private var updateStatus: String {
-        guard let job = downloadJob else { return "\(candidate.isKnownNewer ? "Update available" : "Confirm installed build") · \(candidate.newVersion)" }
-        if job.isDownloading {
-            let transferred = job.bytesWritten > 0
-                ? ByteCountFormatter.string(fromByteCount: job.bytesWritten, countStyle: .file)
-                : nil
-            if let progress = job.progress {
-                let percent = progress > 0 && progress < 0.01 ? "<1%" : String(format: "%.1f%%", progress * 100)
-                return "Downloading · \(percent)" + (transferred.map { " · \($0)" } ?? "")
-            }
-            return transferred.map { "Downloading · \($0)" } ?? "Downloading…"
-        }
-        if job.queuedIPA != nil { return "Downloaded · Ready to update" }
-        if job.errorMessage != nil { return "Download failed · Tap to retry" }
-        return "\(candidate.isKnownNewer ? "Update available" : "Confirm installed build") · \(candidate.newVersion)"
-    }
-}
-
 struct GitHubUpdateDetailView: View {
     let candidate: GitHubUpdateCandidate
     let app: InstalledAppSummary
     let isVersionSelection: Bool
 
-    @State private var selectedCandidate: GitHubUpdateCandidate
+    private var selectedCandidate: GitHubUpdateCandidate { candidate }
 
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.dismiss) private var dismiss
@@ -87,7 +28,6 @@ struct GitHubUpdateDetailView: View {
         self.candidate = candidate
         self.app = app
         self.isVersionSelection = isVersionSelection
-        _selectedCandidate = State(initialValue: candidate)
         _discoveredBuilds = State(initialValue: [candidate])
     }
 
@@ -163,7 +103,7 @@ struct GitHubUpdateDetailView: View {
                 LabeledContent("Signing account", value: account?.email ?? app.accountEmail)
             }
 
-            Section {
+            if !isVersionSelection { Section {
                 ForEach(discoveredBuilds) { build in
                     NavigationLink {
                         GitHubUpdateDetailView(candidate: build, app: app, isVersionSelection: true)
@@ -203,7 +143,7 @@ struct GitHubUpdateDetailView: View {
                 Text("Available Builds")
             } footer: {
                 Text("Choose any discovered IPA build to install it. SideKick records it as installed only after installation succeeds.")
-            }
+            } }
 
             Section("Download") {
                 GitHubUpdateDownloadControls(
@@ -304,7 +244,7 @@ struct GitHubUpdateDetailView: View {
             } catch { errorMessage = error.localizedDescription }
             isLoadingToken = false
             await validateDownload()
-            await loadBuilds()
+            if !isVersionSelection { await loadBuilds() }
         }
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { Task { await validateDownload() } }
@@ -321,7 +261,7 @@ struct GitHubUpdateDetailView: View {
     }
 
     @MainActor
-    private func loadBuilds(append: Bool = false) async {
+    private func loadBuilds(append: Bool = false, forceRefresh: Bool = false) async {
         guard !isLoadingBuilds, !isLoadingToken else { return }
         isLoadingBuilds = true
         defer { isLoadingBuilds = false }
@@ -329,7 +269,7 @@ struct GitHubUpdateDetailView: View {
             guard let configuration = try await configurationStore.configuration(for: app.id) else { return }
             let token = try GitHubCredentialStore().load(id: tokenID)
             let page = append ? buildHistoryPage + 1 : 1
-            let result = try await GitHubUpdateService().buildHistory(for: configuration, token: token, page: page)
+            let result = try await GitHubUpdateService().buildHistory(for: configuration, token: token, page: page, forceRefresh: forceRefresh)
             let builds = result.builds.map { build in
                 GitHubUpdateCandidate(
                     bundleIdentifier: app.id,

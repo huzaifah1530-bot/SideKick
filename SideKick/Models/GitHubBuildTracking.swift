@@ -61,6 +61,55 @@ struct GitHubCheckResult: Sendable {
     var candidate: GitHubUpdateCandidate? = nil
     var detail: String? = nil
     var checkedConfiguration: GitHubUpdateConfiguration? = nil
+    var latestBuild: GitHubTrackedBuild? = nil
+    var checkedAt: Date? = nil
+}
+
+struct GitHubUpdateSummary {
+    let availableCount: Int
+    let pendingCount: Int
+    let attentionCount: Int
+    let title: String
+
+    init(configuredIDs: Set<String>, checks: [GitHubCheckResult], isChecking: Bool, configurationFailed: Bool = false) {
+        let checks = checks.filter { configuredIDs.contains($0.targetID) }
+        availableCount = checks.filter { $0.state == .updateAvailable }.count
+        pendingCount = configuredIDs.subtracting(checks.map(\.targetID)).count
+        attentionCount = checks.filter { $0.state.needsAttention }.count
+        if availableCount > 0 { title = availableCount == 1 ? "1 Update Available" : "\(availableCount) Updates Available" }
+        else if configurationFailed { title = "Couldn’t Load Update Sources" }
+        else if isChecking { title = "Checking for Updates" }
+        else if pendingCount > 0 { title = "Waiting to Check" }
+        else if attentionCount > 0 { title = attentionCount == 1 ? "1 App Needs Attention" : "\(attentionCount) Apps Need Attention" }
+        else if configuredIDs.isEmpty { title = "Set Up GitHub Updates" }
+        else if checks.contains(where: { $0.state == .skipped }) { title = "New Builds Were Skipped" }
+        else { title = "Apps Are Up to Date" }
+    }
+}
+
+extension GitHubCheckState {
+    var title: String {
+        switch self {
+        case .notConfigured: "Not Set Up"
+        case .unknownInstalledBuild: "Confirm Installed Build"
+        case .current: "Up to Date"
+        case .updateAvailable: "Update Available"
+        case .skipped: "Build Skipped"
+        case .noMatchingDownload: "Download Unavailable"
+        case .installedAhead: "Installed Build Is Newer"
+        case .indeterminate: "Review Available Build"
+        case .failed: "Couldn’t Check"
+        }
+    }
+}
+
+extension GitHubUpdateConfiguration {
+    var installedBuildLabel: String? {
+        guard let key = installedBuild?.key else { return nil }
+        let parts = key.split(separator: ":", omittingEmptySubsequences: false)
+        if parts.first == "actions-v2", parts.count == 6 { return "Build \(parts[2])" }
+        return nil
+    }
 }
 
 enum GitHubTrackingPolicy {
@@ -87,6 +136,13 @@ enum GitHubTrackingPolicy {
     }
 
     static func check(target: GitHubUpdateTarget, configuration: GitHubUpdateConfiguration, history: [GitHubTrackedBuild]) -> GitHubCheckResult {
+        var result = evaluate(target: target, configuration: configuration, history: history)
+        result.latestBuild = history.first
+        result.checkedAt = .now
+        return result
+    }
+
+    private static func evaluate(target: GitHubUpdateTarget, configuration: GitHubUpdateConfiguration, history: [GitHubTrackedBuild]) -> GitHubCheckResult {
         guard let latest = history.first else { return GitHubCheckResult(targetID: target.id, state: .noMatchingDownload) }
         let receipt = configuration.installedBuild
         let trusted = target.observation != nil && receipt?.sourceIdentity == configuration.sourceIdentity && receipt?.observation == target.observation

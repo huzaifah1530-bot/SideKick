@@ -9,109 +9,6 @@ private struct QueuedManualUpdate: Identifiable {
     var id: String { installedApp.id }
 }
 
-private struct QueuedManualUpdateRow: View {
-    let update: QueuedManualUpdate
-
-    var body: some View {
-        HStack(spacing: 12) {
-            if let data = update.installedApp.iconData, let icon = UIImage(data: data) {
-                Image(uiImage: icon)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 50, height: 50)
-                    .clipShape(.rect(cornerRadius: 11))
-            } else {
-                Image(systemName: "arrow.down.app.fill")
-                    .font(.system(size: 24))
-                    .foregroundStyle(.white)
-                    .frame(width: 50, height: 50)
-                    .background(.blue.gradient, in: .rect(cornerRadius: 11))
-            }
-            VStack(alignment: .leading, spacing: 4) {
-                Text(update.installedApp.name)
-                    .font(.body.weight(.semibold))
-                Text("Manual IPA · Version \(update.ipa.version)")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-            }
-            Spacer(minLength: 8)
-            Text("QUEUED")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.blue)
-        }
-        .padding(.vertical, 5)
-    }
-}
-
-private struct UnresolvedQueuedManualUpdateRow: View {
-    let ipa: ImportedIPA
-    let detail: String
-
-    var body: some View {
-        HStack(spacing: 12) {
-            if let data = ipa.iconData, let icon = UIImage(data: data) {
-                Image(uiImage: icon)
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 50, height: 50)
-                    .clipShape(.rect(cornerRadius: 11))
-            } else {
-                Image(systemName: "app.fill")
-                    .font(.system(size: 24))
-                    .foregroundStyle(.white)
-                    .frame(width: 50, height: 50)
-                    .background(.orange.gradient, in: .rect(cornerRadius: 11))
-            }
-            VStack(alignment: .leading, spacing: 4) {
-                Text(ipa.name)
-                    .font(.body.weight(.semibold))
-                Text("Manual IPA · Version \(ipa.version)")
-                    .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(1)
-                Text(detail)
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .lineLimit(2)
-            }
-            Spacer(minLength: 8)
-            Text("REVIEW")
-                .font(.caption.weight(.semibold))
-                .foregroundStyle(.orange)
-        }
-        .padding(.vertical, 5)
-    }
-}
-
-private struct GitHubUpdateAttentionDetailView: View {
-    let target: GitHubUpdateTarget
-    let result: GitHubCheckResult
-
-    var body: some View {
-        Form {
-            Section(target.name) {
-                Text(result.state.message)
-            }
-            if let detail = result.detail, !detail.isEmpty {
-                Section("Technical Details") {
-                    Text(detail)
-                        .font(.footnote)
-                        .textSelection(.enabled)
-                }
-            }
-            Section {
-                NavigationLink {
-                    GitHubUpdateSettingsView(target: target)
-                } label: {
-                    Label("Review GitHub Update Settings", systemImage: "chevron.left.forwardslash.chevron.right")
-                }
-            }
-        }
-        .navigationTitle(target.name)
-    }
-}
-
 struct HomeView: View {
     @State var viewModel: HomeViewModel
     @State private var showingImporter = false
@@ -146,17 +43,6 @@ struct HomeView: View {
     private var guestApps: [LiveContainerGuest] { environment.liveContainerState.apps }
     private var githubChecks: [GitHubCheckResult] { environment.githubChecks }
     private var githubUpdates: [GitHubUpdateCandidate] { environment.githubUpdates }
-    private var isCheckingGitHubUpdates: Bool { environment.isCheckingGitHubUpdates }
-    private var configuredGitHubChecks: [GitHubCheckResult] {
-        githubChecks.filter { $0.checkedConfiguration != nil || $0.state == .failed }
-    }
-    private var configuredGitHubAttentionChecks: [GitHubCheckResult] {
-        configuredGitHubChecks.filter { $0.state.needsAttention }
-    }
-    private var hasConfiguredGitHubSources: Bool { !configuredGitHubChecks.isEmpty }
-    private var githubUpdateCheckFailed: Bool {
-        configuredGitHubChecks.contains { $0.state == .failed }
-    }
     private var hasLoadedLocalApps: Bool { environment.hasLoadedLocalApps }
     private var isLoadingLocalApps: Bool { environment.isLoadingLocalApps }
     private var localLoadError: String? { environment.localLoadError }
@@ -210,24 +96,6 @@ struct HomeView: View {
         }
     }
 
-    private func unresolvedQueueDetail(for ipa: ImportedIPA) -> String {
-        if ipa.queuedForInstalledAppID != nil {
-            let hasBundleMatch = installedApps.contains {
-                $0.updateMatchingBundleIdentifiers.contains(ipa.bundleIdentifier.lowercased())
-            }
-            return hasBundleMatch
-                ? "The exact target is unavailable; a different installed copy with this bundle ID remains. SideKick won’t assume it is the queued target."
-                : "The installed app this IPA targeted is no longer available."
-        }
-        let matchingCount = installedApps.filter {
-            $0.updateMatchingBundleIdentifiers.contains(ipa.bundleIdentifier.lowercased())
-        }.count
-        if matchingCount == 0 {
-            return "No installed app matches this queued IPA, so SideKick can’t resolve its target."
-        }
-        return "Multiple installed apps match this older queue entry, so its target is ambiguous."
-    }
-
     private var filteredInstalledApps: [InstalledAppSummary] {
         var seenBundleIDs = Set<String>()
         return installedApps.filter { app in
@@ -248,94 +116,13 @@ struct HomeView: View {
                     .padding(.vertical, 8)
                     .listRowBackground(Color.clear)
                 }
-                if !githubUpdates.isEmpty || !queuedManualUpdates.isEmpty || !unresolvedQueuedManualUpdates.isEmpty {
-                    SwiftUI.Section("Updates") {
-                        ForEach(queuedManualUpdates) { queuedUpdate in
-                            NavigationLink {
-                                AppManagementView(installedApp: queuedUpdate.installedApp)
-                            } label: {
-                                QueuedManualUpdateRow(update: queuedUpdate)
-                            }
-                            .fullWidthListSeparators()
-                            .sideKickNavigationLinkIndicator()
-                        }
-                        ForEach(unresolvedQueuedManualUpdates) { ipa in
-                            NavigationLink {
-                                AppManagementView(queuedUpdate: ipa)
-                            } label: {
-                                UnresolvedQueuedManualUpdateRow(ipa: ipa, detail: unresolvedQueueDetail(for: ipa))
-                            }
-                            .fullWidthListSeparators()
-                            .sideKickNavigationLinkIndicator()
-                        }
-                        ForEach(githubUpdates) { update in
-                            if update.targetKind == .liveContainer {
-                                NavigationLink { LiveContainerGuestDetailView(guestID: update.bundleIdentifier) } label: {
-                                    GitHubUpdateRow(candidate: update, iconData: guestApps.first { $0.id == update.bundleIdentifier }?.iconData)
-                                }
-                                .fullWidthListSeparators()
-                            } else if let app = installedApps.first(where: { $0.id == update.bundleIdentifier }) {
-                                NavigationLink {
-                                    GitHubUpdateDetailView(candidate: update, app: app)
-                                } label: {
-                                    GitHubUpdateRow(candidate: update, app: app)
-                                }
-                                .fullWidthListSeparators()
-                            }
-                        }
+                Section {
+                    NavigationLink {
+                        GitHubUpdatesView(queuedIPAs: queuedManualUpdates.map(\.ipa) + unresolvedQueuedManualUpdates)
+                    } label: {
+                        GitHubUpdatesSummaryRow(queuedCount: queuedManualUpdates.count + unresolvedQueuedManualUpdates.count)
                     }
-                }
-
-                if hasConfiguredGitHubSources {
-                    SwiftUI.Section("GitHub Updates") {
-                        HStack(spacing: 9) {
-                            if isCheckingGitHubUpdates { ProgressView() }
-                            else if configuredGitHubChecks.contains(where: { $0.state.needsAttention }) {
-                                Image(systemName: "exclamationmark.circle").foregroundStyle(.orange)
-                            } else {
-                                Image(systemName: "arrow.down.circle").foregroundStyle(Color.sideKickAccentGradient)
-                            }
-                            Text(updateCheckStatus)
-                                .font(.subheadline.weight(.medium))
-                            Spacer()
-                            if shouldOfferGitHubCheckAction {
-                                SwiftUI.Button(githubUpdateCheckFailed ? "Retry" : "Check Now") {
-                                    Task { await checkGitHubUpdatesNow() }
-                                }
-                                .font(.caption.weight(.semibold))
-                            }
-                        }
-                        .padding(.horizontal, 16)
-                        .padding(.vertical, 13)
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .background(Color(uiColor: .secondarySystemGroupedBackground), in: .rect(cornerRadius: 18))
-                        .listRowInsets(EdgeInsets(top: 4, leading: 0, bottom: 4, trailing: 0))
-                        .listRowBackground(Color.clear)
-                        .listRowSeparator(.hidden)
-                        if isCheckingGitHubUpdates {
-                            ProgressView()
-                                .progressViewStyle(.linear)
-                                .padding(.horizontal, 10)
-                                .padding(.bottom, 8)
-                                .listRowBackground(Color.clear)
-                                .listRowSeparator(.hidden)
-                        }
-                        ForEach(configuredGitHubAttentionChecks, id: \.targetID) { check in
-                            if let target = attentionTarget(for: check) {
-                                NavigationLink {
-                                    GitHubUpdateAttentionDetailView(target: target, result: check)
-                                } label: {
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(target.name).font(.subheadline.weight(.medium))
-                                        Text(check.state.message)
-                                            .font(.footnote)
-                                            .foregroundStyle(.secondary)
-                                    }
-                                }
-                                .fullWidthListSeparators()
-                            }
-                        }
-                    }
+                    .fullWidthListSeparators()
                 }
 
                 if let localLoadError {
@@ -674,42 +461,6 @@ struct HomeView: View {
         capacityGeneration = UUID()
         appIDCapacityTask?.cancel()
         appIDCapacityTask = nil
-    }
-
-    private var updateCheckStatus: String {
-        let availableCount = configuredGitHubChecks.filter { $0.state == .updateAvailable }.count
-        if availableCount > 0 {
-            return availableCount == 1 ? "A GitHub update is available." : "\(availableCount) GitHub updates are available."
-        }
-        let failureCount = configuredGitHubChecks.filter { $0.state == .failed }.count
-        if failureCount > 0 {
-            return failureCount == 1
-                ? "One GitHub update check failed. Retry the check."
-                : "\(failureCount) GitHub update checks failed. Retry the checks."
-        }
-        if configuredGitHubAttentionChecks.count > 0 {
-            return "GitHub update tracking needs attention for \(configuredGitHubAttentionChecks.count) app(s)."
-        }
-        if isCheckingGitHubUpdates { return "Checking GitHub for updates…" }
-        if configuredGitHubChecks.contains(where: { $0.state == .skipped }) { return "The latest GitHub build was skipped." }
-        if configuredGitHubChecks.contains(where: { $0.state == .current }) { return "Confirmed GitHub builds are current." }
-        if configuredGitHubChecks.contains(where: { $0.state == .installedAhead }) { return "Installed builds are ahead of GitHub releases." }
-        return "No confirmed GitHub updates are available."
-    }
-
-    private var shouldOfferGitHubCheckAction: Bool {
-        !isCheckingGitHubUpdates && environment.hasGitHubUpdateTargets
-    }
-
-    private func checkGitHubUpdatesNow() async {
-        environment.requestGitHubUpdateCheck(force: true)
-        await environment.awaitPendingGitHubChecks()
-    }
-
-    private func attentionTarget(for check: GitHubCheckResult) -> GitHubUpdateTarget? {
-        if let app = installedApps.first(where: { $0.id == check.targetID }) { return app.updateTarget }
-        if let guest = guestApps.first(where: { $0.id == check.targetID }) { return guest.updateTarget }
-        return nil
     }
 
     private func openPendingUpdateNotification() async {

@@ -25,6 +25,9 @@ final class AppEnvironment {
     private(set) var githubChecks: [GitHubCheckResult] = []
     private(set) var githubUpdates: [GitHubUpdateCandidate] = []
     private(set) var isCheckingGitHubUpdates = false
+    private(set) var githubConfigurations: [GitHubUpdateConfiguration] = []
+    private(set) var githubConfigurationError: String?
+    private(set) var lastGitHubCheckFinishedAt: Date?
     var githubUpdateCheckFailed: Bool { githubChecks.contains { $0.state == .failed } }
     @ObservationIgnored private var databaseStartupTask: Task<Void, Never>?
     @ObservationIgnored private var maintenanceTask: Task<Void, Never>?
@@ -40,6 +43,7 @@ final class AppEnvironment {
     @ObservationIgnored private var lastCheckedTargets: [String] = []
     @ObservationIgnored private var githubCheckRequested = false
     @ObservationIgnored private var githubChecksSuspended = false
+    @ObservationIgnored private var lastGitHubCheckStartedAt: Date?
 
     init(ipaImportStore: IPAImportStore = IPAImportStore.shared) {
         self.ipaImportStore = ipaImportStore
@@ -118,6 +122,7 @@ final class AppEnvironment {
             } while localReloadRequested
             isLoadingLocalApps = false
             localLoadTask = nil
+            await reloadGitHubConfigurations()
             requestGitHubUpdateCheck()
             loadAppIcons()
         }
@@ -204,11 +209,13 @@ final class AppEnvironment {
         guard DatabaseManager.shared.isStarted, !isLoadingLocalApps, !githubChecksSuspended else { return }
         let targets = updateTargets
         let signature = signatures(targets)
-        guard githubCheckRequested || lastCheckedTargets != signature else { return }
+        let stale = (lastGitHubCheckFinishedAt ?? lastGitHubCheckStartedAt).map { Date.now.timeIntervalSince($0) >= 900 } ?? true
+        guard githubCheckRequested || lastCheckedTargets != signature || stale else { return }
         // Ordinary local reloads queue new work; they never cancel a slow check.
         guard githubScanTask == nil else { return }
         githubCheckRequested = false
         lastCheckedTargets = signature
+        lastGitHubCheckStartedAt = .now
         let generation = UUID()
         githubGeneration = generation
         let targetGenerations = Dictionary(uniqueKeysWithValues: targets.map { ($0.id, UUID()) })
@@ -228,6 +235,7 @@ final class AppEnvironment {
             }
             guard githubGeneration == generation else { return }
             isCheckingGitHubUpdates = false
+            lastGitHubCheckFinishedAt = .now
             githubScanTask = nil
             if !Task.isCancelled, scanResult.checks.count < targets.count {
                 githubCheckRequested = true
@@ -324,6 +332,7 @@ final class AppEnvironment {
     }
 
     func gitHubSettingsChanged() async {
+        await reloadGitHubConfigurations()
         // Immediately remove stale source/skip/install results while rechecking.
         if let configurations = try? await GitHubUpdateConfigurationStore.shared.all() {
             githubUpdates.removeAll { candidate in
@@ -340,6 +349,17 @@ final class AppEnvironment {
             }
         }
         requestGitHubUpdateCheck(force: true)
+    }
+
+    private func reloadGitHubConfigurations() async {
+        do {
+            githubConfigurations = try await GitHubUpdateConfigurationStore.shared.all()
+            githubConfigurationError = nil
+            githubChecks.removeAll { check in
+                guard let configuration = githubConfigurations.first(where: { $0.id == check.targetID }) else { return true }
+                return check.checkedConfiguration != configuration
+            }
+        } catch { githubConfigurationError = error.localizedDescription }
     }
 
     func pauseGitHubChecks() {

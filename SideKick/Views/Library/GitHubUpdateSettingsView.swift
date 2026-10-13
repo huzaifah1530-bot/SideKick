@@ -110,7 +110,7 @@ struct GitHubUpdateSettingsView: View {
                         .fullWidthListSeparators()
                         Text(installedNeedsConfirmation ? "Previous tracking or changed app files need confirmation. Choose the build you actually installed, or leave it unknown." : "Only choose a build you actually installed. Checking or downloading a build does not mark it installed.")
                             .font(.footnote).foregroundStyle(.secondary)
-                        SwiftUI.Button("Reload versions") { Task { await loadHistory() } }
+                        SwiftUI.Button("Reload versions") { Task { await loadHistory(forceRefresh: true) } }
                     }
                     SwiftUI.Button("I Don’t Know the Installed Build") { selectedBaselineKey = nil; baselineWasEdited = true }
                     SwiftUI.Button("Load older versions") { Task { await loadHistory(append: true) } }
@@ -230,7 +230,7 @@ struct GitHubUpdateSettingsView: View {
     }
 
     @MainActor
-    private func loadHistory(configuration existing: GitHubUpdateConfiguration? = nil, append: Bool = false) async {
+    private func loadHistory(configuration existing: GitHubUpdateConfiguration? = nil, append: Bool = false, forceRefresh: Bool = false) async {
         guard !isLoadingHistory else { return }
         isLoadingHistory = true
         let generation = queryGeneration
@@ -250,7 +250,8 @@ struct GitHubUpdateSettingsView: View {
         )
         do {
             let token = try GitHubCredentialStore().load(id: credentialID)
-            let downloadedBuilds = try await GitHubUpdateService().downloadableHistory(for: configuration, token: token, page: page)
+            let service = GitHubUpdateService()
+            let downloadedBuilds = try await service.downloadableHistory(for: configuration, token: token, page: page, forceRefresh: forceRefresh)
             let entries = downloadedBuilds.map(\.historyEntry)
             guard queryGeneration == generation, sourceIdentity == identity,
                   tokenID == credentialID, !Task.isCancelled else { return }
@@ -260,6 +261,15 @@ struct GitHubUpdateSettingsView: View {
                 history += entries.filter { !known.contains($0.key) }
                 builds += downloadedBuilds.filter { !known.contains($0.key) }
             } else { history = entries; builds = downloadedBuilds }
+            // The saved source and target must still match. Draft settings can
+            // populate a list, but cannot replace an app-owned update result.
+            if page == 1, let saved = try await store.configuration(for: target.id),
+               saved.hasSameSource(as: configuration), saved.tokenID == credentialID {
+                var check = try await service.check(for: target, configuration: saved, token: token, forceRefresh: false)
+                guard queryGeneration == generation, sourceIdentity == identity, tokenID == credentialID else { return }
+                check.checkedConfiguration = saved
+                _ = await environment.publishDetailGitHubCheck(check, target: target)
+            }
             if history.isEmpty { message = "No matching releases or downloadable build artifacts were found. Check the source settings and asset name."; showingMessage = true }
         } catch {
             guard queryGeneration == generation, sourceIdentity == identity,

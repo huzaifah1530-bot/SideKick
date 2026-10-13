@@ -42,10 +42,21 @@ struct ContentView: View {
             environment.resumeGitHubChecks()
             guard case .ready = environment.databaseState else { return }
             Task {
-                await environment.reloadLocalCatalogues(checkForUpdates: true)
+                await environment.reloadLocalCatalogues()
                 environment.rescanLiveContainerApps()
             }
             Task { await setupStatus.refresh() }
+        }
+        .task(id: scenePhase) {
+            guard scenePhase == .active else { return }
+            while !Task.isCancelled {
+                // Automatic checks are bounded to avoid exhausting GitHub's
+                // unauthenticated quota. Explicit refresh always checks now.
+                do { try await Task.sleep(for: .seconds(900)) }
+                catch { return }
+                guard !Task.isCancelled else { return }
+                environment.requestGitHubUpdateCheck()
+            }
         }
         .onChange(of: selectedTab) { _, tab in
             guard tab == 0, case .ready = environment.databaseState else { return }

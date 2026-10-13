@@ -7,6 +7,7 @@ struct GitHubHistoryPage: Sendable {
     var builds: [GitHubTrackedBuild]
     let hasMore: Bool
     var newerBuildHasNoDownload = false
+    var fetchedAt: Date? = nil
 }
 
 enum GitHubHistoryError: LocalizedError {

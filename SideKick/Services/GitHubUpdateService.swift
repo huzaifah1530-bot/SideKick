@@ -23,6 +23,7 @@ actor GitHubUpdateService {
     }
 
     private let historyClient = GitHubHistoryClient()
+    private let historyStore = GitHubHistoryStore.shared
 
     func importChoices(repositoryURL: String, source: GitHubUpdateSource, workflow: String, branch: String, token: String?, page: Int) async throws -> GitHubImportPage {
         let configuration = GitHubUpdateConfiguration(bundleIdentifier: "", repositoryURL: repositoryURL,
@@ -36,20 +37,25 @@ actor GitHubUpdateService {
         }, hasMore: result.hasMore)
     }
 
-    func check(for target: GitHubUpdateTarget, configuration: GitHubUpdateConfiguration, token: String? = nil) async throws -> GitHubCheckResult {
+    func check(for target: GitHubUpdateTarget, configuration: GitHubUpdateConfiguration, token: String? = nil, forceRefresh: Bool = true) async throws -> GitHubCheckResult {
         var history: [GitHubTrackedBuild] = []
         var missingNewerDownload = false
+        var fetchedAt: Date?
         for page in 1...5 {
             try Task.checkCancellation()
-            let result = try await historyClient.page(configuration: configuration, token: token, page: page, latestOnly: true)
+            let result = try await historyStore.page(configuration: configuration, token: token, page: page,
+                forceRefresh: forceRefresh && page == 1)
             history += result.builds
+            if page == 1 { fetchedAt = result.fetchedAt }
             missingNewerDownload = missingNewerDownload || result.newerBuildHasNoDownload
             if !history.isEmpty || !result.hasMore { break }
         }
-        let result = GitHubTrackingPolicy.check(target: target, configuration: configuration, history: history)
+        var result = GitHubTrackingPolicy.check(target: target, configuration: configuration, history: history)
+        result.checkedAt = fetchedAt
         if result.state == .current && missingNewerDownload {
-            return GitHubCheckResult(targetID: target.id, state: .noMatchingDownload,
-                detail: "A more recent successful build has no matching downloadable file yet.")
+            result = GitHubCheckResult(targetID: target.id, state: .noMatchingDownload,
+                detail: "A more recent successful build has no matching downloadable file yet.",
+                latestBuild: history.first, checkedAt: fetchedAt)
         }
         return result
     }
@@ -58,12 +64,12 @@ actor GitHubUpdateService {
         try await downloadableHistory(for: configuration, token: token, page: page).map(\.historyEntry)
     }
 
-    func downloadableHistory(for configuration: GitHubUpdateConfiguration, token: String? = nil, page: Int = 1) async throws -> [GitHubTrackedBuild] {
-        try await historyClient.page(configuration: configuration, token: token, page: page).builds
+    func downloadableHistory(for configuration: GitHubUpdateConfiguration, token: String? = nil, page: Int = 1, forceRefresh: Bool = false) async throws -> [GitHubTrackedBuild] {
+        try await historyStore.page(configuration: configuration, token: token, page: page, forceRefresh: forceRefresh).builds
     }
 
-    func buildHistory(for configuration: GitHubUpdateConfiguration, token: String? = nil, page: Int = 1) async throws -> GitHubHistoryPage {
-        try await historyClient.page(configuration: configuration, token: token, page: page, allowMultiple: true)
+    func buildHistory(for configuration: GitHubUpdateConfiguration, token: String? = nil, page: Int = 1, forceRefresh: Bool = false) async throws -> GitHubHistoryPage {
+        try await historyStore.page(configuration: configuration, token: token, page: page, forceRefresh: forceRefresh)
     }
 
     func validateToken(_ token: String) async throws -> String {

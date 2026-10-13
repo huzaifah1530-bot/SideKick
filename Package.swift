@@ -21,6 +21,7 @@ let package = Package(
             "Models/LiveContainerModels.swift",
             "Models/GitHubUpdateConfiguration.swift",
             "Services/GitHubHistoryClient.swift",
+            "Services/GitHubHistoryStore.swift",
             "Services/LiveContainerScanner.swift",
             "Services/LiveContainerStore.swift",
             "Services/GitHubUpdateConfigurationStore.swift",
