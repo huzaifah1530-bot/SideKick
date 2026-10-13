@@ -63,6 +63,7 @@ struct GitHubUpdateRow: View {
 struct GitHubUpdateDetailView: View {
     let candidate: GitHubUpdateCandidate
     let app: InstalledAppSummary
+    let isVersionSelection: Bool
 
     @State private var selectedCandidate: GitHubUpdateCandidate
 
@@ -82,9 +83,10 @@ struct GitHubUpdateDetailView: View {
 
     private let configurationStore = GitHubUpdateConfigurationStore.shared
 
-    init(candidate: GitHubUpdateCandidate, app: InstalledAppSummary) {
+    init(candidate: GitHubUpdateCandidate, app: InstalledAppSummary, isVersionSelection: Bool = false) {
         self.candidate = candidate
         self.app = app
+        self.isVersionSelection = isVersionSelection
         _selectedCandidate = State(initialValue: candidate)
         _discoveredBuilds = State(initialValue: [candidate])
     }
@@ -107,7 +109,7 @@ struct GitHubUpdateDetailView: View {
 
     var body: some View {
         List {
-            if selectedCandidate.updateKey != candidate.updateKey {
+            if isVersionSelection || selectedCandidate.updateKey != candidate.updateKey {
                 Section {
                     Text("You selected a build from history. Installing it can replace a newer installed version.")
                         .foregroundStyle(.secondary)
@@ -163,7 +165,9 @@ struct GitHubUpdateDetailView: View {
 
             Section {
                 ForEach(discoveredBuilds) { build in
-                    SwiftUI.Button { selectedCandidate = build } label: {
+                    NavigationLink {
+                        GitHubUpdateDetailView(candidate: build, app: app, isVersionSelection: true)
+                    } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(build.title).foregroundStyle(.primary).lineLimit(2)
@@ -207,7 +211,8 @@ struct GitHubUpdateDetailView: View {
                     onDownload: { startDownload() },
                     onCancel: { environment.githubUpdateDownloads.cancelDownload(for: selectedCandidate) },
                     onSkip: { Task { await resolveUpdate(markInstalled: false) } },
-                    allowsSkip: selectedCandidate.updateKey == candidate.updateKey
+                    allowsSkip: !isVersionSelection && selectedCandidate.updateKey == candidate.updateKey,
+                    isDisabled: isLoadingToken
                 ) {
                     if let queuedIPA = downloadJob?.queuedIPA {
                         if let account {
@@ -222,7 +227,7 @@ struct GitHubUpdateDetailView: View {
                                     onSourceMissing: { await validateDownload() }
                                 )
                             } label: {
-                                Label("Update App", systemImage: "arrow.down.app.fill")
+                                Label(isVersionSelection ? "Install This Version" : "Update App", systemImage: "arrow.down.app.fill")
                                     .fontWeight(.semibold)
                             }
                             .buttonStyle(.plain)
@@ -285,7 +290,7 @@ struct GitHubUpdateDetailView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle("App Update")
+        .navigationTitle(isVersionSelection ? "Install Version" : "App Update")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { Task { await accountStore.reload() } }
         .onReceive(NotificationCenter.default.publisher(for: .sideKickSigningAccountsDidChange)) { _ in

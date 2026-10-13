@@ -857,7 +857,7 @@ private struct LiveContainerSharedIPA: Identifiable {
     let url: URL
 }
 
-private struct LiveContainerIPAActivity: UIViewControllerRepresentable {
+struct LiveContainerIPAActivity: UIViewControllerRepresentable {
     let url: URL
     func makeUIViewController(context: Context) -> UIActivityViewController {
         UIActivityViewController(activityItems: [url], applicationActivities: nil)

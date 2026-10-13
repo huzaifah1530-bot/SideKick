@@ -25,6 +25,16 @@ struct GitHubTrackedBuild: Sendable {
     let downloadURL: URL
     let date: Date?
     var historyEntry: GitHubUpdateHistoryEntry { GitHubUpdateHistoryEntry(key: key, title: title, date: date) }
+
+    func candidate(for target: GitHubUpdateTarget, configuration: GitHubUpdateConfiguration) -> GitHubUpdateCandidate {
+        GitHubUpdateCandidate(bundleIdentifier: target.id, appName: target.name, currentVersion: target.version,
+            newVersion: version, title: title, assetName: assetName, downloadURL: downloadURL,
+            updateKey: key, source: configuration.source, repositoryURL: configuration.repositoryURL,
+            targetKind: target.kind, sourceIdentity: configuration.sourceIdentity,
+            isKnownNewer: configuration.effectiveBaselineKey.map {
+                GitHubTrackingPolicy.compare(key, to: $0) == .newer
+            } ?? false, buildDate: date)
+    }
 }
 
 enum GitHubCheckState: String, Sendable {

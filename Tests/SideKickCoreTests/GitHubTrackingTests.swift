@@ -3,6 +3,19 @@ import XCTest
 @testable import SideKickCore
 
 final class GitHubTrackingTests: XCTestCase {
+    func testHistoricalCandidateKeepsExactDownloadAndDoesNotAdvanceReceipt() {
+        var configuration = config()
+        configuration.confirmInstalled("actions-v2:81:81:1:200:new", observation: "original")
+        let before = configuration
+        let older = item("actions-v2:52:52:1:100:old")
+        let candidate = older.candidate(for: target(), configuration: configuration)
+        XCTAssertEqual(candidate.updateKey, older.key)
+        XCTAssertEqual(candidate.downloadURL, older.downloadURL)
+        XCTAssertEqual(candidate.sourceIdentity, configuration.sourceIdentity)
+        XCTAssertEqual(candidate.bundleIdentifier, target().id)
+        XCTAssertFalse(candidate.isKnownNewer)
+        XCTAssertEqual(configuration, before)
+    }
     private func config() -> GitHubUpdateConfiguration {
         GitHubUpdateConfiguration(bundleIdentifier: "app.TEAM", repositoryURL: "https://github.com/o/r", source: .actionsArtifact, workflowFile: "build.yml", branch: "main", assetName: "IPA", lastInstalledUpdateKey: nil)
     }

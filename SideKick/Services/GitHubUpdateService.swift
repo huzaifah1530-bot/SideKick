@@ -55,7 +55,11 @@ actor GitHubUpdateService {
     }
 
     func history(for configuration: GitHubUpdateConfiguration, token: String? = nil, page: Int = 1) async throws -> [GitHubUpdateHistoryEntry] {
-        try await historyClient.page(configuration: configuration, token: token, page: page).builds.map(\.historyEntry)
+        try await downloadableHistory(for: configuration, token: token, page: page).map(\.historyEntry)
+    }
+
+    func downloadableHistory(for configuration: GitHubUpdateConfiguration, token: String? = nil, page: Int = 1) async throws -> [GitHubTrackedBuild] {
+        try await historyClient.page(configuration: configuration, token: token, page: page).builds
     }
 
     func buildHistory(for configuration: GitHubUpdateConfiguration, token: String? = nil, page: Int = 1) async throws -> GitHubHistoryPage {

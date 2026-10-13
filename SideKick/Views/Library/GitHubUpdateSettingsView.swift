@@ -1,4 +1,5 @@
 import SwiftUI
+import UIKit
 
 struct GitHubUpdateSettingsView: View {
     let target: GitHubUpdateTarget
@@ -14,6 +15,7 @@ struct GitHubUpdateSettingsView: View {
     @State private var message: String?
     @State private var showingMessage = false
     @State private var history: [GitHubUpdateHistoryEntry] = []
+    @State private var builds: [GitHubTrackedBuild] = []
     @State private var selectedBaselineKey: String?
     @State private var baselineWasEdited = false
     @State private var installedNeedsConfirmation = false
@@ -91,11 +93,15 @@ struct GitHubUpdateSettingsView: View {
                         NavigationLink {
                             GitHubBaselineSelectionView(
                                 history: history,
+                                builds: builds,
+                                target: target,
+                                configuration: draftConfiguration,
+                                onSourceSaved: { baselineWasEdited = false },
                                 selectedKey: Binding(get: { selectedBaselineKey }, set: { selectedBaselineKey = $0; baselineWasEdited = true })
                             )
                         } label: {
                             LabeledContent(
-                                "Version currently installed",
+                                "Versions & Installed Build",
                                 value: selectedBaselineKey.flatMap { selectedKey in
                                     history.first(where: { $0.key == selectedKey }).map(historyLabel)
                                 } ?? selectedBaselineKey.map { "Saved build: \($0)" } ?? "Choose a version"
@@ -136,6 +142,7 @@ struct GitHubUpdateSettingsView: View {
             loadedSource = value
             queryGeneration = UUID()
             history = []
+            builds = []
             historyPage = 1
             baselineWasEdited = false
             selectedBaselineKey = nil
@@ -151,8 +158,17 @@ struct GitHubUpdateSettingsView: View {
             historyTokenID = value
             queryGeneration = UUID()
             history = []
+            builds = []
             historyPage = 1
             isLoadingHistory = false
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .sideKickGitHubSettingsDidChange)) { _ in
+            Task {
+                guard !baselineWasEdited,
+                      let saved = try? await store.configuration(for: target.id),
+                      saved.hasSameSource(as: draftConfiguration) else { return }
+                selectedBaselineKey = saved.effectiveBaselineKey
+            }
         }
         .alert("GitHub Updates", isPresented: $showingMessage) {
             SwiftUI.Button("OK", role: .cancel) { }
@@ -234,14 +250,16 @@ struct GitHubUpdateSettingsView: View {
         )
         do {
             let token = try GitHubCredentialStore().load(id: credentialID)
-            let entries = try await GitHubUpdateService().history(for: configuration, token: token, page: page)
+            let downloadedBuilds = try await GitHubUpdateService().downloadableHistory(for: configuration, token: token, page: page)
+            let entries = downloadedBuilds.map(\.historyEntry)
             guard queryGeneration == generation, sourceIdentity == identity,
                   tokenID == credentialID, !Task.isCancelled else { return }
             historyPage = page
             if append {
                 let known = Set(history.map(\.key))
                 history += entries.filter { !known.contains($0.key) }
-            } else { history = entries }
+                builds += downloadedBuilds.filter { !known.contains($0.key) }
+            } else { history = entries; builds = downloadedBuilds }
             if history.isEmpty { message = "No matching releases or downloadable build artifacts were found. Check the source settings and asset name."; showingMessage = true }
         } catch {
             guard queryGeneration == generation, sourceIdentity == identity,
@@ -261,6 +279,12 @@ struct GitHubUpdateSettingsView: View {
         [repositoryURL, source.rawValue, workflowFile, branch, assetName].joined(separator: "\n")
     }
 
+    private var draftConfiguration: GitHubUpdateConfiguration {
+        GitHubUpdateConfiguration(bundleIdentifier: target.id, repositoryURL: repositoryURL,
+            source: source, workflowFile: workflowFile, branch: branch, assetName: assetName,
+            lastInstalledUpdateKey: nil, tokenID: tokenID)
+    }
+
     @MainActor
     private func loadHistory() async {
         await loadHistory(configuration: nil)
@@ -274,17 +298,21 @@ struct GitHubUpdateSettingsView: View {
 
 private struct GitHubBaselineSelectionView: View {
     let history: [GitHubUpdateHistoryEntry]
+    let builds: [GitHubTrackedBuild]
+    let target: GitHubUpdateTarget
+    let configuration: GitHubUpdateConfiguration
+    let onSourceSaved: () -> Void
     @Binding var selectedKey: String?
-
-    @Environment(\.dismiss) private var dismiss
 
     var body: some View {
         List {
             Section {
                 ForEach(history) { item in
-                    SwiftUI.Button(action: {
-                        select(item)
-                    }) {
+                    NavigationLink {
+                        GitHubHistoricalVersionView(item: item,
+                            build: builds.first(where: { $0.key == item.key }), target: target,
+                            configuration: configuration, onSourceSaved: onSourceSaved, selectedKey: $selectedKey)
+                    } label: {
                         HStack {
                             VStack(alignment: .leading, spacing: 4) {
                                 Text(item.title)
@@ -310,21 +338,157 @@ private struct GitHubBaselineSelectionView: View {
             } header: {
                 Text("Available versions")
             } footer: {
-                Text("Select the release or build that is currently installed. SideKick will only offer newer entries as updates.")
+                Text("Open a version to download and install it, or identify the build you already installed.")
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle("Installed Version")
+        .navigationTitle("Versions")
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    private func select(_ item: GitHubUpdateHistoryEntry) {
-        selectedKey = item.key
-        dismiss()
+}
+
+private struct GitHubHistoricalVersionView: View {
+    let item: GitHubUpdateHistoryEntry
+    let build: GitHubTrackedBuild?
+    let target: GitHubUpdateTarget
+    let configuration: GitHubUpdateConfiguration
+    let onSourceSaved: () -> Void
+    @Binding var selectedKey: String?
+    @Environment(AppEnvironment.self) private var environment
+    @Environment(\.dismiss) private var dismiss
+    @State private var preparedCandidate: GitHubUpdateCandidate?
+    @State private var working = false
+    @State private var message: String?
+    @State private var confirmingBaseline = false
+    @State private var shareURL: URL?
+    @State private var showingShare = false
+
+    private var downloadJob: GitHubUpdateDownloadJob? {
+        preparedCandidate.flatMap { environment.githubUpdateDownloads.jobs[$0.id] }
     }
 
-    private func historyLabel(_ item: GitHubUpdateHistoryEntry) -> String {
-        guard let date = item.date else { return item.title }
-        return "\(item.title) · \(date.formatted(date: .abbreviated, time: .omitted))"
+    var body: some View {
+        List {
+            Section("Version") {
+                Text(item.title).font(.headline)
+                if let date = item.date { LabeledContent("Published", value: date.formatted()) }
+                if let build {
+                    LabeledContent("Version", value: build.version)
+                    LabeledContent("File", value: build.assetName)
+                }
+                Text("Installing an older build replaces the app’s version. Older versions may not support data created by newer versions.")
+                    .font(.footnote).foregroundStyle(.secondary)
+            }
+            Section {
+                if let candidate = preparedCandidate {
+                    if target.kind == .installed {
+                        if let app = environment.installedApps.first(where: { $0.id == target.id }) {
+                            NavigationLink("Download & Install This Version") {
+                                GitHubUpdateDetailView(candidate: candidate, app: app, isVersionSelection: true)
+                            }
+                        } else {
+                            Text("The installed app is unavailable. Refresh My Apps and reopen this version.")
+                        }
+                    } else {
+                        GitHubUpdateDownloadControls(job: downloadJob,
+                            onDownload: { Task { await downloadGuest(candidate) } },
+                            onCancel: { environment.githubUpdateDownloads.cancelDownload(for: candidate) },
+                            onSkip: {}, allowsSkip: false, isDisabled: working) {
+                            SwiftUI.Button("Install in LiveContainer") { Task { await shareGuest(candidate) } }
+                        }
+                        Text("Choose LiveContainer in the share sheet and replace the existing guest. Verify the installation before marking this build installed.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
+                } else {
+                    SwiftUI.Button("Use This Source & Review Installation") { Task { await prepare() } }
+                        .disabled(build == nil || working)
+                    Text("This saves the GitHub source shown in setup. Your installed build remains unchanged until installation succeeds or you confirm it manually.")
+                        .font(.footnote).foregroundStyle(.secondary)
+                }
+                if working { ProgressView() }
+                if let message { Text(message).foregroundStyle(.red).textSelection(.enabled) }
+            }
+            Section {
+                SwiftUI.Button("This Version Is Already Installed") { confirmingBaseline = true }
+            }
+        }
+        .navigationTitle("Version Details")
+        .navigationBarTitleDisplayMode(.inline)
+        .alert("Already installed this exact build?", isPresented: $confirmingBaseline) {
+            SwiftUI.Button("Select Installed Build") { selectedKey = item.key; dismiss() }
+            SwiftUI.Button("Cancel", role: .cancel) { }
+        } message: { Text("This selects the installed build for setup; it does not install anything. Save GitHub settings to apply it.") }
+        .sheet(isPresented: $showingShare, onDismiss: {
+            if let shareURL { try? FileManager.default.removeItem(at: shareURL) }
+            shareURL = nil
+        }) {
+            if let shareURL { LiveContainerIPAActivity(url: shareURL) }
+        }
+    }
+
+    @MainActor private func prepare() async {
+        guard let build, !working else { return }
+        working = true
+        defer { working = false }
+        do {
+            try await GitHubUpdateConfigurationStore.shared.saveSettings(configuration,
+                baselineKey: nil, baselineWasEdited: false, observation: target.observation)
+            let saved = try await GitHubUpdateConfigurationStore.shared.configuration(for: target.id)
+            selectedKey = saved?.effectiveBaselineKey
+            onSourceSaved()
+            preparedCandidate = build.candidate(for: target, configuration: saved ?? configuration)
+            if let preparedCandidate {
+                await environment.githubUpdateDownloads.restoreQueuedFiles(for: [preparedCandidate],
+                    ipaImportStore: environment.ipaImportStore)
+            }
+            message = nil
+        } catch { message = error.localizedDescription }
+    }
+
+    @MainActor private func verifiedGuest(_ candidate: GitHubUpdateCandidate) async throws -> LiveContainerGuest {
+        guard let guest = environment.liveContainerState.apps.first(where: { $0.id == target.id }) else {
+            throw CocoaError(.fileNoSuchFile)
+        }
+        try await environment.liveContainerStore.rescan(guest.connectionID)
+        let snapshot = try await environment.liveContainerStore.snapshot()
+        guard let fresh = snapshot.apps.first(where: { $0.id == target.id }), fresh.isAvailable,
+              let connection = snapshot.connections.first(where: { $0.id == fresh.connectionID }),
+              connection.isConnected, connection.storageKind != .snapshot,
+              let current = try await GitHubUpdateConfigurationStore.shared.configuration(for: target.id),
+              current.sourceIdentity == candidate.sourceIdentity else {
+            throw NSError(domain: "SideKick", code: 1, userInfo: [NSLocalizedDescriptionKey:
+                "The guest or GitHub source is unavailable or changed. Reconnect it and reopen this version."])
+        }
+        return fresh
+    }
+
+    @MainActor private func downloadGuest(_ candidate: GitHubUpdateCandidate) async {
+        guard !working else { return }
+        working = true
+        defer { working = false }
+        do {
+            let guest = try await verifiedGuest(candidate)
+            let token = try GitHubCredentialStore().load(id: configuration.tokenID)
+            environment.githubUpdateDownloads.start(candidate: candidate,
+                expectedBundleIdentifiers: [guest.bundleIdentifier.lowercased()],
+                ipaImportStore: environment.ipaImportStore, token: token)
+            message = nil
+        } catch { message = error.localizedDescription }
+    }
+
+    @MainActor private func shareGuest(_ candidate: GitHubUpdateCandidate) async {
+        guard !working, let ipa = downloadJob?.queuedIPA else { return }
+        working = true
+        defer { working = false }
+        do {
+            let guest = try await verifiedGuest(candidate)
+            guard ipa.bundleIdentifier.lowercased() == guest.bundleIdentifier.lowercased(),
+                  ipa.githubUpdateKey == candidate.updateKey,
+                  ipa.githubSourceIdentity == candidate.sourceIdentity else { throw CocoaError(.fileReadCorruptFile) }
+            shareURL = try await environment.ipaImportStore.fileURL(for: ipa)
+            showingShare = true
+            message = nil
+        } catch { message = error.localizedDescription }
     }
 }
