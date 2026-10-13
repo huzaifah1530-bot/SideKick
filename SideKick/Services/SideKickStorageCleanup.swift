@@ -44,6 +44,54 @@ enum StorageCleanupError: LocalizedError {
     }
 }
 
+// Recognize only install staging directories directly inside our temporary root.
+// Older SideStore builds used globallyUniqueString instead of an ownership marker.
+enum InstallTemporaryDirectory {
+    static func isDisposable(_ url: URL, inside root: URL) -> Bool {
+        guard url.deletingLastPathComponent().standardizedFileURL.path == root.standardizedFileURL.path,
+              (try? OwnedStoragePath.validate(url, inside: root)) != nil,
+              (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true,
+              let children = try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil),
+              !children.isEmpty else { return false }
+        let name = url.lastPathComponent
+        let modern = name.hasPrefix("sidekick-pipeline-") && UUID(uuidString: String(name.dropFirst("sidekick-pipeline-".count))) != nil
+        let legacy = name.range(of: "^[0-9A-Fa-f]{8}(-[0-9A-Fa-f]{4}){3}-[0-9A-Fa-f]{12}-[0-9]+-[0-9A-Fa-f]{12,32}$", options: .regularExpression) != nil
+        guard modern || legacy else { return false }
+        var hasOwnership = false
+        var hasPayload = false
+        for child in children {
+            guard (try? OwnedStoragePath.validate(child, inside: url)) != nil,
+                  let values = try? child.resourceValues(forKeys: [.isRegularFileKey, .isDirectoryKey, .fileSizeKey]) else { return false }
+            switch child.lastPathComponent {
+            case ".sidekick-process":
+                guard values.isRegularFile == true, (values.fileSize ?? Int.max) < 32,
+                      let text = try? String(contentsOf: child, encoding: .utf8),
+                      let pid = Int(text), pid > 0 else { return false }
+                hasOwnership = true
+            case ".sidekick-disposable":
+                guard values.isRegularFile == true, (values.fileSize ?? Int.max) < 128,
+                      (try? String(contentsOf: child, encoding: .utf8)) == "SideKick completed staging v1\n" else { return false }
+                hasOwnership = true
+            case "App.ipa":
+                guard values.isRegularFile == true else { return false }
+                hasPayload = true
+            default:
+                guard child.pathExtension == "app", values.isDirectory == true else { return false }
+                if legacy {
+                    let info = child.appendingPathComponent("Info.plist")
+                    guard (try? OwnedStoragePath.validate(info, inside: child)) != nil,
+                          (try? info.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true,
+                          let data = try? Data(contentsOf: info),
+                          let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any],
+                          let identifier = plist["CFBundleIdentifier"] as? String, !identifier.isEmpty else { return false }
+                }
+                hasPayload = true
+            }
+        }
+        return modern ? hasOwnership : hasPayload
+    }
+}
+
 #if canImport(UIKit)
 import CoreData
 
@@ -64,7 +112,7 @@ enum SideKickStorageCleanup {
     private static var completedTemporaryPaths: Set<String> = []
 
     // Snapshot before preparation; only newly created staging folders belong
-    // to this signing batch. Older and recovery folders remain protected.
+    // to this signing batch. Unknown and recovery folders remain protected.
     static func beginOperation() throws {
         try ensureOperationAllowed()
         if activeOperations == 0 {
@@ -82,8 +130,8 @@ enum SideKickStorageCleanup {
             if let initialTemporaryPaths, !initialTemporaryPaths.contains(url.path), isStagedPipelineDirectory(url) {
                 completedTemporaryPaths.insert(url.path)
                 // Persist ownership for a later launch if this cleanup is
-                // interrupted. Unmarked legacy folders are never inferred
-                // disposable merely because they contain an IPA.
+                // interrupted. Legacy folders additionally require the exact
+                // staging name and only recognized install contents.
                 try? Data("SideKick completed staging v1\n".utf8).write(
                     to: url.appendingPathComponent(".sidekick-disposable"), options: .atomic)
             }
@@ -103,19 +151,7 @@ enum SideKickStorageCleanup {
     }
 
     nonisolated static func isStagedPipelineDirectory(_ url: URL) -> Bool {
-        guard (try? OwnedStoragePath.validate(url, inside: FileManager.default.temporaryDirectory)) != nil,
-              (try? url.resourceValues(forKeys: [.isDirectoryKey]).isDirectory) == true,
-              let children = try? FileManager.default.contentsOfDirectory(at: url, includingPropertiesForKeys: nil),
-              !children.isEmpty,
-              children.allSatisfy({ ["App.app", "App.ipa", ".sidekick-disposable"].contains($0.lastPathComponent) }),
-              children.allSatisfy({ (try? OwnedStoragePath.validate($0, inside: url)) != nil }) else { return false }
-        // Recovery/backup folders and unexpected files make this ineligible.
-        return children.contains { child in
-            (child.lastPathComponent == "App.app"
-                && FileManager.default.fileExists(atPath: child.appendingPathComponent("Info.plist").path))
-                || (child.lastPathComponent == "App.ipa"
-                    && (try? child.resourceValues(forKeys: [.isRegularFileKey]).isRegularFile) == true)
-        }
+        InstallTemporaryDirectory.isDisposable(url, inside: FileManager.default.temporaryDirectory)
     }
 
     nonisolated private static func isCompletedPipelineDirectory(_ url: URL) -> Bool {
@@ -154,7 +190,6 @@ enum SideKickStorageCleanup {
                     let namedByCurrentProcess = url.lastPathComponent.hasPrefix("sidekick-import-\(currentProcess)-") || url.lastPathComponent.hasPrefix("sidekick-github-\(currentProcess)-")
                     let owner = try? String(contentsOf: url.appendingPathComponent(".sidekick-process"), encoding: .utf8)
                     let finishedPipeline = category == "Temporary" && isStagedPipelineDirectory(url)
-                        && (completedPaths.contains(url.path) || isCompletedPipelineDirectory(url))
                     let protected: String?
                     if !safe { protected = "Contains a symbolic link or an unsafe path." }
                     else if category == "Signing source" && (url.lastPathComponent.count != 64 || !url.lastPathComponent.allSatisfy({ $0.isHexDigit })) {
@@ -170,7 +205,7 @@ enum SideKickStorageCleanup {
                         protected = "Recent temporary file or owned by this running process. Kept to protect active work."
                     } else if category == "Export" && url.pathExtension.lowercased() != "ipa" { protected = "Not an exported IPA." }
                     else { protected = nil }
-                    result.append(RemovableStorageItem(url: url, name: policy.owner.map { "\(category) · \($0)" } ?? "\(category) · \(url.lastPathComponent)",
+                    result.append(RemovableStorageItem(url: url, name: finishedPipeline ? "Temporary Install Files" : (policy.owner.map { "\(category) · \($0)" } ?? "\(category) · \(url.lastPathComponent)"),
                         bytes: measureSizes ? SideKickStorageUsage.size(of: url) : 0, policy: policy, protectedReason: protected))
                 }
             }
@@ -269,9 +304,7 @@ enum SideKickStorageCleanup {
         try OwnedStoragePath.validate(item.url, inside: root)
         let values = try item.url.resourceValues(forKeys: [.contentModificationDateKey])
         let modified = values.contentModificationDate ?? .now
-        let completedPaths = completedTemporaryPaths
         let finishedPipeline = category == "Temporary" && isStagedPipelineDirectory(item.url)
-            && (completedPaths.contains(item.url.path) || isCompletedPipelineDirectory(item.url))
         let policy = category == "Signing source"
             ? StorageRemovalPolicy.payload(signature: item.url.lastPathComponent, retainedSignatures: owners.names, retainedIdentities: owners.identities)
             : StorageRemovalPolicy(owner: nil, requiresSourceConfirmation: false)
@@ -310,7 +343,16 @@ enum SideKickStorageCleanup {
             // saved. Give unreferenced sources a recovery window before pruning.
             let disposable = candidates.filter { item in
                 guard item.protectedReason == nil, !item.policy.requiresSourceConfirmation else { return false }
-                if item.url.deletingLastPathComponent().standardizedFileURL == temporary.standardizedFileURL { return true }
+                if item.url.deletingLastPathComponent().standardizedFileURL == temporary.standardizedFileURL {
+                    // Recover modern interrupted stages immediately at idle. Give
+                    // unmarked legacy stages a recovery window during automatic cleanup.
+                    if isStagedPipelineDirectory(item.url), !item.url.lastPathComponent.hasPrefix("sidekick-pipeline-"),
+                       !completedTemporaryPaths.contains(item.url.path), !isCompletedPipelineDirectory(item.url) {
+                        let modified = try? item.url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate
+                        return modified.map { $0 < cutoff } ?? false
+                    }
+                    return true
+                }
                 guard item.url.deletingLastPathComponent().standardizedFileURL == payloads.standardizedFileURL,
                       let modified = try? item.url.resourceValues(forKeys: [.contentModificationDateKey]).contentModificationDate else { return false }
                 return modified < cutoff
