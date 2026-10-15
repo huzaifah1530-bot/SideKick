@@ -1,6 +1,6 @@
 import SwiftUI
 
-private struct UnsavedSettingsGuard: ViewModifier {
+@MainActor private struct UnsavedSettingsGuard: ViewModifier {
     let isDirty: Bool
     let save: () async -> Bool
     let discard: () -> Void
@@ -35,7 +35,7 @@ private struct UnsavedSettingsGuard: ViewModifier {
 }
 
 extension View {
-    func guardUnsavedSettings(isDirty: Bool, save: @escaping () async -> Bool, discard: @escaping () -> Void) -> some View {
+    @MainActor func guardUnsavedSettings(isDirty: Bool, save: @escaping () async -> Bool, discard: @escaping () -> Void) -> some View {
         modifier(UnsavedSettingsGuard(isDirty: isDirty, save: save, discard: discard))
     }
 }
