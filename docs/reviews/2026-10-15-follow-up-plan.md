@@ -1,6 +1,6 @@
 # Authentication, lifecycle and diagnostics follow-up
 
-Scope: user request of 15 October; implement in this session without delegation, commits or publication. Preserve existing dirty files and vendor pins.
+Scope: user request of 15 October; implement in this session without delegation. The user subsequently authorized committing and pushing to `main` for the GitHub Actions IPA build. Preserve existing dirty files and vendor pins.
 
 1. Compare 0.6.4, 0.7.0-alpha and nightly SideSign changes against the shipping patch chain. Preserve cryptographic proof checks and nonzero Apple errors. Add regression cases for empty `au` and consistent provider identity through two-factor requests. Do not infer the device's Apple error from its generic alert.
 2. Use UIKit application lifecycle in the hosted root. Resume must schedule pending discovery; background still cancels and invalidates results. Keep throttling, per-target generation checks and newest-download short circuit.
