@@ -116,6 +116,12 @@ final class LocalVPNService {
     }
 
     func authorize() async throws {
+        try await SideKickDiagnostics.perform(DiagnosticsStore.operationID == nil ? .connection : DiagnosticsStore.operation, stage: .localConnection) {
+            try await performAuthorize()
+        }
+    }
+
+    private func performAuthorize() async throws {
         guard !isBusy else { throw LocalVPNError.inUse }
         guard extensionBundleIdentifier != nil else { throw LocalVPNError.missingExtension }
         guard hasSupportedProfiles else { throw LocalVPNError.unsupportedSignature }
@@ -147,6 +153,12 @@ final class LocalVPNService {
     }
 
     func acquire() async throws -> UUID {
+        return try await SideKickDiagnostics.perform(DiagnosticsStore.operationID == nil ? .connection : DiagnosticsStore.operation, stage: .localConnection) {
+            return try await performAcquire()
+        }
+    }
+
+    private func performAcquire() async throws -> UUID {
         guard !isMutatingConfiguration else { throw LocalVPNError.inUse }
         let lease = UUID()
         leases.insert(lease)

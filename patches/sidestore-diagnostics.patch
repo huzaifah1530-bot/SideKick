@@ -1,0 +1,42 @@
+diff --git a/SideStore/Core/Anisette/AnisetteProvider.swift b/SideStore/Core/Anisette/AnisetteProvider.swift
+--- a/SideStore/Core/Anisette/AnisetteProvider.swift
++++ b/SideStore/Core/Anisette/AnisetteProvider.swift
+@@ -11,6 +11,18 @@
+ 
+ enum AnisetteProvider {
+     static func fetch(handler: AnisetteServerHandler? = nil) async throws -> ALTAnisetteData {
++        AuthenticationDiagnostics.record(.anisette, event: .started)
++        do {
++            let result = try await fetchSelectedProvider(handler: handler)
++            AuthenticationDiagnostics.record(.anisette, event: .succeeded)
++            return result
++        } catch {
++            AuthenticationDiagnostics.record(.anisette, event: .failed, code: (error as NSError).code)
++            throw error
++        }
++    }
++
++    private static func fetchSelectedProvider(handler: AnisetteServerHandler?) async throws -> ALTAnisetteData {
+         if UserDefaults.standard.useOnDeviceAnisette {
+             debugLog("[AnisetteProvider] Fetching anisette via On-Device Anisette (ODA)...")
+             return try await OnDeviceAnisetteManager.shared.fetchAnisetteData()
+diff --git a/SideStore/Core/Operations/StandaloneOperations/SignInOperation.swift b/SideStore/Core/Operations/StandaloneOperations/SignInOperation.swift
+--- a/SideStore/Core/Operations/StandaloneOperations/SignInOperation.swift
++++ b/SideStore/Core/Operations/StandaloneOperations/SignInOperation.swift
+@@ -105,7 +105,15 @@
+         if self.isCancelled { throw OperationError.cancelled }
+ 
+         // Resolve Team & Save State
+-        let team = try await self.fetchTeam(for: account, session: session)
++        AuthenticationDiagnostics.record(.developerTeam, event: .started)
++        let team: ALTTeam
++        do {
++            team = try await self.fetchTeam(for: account, session: session)
++            AuthenticationDiagnostics.record(.developerTeam, event: .succeeded)
++        } catch {
++            AuthenticationDiagnostics.record(.developerTeam, event: .failed, code: (error as NSError).code)
++            throw error
++        }
+         try await self.saveTeamAndAccount(team, makeActive: true)
+         reportProgress(stepWeight * 2)
+ 

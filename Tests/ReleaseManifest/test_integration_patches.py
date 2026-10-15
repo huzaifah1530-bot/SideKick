@@ -33,6 +33,9 @@ class IntegrationPatchTests(unittest.TestCase):
                 "SideStore/Core/Operations/PipelineOperations/RemoveAppExtensionsOperation.swift",
                 "SideStore/MaintenanceManager.swift", "SideStore/Utils/iostreams/ConsoleLog.swift",
                 "SideStore/Utils/common/FileOutputStream.swift",
+                "SideStore/Core/Anisette/AnisetteProvider.swift",
+                "SideStore/Core/Anisette/OnDeviceAnisetteManager.swift",
+                "SideStore/Core/Operations/StandaloneOperations/SignInOperation.swift",
             ])
             for patch in PATCHES:
                 content = (ROOT / "patches" / patch).read_text(encoding="utf-8")
@@ -60,6 +63,13 @@ class IntegrationPatchTests(unittest.TestCase):
             patch_path.write_bytes(audit_patch.encode("utf-8"))
             result = subprocess.run(["git", "-C", str(checkout), "apply", str(patch_path)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
+            for name in ("sidestore-anisette-recovery.patch", "sidestore-diagnostics.patch"):
+                patch_path.write_bytes((ROOT / "patches" / name).read_text(encoding="utf-8").encode("utf-8"))
+                result = subprocess.run(["git", "-C", str(checkout), "apply", str(patch_path)], capture_output=True, text=True)
+                self.assertEqual(result.returncode, 0, f"{name}: {result.stderr}")
+            if compiler := shutil.which("swiftc"):
+                for relative in ("SideStore/Core/Anisette/AnisetteProvider.swift", "SideStore/Core/Operations/StandaloneOperations/SignInOperation.swift"):
+                    subprocess.run([compiler, "-frontend", "-parse", str(checkout / relative)], check=True)
             result = subprocess.run([sys.executable, str(ROOT / "scripts/embed-file-transfer.py"), str(checkout)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             helper = (checkout / "SideBackup/SideBackupApp.swift").read_text(encoding="utf-8")

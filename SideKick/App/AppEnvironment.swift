@@ -387,6 +387,7 @@ final class AppEnvironment {
     }
 
     func pauseGitHubChecks() {
+        DiagnosticsStore.shared.record(.paused, operation: .lifecycle, stage: .lifecycle, operationID: UUID())
         githubChecksSuspended = true
         githubGeneration = UUID()
         githubScanTask?.cancel()
@@ -397,6 +398,8 @@ final class AppEnvironment {
 
     func resumeGitHubChecks() {
         githubChecksSuspended = false
+        DiagnosticsStore.shared.record(.resumed, operation: .lifecycle, stage: .lifecycle, operationID: UUID())
+        requestGitHubUpdateCheck()
     }
 
     private func loadAppIcons() {

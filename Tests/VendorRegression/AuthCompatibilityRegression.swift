@@ -6,6 +6,8 @@ private final class Attempts: @unchecked Sendable { var blobs: [Data?] = [] }
 @main struct AuthCompatibilityRegression {
     static func main() async throws {
         precondition(AuthCompatibility.authType(statusType: nil, responseType: nil, statusCode: 409) == "pushedCode")
+        precondition(AuthCompatibility.authType(statusType: "", responseType: nil, statusCode: 409) == "pushedCode")
+        precondition(AuthCompatibility.authType(statusType: "", responseType: "sms", statusCode: 409) == "sms")
         precondition(AuthCompatibility.authType(statusType: "repair", responseType: nil, statusCode: 409) == "repair")
         precondition(AuthCompatibility.authType(statusType: nil, responseType: "sms", statusCode: 409) == "sms")
         precondition(AuthCompatibility.authType(statusType: nil, responseType: nil, statusCode: 200) == nil)

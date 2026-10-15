@@ -198,6 +198,12 @@ final class SigningAccountStore {
     }
 
     func addAccount(appleID: String, password: String) async throws {
+        try await SideKickDiagnostics.perform(.addAccount, stage: .authentication) {
+            try await performAddAccount(appleID: appleID, password: password)
+        }
+    }
+
+    private func performAddAccount(appleID: String, password: String) async throws {
         guard !isWorking, SigningAccountOperationCoordinator.acquire() else {
             throw SigningAccountError.engineBusy
         }
@@ -305,6 +311,9 @@ final class SigningAccountStore {
             NotificationCenter.default.post(name: .sideKickSigningAccountsDidChange, object: nil)
             setSignInCheckpoint("Account saved successfully")
         } catch {
+            if let id = DiagnosticsStore.operationID {
+                DiagnosticsStore.shared.failure(error, operation: .addAccount, stage: .session, operationID: id)
+            }
             if let previousCredentials {
                 do { try await restoreSession(previousCredentials) }
                 catch { debugLog("[SideKick] Could not restore the previous signing session after account setup failed: \(error.localizedDescription)") }
@@ -314,6 +323,15 @@ final class SigningAccountStore {
     }
 
     private func setSignInCheckpoint(_ value: String) {
+        if let id = DiagnosticsStore.operationID {
+            switch value {
+            case "Apple ID authenticated; saving its signing session":
+                DiagnosticsStore.shared.record(.started, operation: DiagnosticsStore.operation, stage: .session, operationID: id)
+            case "Account saved successfully":
+                DiagnosticsStore.shared.record(.succeeded, operation: DiagnosticsStore.operation, stage: .session, operationID: id)
+            default: break
+            }
+        }
         signInCheckpoint = value
         UserDefaults.standard.set(value, forKey: "sidekick.sign-in-checkpoint")
     }
@@ -623,6 +641,12 @@ final class SigningAccountStore {
     /// Completes the device registration and certificate setup deferred by the
     /// account sign-in screen before a real signing operation begins.
     private func ensureSigningReady(for target: SigningAccountSummary, forceRefreshCertificate: Bool = false) async throws {
+        try await SideKickDiagnostics.perform(DiagnosticsStore.operationID == nil ? .restoreAccount : DiagnosticsStore.operation, stage: .signing) {
+            try await prepareSigning(for: target, forceRefreshCertificate: forceRefreshCertificate)
+        }
+    }
+
+    private func prepareSigning(for target: SigningAccountSummary, forceRefreshCertificate: Bool) async throws {
         let key = SigningSessionVault.key(
             accountIdentifier: target.accountIdentifier,
             teamIdentifier: target.teamIdentifier
@@ -702,6 +726,12 @@ final class SigningAccountStore {
     }
 
     private func restoreSession(_ credentials: SigningSessionCredentials, activateTeam: Bool = true) async throws {
+        try await SideKickDiagnostics.perform(DiagnosticsStore.operationID == nil ? .restoreAccount : DiagnosticsStore.operation, stage: .session) {
+            try await applySession(credentials, activateTeam: activateTeam)
+        }
+    }
+
+    private func applySession(_ credentials: SigningSessionCredentials, activateTeam: Bool) async throws {
         let signingCertificate = try credentials.certificateData.map {
             try CertificateManager.parse($0, password: credentials.certificatePassword)
         }

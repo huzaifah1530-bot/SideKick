@@ -5,6 +5,7 @@ struct AccountsView: View {
     @State private var accountStore = SigningAccountStore()
     @State private var errorMessage: String?
     @State private var isShowingSignIn = false
+    @State private var isShowingDiagnostics = false
     @State private var submittedCredentials: (appleID: String, password: String)?
 
     var body: some View {
@@ -79,9 +80,20 @@ struct AccountsView: View {
                 get: { errorMessage != nil },
                 set: { if !$0 { errorMessage = nil } }
             )) {
+                SwiftUI.Button("Diagnostics") { errorMessage = nil; isShowingDiagnostics = true }
                 SwiftUI.Button("OK", role: .cancel) { errorMessage = nil }
             } message: {
                 Text(errorMessage ?? "")
+            }
+            .sheet(isPresented: $isShowingDiagnostics) {
+                NavigationStack {
+                    DiagnosticsView()
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) {
+                                SwiftUI.Button("Done") { isShowingDiagnostics = false }
+                            }
+                        }
+                }
             }
         }
     }

@@ -2,13 +2,15 @@ diff --git a/Sources/AuthCompatibility.swift b/Sources/AuthCompatibility.swift
 new file mode 100644
 --- /dev/null
 +++ b/Sources/AuthCompatibility.swift
-@@ -0,0 +1,22 @@
+@@ -0,0 +1,24 @@
 +import Foundation
 +
 +// Compatibility policy shared by the remote provisioning and authentication flows.
 +enum AuthCompatibility {
 +    static func authType(statusType: String?, responseType: String?, statusCode: Int?) -> String? {
-+        statusType ?? responseType ?? (statusCode == 409 ? "pushedCode" : nil)
++        let status = statusType.flatMap { $0.isEmpty ? nil : $0 }
++        let response = responseType.flatMap { $0.isEmpty ? nil : $0 }
++        return status ?? response ?? (statusCode == 409 ? "pushedCode" : nil)
 +    }
 +
 +    static func withProvisioningRecovery<T>(
@@ -89,7 +91,21 @@ diff --git a/Sources/DeveloperPortal/Authentication.swift b/Sources/DeveloperPor
  
              case "repair":
                  let directRepairURL = completeResponseDictionary["repairUrl"] as? String
-@@ -288,7 +302,7 @@
+@@ -270,6 +284,13 @@
+     }
+ 
+     func sendAuthenticationRequest(parameters requestParameters: [String: any Sendable], anisetteData: AnisetteData) async throws -> [String: any Sendable] {
++        let diagnosticStage: AuthenticationDiagnostics.Stage
++        switch requestParameters["o"] as? String {
++        case "init": diagnosticStage = .authInit
++        case "complete": diagnosticStage = .authComplete
++        default: diagnosticStage = .authTokens
++        }
++        AuthenticationDiagnostics.record(diagnosticStage, event: .started)
+         let requestURL = Constants.URLs.grandSlamAuth
+         let h = customHeaders
+ 
+@@ -288,7 +309,7 @@
              "Content-Type": "text/x-xml-plist",
              "X-MMe-Client-Info": anisetteData.clientInfo,
              "Accept": "*/*",
@@ -98,18 +114,41 @@ diff --git a/Sources/DeveloperPortal/Authentication.swift b/Sources/DeveloperPor
              "Connection": "close"
          ]
          headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
-@@ -311,6 +325,10 @@
+@@ -301,16 +322,25 @@
+         do {
+             (data, response) = try await session.data(for: request)
+         } catch {
++            AuthenticationDiagnostics.record(diagnosticStage, event: .failed, code: (error as NSError).code)
+             debugLog("[SideSign] sendAuthenticationRequest network error: \(error)")
+             throw error
+         }
+ 
+         let httpResponse = response as? HTTPURLResponse
+         let statusCode = httpResponse?.statusCode ?? 0
++        AuthenticationDiagnostics.record(diagnosticStage, event: .response, httpStatus: statusCode)
+ 
          guard !data.isEmpty else {
              debugLog("[SideSign] Auth endpoint returned 0 bytes (HTTP \(statusCode))")
              throw ServerError.badServerResponse(reason: "Auth endpoint returned empty response (0 bytes)", jsonPayload: "0 bytes")
 +        }
 +
++        if statusCode == 429 {
++            throw DeveloperPortalError.tooManyAttempts(cause: "Apple limited sign-in requests. Try again later.")
++        }
 +        if (500...599).contains(statusCode) {
 +            throw ServerError.badServerResponse(reason: "Apple authentication service unavailable (HTTP \(statusCode)). Try again later.", jsonPayload: redactedAuthenticationPayload)
          }
  
          guard let responseDictionary = parsePlistOrJSON(data) else {
-@@ -540,7 +558,8 @@
+@@ -325,6 +355,7 @@
+         }
+ 
+         let errorCode = status["ec"] as? Int ?? 0
++        AuthenticationDiagnostics.record(diagnosticStage, event: .response, httpStatus: statusCode, code: errorCode, challengeStatus: status["hsc"] as? Int)
+         if errorCode != 0 {
+             debugLog("[SideSign] Auth endpoint returned error code \(errorCode) (HTTP \(statusCode)).")
+             switch errorCode {
+@@ -540,8 +571,10 @@
                              completeResponseDictionary: [String: any Sendable],
                              statusDictionary: [String: any Sendable]?,
                              context: TwoFactorAuthContext,
@@ -117,9 +156,11 @@ diff --git a/Sources/DeveloperPortal/Authentication.swift b/Sources/DeveloperPor
 +                            verificationHandler: VerificationHandler?,
 +                            codeAlreadySent: Bool = false) async throws
      {
++        AuthenticationDiagnostics.record(.twoFactor, event: .started)
          guard let verificationHandler else {
              debugLog("[SideSign] 2FA required but no verificationHandler provided")
-@@ -559,6 +578,10 @@
+             throw DeveloperPortalError.requiresTwoFactorAuthentication
+@@ -559,6 +592,10 @@
              phoneNumbers: phoneNumbers
          )
          var activeChannel: TwoFactorAuthChannel? = nil
@@ -130,6 +171,23 @@ diff --git a/Sources/DeveloperPortal/Authentication.swift b/Sources/DeveloperPor
  
          while true {
              debugLog("[SideSign] Prompting user with 2FA request (\(currentRequest))...")
+@@ -796,6 +833,7 @@
+         let verifyDictionary = parsePlistOrJSON(data)
+         let (xmluiTitle, xmluiMessage) = parseXMLUIAlertMessage(from: data)
+         let errorCode = verifyDictionary?["ec"] as? Int ?? 0
++        AuthenticationDiagnostics.record(.twoFactorVerify, event: .response, httpStatus: statusCode, code: errorCode)
+ 
+         if errorCode == GrandSlamAuthErrorCodes.tooManyAttempts 
+             || errorCode == GrandSlamAuthErrorCodes.tooManyCodesRequested 
+@@ -847,7 +885,7 @@
+             "Accept": "application/x-buddyml",
+             "Accept-Language": "en-us",
+             "Content-Type": "application/x-plist",
+-            "User-Agent": h.developerServices.userAgent,
++            "User-Agent": a.userAgent.isEmpty ? h.developerServices.userAgent : a.userAgent,
+             "X-Apple-App-Info": h.grandSlam.authApp,
+             "X-Xcode-Version": context.xcodeVersion,
+             "X-Apple-Identity-Token": encodedIdentityToken,
 diff --git a/Sources/Anisette/AnisetteDataManager.swift b/Sources/Anisette/AnisetteDataManager.swift
 --- a/Sources/Anisette/AnisetteDataManager.swift
 +++ b/Sources/Anisette/AnisetteDataManager.swift
@@ -227,7 +285,7 @@ diff --git a/Sources/Anisette/AnisetteDataManager.swift b/Sources/Anisette/Anise
 diff --git a/Sources/Anisette/RemoteAnisetteDataProvider.swift b/Sources/Anisette/RemoteAnisetteDataProvider.swift
 --- a/Sources/Anisette/RemoteAnisetteDataProvider.swift
 +++ b/Sources/Anisette/RemoteAnisetteDataProvider.swift
-@@ -74,14 +74,24 @@
+@@ -74,14 +74,26 @@
                  ]
                  postReq.httpBody = try JSONSerialization.data(withJSONObject: payload)
  
@@ -241,9 +299,11 @@ diff --git a/Sources/Anisette/RemoteAnisetteDataProvider.swift b/Sources/Anisett
 +                guard let httpResp = response as? HTTPURLResponse else {
 +                    throw AnisetteError.invalidAnisetteData
 +                }
++                AuthenticationDiagnostics.record(.anisette, event: .response, httpStatus: httpResp.statusCode)
 +                let json = try? JSONSerialization.jsonObject(with: data) as? [String: String]
 +                // Recognize the ADI rejection even when the server returns a non-2xx status.
 +                if json?["message"]?.contains("-45061") == true {
++                    AuthenticationDiagnostics.record(.anisette, event: .failed, code: -45061)
 +                    throw AnisetteError.incorrectlyProvisioned
 +                }
 +                if httpResp.isSuccess, let json {
@@ -258,3 +318,31 @@ diff --git a/Sources/Anisette/RemoteAnisetteDataProvider.swift b/Sources/Anisett
                  }
              }
          }
+diff --git a/Sources/AuthenticationDiagnostics.swift b/Sources/AuthenticationDiagnostics.swift
+new file mode 100644
+--- /dev/null
++++ b/Sources/AuthenticationDiagnostics.swift
+@@ -0,0 +1,23 @@
++import Foundation
++
++/// This notification carries allowlisted stages and numeric codes only. Never
++/// forward the ordinary debug logger: it can contain credential-bearing values.
++public enum AuthenticationDiagnostics {
++    public enum Stage: String, Sendable {
++        case anisette, authInit, authComplete, authTokens, twoFactor, twoFactorVerify, developerTeam
++    }
++    public enum Event: String, Sendable { case started, succeeded, failed, response }
++    @TaskLocal public static var operationID: UUID?
++    @TaskLocal public static var entryPoint: String?
++    public static let notification = Notification.Name("SideSign.AuthenticationDiagnostics")
++
++    public static func record(_ stage: Stage, event: Event, httpStatus: Int? = nil, code: Int? = nil, challengeStatus: Int? = nil) {
++        guard let operationID, let entryPoint else { return }
++        var fields: [String: Any] = ["operationID": operationID.uuidString,
++            "operation": entryPoint, "stage": stage.rawValue, "event": event.rawValue]
++        if let httpStatus { fields["httpStatus"] = httpStatus }
++        if let code { fields["code"] = code }
++        if let challengeStatus { fields["challengeStatus"] = challengeStatus }
++        NotificationCenter.default.post(name: notification, object: nil, userInfo: fields)
++    }
++}

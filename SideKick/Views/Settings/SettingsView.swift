@@ -31,6 +31,10 @@ struct SettingsView: View {
                 }
 
                 Section("Device & Services") {
+                    NavigationLink { DiagnosticsView() } label: {
+                        Label("Diagnostics", systemImage: "list.bullet.clipboard")
+                    }
+                    .fullWidthListSeparators()
                     NavigationLink { LiveContainerConnectionsView() } label: {
                         Label("LiveContainer", systemImage: "square.stack.3d.up")
                     }

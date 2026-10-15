@@ -108,6 +108,14 @@ actor GitHubDiagnosticsStore {
     func record(_ event: Event, appName: String? = nil, repository: String? = nil,
                 authenticated: Bool? = nil, httpStatus: Int? = nil, failure: Failure? = nil,
                 count: Int? = nil, state: GitHubCheckState? = nil, skip: SkipReason? = nil) {
+        // The shared stream omits the app/repository names retained by this
+        // dedicated viewer. Never forward its free-form display strings.
+        if event == .scanStarted || event == .scanFinished || event == .scanCancelled || event == .requestFinished || event == .checkSkipped {
+            let sharedEvent: DiagnosticsStore.Event = event == .scanStarted ? .started
+                : (event == .scanFinished ? .succeeded : (event == .scanCancelled ? .paused : .response))
+            DiagnosticsStore.shared.record(sharedEvent, operation: .github, stage: .github,
+                operationID: DiagnosticsStore.operationID ?? UUID(), httpStatus: httpStatus)
+        }
         entries.append(Entry(id: UUID(), date: .now, event: event,
             appName: appName.map(Self.safeName), repository: Self.safeRepository(repository),
             authenticated: authenticated, httpStatus: httpStatus, failure: failure,

@@ -103,6 +103,17 @@ final class SideStoreOperationService {
         recoveryHandler: @escaping @MainActor @Sendable () -> Void = {},
         progressHandler: @escaping @MainActor @Sendable (Double) -> Void = { _ in }
     ) async throws {
+        try await SideKickDiagnostics.perform(.install, stage: .installation) {
+            try await performInstall(ipa, using: account, recoveryHandler: recoveryHandler, progressHandler: progressHandler)
+        }
+    }
+
+    private func performInstall(
+        _ ipa: ImportedIPA,
+        using account: SigningAccountSummary,
+        recoveryHandler: @escaping @MainActor @Sendable () -> Void = {},
+        progressHandler: @escaping @MainActor @Sendable (Double) -> Void = { _ in }
+    ) async throws {
         guard !NativeAppTransferService.isRunning else { throw NativeTransferError.inUse }
         if let target = ipa.queuedForInstalledAppID, NativeAppTransferService.hasUnfinishedTransfer(target) {
             throw NativeTransferError.transferPending
@@ -195,6 +206,18 @@ final class SideStoreOperationService {
         using selectedAccount: SigningAccountSummary? = nil,
         progressHandler: @escaping @MainActor @Sendable (Double) -> Void = { _ in }
     ) async throws {
+        try await SideKickDiagnostics.perform(.refresh, stage: .refresh) {
+            try await performRefresh(bundleIdentifier: bundleIdentifier, requiresPresenter: requiresPresenter, updatesExpiryNotifications: updatesExpiryNotifications, using: selectedAccount, progressHandler: progressHandler)
+        }
+    }
+
+    private func performRefresh(
+        bundleIdentifier: String,
+        requiresPresenter: Bool = true,
+        updatesExpiryNotifications: Bool = true,
+        using selectedAccount: SigningAccountSummary? = nil,
+        progressHandler: @escaping @MainActor @Sendable (Double) -> Void = { _ in }
+    ) async throws {
         let presenter = UIApplication.shared.topViewController()
         guard !NativeAppTransferService.isRunning else { throw NativeTransferError.inUse }
         guard !NativeAppTransferService.hasUnfinishedTransfer(bundleIdentifier) else { throw NativeTransferError.transferPending }
@@ -250,6 +273,16 @@ final class SideStoreOperationService {
     }
 
     func resign(
+        bundleIdentifier: String,
+        using selectedAccount: SigningAccountSummary,
+        progressHandler: @escaping @MainActor @Sendable (Double) -> Void = { _ in }
+    ) async throws {
+        try await SideKickDiagnostics.perform(.resign, stage: .signing) {
+            try await performResign(bundleIdentifier: bundleIdentifier, using: selectedAccount, progressHandler: progressHandler)
+        }
+    }
+
+    private func performResign(
         bundleIdentifier: String,
         using selectedAccount: SigningAccountSummary,
         progressHandler: @escaping @MainActor @Sendable (Double) -> Void = { _ in }

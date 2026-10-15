@@ -37,6 +37,13 @@ enum GitHubUpdateScanner {
 
     static func scanTargets(_ apps: [GitHubUpdateTarget],
         onCheck: @escaping @Sendable (GitHubCheckResult) async -> Void = { _ in }) async -> Result {
+        await DiagnosticsStore.$operationID.withValue(UUID()) {
+            await performScanTargets(apps, onCheck: onCheck)
+        }
+    }
+
+    private static func performScanTargets(_ apps: [GitHubUpdateTarget],
+        onCheck: @escaping @Sendable (GitHubCheckResult) async -> Void) async -> Result {
         var result = Result()
         await GitHubDiagnosticsStore.shared.record(.scanStarted, count: apps.count)
         // Each repository has its own service. Bound concurrency, but publish

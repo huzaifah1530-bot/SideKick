@@ -26,6 +26,9 @@ class AuthCompatibilityPatchTests(unittest.TestCase):
             self.assertNotIn('token: \\(idmsToken)', auth)
             self.assertIn('codeAlreadySent: pushedCode', auth)
             self.assertIn('PushedCodeState.handled', auth)
+            two_factor = auth[auth.index('    private func makeTwoFactorAuthRequest'):]
+            self.assertIn('a.userAgent.isEmpty ? h.developerServices.userAgent : a.userAgent', two_factor)
+            self.assertIn('AuthenticationDiagnostics.record', auth)
             # Exercise the actual response gate, rather than only the later UI dispatch helper.
             gate = auth[auth.index('        let errorCode = status["ec"]'):auth.index('\n        return dictionary', auth.index('        let errorCode = status["ec"]'))]
             self.assertIn('if errorCode != 0 {', gate)
@@ -55,6 +58,7 @@ struct DeveloperPortalError: Error {
 enum ServerError: Error { case underlyingError(code: Int, message: String) }
 func debugLog(_ value: String) { }
 func responsePolicy(status: [String: any Sendable], dictionary: [String: any Sendable], requestParameters: [String: any Sendable], statusCode: Int = 200) throws {
+let diagnosticStage = AuthenticationDiagnostics.Stage.authComplete
 ''' + gate + '\n}\n')
                 changed_sources = [
                     'Sources/AuthCompatibility.swift', 'Sources/Constants.swift',
@@ -64,7 +68,7 @@ func responsePolicy(status: [String: any Sendable], dictionary: [String: any Sen
                 ]
                 subprocess.run(['swiftc', '-frontend', '-parse', *[str(target / name) for name in changed_sources]], check=True)
                 binary = target / 'auth-regression'
-                subprocess.run(['swiftc', '-swift-version', '6', '-parse-as-library', str(target / 'Sources/AuthCompatibility.swift'), str(policy), str(ROOT / 'Tests/VendorRegression/AuthCompatibilityRegression.swift'), '-o', str(binary)], check=True)
+                subprocess.run(['swiftc', '-swift-version', '6', '-parse-as-library', str(target / 'Sources/AuthCompatibility.swift'), str(target / 'Sources/AuthenticationDiagnostics.swift'), str(policy), str(ROOT / 'Tests/VendorRegression/AuthCompatibilityRegression.swift'), '-o', str(binary)], check=True)
                 subprocess.run([str(binary)], check=True)
             else:
                 print('Swift behavioral fixture requires macOS CI (swiftc unavailable locally).')

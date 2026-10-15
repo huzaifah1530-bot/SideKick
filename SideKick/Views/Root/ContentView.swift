@@ -1,10 +1,11 @@
 import SwiftUI
 import CoreData
 import Combine
+import UIKit
 
 struct ContentView: View {
     @Environment(AppEnvironment.self) private var environment
-    @Environment(\.scenePhase) private var scenePhase
+    @State private var isForeground = false
     @State private var selectedTab = 0
     @State private var setupStatus = SetupStatus()
 
@@ -31,14 +32,20 @@ struct ContentView: View {
             }
         }
         .task {
-            if scenePhase == .background { environment.pauseGitHubChecks() }
-            else { environment.resumeGitHubChecks() }
+            // The shipping root is hosted by UIKit, not a SwiftUI App/Scene.
+            // Its scenePhase environment can remain at the default background.
+            isForeground = UIApplication.shared.applicationState != .background
+            if isForeground { environment.resumeGitHubChecks() }
+            else { environment.pauseGitHubChecks() }
             await environment.startDatabase()
             if case .ready = environment.databaseState { await setupStatus.refresh() }
         }
-        .onChange(of: scenePhase) { _, phase in
-            if phase == .background { environment.pauseGitHubChecks() }
-            guard phase == .active else { return }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
+            isForeground = false
+            environment.pauseGitHubChecks()
+        }
+        .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
+            isForeground = true
             environment.resumeGitHubChecks()
             guard case .ready = environment.databaseState else { return }
             Task {
@@ -47,8 +54,8 @@ struct ContentView: View {
             }
             Task { await setupStatus.refresh() }
         }
-        .task(id: scenePhase) {
-            guard scenePhase == .active else { return }
+        .task(id: isForeground) {
+            guard isForeground else { return }
             while !Task.isCancelled {
                 // Automatic checks are bounded to avoid exhausting GitHub's
                 // unauthenticated quota. Explicit refresh always checks now.

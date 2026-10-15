@@ -14,7 +14,7 @@ let package = Package(
             "Services/PairingSetupImporter.swift", "Services/ProgressFileDownload.swift", "Services/SideKickCertificateExport.swift",
             "Services/SideKickDataDirectory.swift", "Services/SideKickLogStorage.swift", "Services/SideKickStorageUsage.swift",
             "Services/SideStoreOperationService.swift", "Services/SigningAccountStore.swift", "Services/SigningExpiry.swift",
-            "Services/NativeAppTransferService.swift"
+            "Services/NativeAppTransferService.swift", "Services/SideKickDiagnostics.swift"
         ], sources: [
             "Models/GitHubBuildTracking.swift",
             "Models/ImportedIPA.swift",
@@ -23,6 +23,7 @@ let package = Package(
             "Services/GitHubHistoryClient.swift",
             "Services/GitHubHistoryStore.swift",
             "Services/GitHubDiagnosticsStore.swift",
+            "Services/DiagnosticsStore.swift",
             "Services/GitHubUpdateDiscovery.swift",
             "Services/AnisetteConfiguration.swift",
             "Services/LiveContainerScanner.swift",
