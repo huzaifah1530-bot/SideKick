@@ -56,6 +56,10 @@ struct SettingsView: View {
                 }
 
                 Section("App updates") {
+                    NavigationLink { GitHubDiagnosticsView() } label: {
+                        Label("GitHub Update Logs", systemImage: "list.bullet.clipboard")
+                    }
+                    .fullWidthListSeparators()
                     NavigationLink {
                         SkippedGitHubUpdatesView()
                     } label: {

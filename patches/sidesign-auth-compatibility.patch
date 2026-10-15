@@ -1,0 +1,260 @@
+diff --git a/Sources/AuthCompatibility.swift b/Sources/AuthCompatibility.swift
+new file mode 100644
+--- /dev/null
++++ b/Sources/AuthCompatibility.swift
+@@ -0,0 +1,22 @@
++import Foundation
++
++// Compatibility policy shared by the remote provisioning and authentication flows.
++enum AuthCompatibility {
++    static func authType(statusType: String?, responseType: String?, statusCode: Int?) -> String? {
++        statusType ?? responseType ?? (statusCode == 409 ? "pushedCode" : nil)
++    }
++
++    static func withProvisioningRecovery<T>(
++        existingBlob: Data?, isRemote: Bool,
++        isProvisioningError: (Error) -> Bool,
++        isolation: isolated (any Actor)? = #isolation,
++        operation: (Data?) async throws -> T
++    ) async throws -> T {
++        do { return try await operation(existingBlob) }
++        catch {
++            guard isRemote, existingBlob != nil, isProvisioningError(error) else { throw error }
++            // Retry once only; a second rejection or unrelated error escapes to the caller.
++            return try await operation(nil)
++        }
++    }
++}
+diff --git a/Sources/DeveloperPortal/Authentication.swift b/Sources/DeveloperPortal/Authentication.swift
+--- a/Sources/DeveloperPortal/Authentication.swift
++++ b/Sources/DeveloperPortal/Authentication.swift
+@@ -8,6 +8,10 @@
+ 
+ import Foundation
+ import GSACryptoKit
++
++private enum PushedCodeState {
++    @TaskLocal static var handled = false
++}
+ 
+ private let redactedAuthenticationPayload = "[authentication payload redacted]"
+ 
+@@ -173,8 +177,11 @@
+         
+         // 2FA auth type
+         let statusDictionary = completeResponseDictionary["Status"] as? [String: any Sendable]
+-        let authType = (statusDictionary?["au"] as? String)
+-           ?? (completeResponseDictionary["au"] as? String)
++        let authType = AuthCompatibility.authType(
++            statusType: statusDictionary?["au"] as? String,
++            responseType: completeResponseDictionary["au"] as? String,
++            statusCode: statusDictionary?["hsc"] as? Int
++        )
+         verboseLog("[SideSign] Authentication status type present: \(authType != nil).")
+ 
+         let twoFactorAuthContext = TwoFactorAuthContext(
+@@ -185,17 +192,23 @@
+         )
+ 
+         switch authType {
+-            case "trustedDeviceSecondaryAuth", "trustedDevice", "secondaryAuth", "sms", "voice", "phone":
+-                let isTrustedDevice = (authType == "trustedDeviceSecondaryAuth" || authType == "trustedDevice")
++            case "trustedDeviceSecondaryAuth", "trustedDevice", "secondaryAuth", "sms", "voice", "phone", "pushedCode":
++                let pushedCode = authType == "pushedCode"
++                guard !pushedCode || !PushedCodeState.handled else {
++                    throw DeveloperPortalError.requiresTwoFactorAuthentication
++                }
++                let isTrustedDevice = pushedCode || (authType == "trustedDeviceSecondaryAuth" || authType == "trustedDevice")
+                 try await handle2FARequest(
+                     isTrustedDevice: isTrustedDevice,
+                     completeResponseDictionary: completeResponseDictionary,
+                     statusDictionary: statusDictionary,
+                     context: twoFactorAuthContext,
+-                    verificationHandler: verificationHandler
++                    verificationHandler: verificationHandler,
++                    codeAlreadySent: pushedCode
+                 )
+                 // recur coz we just solved 2FA above and this invocation shouldn't come to this case
+-                return try await authenticate(
++                return try await PushedCodeState.$handled.withValue(PushedCodeState.handled || pushedCode) {
++                    try await authenticate(
+                     appleID: unsanitizedAppleID, 
+                     password: password, 
+                     anisetteData: anisetteData, 
+@@ -204,6 +217,7 @@
+                     accountRepairHandler: accountRepairHandler, 
+                     verificationHandler: verificationHandler
+                 )
++                }
+ 
+             case "repair":
+                 let directRepairURL = completeResponseDictionary["repairUrl"] as? String
+@@ -288,7 +302,7 @@
+             "Content-Type": "text/x-xml-plist",
+             "X-MMe-Client-Info": anisetteData.clientInfo,
+             "Accept": "*/*",
+-            "User-Agent": h.grandSlam.userAgent,
++            "User-Agent": anisetteData.userAgent.isEmpty ? h.grandSlam.userAgent : anisetteData.userAgent,
+             "Connection": "close"
+         ]
+         headers.forEach { request.setValue($1, forHTTPHeaderField: $0) }
+@@ -311,6 +325,10 @@
+         guard !data.isEmpty else {
+             debugLog("[SideSign] Auth endpoint returned 0 bytes (HTTP \(statusCode))")
+             throw ServerError.badServerResponse(reason: "Auth endpoint returned empty response (0 bytes)", jsonPayload: "0 bytes")
++        }
++
++        if (500...599).contains(statusCode) {
++            throw ServerError.badServerResponse(reason: "Apple authentication service unavailable (HTTP \(statusCode)). Try again later.", jsonPayload: redactedAuthenticationPayload)
+         }
+ 
+         guard let responseDictionary = parsePlistOrJSON(data) else {
+@@ -540,7 +558,8 @@
+                             completeResponseDictionary: [String: any Sendable],
+                             statusDictionary: [String: any Sendable]?,
+                             context: TwoFactorAuthContext,
+-                            verificationHandler: VerificationHandler?) async throws 
++                            verificationHandler: VerificationHandler?,
++                            codeAlreadySent: Bool = false) async throws
+     {
+         guard let verificationHandler else {
+             debugLog("[SideSign] 2FA required but no verificationHandler provided")
+@@ -559,6 +578,10 @@
+             phoneNumbers: phoneNumbers
+         )
+         var activeChannel: TwoFactorAuthChannel? = nil
++        if codeAlreadySent {
++            currentRequest = .trustedDevice(error: nil)
++            activeChannel = .trustedDevice
++        }
+ 
+         while true {
+             debugLog("[SideSign] Prompting user with 2FA request (\(currentRequest))...")
+diff --git a/Sources/Anisette/AnisetteDataManager.swift b/Sources/Anisette/AnisetteDataManager.swift
+--- a/Sources/Anisette/AnisetteDataManager.swift
++++ b/Sources/Anisette/AnisetteDataManager.swift
+@@ -170,6 +170,7 @@
+ }
+ 
+ public enum AnisetteError: LocalizedError, Sendable {
++    case incorrectlyProvisioned
+     case modeNotConfigured
+     case invalidServerSourceURL
+     case missingODAEntry
+@@ -191,6 +192,8 @@
+ 
+     public var errorDescription: String? {
+         switch self {
++        case .incorrectlyProvisioned:
++            return "Anisette provisioning state must be renewed."
+         case .modeNotConfigured:
+             return "No Anisette operating mode is configured. Set activeMode or pass a mode parameter."
+         case .invalidServerSourceURL:
+@@ -343,6 +346,14 @@
+         withStateLock { remoteCache = nil }
+     }
+ 
++    /// Clears cached providers after the caller resets its persisted provisioning identity.
++    public func resetProvisioningCache() {
++        withStateLock {
++            remoteCache = nil
++            localProvider = nil
++        }
++    }
++
+     public static var defaultBaseDirectory: URL {
+         #if os(tvOS)
+         if let caches = FileManager.default.urls(for: .cachesDirectory, in: .userDomainMask).first {
+@@ -520,14 +531,26 @@
+         }
+ 
+         let clientInfo = headers?.clientInfo ?? Constants.Anisette.defaultClientInfo
+-        let client = try await getClient(for: resolvedMode, clientInfo: clientInfo)
++        let userAgent = headers?.userAgent ?? Constants.Anisette.defaultUserAgent
++        let client = try await getClient(for: resolvedMode, clientInfo: clientInfo, userAgent: userAgent)
+ 
+         do {
+-            let (rawHeaders, newBlob) = try await client.getAnisetteData(
+-                identifier: identifier,
+-                storage: .memory(existingBlob: existingAdiBlob),
+-                headers: headers
+-            )
++            let isRemote: Bool
++            if case .remote = resolvedMode { isRemote = true } else { isRemote = false }
++            let (rawHeaders, newBlob) = try await AuthCompatibility.withProvisioningRecovery(
++                existingBlob: existingAdiBlob, isRemote: isRemote,
++                isProvisioningError: { error in
++                    guard let anisetteError = error as? AnisetteError else { return false }
++                    if case .incorrectlyProvisioned = anisetteError { return true }
++                    return false
++                }
++            ) { blob in
++                try await client.getAnisetteData(
++                    identifier: identifier,
++                    storage: .memory(existingBlob: blob),
++                    headers: headers
++                )
++            }
+ 
+             let anisetteData = try Self.validateAndCreateAnisetteData(from: rawHeaders)
+ 
+@@ -559,14 +582,14 @@
+         }
+     }
+ 
+-    private func getClient(for mode: AnisetteMode, clientInfo: String) async throws -> AnisetteClient {
++    private func getClient(for mode: AnisetteMode, clientInfo: String, userAgent: String) async throws -> AnisetteClient {
+         switch mode {
+         case .remote(let server):
+             try FileManager.default.createDirectory(at: provisioningDir, withIntermediateDirectories: true)
+             return try AnisetteClient(
+                 provisioningDir: provisioningDir,
+                 clientInfo: clientInfo,
+-                userAgent: Constants.Anisette.defaultUserAgent,
++                userAgent: userAgent,
+                 lookupURL: Constants.Anisette.URLs.grandSlamLookup,
+                 requiredLibraries: Constants.Anisette.Libraries.requiredNames,
+                 provider: RemoteAnisetteDataProvider(serverURL: server)
+@@ -578,7 +601,7 @@
+             return try AnisetteClient(
+                 provisioningDir: targetProvDir,
+                 clientInfo: clientInfo,
+-                userAgent: Constants.Anisette.defaultUserAgent,
++                userAgent: userAgent,
+                 lookupURL: Constants.Anisette.URLs.grandSlamLookup,
+                 requiredLibraries: Constants.Anisette.Libraries.requiredNames,
+                 libraryDirectoryResolver: { libDir }
+diff --git a/Sources/Anisette/RemoteAnisetteDataProvider.swift b/Sources/Anisette/RemoteAnisetteDataProvider.swift
+--- a/Sources/Anisette/RemoteAnisetteDataProvider.swift
++++ b/Sources/Anisette/RemoteAnisetteDataProvider.swift
+@@ -74,14 +74,24 @@
+                 ]
+                 postReq.httpBody = try JSONSerialization.data(withJSONObject: payload)
+ 
+-                if let (data, response) = try? await URLSession.shared.data(for: postReq),
+-                   let httpResp = response as? HTTPURLResponse, httpResp.isSuccess,
+-                   let json = try? JSONSerialization.jsonObject(with: data) as? [String: String] {
+-                    if let result = json["result"], result == "GetHeadersError" {
+-                        let msg = json["message"] ?? "GetHeadersError"
+-                        throw AnisetteError.badServerResponse(statusCode: -1, payload: msg)
++                let (data, response) = try await URLSession.shared.data(for: postReq)
++                guard let httpResp = response as? HTTPURLResponse else {
++                    throw AnisetteError.invalidAnisetteData
++                }
++                let json = try? JSONSerialization.jsonObject(with: data) as? [String: String]
++                // Recognize the ADI rejection even when the server returns a non-2xx status.
++                if json?["message"]?.contains("-45061") == true {
++                    throw AnisetteError.incorrectlyProvisioned
++                }
++                if httpResp.isSuccess, let json {
++                    if json["result"] == "GetHeadersError" {
++                        throw AnisetteError.badServerResponse(statusCode: httpResp.statusCode, payload: "Remote Anisette header generation failed")
+                     }
+                     return try AnisetteDataResponse(from: json)
++                }
++                // Only an unsupported v3 endpoint may fall back to the legacy API.
++                guard httpResp.statusCode == 404 || httpResp.statusCode == 405 else {
++                    throw AnisetteError.badServerResponse(statusCode: httpResp.statusCode, payload: "Remote Anisette request failed")
+                 }
+             }
+         }

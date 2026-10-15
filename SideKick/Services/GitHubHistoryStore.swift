@@ -3,12 +3,14 @@ import Foundation
 /// App-session history shared by automatic checks and version screens. Credentials
 /// stay in memory, never in diagnostics or on disk. Downloads still authenticate.
 actor GitHubHistoryStore {
-    typealias Loader = @Sendable (GitHubUpdateConfiguration, String?, Int) async throws -> GitHubHistoryPage
+    typealias Loader = @Sendable (GitHubUpdateConfiguration, String?, Int, Bool) async throws -> GitHubHistoryPage
     static let shared = GitHubHistoryStore()
     private struct Key: Hashable {
         let source: String
         let token: String?
         let page: Int
+        // Discovery stops at the newest download; version lists need the complete page.
+        let latestOnly: Bool
     }
     private struct Entry {
         let value: GitHubHistoryPage
@@ -19,23 +21,24 @@ actor GitHubHistoryStore {
     private var entries: [Key: Entry] = [:]
     private var requests: [Key: Task<GitHubHistoryPage, Error>] = [:]
 
-    init(lifetime: TimeInterval = 300, loader: @escaping Loader = { configuration, token, page in
-        try await GitHubHistoryClient().page(configuration: configuration, token: token, page: page)
+    init(lifetime: TimeInterval = 300, loader: @escaping Loader = { configuration, token, page, latestOnly in
+        try await GitHubHistoryClient().page(configuration: configuration, token: token, page: page, latestOnly: latestOnly)
     }) {
         self.lifetime = lifetime
         self.loader = loader
     }
 
     func page(configuration: GitHubUpdateConfiguration, token: String?, page: Int,
-              forceRefresh: Bool = false) async throws -> GitHubHistoryPage {
-        let key = Key(source: configuration.sourceIdentity, token: token, page: page)
+              forceRefresh: Bool = false, latestOnly: Bool = false) async throws -> GitHubHistoryPage {
+        let key = Key(source: configuration.sourceIdentity, token: token, page: page, latestOnly: latestOnly)
         if let request = requests[key] { return try await request.value }
         if !forceRefresh, let entry = entries[key], Date.now.timeIntervalSince(entry.fetchedAt) < lifetime {
+            await GitHubDiagnosticsStore.shared.record(.cacheHit, repository: configuration.repositoryURL, authenticated: token?.isEmpty == false)
             return entry.value
         }
         let loader = self.loader
         let request = Task {
-            var result = try await loader(configuration, token, page)
+            var result = try await loader(configuration, token, page, latestOnly)
             result.fetchedAt = .now
             return result
         }

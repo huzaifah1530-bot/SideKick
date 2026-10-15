@@ -76,6 +76,14 @@ jobs:
           git -C Vendor/SideStore/Dependencies/SideSign apply ../../../../patches/sidesign-audit-fixes.patch
           git -C Vendor/SideStore/Dependencies/minimuxer apply ../../../../patches/minimuxer-audit-fixes.patch
 
+      - name: Apply Apple authentication compatibility after audited SideSign fixes
+        run: |
+          git -C Vendor/SideStore/Dependencies/SideSign apply ../../../../patches/sidesign-auth-compatibility.patch
+          git -C Vendor/SideStore apply ../../patches/sidestore-anisette-recovery.patch
+
+      - name: Test authentication patch composition and bounded recovery
+        run: python3 -m unittest discover -s Tests/VendorRegression -p test_auth_compatibility_patch.py -v
+
       - name: Add native Files transfer helper
         run: python3 scripts/embed-file-transfer.py Vendor/SideStore
 

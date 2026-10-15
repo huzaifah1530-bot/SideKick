@@ -206,13 +206,27 @@ final class AppEnvironment {
 
     func requestGitHubUpdateCheck(force: Bool = false) {
         if force { githubCheckRequested = true }
-        guard DatabaseManager.shared.isStarted, !isLoadingLocalApps, !githubChecksSuspended else { return }
+        guard DatabaseManager.shared.isStarted else { return }
+        guard !isLoadingLocalApps else {
+            Task { await GitHubDiagnosticsStore.shared.record(.checkSkipped, skip: .catalogueLoading) }
+            return
+        }
+        guard !githubChecksSuspended else {
+            Task { await GitHubDiagnosticsStore.shared.record(.checkSkipped, skip: .suspended) }
+            return
+        }
         let targets = updateTargets
         let signature = signatures(targets)
         let stale = (lastGitHubCheckFinishedAt ?? lastGitHubCheckStartedAt).map { Date.now.timeIntervalSince($0) >= 900 } ?? true
-        guard githubCheckRequested || lastCheckedTargets != signature || stale else { return }
+        guard githubCheckRequested || lastCheckedTargets != signature || stale else {
+            Task { await GitHubDiagnosticsStore.shared.record(.checkSkipped, skip: .throttled) }
+            return
+        }
         // Ordinary local reloads queue new work; they never cancel a slow check.
-        guard githubScanTask == nil else { return }
+        guard githubScanTask == nil else {
+            Task { await GitHubDiagnosticsStore.shared.record(.checkSkipped, skip: .inFlight) }
+            return
+        }
         githubCheckRequested = false
         lastCheckedTargets = signature
         lastGitHubCheckStartedAt = .now
@@ -297,11 +311,17 @@ final class AppEnvironment {
         var configurationReadFailed = false
         do {
             let configuration = try await GitHubUpdateConfigurationStore.shared.configuration(for: check.targetID)
-            guard configuration == check.checkedConfiguration else { return false }
+            guard configuration == check.checkedConfiguration else {
+                await GitHubDiagnosticsStore.shared.record(.checkSkipped, appName: targets.first(where: { $0.id == check.targetID })?.name, skip: .superseded)
+                return false
+            }
         } catch {
             // A source-read failure is safe to publish as a failed status only;
             // it cannot authorize or replace an update candidate.
-            guard check.state == .failed, check.checkedConfiguration == nil else { return false }
+            guard check.state == .failed, check.checkedConfiguration == nil else {
+                await GitHubDiagnosticsStore.shared.record(.checkSkipped, appName: targets.first(where: { $0.id == check.targetID })?.name, failure: .classify(error), skip: .superseded)
+                return false
+            }
             configurationReadFailed = true
         }
         guard githubGeneration == generation,
@@ -309,7 +329,10 @@ final class AppEnvironment {
               !Task.isCancelled,
               let checked = targets.first(where: { $0.id == check.targetID }),
               let current = updateTargets.first(where: { $0.id == check.targetID }),
-              signatures([checked]) == signatures([current]) else { return false }
+              signatures([checked]) == signatures([current]) else {
+            await GitHubDiagnosticsStore.shared.record(.checkSkipped, appName: targets.first(where: { $0.id == check.targetID })?.name, skip: Task.isCancelled ? .cancelled : .superseded)
+            return false
+        }
         githubChecks.removeAll { $0.targetID == check.targetID }
         githubChecks.append(check)
         if check.state != .failed && !configurationReadFailed {
@@ -317,6 +340,7 @@ final class AppEnvironment {
             if let candidate = check.candidate { githubUpdates.append(candidate) }
         }
         githubUpdates.sort { $0.appName.localizedCaseInsensitiveCompare($1.appName) == .orderedAscending }
+        await GitHubDiagnosticsStore.shared.record(.checkPublished, appName: current.name, state: check.state)
         debugLog("[SideKick] Published GitHub result for \(check.targetID): \(check.state.rawValue).")
         // Rows are visible before queue restoration or notification requests.
         if let candidate = check.candidate {

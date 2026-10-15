@@ -1,0 +1,14 @@
+diff --git a/SideStore/Core/Anisette/OnDeviceAnisetteManager.swift b/SideStore/Core/Anisette/OnDeviceAnisetteManager.swift
+--- a/SideStore/Core/Anisette/OnDeviceAnisetteManager.swift
++++ b/SideStore/Core/Anisette/OnDeviceAnisetteManager.swift
+@@ -44,6 +44,10 @@ public actor OnDeviceAnisetteManager {
+         provider.isReady()
+     }
+ 
++    public func resetProvisioningCache() {
++        provider.resetProvisioningCache()
++    }
++
+     public func fetchAnisetteData() async throws -> ALTAnisetteData {
+         debugLog("[OnDeviceAnisetteManager] [Fetch] Fetching on-device Anisette headers...")
+ 

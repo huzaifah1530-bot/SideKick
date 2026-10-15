@@ -168,7 +168,20 @@ actor GitHubHistoryClient {
         request.setValue("application/vnd.github+json", forHTTPHeaderField: "Accept")
         request.setValue("SideKick", forHTTPHeaderField: "User-Agent")
         if let token, !token.isEmpty { request.setValue("Bearer " + token, forHTTPHeaderField: "Authorization") }
-        let (data, response) = try await transport(request)
+        let repositoryParts = path.split(separator: "/")
+        let diagnosticRepository = repositoryParts.count >= 3 && repositoryParts.first == "repos"
+            ? "https://github.com/" + repositoryParts.dropFirst().prefix(2).joined(separator: "/") : nil
+        let data: Data
+        let response: HTTPURLResponse
+        do {
+            (data, response) = try await transport(request)
+        } catch {
+            await GitHubDiagnosticsStore.shared.record(.requestFinished, repository: diagnosticRepository, authenticated: token?.isEmpty == false,
+                failure: .classify(error))
+            throw error
+        }
+        await GitHubDiagnosticsStore.shared.record(.requestFinished, repository: diagnosticRepository, authenticated: token?.isEmpty == false,
+            httpStatus: response.statusCode)
         if response.statusCode == 401 { throw GitHubHistoryError.unauthorized }
         guard (200..<300).contains(response.statusCode) else { throw GitHubHistoryError.unavailable(response.statusCode) }
         do { return try JSONDecoder().decode(T.self, from: data) }

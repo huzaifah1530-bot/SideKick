@@ -45,6 +45,80 @@ final class SigningAccountStore {
     private(set) var loadError: String?
     private let vault = SigningSessionVault()
 
+    /// Settings changes share the signing gate, so an install cannot use half-updated identity data.
+    func saveAnisetteConfiguration(server: String, clientInfo: String, userAgent: String, onDevice: Bool) async throws {
+        let url = try AnisetteConfiguration.validatedServer(server)
+        let client = try AnisetteConfiguration.validatedHeader(clientInfo)
+        let agent = try AnisetteConfiguration.validatedHeader(userAgent)
+        guard SigningAccountOperationCoordinator.acquire() else { throw SigningAccountError.engineBusy }
+        defer { SigningAccountOperationCoordinator.release() }
+        guard !AppManager.shared.isActivelyManagingAnyApp, !NativeAppTransferService.isRunning,
+              !SideKickStorageCleanup.hasActiveOperations else {
+            throw SigningAccountError.engineBusy
+        }
+        var config = await AnisetteConfigManager.shared.loadConfig()
+        let configurationChanged = config.clientInfo != (client.isEmpty ? AppConstants.Anisette.defaultClientInfo : client)
+            || config.userAgent != (agent.isEmpty ? AppConstants.Anisette.defaultUserAgent : agent)
+            || UserDefaults.standard.useOnDeviceAnisette != onDevice
+            || (!onDevice && UserDefaults.standard.menuAnisetteURL != url.absoluteString)
+        config.clientInfo = client.isEmpty ? AppConstants.Anisette.defaultClientInfo : client
+        config.userAgent = agent.isEmpty ? AppConstants.Anisette.defaultUserAgent : agent
+        await AnisetteConfigManager.shared.saveConfig(config)
+        var servers = await AnisetteServersManager.shared.loadLocalServers()
+        servers.removeAll { $0.address == url.absoluteString }
+        servers.insert(AnisetteServerItem(name: "Custom server", address: url.absoluteString), at: 0)
+        await AnisetteServersManager.shared.saveLocalServers(servers)
+        UserDefaults.standard.menuAnisetteURL = url.absoluteString
+        UserDefaults.standard.useOnDeviceAnisette = onDevice
+        // Keep the selected custom endpoint authoritative until the user changes it.
+        UserDefaults.standard.disableAnisetteRotation = true
+        UserDefaults.standard.set(true, forKey: "sidekick.anisette.defaults.v1")
+        if configurationChanged {
+            // Provisioning identities cannot be reused across incompatible generators.
+            AnisetteConfigManager.shared.anisetteAdiBlob = nil
+            AnisetteConfigManager.shared.anisetteIdentifier = nil
+        }
+        SideSign.AnisetteDataManager.shared.resetProvisioningCache()
+        await OnDeviceAnisetteManager.shared.resetProvisioningCache()
+    }
+
+    func resetAnisetteProvisioning() async throws {
+        guard SigningAccountOperationCoordinator.acquire() else { throw SigningAccountError.engineBusy }
+        defer { SigningAccountOperationCoordinator.release() }
+        guard !AppManager.shared.isActivelyManagingAnyApp, !NativeAppTransferService.isRunning,
+              !SideKickStorageCleanup.hasActiveOperations else {
+            throw SigningAccountError.engineBusy
+        }
+        // Never call signOut here: account sessions, certificates and installation records stay intact.
+        AnisetteConfigManager.shared.anisetteAdiBlob = nil
+        AnisetteConfigManager.shared.anisetteIdentifier = nil
+        SideSign.AnisetteDataManager.shared.resetProvisioningCache()
+        await OnDeviceAnisetteManager.shared.resetProvisioningCache()
+    }
+
+    private func prepareAnisetteDefaults() async {
+        let defaults = UserDefaults.standard
+        let persisted = defaults.persistentDomain(forName: Bundle.main.bundleIdentifier ?? "") ?? [:]
+        let servers = await AnisetteServersManager.shared.loadLocalServers()
+        guard AnisetteConfiguration.shouldOfferWindowsDefault(persisted: persisted,
+            hasConfigFile: AnisetteConfigManager.shared.hasConfigFile(), hasSavedServers: !servers.isEmpty) else { return }
+        await AnisetteServersManager.shared.saveLocalServers([
+            AnisetteServerItem(name: "Windows Anisette", address: AnisetteConfiguration.windowsServer)
+        ])
+        defaults.menuAnisetteURL = AnisetteConfiguration.windowsServer
+        defaults.useOnDeviceAnisette = false
+        defaults.disableAnisetteRotation = true
+        var config = await AnisetteConfigManager.shared.loadConfig()
+        config.clientInfo = AnisetteConfiguration.windowsClientInfo
+        config.userAgent = AnisetteConfiguration.windowsUserAgent
+        await AnisetteConfigManager.shared.saveConfig(config)
+        AnisetteConfigManager.shared.anisetteAdiBlob = nil
+        AnisetteConfigManager.shared.anisetteIdentifier = nil
+        SideSign.AnisetteDataManager.shared.resetProvisioningCache()
+        await OnDeviceAnisetteManager.shared.resetProvisioningCache()
+        defaults.set(true, forKey: "sidekick.anisette.defaults.v1")
+    }
+
     func reload() async {
         do {
             var archive = try SigningAccountArchive.load()
@@ -172,6 +246,7 @@ final class SigningAccountStore {
         )
         let result: SignInResult
         do {
+            await prepareAnisetteDefaults()
             result = try await AuthManager.shared.signIn(
                 presentingViewController: presenter,
                 signInHandler: handler,
@@ -581,6 +656,7 @@ final class SigningAccountStore {
             }
         )
 
+        await prepareAnisetteDefaults()
         let result = try await AuthManager.shared.signIn(
             presentingViewController: presenter,
             signInHandler: handler,

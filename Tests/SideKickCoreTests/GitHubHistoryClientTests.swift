@@ -56,4 +56,42 @@ final class GitHubHistoryClientTests: XCTestCase {
         do { _ = try await reader.page(configuration: config(), token: "fake-token", page: 1); XCTFail("Failed HTTP must throw") }
         catch { XCTAssertTrue(error is GitHubHistoryError) }
     }
+    func testDiscoveryPublishesLatestBuildWithoutReadingAnOlderFailingRun() async throws {
+        let reader = GitHubHistoryClient { request in
+            let url = request.url!
+            if url.path.contains("/110/") {
+                return (Data(), HTTPURLResponse(url: url, statusCode: 503, httpVersion: nil, headerFields: nil)!)
+            }
+            let value: [String: Any]
+            if url.path.hasSuffix("/runs") {
+                value = ["workflow_runs": [
+                    ["id": 111, "run_number": 111, "head_branch": "main", "conclusion": "success"],
+                    ["id": 110, "run_number": 110, "head_branch": "main", "conclusion": "success"]]]
+            } else {
+                value = ["artifacts": [["id": 200, "name": "IPA", "expired": false,
+                    "archive_download_url": "https://api.github.com/artifacts/200/zip"]]]
+            }
+            return (try JSONSerialization.data(withJSONObject: value), HTTPURLResponse(url: url, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        }
+        let store = GitHubHistoryStore(loader: { configuration, token, page, latestOnly in
+            try await reader.page(configuration: configuration, token: token, page: page, latestOnly: latestOnly)
+        })
+        var configuration = config()
+        let target = GitHubUpdateTarget(id: "app", name: "App", version: "1", observation: "binary107")
+        configuration.confirmInstalled("actions-v2:107:107:1:100:old", observation: target.observation)
+        let result = try await GitHubUpdateDiscovery.check(for: target, configuration: configuration,
+            token: nil, historyStore: store)
+        XCTAssertEqual(result.state, .updateAvailable)
+        XCTAssertTrue(result.candidate?.updateKey.hasPrefix("actions-v2:111:") == true)
+        // A shortened discovery page must not masquerade as full version history.
+        do {
+            _ = try await store.page(configuration: configuration, token: nil, page: 1)
+            XCTFail("Full history must still read the older run and surface its failure")
+        } catch {
+            guard case GitHubHistoryError.unavailable(503) = error else {
+                return XCTFail("Expected the older run failure, got \(error)")
+            }
+        }
+    }
+
 }

@@ -317,12 +317,34 @@ private enum PairingSetupError: LocalizedError {
 }
 
 struct AnisetteSettingsView: View {
-    @AppStorage("useOnDeviceAnisette") private var useOnDeviceAnisette = true
+    @State private var useOnDeviceAnisette = true
+    @State private var server = AnisetteConfiguration.windowsServer
+    @State private var clientInfo = ""
+    @State private var userAgent = ""
+    @State private var isSaving = false
+    @State private var showReset = false
+    @State private var message: String?
+    @State private var settingsLoaded = false
 
     var body: some View {
         Form {
             Section {
                 Toggle("Generate Anisette on this device", isOn: $useOnDeviceAnisette)
+                TextField("Server URL", text: $server)
+                    .keyboardType(.URL)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                SwiftUI.Button("Use Windows Anisette server") {
+                    server = AnisetteConfiguration.windowsServer
+                    useOnDeviceAnisette = false
+                    clientInfo = AnisetteConfiguration.windowsClientInfo
+                    userAgent = AnisetteConfiguration.windowsUserAgent
+                }
+                SwiftUI.Button("Use On-Device Defaults") {
+                    useOnDeviceAnisette = true
+                    clientInfo = AppConstants.Anisette.defaultClientInfo
+                    userAgent = AppConstants.Anisette.defaultUserAgent
+                }
                 NavigationLink {
                     AnisetteServersView()
                 } label: {
@@ -332,17 +354,69 @@ struct AnisetteSettingsView: View {
             } header: {
                 Text("Authentication data")
             } footer: {
-                Text("Anisette is used by Apple ID authentication. Server management supports selecting or adding a server, importing a saved list, and updating the catalogue. Changes apply to the next authentication request.")
+                Text("The Windows preset selects a remote server with matching authentication headers. Save to apply your changes. Switching providers or headers regenerates authentication data; your saved accounts and certificates are kept.")
             }
 
             Section {
-                LabeledContent("Mode", value: useOnDeviceAnisette ? "On this device" : "Remote server")
+                TextField("Client information", text: $clientInfo, axis: .vertical)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                TextField("User agent", text: $userAgent, axis: .vertical)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                SwiftUI.Button("Save Authentication Settings") {
+                    run {
+                        try await SigningAccountStore().saveAnisetteConfiguration(server: server,
+                            clientInfo: clientInfo, userAgent: userAgent, onDevice: useOnDeviceAnisette)
+                        message = "Authentication settings saved."
+                    }
+                }
             } header: {
-                Text("Current setup")
+                Text("Custom authentication headers")
+            } footer: {
+                Text("Leave a header empty to use the compatibility default. Use a matching client information and user agent pair for your server.")
             }
+            Section {
+                SwiftUI.Button("Regenerate Authentication Data", role: .destructive) { showReset = true }
+            } footer: {
+                Text("Clears saved Anisette provisioning data and creates fresh data at the next sign-in. Saved accounts, certificates and installed app records are kept.")
+            }
+            if let message {
+                Section { Text(message).font(.footnote) }
+            }
+        }
+        .disabled(isSaving || !settingsLoaded)
+        .task {
+            useOnDeviceAnisette = UserDefaults.standard.useOnDeviceAnisette
+            let currentServer = UserDefaults.standard.menuAnisetteURL
+            server = currentServer.isEmpty ? AnisetteConfiguration.windowsServer : currentServer
+            let config = await AnisetteConfigManager.shared.loadConfig()
+            clientInfo = config.clientInfo
+            userAgent = config.userAgent
+            settingsLoaded = true
+        }
+        .confirmationDialog("Regenerate authentication data?", isPresented: $showReset, titleVisibility: .visible) {
+            SwiftUI.Button("Regenerate Data", role: .destructive) {
+                run {
+                    try await SigningAccountStore().resetAnisetteProvisioning()
+                    message = "Authentication data cleared. Fresh data will be generated at the next sign-in."
+                }
+            }
+        } message: {
+            Text("Your accounts, certificates and app records will stay on this device.")
         }
         .navigationTitle("Anisette")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func run(_ operation: @escaping @MainActor () async throws -> Void) {
+        isSaving = true
+        message = nil
+        Task { @MainActor in
+            defer { isSaving = false }
+            do { try await operation() }
+            catch { message = error.localizedDescription }
+        }
     }
 }
 

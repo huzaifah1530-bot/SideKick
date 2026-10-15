@@ -38,26 +38,8 @@ actor GitHubUpdateService {
     }
 
     func check(for target: GitHubUpdateTarget, configuration: GitHubUpdateConfiguration, token: String? = nil, forceRefresh: Bool = true) async throws -> GitHubCheckResult {
-        var history: [GitHubTrackedBuild] = []
-        var missingNewerDownload = false
-        var fetchedAt: Date?
-        for page in 1...5 {
-            try Task.checkCancellation()
-            let result = try await historyStore.page(configuration: configuration, token: token, page: page,
-                forceRefresh: forceRefresh && page == 1)
-            history += result.builds
-            if page == 1 { fetchedAt = result.fetchedAt }
-            missingNewerDownload = missingNewerDownload || result.newerBuildHasNoDownload
-            if !history.isEmpty || !result.hasMore { break }
-        }
-        var result = GitHubTrackingPolicy.check(target: target, configuration: configuration, history: history)
-        result.checkedAt = fetchedAt
-        if result.state == .current && missingNewerDownload {
-            result = GitHubCheckResult(targetID: target.id, state: .noMatchingDownload,
-                detail: "A more recent successful build has no matching downloadable file yet.",
-                latestBuild: history.first, checkedAt: fetchedAt)
-        }
-        return result
+        try await GitHubUpdateDiscovery.check(for: target, configuration: configuration, token: token,
+            forceRefresh: forceRefresh, historyStore: historyStore)
     }
 
     func history(for configuration: GitHubUpdateConfiguration, token: String? = nil, page: Int = 1) async throws -> [GitHubUpdateHistoryEntry] {

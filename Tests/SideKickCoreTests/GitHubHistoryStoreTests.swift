@@ -18,9 +18,9 @@ final class GitHubHistoryStoreTests: XCTestCase {
         GitHubUpdateConfiguration(bundleIdentifier: "app", repositoryURL: "https://github.com/o/r",
             source: .actionsArtifact, workflowFile: "build.yml", branch: "main", assetName: "IPA", lastInstalledUpdateKey: nil)
     }
-    func testLaunchAndVersionListShareOneRequestAndExplicitReloadFetchesNewData() async throws {
+    func testConcurrentHistoryReadsShareOneRequestAndExplicitReloadFetchesNewData() async throws {
         let fixture = Fixture()
-        let store = GitHubHistoryStore(loader: { _, _, _ in try await fixture.page() })
+        let store = GitHubHistoryStore(loader: { _, _, _, _ in try await fixture.page() })
         async let launch = store.page(configuration: config(), token: nil, page: 1)
         async let list = store.page(configuration: config(), token: nil, page: 1)
         let (a, b) = try await (launch, list)
@@ -34,12 +34,12 @@ final class GitHubHistoryStoreTests: XCTestCase {
     }
     func testExpiredCacheAndChangedCredentialsOrSourceCannotReuseOldHistory() async throws {
         let fixture = Fixture()
-        let store = GitHubHistoryStore(lifetime: 0, loader: { _, _, _ in try await fixture.page() })
+        let store = GitHubHistoryStore(lifetime: 0, loader: { _, _, _, _ in try await fixture.page() })
         _ = try await store.page(configuration: config(), token: nil, page: 1)
         _ = try await store.page(configuration: config(), token: nil, page: 1)
         let calls = await fixture.calls
         XCTAssertEqual(calls, 2)
-        let partitioned = GitHubHistoryStore(loader: { _, _, _ in try await fixture.page() })
+        let partitioned = GitHubHistoryStore(loader: { _, _, _, _ in try await fixture.page() })
         _ = try await partitioned.page(configuration: config(), token: "a", page: 1)
         _ = try await partitioned.page(configuration: config(), token: "b", page: 1)
         var changed = config(); changed.branch = "beta"
@@ -85,7 +85,7 @@ final class GitHubHistoryStoreTests: XCTestCase {
             }
         }
         let attempts = Attempts()
-        let store = GitHubHistoryStore(loader: { _, _, _ in try await attempts.load() })
+        let store = GitHubHistoryStore(loader: { _, _, _, _ in try await attempts.load() })
         do { _ = try await store.page(configuration: config(), token: nil, page: 1); XCTFail("Must surface failure") }
         catch { XCTAssertTrue(error is GitHubHistoryError) }
         _ = try await store.page(configuration: config(), token: nil, page: 1)
@@ -103,7 +103,7 @@ final class GitHubHistoryStoreTests: XCTestCase {
             }
         }
         let attempts = Attempts()
-        let store = GitHubHistoryStore(loader: { _, _, _ in try await attempts.load() })
+        let store = GitHubHistoryStore(loader: { _, _, _, _ in try await attempts.load() })
         _ = try await store.page(configuration: config(), token: nil, page: 1)
         do { _ = try await store.page(configuration: config(), token: nil, page: 1, forceRefresh: true); XCTFail("Must surface failure") }
         catch { XCTAssertTrue(error is GitHubHistoryError) }
