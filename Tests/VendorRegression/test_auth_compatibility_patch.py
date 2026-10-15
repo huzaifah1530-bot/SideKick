@@ -37,6 +37,9 @@ class AuthCompatibilityPatchTests(unittest.TestCase):
             self.assertIn('defaultClientInfo     = AnisetteConstants.defaultClientInfo', constants)
             self.assertIn('defaultUserAgent      = AnisetteConstants.defaultUserAgent', constants)
             manager = (target / 'Sources/Anisette/AnisetteDataManager.swift').read_text()
+            remote = (target / 'Sources/Anisette/RemoteAnisetteDataProvider.swift').read_text()
+            self.assertEqual(remote.count('let cleanIdentifier = AuthCompatibility.remoteIdentifier(identifier)'), 2,
+                             'Provisioning and get_headers must send the same Base64 UUID bytes')
             self.assertIn('resetProvisioningCache', manager)
             self.assertIn('AuthCompatibility.withProvisioningRecovery', manager)
             if shutil.which('swiftc'):

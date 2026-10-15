@@ -2,11 +2,16 @@ diff --git a/Sources/AuthCompatibility.swift b/Sources/AuthCompatibility.swift
 new file mode 100644
 --- /dev/null
 +++ b/Sources/AuthCompatibility.swift
-@@ -0,0 +1,24 @@
+@@ -0,0 +1,29 @@
 +import Foundation
 +
 +// Compatibility policy shared by the remote provisioning and authentication flows.
 +enum AuthCompatibility {
++    // anisette-v3-server Base64-decodes this field into the UUID bytes.
++    static func remoteIdentifier(_ bytes: [UInt8]) -> String {
++        Data(bytes).base64EncodedString()
++    }
++
 +    static func authType(statusType: String?, responseType: String?, statusCode: Int?) -> String? {
 +        let status = statusType.flatMap { $0.isEmpty ? nil : $0 }
 +        let response = responseType.flatMap { $0.isEmpty ? nil : $0 }
@@ -285,6 +290,15 @@ diff --git a/Sources/Anisette/AnisetteDataManager.swift b/Sources/Anisette/Anise
 diff --git a/Sources/Anisette/RemoteAnisetteDataProvider.swift b/Sources/Anisette/RemoteAnisetteDataProvider.swift
 --- a/Sources/Anisette/RemoteAnisetteDataProvider.swift
 +++ b/Sources/Anisette/RemoteAnisetteDataProvider.swift
+@@ -56,7 +56,7 @@
+         identifier: [UInt8],
+         adiPb: [UInt8]
+     ) async throws -> AnisetteDataResponse {
+-        let cleanIdentifier = identifier.map { String(format: "%02x", $0) }.joined()
++        let cleanIdentifier = AuthCompatibility.remoteIdentifier(identifier)
+         let baseURL = serverURL.absoluteString.trimmingCharacters(in: CharacterSet(charactersIn: "/"))
+ 
+         // 1. If adiPb is present, attempt v3 /v3/get_headers
 @@ -74,14 +74,26 @@
                  ]
                  postReq.httpBody = try JSONSerialization.data(withJSONObject: payload)
@@ -318,6 +332,15 @@ diff --git a/Sources/Anisette/RemoteAnisetteDataProvider.swift b/Sources/Anisett
                  }
              }
          }
+@@ -124,7 +136,7 @@
+         let webSocketTask = URLSession.shared.webSocketTask(with: webSocketURL)
+         webSocketTask.resume()
+ 
+-        let cleanIdentifier = identifier.map { String(format: "%02x", $0) }.joined()
++        let cleanIdentifier = AuthCompatibility.remoteIdentifier(identifier)
+ 
+         do {
+             while true {
 diff --git a/Sources/AuthenticationDiagnostics.swift b/Sources/AuthenticationDiagnostics.swift
 new file mode 100644
 --- /dev/null

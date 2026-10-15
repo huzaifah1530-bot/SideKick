@@ -119,6 +119,19 @@ final class SigningAccountStore {
         defaults.set(true, forKey: "sidekick.anisette.defaults.v1")
     }
 
+    /// Old remote blobs were provisioned with a hex string where v3 expects
+    /// Base64 UUID bytes. Reset that identity once under the existing signing gate.
+    private func migrateRemoteAnisetteIdentifier() async {
+        let defaults = UserDefaults.standard
+        guard !defaults.useOnDeviceAnisette,
+              !defaults.bool(forKey: "sidekick.anisette.remote-base64-identifier.v1") else { return }
+        AnisetteConfigManager.shared.anisetteAdiBlob = nil
+        AnisetteConfigManager.shared.anisetteIdentifier = nil
+        SideSign.AnisetteDataManager.shared.resetProvisioningCache()
+        await OnDeviceAnisetteManager.shared.resetProvisioningCache()
+        defaults.set(true, forKey: "sidekick.anisette.remote-base64-identifier.v1")
+    }
+
     func reload() async {
         do {
             var archive = try SigningAccountArchive.load()
@@ -253,6 +266,7 @@ final class SigningAccountStore {
         let result: SignInResult
         do {
             await prepareAnisetteDefaults()
+            await migrateRemoteAnisetteIdentifier()
             result = try await AuthManager.shared.signIn(
                 presentingViewController: presenter,
                 signInHandler: handler,

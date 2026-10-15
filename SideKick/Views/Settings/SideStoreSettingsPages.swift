@@ -174,6 +174,7 @@ struct ConnectionSettingsView: View {
     @State private var vpn = LocalVPNService.shared
     @State private var isAutomaticPortDraft = true
     @State private var fixedPortDraft = ""
+    @State private var portDraftLoaded = false
     @State private var isChoosingPairingFile = false
     @State private var isShowingLocalConnection = false
     @State private var pairingStatus: String?
@@ -209,11 +210,7 @@ struct ConnectionSettingsView: View {
                     }
                 }
                 SwiftUI.Button("Save Port") {
-                    if isAutomaticPortDraft {
-                        portOverride = 0
-                    } else if let port = validatedFixedPortDraft {
-                        portOverride = port
-                    }
+                    _ = savePort()
                 }
                 .disabled(isAutomaticPortDraft ? portOverride == 0 : validatedFixedPortDraft == nil)
             } header: {
@@ -238,7 +235,15 @@ struct ConnectionSettingsView: View {
             fixedPortDraft = value == 0 ? "" : String(value)
             syncMinimuxerBackendFromUserDefaults()
         }
+        .guardUnsavedSettings(isDirty: portDraftLoaded && (isAutomaticPortDraft ? portOverride != 0 : fixedPortDraft != String(portOverride)), save: {
+            savePort()
+        }, discard: {
+            isAutomaticPortDraft = portOverride == 0
+            fixedPortDraft = portOverride == 0 ? "" : String(portOverride)
+        })
         .onAppear {
+            guard !portDraftLoaded else { return }
+            portDraftLoaded = true
             isAutomaticPortDraft = portOverride == 0
             fixedPortDraft = portOverride == 0 ? "" : String(portOverride)
         }
@@ -262,6 +267,14 @@ struct ConnectionSettingsView: View {
         } message: {
             Text(pairingStatus ?? "")
         }
+    }
+
+    private func savePort() -> Bool {
+        if isAutomaticPortDraft { portOverride = 0; return true }
+        guard let port = validatedFixedPortDraft else { return false }
+        portOverride = port
+        fixedPortDraft = String(port)
+        return true
     }
 
     private var validatedFixedPortDraft: Int? {
@@ -325,6 +338,14 @@ struct AnisetteSettingsView: View {
     @State private var showReset = false
     @State private var message: String?
     @State private var settingsLoaded = false
+    private struct Draft: Equatable {
+        let onDevice: Bool
+        let server: String
+        let clientInfo: String
+        let userAgent: String
+    }
+    @State private var savedDraft: Draft?
+    private var draft: Draft { Draft(onDevice: useOnDeviceAnisette, server: server, clientInfo: clientInfo, userAgent: userAgent) }
 
     var body: some View {
         Form {
@@ -365,11 +386,7 @@ struct AnisetteSettingsView: View {
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                 SwiftUI.Button("Save Authentication Settings") {
-                    run {
-                        try await SigningAccountStore().saveAnisetteConfiguration(server: server,
-                            clientInfo: clientInfo, userAgent: userAgent, onDevice: useOnDeviceAnisette)
-                        message = "Authentication settings saved."
-                    }
+                    Task { _ = await saveAuthenticationSettings() }
                 }
             } header: {
                 Text("Custom authentication headers")
@@ -386,13 +403,24 @@ struct AnisetteSettingsView: View {
             }
         }
         .disabled(isSaving || !settingsLoaded)
+        .guardUnsavedSettings(isDirty: settingsLoaded && savedDraft != draft, save: {
+            await saveAuthenticationSettings()
+        }, discard: {
+            guard let savedDraft else { return }
+            useOnDeviceAnisette = savedDraft.onDevice
+            server = savedDraft.server
+            clientInfo = savedDraft.clientInfo
+            userAgent = savedDraft.userAgent
+        })
         .task {
+            guard !settingsLoaded else { return }
             useOnDeviceAnisette = UserDefaults.standard.useOnDeviceAnisette
             let currentServer = UserDefaults.standard.menuAnisetteURL
             server = currentServer.isEmpty ? AnisetteConfiguration.windowsServer : currentServer
             let config = await AnisetteConfigManager.shared.loadConfig()
             clientInfo = config.clientInfo
             userAgent = config.userAgent
+            savedDraft = draft
             settingsLoaded = true
         }
         .confirmationDialog("Regenerate authentication data?", isPresented: $showReset, titleVisibility: .visible) {
@@ -407,6 +435,22 @@ struct AnisetteSettingsView: View {
         }
         .navigationTitle("Anisette")
         .navigationBarTitleDisplayMode(.inline)
+    }
+
+    @MainActor private func saveAuthenticationSettings() async -> Bool {
+        guard !isSaving else { return false }
+        isSaving = true
+        defer { isSaving = false }
+        do {
+            try await SigningAccountStore().saveAnisetteConfiguration(server: server,
+                clientInfo: clientInfo, userAgent: userAgent, onDevice: useOnDeviceAnisette)
+            savedDraft = draft
+            message = "Authentication settings saved."
+            return true
+        } catch {
+            message = error.localizedDescription
+            return false
+        }
     }
 
     private func run(_ operation: @escaping @MainActor () async throws -> Void) {

@@ -66,13 +66,20 @@ struct GitHubAccountSettingsView: View {
 }
 
 struct GitHubTokenEditorView: View {
-    let credential: GitHubCredentialStore.Credential?
+    @State private var credential: GitHubCredentialStore.Credential?
     @Environment(\.dismiss) private var dismiss
     @State private var label = ""
     @State private var token = ""
     @State private var isSaving = false
     @State private var errorMessage: String?
     @State private var confirmingDelete = false
+    @State private var savedLabel = ""
+
+    init(credential: GitHubCredentialStore.Credential?) {
+        _credential = State(initialValue: credential)
+        _label = State(initialValue: credential?.label ?? "")
+        _savedLabel = State(initialValue: credential?.label ?? "")
+    }
 
     var body: some View {
         Form {
@@ -87,7 +94,7 @@ struct GitHubTokenEditorView: View {
                 Text("The name helps you choose the right token for each repository. Leave the replacement token empty to keep the current one.")
             }
             Section {
-                SwiftUI.Button { Task { await save() } } label: {
+                SwiftUI.Button { Task { if await save() { dismiss() } } } label: {
                     HStack { Text("Save Token"); Spacer(); if isSaving { ProgressView() } }
                 }
                 .disabled(isSaving || label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (credential == nil && token.isEmpty))
@@ -100,7 +107,10 @@ struct GitHubTokenEditorView: View {
         }
         .navigationTitle(credential == nil ? "Add GitHub Token" : "Edit GitHub Token")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear { label = credential?.label ?? "" }
+        .disabled(isSaving)
+        .guardUnsavedSettings(isDirty: label != savedLabel || !token.isEmpty, save: {
+            await save()
+        }, discard: { label = savedLabel; token = "" })
         .alert("Delete this token?", isPresented: $confirmingDelete) {
             SwiftUI.Button("Delete Token", role: .destructive) {
                 do { if let credential { try GitHubCredentialStore().delete(id: credential.id) }; dismiss() }
@@ -110,7 +120,13 @@ struct GitHubTokenEditorView: View {
         } message: { Text("Apps using this token will need another token selected in their GitHub update settings.") }
     }
 
-    @MainActor private func save() async {
+    @MainActor private func save() async -> Bool {
+        guard !isSaving else { return false }
+        guard !label.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty,
+              credential != nil || !token.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            errorMessage = "Enter a name and a GitHub token before saving."
+            return false
+        }
         isSaving = true
         defer { isSaving = false }
         do {
@@ -123,8 +139,12 @@ struct GitHubTokenEditorView: View {
                 username = try await GitHubUpdateService().validateToken(savedToken)
             }
             try GitHubCredentialStore().save(label: label.trimmingCharacters(in: .whitespacesAndNewlines), username: username, token: savedToken, id: credential?.id)
-            dismiss()
-        } catch { errorMessage = error.localizedDescription }
+            credential = try GitHubCredentialStore().all().last
+            label = credential?.label ?? label
+            savedLabel = label
+            token = ""
+            return true
+        } catch { errorMessage = error.localizedDescription; return false }
     }
 }
 

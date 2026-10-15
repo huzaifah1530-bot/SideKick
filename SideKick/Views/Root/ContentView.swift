@@ -8,12 +8,16 @@ struct ContentView: View {
     @State private var isForeground = false
     @State private var selectedTab = 0
     @State private var setupStatus = SetupStatus()
+    @StateObject private var unsavedSettings = UnsavedSettingsCoordinator.shared
 
     var body: some View {
         Group {
             if case .ready = environment.databaseState {
                 if setupStatus.isReady {
-                    TabView(selection: $selectedTab) {
+                    TabView(selection: Binding(get: { selectedTab }, set: { tab in
+                        guard tab != selectedTab else { return }
+                        unsavedSettings.requestNavigation { selectedTab = tab }
+                    })) {
                         HomeView(viewModel: HomeViewModel(store: environment.ipaImportStore))
                             .tabItem { Label("SideKick", systemImage: "bolt.fill") }
                             .tag(0)
@@ -39,6 +43,13 @@ struct ContentView: View {
             else { environment.pauseGitHubChecks() }
             await environment.startDatabase()
             if case .ready = environment.databaseState { await setupStatus.refresh() }
+        }
+        .alert("Save changes?", isPresented: $unsavedSettings.isPresented) {
+            SwiftUI.Button("Save") { Task { await unsavedSettings.saveAndLeave() } }
+                .keyboardShortcut(.defaultAction)
+            SwiftUI.Button("Don’t Save", role: .destructive) { unsavedSettings.discardAndLeave() }
+        } message: {
+            Text("You have unsaved settings. Save them before leaving, or discard your changes.")
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
             isForeground = false
@@ -81,7 +92,7 @@ struct ContentView: View {
             environment.rescanLiveContainerApps()
         }
         .onReceive(NotificationCenter.default.publisher(for: GitHubUpdateNotificationRouteStore.tappedNotification)) { _ in
-            selectedTab = 0
+            unsavedSettings.requestNavigation { selectedTab = 0 }
         }
         .onReceive(NotificationCenter.default.publisher(for: .NSManagedObjectContextObjectsDidChange)
             .filter { notification in

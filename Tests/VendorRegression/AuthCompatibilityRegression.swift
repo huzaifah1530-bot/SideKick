@@ -5,6 +5,10 @@ private final class Attempts: @unchecked Sendable { var blobs: [Data?] = [] }
 
 @main struct AuthCompatibilityRegression {
     static func main() async throws {
+        let identifier = Array(UInt8(0)...UInt8(15))
+        let encodedIdentifier = AuthCompatibility.remoteIdentifier(identifier)
+        precondition(encodedIdentifier == "AAECAwQFBgcICQoLDA0ODw==")
+        precondition(Data(base64Encoded: encodedIdentifier) == Data(identifier))
         precondition(AuthCompatibility.authType(statusType: nil, responseType: nil, statusCode: 409) == "pushedCode")
         precondition(AuthCompatibility.authType(statusType: "", responseType: nil, statusCode: 409) == "pushedCode")
         precondition(AuthCompatibility.authType(statusType: "", responseType: "sms", statusCode: 409) == "sms")

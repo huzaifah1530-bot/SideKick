@@ -24,6 +24,7 @@ let package = Package(
             "Services/GitHubHistoryStore.swift",
             "Services/GitHubDiagnosticsStore.swift",
             "Services/DiagnosticsStore.swift",
+            "Services/UnsavedSettingsCoordinator.swift",
             "Services/GitHubUpdateDiscovery.swift",
             "Services/AnisetteConfiguration.swift",
             "Services/LiveContainerScanner.swift",
