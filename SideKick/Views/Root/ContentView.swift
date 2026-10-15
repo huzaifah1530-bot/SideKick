@@ -47,7 +47,7 @@ struct ContentView: View {
         .alert("Save changes?", isPresented: $unsavedSettings.isPresented) {
             SwiftUI.Button("Save") { Task { await unsavedSettings.saveAndLeave() } }
                 .keyboardShortcut(.defaultAction)
-            SwiftUI.Button("Don’t Save", role: .destructive) { unsavedSettings.discardAndLeave() }
+            SwiftUI.Button("Don’t Save") { unsavedSettings.discardAndLeave() }
         } message: {
             Text("You have unsaved settings. Save them before leaving, or discard your changes.")
         }

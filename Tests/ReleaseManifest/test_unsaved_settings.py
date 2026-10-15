@@ -12,3 +12,5 @@ class UnsavedSettingsIntegrationTests(unittest.TestCase):
         self.assertIn('.guardUnsavedSettings(', tokens)
         self.assertIn('unsavedSettings.requestNavigation', root)
         self.assertIn('.keyboardShortcut(.defaultAction)', root)
+        self.assertIn('Button("Don’t Save")', root)
+        self.assertNotIn('Button("Don’t Save", role:', root)
