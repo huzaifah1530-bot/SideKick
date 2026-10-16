@@ -271,7 +271,7 @@ struct GitHubUpdateDetailView: View {
             .padding(.vertical, 4)
         }
 
-        Section("Builds") {
+        Section {
             LabeledContent("Installed", value: "\(app.version) (\(app.buildVersion))")
             if let label = environment.githubConfigurations.first(where: { $0.id == app.id })?.installedBuildLabel {
                 LabeledContent("GitHub build", value: label)
@@ -281,6 +281,8 @@ struct GitHubUpdateDetailView: View {
             LabeledContent("Available", value: selectedCandidate.newVersion)
             Text(selectedCandidate.title)
                 .font(.subheadline).foregroundStyle(.secondary)
+        } header: {
+            Text("Builds")
         } footer: {
             if installedBuildIsUnconfirmed {
                 Text("The installed version doesn't identify the exact GitHub build. Confirm it only if you installed this build yourself.")
