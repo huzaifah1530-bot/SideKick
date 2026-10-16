@@ -238,7 +238,7 @@ new file mode 100644
 +         "sim": challenge.base64EncodedString(), "device_id": deviceID, "md_lu": localUserID]
 +    }
 +
-+    static func withResynchronization<T>(
++    static func withResynchronization<T: Sendable>(
 +        initial: T, isolation: isolated (any Actor)? = #isolation,
 +        request: (T, Bool) async throws -> [String: any Sendable],
 +        resynchronize: ((T, Data) async throws -> T)?
