@@ -167,6 +167,9 @@ jobs:
           fi
           mkdir -p "$APP_PATH/ThirdPartyLicenses"
           cp SideKickVPN/LICENSE "$APP_PATH/ThirdPartyLicenses/LocalDevVPN.txt"
+          # SideSign retains only entitlement keys already requested by the helper.
+          # Xcode signing is disabled above; preserve this request explicitly.
+          python3 scripts/package-transfer-helper.py "$APP_PATH/SideBackup.ipa"
           # Ad-hoc signatures preserve entitlement requests for IPA re-signers.
           # They are not provisioning profiles and do not make this IPA installable.
           if [ -d "$APP_PATH/Frameworks" ]; then
