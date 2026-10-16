@@ -1040,6 +1040,24 @@ struct InstallAccountSelectionView: View {
     }
 }
 
+enum InstallStartState: Equatable {
+    case awaitingConfirmation, ready, running, finished
+
+    init(requiresConfirmation: Bool) {
+        self = requiresConfirmation ? .awaitingConfirmation : .ready
+    }
+
+    mutating func confirm() {
+        if self == .awaitingConfirmation { self = .ready }
+    }
+
+    mutating func begin() -> Bool {
+        guard self == .ready else { return false }
+        self = .running
+        return true
+    }
+}
+
 struct InstallConsoleView: View {
     let app: ImportedIPA
     let account: SigningAccountSummary
@@ -1052,14 +1070,37 @@ struct InstallConsoleView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var lines: [String] = []
     @State private var progress = 0.0
-    @State private var isRunning = true
-    @State private var didStart = false
+    @State private var startState = InstallStartState(requiresConfirmation: UserDefaults.standard.isInstallConfirmationEnabled)
     @State private var failure: String?
     @State private var lastLoggedPercent = -5
     @State private var stageSummary = "Preparing your app"
-    @State private var showingInstallConfirmation = false
+
+    private var isRunning: Bool { startState != .finished }
 
     var body: some View {
+        Group {
+            if startState == .awaitingConfirmation {
+                VStack(alignment: .leading, spacing: 20) {
+                    Text(isUpdate ? "Ready to Update" : "Ready to Install").font(.largeTitle.bold())
+                    Text(app.name).font(.title3)
+                    Text("Version \(app.version) will be signed using \(account.email).")
+                        .foregroundStyle(.secondary)
+                    SwiftUI.Button(isUpdate ? "Update" : "Install") { startState.confirm() }
+                        .buttonStyle(.borderedProminent)
+                    SwiftUI.Button("Cancel", role: .cancel) { dismiss() }
+                }
+                .padding(24)
+                .frame(maxWidth: 640, alignment: .leading)
+            } else {
+                statusView
+            }
+        }
+        .task(id: startState == .awaitingConfirmation) {
+            await runInstall()
+        }
+    }
+
+    private var statusView: some View {
         OperationStatusView(
             title: isUpdate ? "Update Status" : "Install Status",
             appName: app.name,
@@ -1073,25 +1114,11 @@ struct InstallConsoleView: View {
             onRetry: retry,
             onClose: { dismiss() }
         )
-        .task {
-            guard !didStart else { return }
-            didStart = true
-            if UserDefaults.standard.isInstallConfirmationEnabled {
-                showingInstallConfirmation = true
-            } else {
-                await runInstall()
-            }
-        }
-        .alert(isUpdate ? "Update \(app.name)?" : "Install \(app.name)?", isPresented: $showingInstallConfirmation) {
-            SwiftUI.Button(isUpdate ? "Update" : "Install") { Task { await runInstall() } }
-            SwiftUI.Button("Cancel", role: .cancel) { isRunning = false; dismiss() }
-        } message: {
-            Text("Version \(app.version) will be signed using \(account.email).")
-        }
     }
 
     @MainActor
     private func runInstall() async {
+        guard startState.begin() else { return }
         failure = nil
         stageSummary = isUpdate ? "Preparing your app update." : "Preparing your app for installation."
         append("Starting install · \(Date.now.formatted(date: .omitted, time: .standard))")
@@ -1129,7 +1156,7 @@ struct InstallConsoleView: View {
                 await onSourceMissing?()
             }
         }
-        isRunning = false
+        startState = .finished
     }
 
     @MainActor
@@ -1142,7 +1169,7 @@ struct InstallConsoleView: View {
         progress = 0
         lastLoggedPercent = -5
         stageSummary = "Preparing your app"
-        isRunning = true
+        startState = .ready
         Task { await runInstall() }
     }
 }
