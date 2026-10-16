@@ -575,7 +575,7 @@ private enum AppSigningError: LocalizedError {
     }
 }
 
-private struct OperationStatusView: View {
+struct OperationStatusView: View {
     let title: String
     let appName: String
     let stageSummary: String
@@ -587,6 +587,7 @@ private struct OperationStatusView: View {
     let accountStore: SigningAccountStore?
     let onRetry: () -> Void
     let onClose: () -> Void
+    var expandActivityInitially = false
 
     @State private var isActivityExpanded = false
 
@@ -684,6 +685,7 @@ private struct OperationStatusView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(isRunning ? .hidden : .visible, for: .navigationBar)
         .interactiveDismissDisabled(isRunning)
+        .onAppear { if expandActivityInitially { isActivityExpanded = true } }
     }
 
     private var shouldOfferReconnect: Bool {

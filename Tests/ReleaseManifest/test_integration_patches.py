@@ -27,6 +27,10 @@ class IntegrationPatchTests(unittest.TestCase):
             paths.update(path.rstrip("\t\r") for path in re.findall(r"^--- a/(.+)$", audit_patch, re.M))
             paths.update([
                 "SideBackup/SideBackupApp.swift", "SideStore/Core/Operations/PipelineOperations/StageBackupAppOperation.swift",
+                "SideBackup/ContentView.swift", "SideBackup/ConsoleLog.swift",
+                "Shared/Extensions/Bundle+AltStore.swift", "SideStore/Core/Operations/PipelineExecutor.swift",
+                "SideStore/Core/Operations/PipelineOperations/FetchProvisioningProfilesOperation.swift",
+                "SideStore/Core/Operations/PipelineOperations/ResignAppOperation.swift",
                 "SideStore/Core/Operations/PipelineOperations/RemoveBackupDataOperation.swift",
                 "AltWidget/Info.plist", "SideBackup/Info.plist",
                 "AltStore/Resources/ReleaseEntitlements.plist",
@@ -70,6 +74,52 @@ class IntegrationPatchTests(unittest.TestCase):
             if compiler := shutil.which("swiftc"):
                 for relative in ("SideStore/Core/Anisette/AnisetteProvider.swift", "SideStore/Core/Operations/StandaloneOperations/SignInOperation.swift"):
                     subprocess.run([compiler, "-frontend", "-parse", str(checkout / relative)], check=True)
+            result = subprocess.run([sys.executable, str(ROOT / "scripts/integrate-backup-helper.py"), str(checkout)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            stage = (checkout / "SideStore/Core/Operations/PipelineOperations/StageBackupAppOperation.swift").read_text()
+            self.assertIn('updates["SideKickBackupAppGroup"] = backupGroup', stage)
+            shared = (checkout / "Shared/Extensions/Bundle+AltStore.swift").read_text()
+            self.assertIn('return self.appGroups.contains(expected) ? expected : nil', shared)
+            provisioning = (checkout / "SideStore/Core/Operations/PipelineOperations/FetchProvisioningProfilesOperation.swift").read_text()
+            self.assertIn('targetAppBundle.infoPlist["SideKickBackupAppGroup"] as? String == groupIdentifier', provisioning)
+            self.assertIn('Bundle.main.appGroups.contains(groupIdentifier)', provisioning)
+            self.assertLess(provisioning.index('return groupIdentifier'), provisioning.index('return groupIdentifier + "." + team.identifier'))
+            signing = (checkout / "SideStore/Core/Operations/PipelineOperations/ResignAppOperation.swift").read_text()
+            self.assertIn('resignedAppBundle.executableName == "SideBackup"', signing)
+            self.assertIn(').contains(expected)', signing)
+            helper = (checkout / "SideBackup/ContentView.swift").read_text()
+            self.assertNotIn('Color("Background")', helper)
+            self.assertIn('Activity Log', helper)
+            self.assertIn('SideKick', helper)
+            if compiler := shutil.which("swiftc"):
+                for relative in ["SideBackup/ContentView.swift", "Shared/Extensions/Bundle+AltStore.swift",
+                                 "SideStore/Core/Operations/PipelineExecutor.swift",
+                                 "SideStore/Core/Operations/PipelineOperations/StageBackupAppOperation.swift",
+                                 "SideStore/Core/Operations/PipelineOperations/FetchProvisioningProfilesOperation.swift",
+                                 "SideStore/Core/Operations/PipelineOperations/ResignAppOperation.swift",
+                                 "AltStore/Managing Apps/AppManager.swift"]:
+                    subprocess.run([compiler, "-frontend", "-parse", str(checkout / relative)], check=True)
+                # Exercise the actual composed resolver with different host/helper IDs.
+                getter = re.search(r'@objc dynamic var altstoreAppGroup: String\? \{.*?\n    \}', shared, re.S).group(0)
+                fixture = '''import Foundation
+enum Bundle { static let baseAltStoreAppGroupID = "group.com.spotify.client.TEAM" }
+struct FakeBundle {
+    let appGroups: [String]
+    let expected: String?
+    func object(forInfoDictionaryKey: String) -> Any? { expected }
+    GETTER
+}
+let host = "group.com.sidekick.app.TEAM"
+precondition(FakeBundle(appGroups: [host], expected: host).altstoreAppGroup == host)
+precondition(FakeBundle(appGroups: [host + ".TEAM"], expected: host).altstoreAppGroup == nil)
+precondition(FakeBundle(appGroups: [Bundle.baseAltStoreAppGroupID], expected: host).altstoreAppGroup == nil)
+precondition(FakeBundle(appGroups: [Bundle.baseAltStoreAppGroupID], expected: nil).altstoreAppGroup == Bundle.baseAltStoreAppGroupID)
+'''.replace('GETTER', getter.replace('@objc dynamic ', ''))
+                source = checkout / "BackupGroupFixture.swift"
+                source.write_text(fixture)
+                binary = checkout / "backup-group-fixture"
+                subprocess.run([compiler, str(source), "-o", str(binary)], check=True)
+                subprocess.run([str(binary)], check=True)
             for relative, patch_name in [
                 ("Dependencies/SideSign", "sidesign-audit-fixes.patch"),
                 ("Dependencies/minimuxer", "minimuxer-audit-fixes.patch"),

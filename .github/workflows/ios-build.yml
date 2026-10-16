@@ -87,6 +87,9 @@ jobs:
       - name: Test shipping patch composition and dependency recovery
         run: python3 -m unittest discover -s Tests/VendorRegression -v
 
+      - name: Apply SideKick backup helper integration
+        run: python3 scripts/integrate-backup-helper.py Vendor/SideStore
+
       - name: Test vendor audit regressions
         run: |
           python3 scripts/verify-sidestore-regressions.py

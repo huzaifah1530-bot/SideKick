@@ -17,10 +17,13 @@ class AppOffloadTests(unittest.TestCase):
         self.assertNotIn('SideKickCredentialTransferRequest', service)
         self.assertNotIn('embed-file-transfer.py', workflow)
         self.assertNotIn('embed-credential-transfer.py', workflow)
-        operation = view.split('private func run(restoring: Bool)')[1].split('private func prepareIPA()')[0]
-        self.assertLess(operation.index('try await service.perform'), operation.index('offerLiveContainer = true'))
-        self.assertIn('if !restoring && offloaded', operation)
-        self.assertGreater(operation.index('catch'), operation.index('offerLiveContainer = true'))
+        self.assertIn('AppOffloadConsoleView(', view)
+        self.assertIn('if succeeded && offloaded { offerLiveContainer = true }', view)
+        self.assertIn('OperationStatusView(', view)
+        self.assertIn('progressHandler:', view)
+        self.assertIn('stageHandler:', view)
+        self.assertIn('group.progress.observe', service)
+        self.assertIn('scripts/integrate-backup-helper.py', workflow)
         # Native data backup must complete before upstream removes the installation.
         import subprocess
         pipeline = subprocess.check_output(['git', '-C', str(ROOT / 'Vendor/SideStore'), 'show',

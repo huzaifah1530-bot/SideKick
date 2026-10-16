@@ -535,7 +535,7 @@ struct QuietRefreshOutcome {
     var failureMessage: String?
 }
 
-private final class ProgressObservationBox: @unchecked Sendable {
+final class ProgressObservationBox: @unchecked Sendable {
     private let lock = NSLock()
     private var observation: NSKeyValueObservation?
     private var isFinished = false

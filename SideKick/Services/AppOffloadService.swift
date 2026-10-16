@@ -36,18 +36,30 @@ final class AppOffloadService {
 
     func isOffloaded() async throws -> Bool { !(try await installedRecord()).isActive }
 
-    func perform(restoring: Bool) async throws {
+    func perform(restoring: Bool,
+                 stageHandler: @escaping @MainActor @Sendable (String) -> Void = { _ in },
+                 progressHandler: @escaping @MainActor @Sendable (Double) -> Void = { _ in }) async throws {
         guard !Self.running, !AppManager.shared.isActivelyManagingAnyApp else { throw AppOffloadError.inUse }
         Self.running = true
         defer { Self.running = false }
+        stageHandler("Checking the retained app and backup state")
         let installed = try await installedRecord()
         guard let presenter = UIApplication.shared.topViewController() else { throw AppOffloadError.inUse }
         guard ALTApplication(fileURL: installed.fileURL) != nil else { throw AppOffloadError.sourceMissing }
         if !restoring {
             guard installed.isActive, !Self.blocksNativeOperations(app.id) else { throw AppOffloadError.restoreRequired }
         }
+        let appID = installed.bundleIdentifier
+        let observer = NotificationCenter.default.addObserver(forName: Notification.Name("SideKick.pipelineStep"), object: nil, queue: .main) { notification in
+            guard notification.userInfo?["appID"] as? String == appID,
+                  let step = notification.userInfo?["step"] as? String,
+                  let message = Self.stageMessage(step) else { return }
+            Task { @MainActor in stageHandler(message) }
+        }
+        defer { NotificationCenter.default.removeObserver(observer) }
         try SideKickStorageCleanup.beginOperation()
         defer { SideKickStorageCleanup.endOperation() }
+        stageHandler("Connecting to this iPhone")
         let lease = try await LocalVPNService.shared.acquire()
         defer { LocalVPNService.shared.release(lease) }
         // Use SideStore's normal backup/restore pipeline, including its App Group.
@@ -62,20 +74,31 @@ final class AppOffloadService {
         let recoverBinary = restoring && (Self.needsLegacyRecovery(app.id) || (installed.isActive && !hasBackup))
         UserDefaults.standard.set(restoring ? "restoring" : "offloading", forKey: key)
         do {
+            stageHandler("Preparing the signing account")
             try await accounts.withAccount(accountIdentifier: app.accountIdentifier, teamIdentifier: app.teamIdentifier) {
                 try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
-                    let finished: (Result<InstalledApp, Error>) -> Void = { continuation.resume(with: $0.map { _ in () }) }
+                    let observationBox = ProgressObservationBox()
+                    let finished: (Result<InstalledApp, Error>) -> Void = {
+                        observationBox.finish()
+                        continuation.resume(with: $0.map { _ in () })
+                    }
+                    let group: RefreshGroup
                     if recoverBinary {
-                        AppManager.shared.reinstall(installed, presentingViewController: presenter, completionHandler: finished)
+                        group = AppManager.shared.reinstall(installed, presentingViewController: presenter, completionHandler: finished)
                     } else if restoring {
                         if installed.isActive {
-                            AppManager.shared.restore(installed, presentingViewController: presenter, completionHandler: finished)
+                            group = AppManager.shared.restore(installed, presentingViewController: presenter, completionHandler: finished)
                         } else {
-                            AppManager.shared.activate(installed, presentingViewController: presenter, completionHandler: finished)
+                            group = AppManager.shared.activate(installed, presentingViewController: presenter, completionHandler: finished)
                         }
                     } else {
-                        AppManager.shared.deactivate(installed, presentingViewController: presenter, completionHandler: finished)
+                        group = AppManager.shared.deactivate(installed, presentingViewController: presenter, completionHandler: finished)
                     }
+                    let observation = group.progress.observe(\.fractionCompleted, options: [.initial, .new]) { progress, _ in
+                        let value = progress.fractionCompleted
+                        Task { @MainActor in progressHandler(value) }
+                    }
+                    observationBox.retain(observation)
                 }
             }
             UserDefaults.standard.set(restoring ? "active" : "offloaded", forKey: key)
@@ -84,6 +107,25 @@ final class AppOffloadService {
         } catch {
             UserDefaults.standard.set("recoveryNeeded", forKey: key)
             throw error
+        }
+    }
+
+    private nonisolated static func stageMessage(_ step: String) -> String? {
+        switch step {
+        case "stageBackupApp": "Preparing the SideKick backup helper"
+        case "updateAppCertificate", "verifyCertificate": "Checking the signing certificate"
+        case "fetchProvisioningProfiles": "Preparing signing permissions and shared backup storage"
+        case "resignApp": "Signing the app"
+        case "createIPA", "exportResignedIPA": "Preparing the signed IPA"
+        case "sendApp", "installApp": "Installing the prepared app on this iPhone"
+        case "backupAppData": "Open the app when prompted. The SideKick helper is backing up its data."
+        case "restoreAppData": "Open the app when prompted. The SideKick helper is restoring its data."
+        case "uninstallApp": "Backup finished. Removing the native installation"
+        case "markAppInactive": "Saving the offloaded app’s status"
+        case "stageApp": "Preparing the original app for reinstallation"
+        case "removeBackupData": "Restore finished. Cleaning up the completed backup"
+        case "cacheResignedMetadata", "cleanStagedApp": "Saving app status and finishing up"
+        default: nil
         }
     }
 
