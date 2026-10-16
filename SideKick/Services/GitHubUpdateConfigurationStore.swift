@@ -56,29 +56,42 @@ actor GitHubUpdateConfigurationStore {
         try all().first { $0.bundleIdentifier == bundleIdentifier }
     }
 
-    /// Creates SideKick's default Actions source when none exists. Older installs
-    /// have no opt-out marker, so the default is added on their first automatic scan.
+    /// Use published releases for SideKick itself; preserve opt-outs and custom sources.
     func ensureSelfUpdateConfiguration(for targetID: String) throws -> GitHubUpdateConfiguration? {
         guard targetID == Bundle.main.bundleIdentifier else { return nil }
-        if let existing = try configuration(for: targetID) { return existing }
-        guard !UserDefaults.standard.bool(forKey: Self.selfUpdateOptOutKey) else { return nil }
+        let existing = try configuration(for: targetID)
+        guard existing != nil || !UserDefaults.standard.bool(forKey: Self.selfUpdateOptOutKey) else { return nil }
         let vpnExtension = Bundle.main.bundleURL.appendingPathComponent("PlugIns/SideKickVPN.appex", isDirectory: true)
-        let assetName = fileManager.fileExists(atPath: vpnExtension.path)
-            ? "SideKick-vpn-unsigned-ipa"
-            : "SideKick-unsigned-ipa"
+        let configuration = Self.releaseDefault(for: targetID,
+            includesVPN: fileManager.fileExists(atPath: vpnExtension.path), replacing: existing)
+        if configuration != existing { try save(configuration) }
+        return configuration
+    }
 
+    static func releaseDefault(for targetID: String, includesVPN: Bool,
+                               replacing existing: GitHubUpdateConfiguration? = nil) -> GitHubUpdateConfiguration {
+        if let existing {
+            guard existing.selfUpdateReleaseMigrationApplied != true,
+                  GitHubSourceIdentity.repository(existing.repositoryURL) == GitHubSourceIdentity.repository(selfUpdateRepositoryURL),
+                  existing.source == .actionsArtifact,
+                  existing.workflowFile == "ios-build.yml", existing.branch == "main",
+                  ["SideKick-unsigned-ipa", "SideKick-vpn-unsigned-ipa"].contains(existing.assetName) else { return existing }
+        }
+
+        // Actions receipts and skipped keys cannot establish an installed release.
         let configuration = GitHubUpdateConfiguration(
             bundleIdentifier: targetID,
             repositoryURL: Self.selfUpdateRepositoryURL,
-            source: .actionsArtifact,
-            workflowFile: "ios-build.yml",
-            branch: "main",
-            assetName: assetName,
+            source: .latestRelease,
+            workflowFile: "",
+            branch: "",
+            assetName: includesVPN ? "SideKick-vpn-unsigned.ipa" : "SideKick-unsigned.ipa",
             baselineUpdateKey: nil,
             lastInstalledUpdateKey: nil,
-            tokenID: nil
+            tokenID: existing?.tokenID,
+            originalBundleIdentifier: existing?.originalBundleIdentifier,
+            selfUpdateReleaseMigrationApplied: true
         )
-        try save(configuration)
         return configuration
     }
 
@@ -151,6 +164,9 @@ actor GitHubUpdateConfigurationStore {
             result.clearDismissedUpdate()
         }
         if baselineWasEdited { result.setInstalledBaseline(baselineKey, observation: observation) }
+        if settings.bundleIdentifier == Bundle.main.bundleIdentifier {
+            result.selfUpdateReleaseMigrationApplied = true
+        }
         try save(result)
         if settings.bundleIdentifier == Bundle.main.bundleIdentifier {
             UserDefaults.standard.removeObject(forKey: Self.selfUpdateOptOutKey)

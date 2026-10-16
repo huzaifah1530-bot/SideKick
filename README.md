@@ -1,3 +1,5 @@
+> **Early release — feature status:** Core sideloading features, including installing apps, signing, refreshing and automatic refresh, are the currently supported functionality. Other features are still being added and tested. They may already be visible in the app, but they are not guaranteed to work.
+
 # SideKick
 
 SideKick is a native SwiftUI iOS sideloading app. The existing SwiftUI screens and IPA library are being integrated with SideStore's on-device signing and installation engine.
@@ -17,6 +19,8 @@ SideKick's app experience is implemented in this repository's `SideKick/` direct
 SideKick uses code from [LocalDevVPN by seomin0610](https://github.com/seomin0610/LocalDevVPN), originally forked from jkcoxson/LocalDevVPN, with contributions credited to Stossy11, Magesh K, and the SideStore Team. The imported tunnel provider, CIDR validation, and tunnel constants are pinned to commit `8a97427bcbdf90cbb62c2eadb8cfe5751c50eccc` in `SideKickVPN/`. SideKick adds packet-loop shutdown, a heartbeat watchdog, a native extension target, operation-scoped connection management, and its own setup/settings UI. The original [StosVPN license](SideKickVPN/LICENSE) and [provenance](SideKickVPN/UPSTREAM.md) are included; CI bundles the license with the app.
 
 ## Integration status
+
+SideKick’s own update checks use published GitHub Releases. The default release asset is `SideKick-unsigned.ipa` (`SideKick-vpn-unsigned.ipa` for the optional built-in VPN variant). Other apps can still use either releases or Actions artifacts. Changing this update source does not publish a release.
 
 - **LiveContainer:** My Apps has a separate guest library with bookmarked read-only directory scanning, version/build metadata, connection recovery, launch requests, and existing GitHub source/token/update notifications. Link an actual Applications directory exposed in Files. Private App Group access is not assumed; snapshots are labelled and excluded from automatic checks/guest launches. Guest IPAs never enter SideKick's signing/install queue. See [integration behavior and validation limits](docs/livecontainer-integration.md).
 - Storage offers **Manage Cached & Temporary Files** with ownership explanations and explicit retained-source removal. Deleting a current extracted source can require reimporting an IPA before refresh. Recent/current-process temporary files are protected. Update options show all saved accounts: another team requires a separate source-based installation with separate data/credentials.

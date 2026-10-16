@@ -36,6 +36,8 @@ struct GitHubUpdateConfiguration: Codable, Identifiable, Hashable, Sendable {
     var pendingSelfUpdate: GitHubPendingSelfUpdate? = nil
     // The product ID is independent of the signing team's installed ID.
     var originalBundleIdentifier: String? = nil
+    // Once migrated, an explicit choice to return to Actions must remain intact.
+    var selfUpdateReleaseMigrationApplied: Bool? = nil
 
     var effectiveBaselineKey: String? { lastInstalledUpdateKey ?? baselineUpdateKey }
     var sourceIdentity: String {
