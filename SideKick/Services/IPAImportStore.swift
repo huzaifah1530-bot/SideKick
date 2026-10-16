@@ -150,7 +150,7 @@ actor IPAImportStore {
         }
     }
 
-    func importManagedIPA(from sourceURL: URL, expectedBundleIdentifiers: Set<String>, updateKey: String? = nil, repositoryURL: String? = nil, targetID: String? = nil, sourceIdentity: String? = nil) throws -> ImportedIPA {
+    func importManagedIPA(from sourceURL: URL, expectedBundleIdentifiers: Set<String>, updateKey: String? = nil, repositoryURL: String? = nil, targetID: String? = nil, sourceIdentity: String? = nil, importConfiguration: GitHubUpdateConfiguration? = nil) throws -> ImportedIPA {
         try Task.checkCancellation()
         let metadata = try readMetadata(from: sourceURL)
         let expected = expectedBundleIdentifiers.map { $0.lowercased() }
@@ -175,7 +175,8 @@ actor IPAImportStore {
                 queuedForInstalledAppID: targetID,
                 githubUpdateKey: updateKey,
                 githubSourceIdentity: sourceIdentity,
-                githubRepositoryURL: repositoryURL
+                githubRepositoryURL: repositoryURL,
+                githubImportConfiguration: importConfiguration
             )
             try Task.checkCancellation()
             try saveImportedIPA(app)
@@ -209,6 +210,15 @@ actor IPAImportStore {
             }
         }
         NotificationCenter.default.post(name: .sideKickImportedIPAsDidChange, object: nil)
+    }
+
+    func finishLiveContainerHandoff(_ completed: ImportedIPA) throws {
+        guard var current = try importedApps().first(where: {
+            $0.id == completed.id && $0.importedAt == completed.importedAt &&
+                $0.githubUpdateKey == completed.githubUpdateKey && $0.githubSourceIdentity == completed.githubSourceIdentity
+        }), current.liveContainerHandoffRequested == true else { return }
+        current.liveContainerHandoffRequested = false
+        try saveImportedIPA(current)
     }
 
     func isManagedIPAAvailable(_ app: ImportedIPA) -> Bool {

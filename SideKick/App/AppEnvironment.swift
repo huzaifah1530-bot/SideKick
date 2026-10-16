@@ -149,6 +149,9 @@ final class AppEnvironment {
                 liveContainerReloadRequested = false
                 do {
                     liveContainerState = try await liveContainerStore.snapshot()
+                    let imports = try await ipaImportStore.importedApps()
+                    let linkedImports = try await GitHubUpdateConfigurationStore.shared.reconcileLiveContainerImports(imports, catalogue: liveContainerState)
+                    for ipa in linkedImports { try await ipaImportStore.finishLiveContainerHandoff(ipa) }
                     hasLoadedLiveContainerCatalogue = true
                     liveContainerLoadError = nil
                     debugLog("[SideKick] Published \(liveContainerState.apps.count) cached LiveContainer apps.")

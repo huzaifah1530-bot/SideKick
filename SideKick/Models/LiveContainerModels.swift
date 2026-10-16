@@ -36,6 +36,7 @@ struct LiveContainerGuest: Codable, Identifiable, Sendable, Equatable {
     var isAvailable: Bool = true
     var observation: String? = nil
     var warning: String?
+    var executableIdentity: String? = nil
     var id: String { Self.identifier(connectionID: connectionID, folder: folder) }
 
     static func identifier(connectionID: UUID, folder: String) -> String {
@@ -63,6 +64,33 @@ struct LiveContainerState: Codable, Sendable {
         connections = try values.decode([LiveContainerConnection].self, forKey: .connections)
         apps = try values.decode([LiveContainerGuest].self, forKey: .apps)
         pendingForgetGuestIDs = try values.decodeIfPresent([UUID: [String]].self, forKey: .pendingForgetGuestIDs) ?? [:]
+    }
+}
+
+enum LiveContainerImportPolicy {
+    static func matches(_ ipa: ImportedIPA, guest: LiveContainerGuest, connection: LiveContainerConnection) -> Bool {
+        // An older guest can have identical version labels while the share sheet
+        // is still open. Wait for the downloaded binary instead of consuming intent.
+        if let expected = ipa.executableIdentity, let observed = guest.executableIdentity, expected != observed { return false }
+        return guest.connectionID == connection.id && connection.isConnected && connection.error == nil &&
+            connection.storageKind != .snapshot && guest.isAvailable &&
+            guest.bundleIdentifier.caseInsensitiveCompare(ipa.bundleIdentifier) == .orderedSame &&
+            guest.version == ipa.version && ipa.buildVersion == guest.build
+    }
+
+    static func verifiesBuild(_ ipa: ImportedIPA, guest: LiveContainerGuest) -> Bool {
+        guard let identity = ipa.executableIdentity, !identity.isEmpty else { return false }
+        return identity == guest.executableIdentity
+    }
+}
+
+enum LiveContainerImportError: LocalizedError {
+    case guestMismatch, missingSource
+    var errorDescription: String? {
+        switch self {
+        case .guestMismatch: "This guest does not match the imported IPA, or its folder is unavailable. Import the IPA in LiveContainer and rescan."
+        case .missingSource: "This IPA has no complete GitHub download record. Configure its update source in the guest’s settings."
+        }
     }
 }
 

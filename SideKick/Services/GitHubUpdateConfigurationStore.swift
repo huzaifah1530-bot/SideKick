@@ -150,6 +150,66 @@ actor GitHubUpdateConfigurationStore {
         return true
     }
 
+    // Called only after the user confirms this downloaded build was imported.
+    // Sharing an IPA does not provide an installation receipt from LiveContainer.
+    @discardableResult
+    func recordLiveContainerImport(_ ipa: ImportedIPA, guest: LiveContainerGuest,
+                                   connection: LiveContainerConnection) throws -> Bool {
+        guard LiveContainerImportPolicy.matches(ipa, guest: guest, connection: connection) else {
+            throw LiveContainerImportError.guestMismatch
+        }
+        guard let origin = ipa.githubImportConfiguration, let key = ipa.githubUpdateKey, !key.isEmpty,
+              origin.sourceIdentity == ipa.githubSourceIdentity,
+              !origin.repositoryURL.isEmpty, !origin.assetName.isEmpty else {
+            throw LiveContainerImportError.missingSource
+        }
+        return try recordSuccessfulImport(origin, key: key, for: guest.updateTarget)
+    }
+
+    @discardableResult
+    func reconcileLiveContainerImports(_ imports: [ImportedIPA], catalogue: LiveContainerState) throws -> [ImportedIPA] {
+        let pending = imports.filter { $0.liveContainerHandoffRequested == true && $0.githubImportConfiguration != nil }
+        var linked: [ImportedIPA] = []
+        for guest in catalogue.apps {
+            guard !catalogue.pendingForgetGuestIDs.values.flatMap({ $0 }).contains(guest.id),
+                  guest.warning == nil,
+                  let connection = catalogue.connections.first(where: { $0.id == guest.connectionID }) else { continue }
+            let matching = pending.filter { ipa in
+                guard LiveContainerImportPolicy.matches(ipa, guest: guest, connection: connection) else { return false }
+                // Never silently choose between installations or different repository builds.
+                return catalogue.apps.filter { other in
+                    guard let owner = catalogue.connections.first(where: { $0.id == other.connectionID }) else { return false }
+                    return LiveContainerImportPolicy.matches(ipa, guest: other, connection: owner)
+                }.count == 1
+            }
+            guard let ipa = matching.first, let origin = ipa.githubImportConfiguration,
+                  let key = ipa.githubUpdateKey, !key.isEmpty,
+                  origin.sourceIdentity == ipa.githubSourceIdentity,
+                  Set(matching.compactMap(\.githubSourceIdentity)).count == 1,
+                  Set(matching.compactMap(\.githubUpdateKey)).count == 1 else { continue }
+            let existing = try configuration(for: guest.id)
+            guard existing == nil || existing?.hasSameSource(as: origin) == true else { continue }
+            if LiveContainerImportPolicy.verifiesBuild(ipa, guest: guest) {
+                if existing?.installedBuild?.key != key || existing?.installedBuild?.observation != guest.updateTarget.observation {
+                    _ = try recordSuccessfulImport(origin, key: key, for: guest.updateTarget)
+                }
+            } else if existing == nil {
+                // Repository tracking is known even when LiveContainer changes the binary.
+                // Preserve it without inventing an installed-build receipt from version labels.
+                var source = origin
+                source.bundleIdentifier = guest.id
+                source.baselineUpdateKey = nil
+                source.lastInstalledUpdateKey = nil
+                source.installedBuild = nil
+                source.pendingSelfUpdate = nil
+                source.clearDismissedUpdate()
+                try save(source)
+            }
+            linked.append(contentsOf: matching)
+        }
+        return linked
+    }
+
     func saveSettings(_ settings: GitHubUpdateConfiguration, baselineKey: String?, baselineWasEdited: Bool, observation: String?) throws {
         var result = settings
         if let current = try configuration(for: settings.id), current.hasSameSource(as: settings) {

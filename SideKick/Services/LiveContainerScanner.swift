@@ -56,6 +56,7 @@ enum LiveContainerScanner {
         }
         var validated = guest
         validated.observation = stamp.joined(separator: "|")
+        validated.executableIdentity = executableIdentity(info: info, bundle: bundle, root: directory)
         return validated
     }
 
@@ -103,6 +104,7 @@ enum LiveContainerScanner {
                     }
                 }
                 guest.observation = stamp.joined(separator: "|")
+                guest.executableIdentity = executableIdentity(info: info, bundle: child, root: directory)
                 result.apps.append(guest)
             } catch is CancellationError { throw CancellationError() }
             catch {
@@ -111,6 +113,18 @@ enum LiveContainerScanner {
             }
         }
         return result
+    }
+
+    private static func executableIdentity(info: [String: Any], bundle: URL, root: URL) -> String? {
+        guard let name = string(info["CFBundleExecutable"]), name == (name as NSString).lastPathComponent else { return nil }
+        let executable = bundle.appendingPathComponent(name)
+        guard (try? OwnedStoragePath.validate(executable, inside: root)) != nil,
+              let handle = try? FileHandle(forReadingFrom: executable) else { return nil }
+        defer { try? handle.close() }
+        guard let header = try? handle.read(upToCount: 32),
+              let size = GitHubExecutableIdentity.metadataRegionSize(header, maximumSize: 1024 * 1024),
+              let commands = try? handle.read(upToCount: size - 32) else { return nil }
+        return GitHubExecutableIdentity.read(header + commands)
     }
 
     private static func string(_ value: Any?) -> String? {

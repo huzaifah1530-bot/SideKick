@@ -46,6 +46,8 @@ final class GitHubUpdateDownloadStore {
                 if let temporaryURL { try? FileManager.default.removeItem(at: temporaryURL) }
             }
             do {
+                let source = try await GitHubUpdateConfigurationStore.shared.configuration(for: candidate.bundleIdentifier)
+                let importConfiguration = source?.sourceIdentity == candidate.sourceIdentity ? source : nil
                 let downloaded = try await GitHubUpdateService().downloadIPA(for: candidate, token: token) { progress in
                     Task { @MainActor in
                         if self.generations[candidate.id] == generation { self.setProgress(progress, for: candidate.id) }
@@ -59,7 +61,8 @@ final class GitHubUpdateDownloadStore {
                     updateKey: candidate.updateKey,
                     repositoryURL: candidate.repositoryURL,
                     targetID: candidate.bundleIdentifier,
-                    sourceIdentity: candidate.sourceIdentity
+                    sourceIdentity: candidate.sourceIdentity,
+                    importConfiguration: importConfiguration
                 )
                 guard self.generations[candidate.id] == generation else {
                     do { try await ipaImportStore.delete(queuedIPA) }

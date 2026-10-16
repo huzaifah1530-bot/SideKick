@@ -189,6 +189,16 @@ struct AppManagementView: View {
                 }
             }
 
+            if let ipa = importedApp ?? pendingUpdateIPA ?? requiredQueuedIPA {
+                Section("LiveContainer") {
+                    NavigationLink {
+                        LiveContainerImportView(app: ipa)
+                    } label: {
+                        Label("Install in LiveContainer", systemImage: "arrow.up.forward.app")
+                    }
+                }
+            }
+
             Section("Details") {
                 LabeledContent("Bundle ID", value: bundleIdentifier)
                     .lineLimit(2)

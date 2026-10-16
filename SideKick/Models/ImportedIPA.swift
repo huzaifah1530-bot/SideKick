@@ -22,6 +22,7 @@ struct ImportedIPA: Codable, Identifiable, Hashable, Sendable {
     var githubSourceIdentity: String? = nil
     var githubRepositoryURL: String? = nil
     var githubImportConfiguration: GitHubUpdateConfiguration? = nil
+    var liveContainerHandoffRequested: Bool? = nil
 
     // Before queue state was persisted, every retained IPA matching an installed app
     // came from the explicit "Queue for Update" choice.
