@@ -72,7 +72,26 @@ final class NativeAppTransferService {
     }
 
     func prepareGuestIPA() async throws -> URL {
+        guard !Self.running else { throw NativeTransferError.inUse }
+        Self.running = true
+        defer { Self.running = false }
+        try SideKickStorageCleanup.beginOperation()
+        defer { SideKickStorageCleanup.endOperation() }
         let installed = try await installedRecord()
+        let sourceURL = installed.fileURL
+        let identity = app.id
+        let packaging = Task.detached(priority: .userInitiated) {
+            try Self.packageGuestIPA(sourceURL: sourceURL, identity: identity)
+        }
+        return try await withTaskCancellationHandler {
+            try await packaging.value
+        } onCancel: {
+            packaging.cancel()
+        }
+    }
+
+    private nonisolated static func packageGuestIPA(sourceURL: URL, identity: String) throws -> URL {
+        try Task.checkCancellation()
         let fm = FileManager.default
         let root = fm.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("LiveContainerTransfers")
         try fm.createDirectory(at: root, withIntermediateDirectories: true)
@@ -80,13 +99,16 @@ final class NativeAppTransferService {
         try fm.createDirectory(at: temporary, withIntermediateDirectories: true)
         defer { try? fm.removeItem(at: temporary) }
         let copy = temporary.appendingPathComponent("Guest.app")
-        try fm.copyItem(at: installed.fileURL, to: copy)
+        try fm.copyItem(at: sourceURL, to: copy)
         guard let bundle = ALTApplication(fileURL: copy) else { throw NativeTransferError.sourceMissing }
         // Keep the native preference-domain identity when LiveContainer launches.
-        try bundle.updateInfoPlist(with: ["CFBundleIdentifier": app.id])
+        try bundle.updateInfoPlist(with: ["CFBundleIdentifier": identity])
+        try Task.checkCancellation()
         let zipped = try fm.zipAppBundle(at: copy, compressionLevel: .none)
+        try Task.checkCancellation()
         let output = root.appendingPathComponent(UUID().uuidString + ".ipa")
-        try fm.copyItem(at: zipped, to: output)
+        do { try fm.copyItem(at: zipped, to: output) }
+        catch { try? fm.removeItem(at: output); throw error }
         try? fm.removeItem(at: zipped)
         return output
     }

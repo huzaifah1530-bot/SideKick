@@ -4,7 +4,7 @@ import Foundation
 /// error description, request, URL, header, response body or account identifier.
 final class DiagnosticsStore: @unchecked Sendable {
     enum Operation: String, Codable, Sendable {
-        case addAccount, restoreAccount, install, refresh, resign, connection, github, lifecycle
+        case addAccount, restoreAccount, install, refresh, resign, connection, github, lifecycle, transfer
         var title: String {
             switch self {
             case .addAccount: "Add Apple ID"
@@ -15,13 +15,14 @@ final class DiagnosticsStore: @unchecked Sendable {
             case .connection: "Local connection"
             case .github: "GitHub updates"
             case .lifecycle: "App activity"
+            case .transfer: "LiveContainer transfer"
             }
         }
     }
     enum Stage: String, Codable, Sendable {
         case authentication, anisette, anisetteResync, authInit, authComplete, authTokens
         case twoFactor, twoFactorVerify, developerTeam, session
-        case signing, installation, refresh, localConnection, github, lifecycle
+        case signing, installation, refresh, localConnection, github, lifecycle, guestIPA, appDataTransfer
 
         var title: String {
             switch self {
@@ -41,6 +42,8 @@ final class DiagnosticsStore: @unchecked Sendable {
             case .localConnection: "Local connection"
             case .github: "GitHub discovery"
             case .lifecycle: "Foreground and background"
+            case .guestIPA: "Create LiveContainer IPA"
+            case .appDataTransfer: "Transfer app files"
             }
         }
 
@@ -57,6 +60,8 @@ final class DiagnosticsStore: @unchecked Sendable {
             case .installation, .refresh: return "Check the preceding signing and connection events for this operation."
             case .github: return "See GitHub Update Logs for per-app discovery details."
             case .lifecycle: return "Foreground resumes pending checks; background pauses them."
+            case .guestIPA: return "Check the transfer screen for compatibility or retained app source errors."
+            case .appDataTransfer: return "Keep exported folders and check the transfer screen before retrying or recovering the app."
             }
         }
     }

@@ -22,4 +22,6 @@ Local checks passed: 7 release/connection fixtures and both authentication/vendo
 
 Device validation is pending: install build 125, retry refresh, and refresh Health Check to confirm IPv4 interfaces return and determine whether a reachable peer is selected. A successful macOS fixture/build does not prove that the user's VPN route and pairing will work after IPv4 discovery is restored. Do not clear pairing, rotate identities, or change ports speculatively if another stage fails. If IPv4 returns but discovery still fails, the existing IPv6 tunnel-candidate exclusion and service reachability remain separate investigation leads, not confirmed causes.
 
+The user subsequently confirmed that build 125 worked. This establishes successful device validation for the reported connection/refresh failure; the next task concerns the separate LiveContainer transfer flow.
+
 Graphify was consulted for scanner and test navigation and refreshed after edits. It describes the raw dirty vendor sources, not composed shipping patches. Unrelated VPN, vendor, audit and Graphify setup work remains intact; no subagents were used.
