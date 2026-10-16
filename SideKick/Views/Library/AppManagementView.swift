@@ -136,8 +136,9 @@ struct AppManagementView: View {
                         .fullWidthListSeparators()
                         .disabled(accountStore.isWorking)
                     } else {
-                        Text("Add an Apple ID in Accounts to install this app.")
-                            .foregroundStyle(.secondary)
+                        NavigationLink { AccountsView() } label: {
+                            Label("Add Apple Account to Install", systemImage: "person.crop.circle.badge.plus")
+                        }
                     }
                 }
             } else if let installedApp, !isQueuedTargetUnavailable, installedApp.isActive {

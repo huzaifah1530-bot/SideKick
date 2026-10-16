@@ -12,15 +12,3 @@ extension Color {
         endPoint: .bottomTrailing
     )
 }
-
-extension View {
-    @ViewBuilder
-    func sideKickNavigationLinkIndicator() -> some View {
-        if #available(iOS 26.0, *) {
-            self.navigationLinkIndicatorVisibility(.hidden)
-        } else {
-            // Preserve the standard iOS 18 disclosure indicator.
-            self
-        }
-    }
-}

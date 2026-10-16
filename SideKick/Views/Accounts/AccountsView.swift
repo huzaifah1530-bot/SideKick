@@ -2,98 +2,112 @@ import SwiftUI
 import SideSign
 
 struct AccountsView: View {
+    let showsNavigationStack: Bool
     @State private var accountStore = SigningAccountStore()
     @State private var errorMessage: String?
     @State private var isShowingSignIn = false
     @State private var isShowingDiagnostics = false
     @State private var submittedCredentials: (appleID: String, password: String)?
 
+    init(showsNavigationStack: Bool = false) {
+        self.showsNavigationStack = showsNavigationStack
+    }
+
     var body: some View {
-        NavigationStack {
-            List {
-                if accountStore.isWorking {
-                    Section {
-                        HStack(spacing: 12) {
-                            ProgressView()
-                            VStack(alignment: .leading, spacing: 3) {
-                                Text("Adding Apple ID")
-                                    .font(.subheadline.weight(.medium))
-                                if let checkpoint = accountStore.signInCheckpoint {
-                                    Text(friendlySignInCheckpoint(checkpoint))
-                                        .font(.footnote)
-                                        .foregroundStyle(.secondary)
-                                }
+        if showsNavigationStack {
+            NavigationStack { content }
+        } else {
+            content
+        }
+    }
+
+    private var content: some View {
+        List {
+            if accountStore.isWorking {
+                Section {
+                    HStack(spacing: 12) {
+                        ProgressView()
+                        VStack(alignment: .leading, spacing: 3) {
+                            Text("Adding Apple Account")
+                                .font(.subheadline.weight(.medium))
+                            if let checkpoint = accountStore.signInCheckpoint {
+                                Text(friendlySignInCheckpoint(checkpoint))
+                                    .font(.footnote)
+                                    .foregroundStyle(.secondary)
                             }
                         }
-                        .accessibilityElement(children: .combine)
+                    }
+                    .accessibilityElement(children: .combine)
+                }
+            }
+            if let loadError = accountStore.loadError {
+                Section {
+                    Label(loadError, systemImage: "exclamationmark.triangle")
+                        .foregroundStyle(.secondary)
+                    SwiftUI.Button("Try Again") { Task { await accountStore.reload() } }
+                }
+            }
+            if accountStore.accounts.isEmpty {
+                ContentUnavailableView {
+                    Label("No Apple Accounts", systemImage: "person.crop.circle")
+                } description: {
+                    Text("Add an Apple Account to sign and install apps.")
+                } actions: {
+                    SwiftUI.Button("Add Apple Account") { isShowingSignIn = true }
+                        .buttonStyle(.borderedProminent)
+                }
+                .listRowBackground(Color.clear)
+            } else {
+                Section("Apple Accounts") {
+                    ForEach(accountStore.accounts) { account in
+                        NavigationLink {
+                            SigningAccountDetailView(account: account, accountStore: accountStore)
+                        } label: {
+                            accountRow(account)
+                        }
+                        .fullWidthListSeparators()
                     }
                 }
-                if let loadError = accountStore.loadError {
-                    Section {
-                        Label(loadError, systemImage: "exclamationmark.triangle")
-                            .foregroundStyle(.secondary)
-                        SwiftUI.Button("Try Again") { Task { await accountStore.reload() } }
-                    }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Accounts")
+        .background(Color(uiColor: .systemGroupedBackground))
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                SwiftUI.Button {
+                    isShowingSignIn = true
+                } label: {
+                    Image(systemName: "plus")
                 }
-                if accountStore.accounts.isEmpty {
-                    ContentUnavailableView(
-                        "No Apple IDs",
-                        systemImage: "person.crop.circle",
-                        description: Text("Add an Apple ID to sign and install apps.")
-                    )
-                    .listRowBackground(Color.clear)
-                } else {
-                    Section("Apple IDs") {
-                        ForEach(accountStore.accounts) { account in
-                            NavigationLink {
-                                SigningAccountDetailView(account: account, accountStore: accountStore)
-                            } label: {
-                                accountRow(account)
-                            }
-                            .fullWidthListSeparators()
+                .accessibilityLabel("Add Apple Account")
+                .disabled(accountStore.isWorking)
+            }
+        }
+        .task { await accountStore.reload() }
+        .refreshable { await accountStore.reload() }
+        .sheet(isPresented: $isShowingSignIn, onDismiss: beginSignIn) {
+            AppleIDSignInSheet { appleID, password in
+                submittedCredentials = (appleID, password)
+            }
+        }
+        .alert("Couldn’t add Apple Account", isPresented: Binding(
+            get: { errorMessage != nil },
+            set: { if !$0 { errorMessage = nil } }
+        )) {
+            SwiftUI.Button("Diagnostics") { errorMessage = nil; isShowingDiagnostics = true }
+            SwiftUI.Button("OK", role: .cancel) { errorMessage = nil }
+        } message: {
+            Text(errorMessage ?? "")
+        }
+        .sheet(isPresented: $isShowingDiagnostics) {
+            NavigationStack {
+                DiagnosticsView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            SwiftUI.Button("Done") { isShowingDiagnostics = false }
                         }
                     }
-                }
-            }
-            .listStyle(.insetGrouped)
-            .navigationTitle("Accounts")
-            .background(Color(uiColor: .systemGroupedBackground))
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    SwiftUI.Button {
-                        isShowingSignIn = true
-                    } label: {
-                        Image(systemName: "plus")
-                    }
-                    .accessibilityLabel("Add Apple ID")
-                    .disabled(accountStore.isWorking)
-                }
-            }
-            .task { await accountStore.reload() }
-            .refreshable { await accountStore.reload() }
-            .sheet(isPresented: $isShowingSignIn, onDismiss: beginSignIn) {
-                AppleIDSignInSheet { appleID, password in
-                    submittedCredentials = (appleID, password)
-                }
-            }
-            .alert("Couldn’t add Apple ID", isPresented: Binding(
-                get: { errorMessage != nil },
-                set: { if !$0 { errorMessage = nil } }
-            )) {
-                SwiftUI.Button("Diagnostics") { errorMessage = nil; isShowingDiagnostics = true }
-                SwiftUI.Button("OK", role: .cancel) { errorMessage = nil }
-            } message: {
-                Text(errorMessage ?? "")
-            }
-            .sheet(isPresented: $isShowingDiagnostics) {
-                NavigationStack {
-                    DiagnosticsView()
-                        .toolbar {
-                            ToolbarItem(placement: .cancellationAction) {
-                                SwiftUI.Button("Done") { isShowingDiagnostics = false }
-                            }
-                        }
-                }
             }
         }
     }

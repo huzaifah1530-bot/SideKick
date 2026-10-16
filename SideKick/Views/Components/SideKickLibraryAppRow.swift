@@ -31,11 +31,12 @@ struct SideKickLibraryAppRow<Metadata: View, Status: View>: View {
                     Image(systemName: "app.fill")
                         .resizable().scaledToFit().padding(12)
                         .foregroundStyle(.white)
-                        .background(.blue.gradient)
+                        .background(Color.sideKickAccent.gradient)
                 }
             }
-            .frame(width: 56, height: 56)
+            .frame(width: 52, height: 52)
             .clipShape(.rect(cornerRadius: 12))
+            .accessibilityHidden(true)
 
             VStack(alignment: .leading, spacing: 4) {
                 Text(name).font(.body.weight(.semibold))
@@ -47,11 +48,8 @@ struct SideKickLibraryAppRow<Metadata: View, Status: View>: View {
             }
             .frame(maxWidth: .infinity, alignment: .leading)
 
-            Spacer(minLength: 8)
             status
         }
-        .padding(.vertical, 8)
-        .padding(.horizontal, 6)
-        .listRowBackground(Color(uiColor: .secondarySystemGroupedBackground))
+        .padding(.vertical, 4)
     }
 }

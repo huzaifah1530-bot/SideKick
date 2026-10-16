@@ -19,9 +19,9 @@ struct ContentView: View {
                         unsavedSettings.requestNavigation { selectedTab = tab }
                     })) {
                         HomeView(viewModel: HomeViewModel(store: environment.ipaImportStore))
-                            .tabItem { Label("SideKick", systemImage: "bolt.fill") }
+                            .tabItem { Label("Apps", systemImage: "square.stack.3d.up") }
                             .tag(0)
-                        AccountsView()
+                        AccountsView(showsNavigationStack: true)
                             .tabItem { Label("Accounts", systemImage: "person.2.fill") }
                             .tag(1)
                         SettingsView()

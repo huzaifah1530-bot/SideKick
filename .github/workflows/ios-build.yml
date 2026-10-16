@@ -22,24 +22,13 @@ concurrency:
 jobs:
   build-ipa:
     name: Build unsigned SideKick IPA
-    runs-on: macos-15
+    runs-on: xcode-27
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
         with:
           submodules: recursive
-
-      - name: Select Xcode 26
-        run: |
-          set -euo pipefail
-          XCODE_PATH="$(ls -d /Applications/Xcode_26*.app 2>/dev/null | sort -V | tail -n 1 || true)"
-          if [ -z "$XCODE_PATH" ]; then
-            echo "No Xcode 26.x found on this runner. Available Xcodes:"
-            ls -d /Applications/Xcode*.app
-            exit 1
-          fi
-          sudo xcode-select -s "$XCODE_PATH/Contents/Developer"
 
       - name: Show toolchain
         run: |

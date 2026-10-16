@@ -116,13 +116,15 @@ struct HomeView: View {
                     .padding(.vertical, 8)
                     .listRowBackground(Color.clear)
                 }
-                Section {
-                    NavigationLink {
-                        GitHubUpdatesView(queuedIPAs: queuedManualUpdates.map(\.ipa) + unresolvedQueuedManualUpdates)
-                    } label: {
-                        GitHubUpdatesSummaryRow(queuedCount: queuedManualUpdates.count + unresolvedQueuedManualUpdates.count)
+                if !environment.githubConfigurations.isEmpty || !githubChecks.isEmpty || environment.githubConfigurationError != nil || !queuedManualUpdates.isEmpty || !unresolvedQueuedManualUpdates.isEmpty {
+                    Section {
+                        NavigationLink {
+                            GitHubUpdatesView(queuedIPAs: queuedManualUpdates.map(\.ipa) + unresolvedQueuedManualUpdates)
+                        } label: {
+                            GitHubUpdatesSummaryRow(queuedCount: queuedManualUpdates.count + unresolvedQueuedManualUpdates.count)
+                        }
+                        .fullWidthListSeparators()
                     }
-                    .fullWidthListSeparators()
                 }
 
                 if let localLoadError {
@@ -141,11 +143,14 @@ struct HomeView: View {
                     .padding(.vertical, 24)
                     .listRowBackground(Color.clear)
                 } else if installedApps.isEmpty && filteredImportedApps.isEmpty && guestApps.isEmpty && queuedManualUpdates.isEmpty && unresolvedQueuedManualUpdates.isEmpty {
-                    ContentUnavailableView(
-                        "Your apps appear here",
-                        systemImage: "square.stack.3d.up",
-                        description: Text("Import an IPA to install it, or manage apps already installed with SideKick.")
-                    )
+                    ContentUnavailableView {
+                        Label("No Apps Yet", systemImage: "square.stack.3d.up")
+                    } description: {
+                        Text("Import an IPA to get started.")
+                    } actions: {
+                        SwiftUI.Button("Import from Files") { showingImporter = true }
+                            .buttonStyle(.borderedProminent)
+                    }
                     .listRowBackground(Color.clear)
                 }
 
@@ -158,7 +163,6 @@ struct HomeView: View {
                                 installedAppRow(app)
                             }
                             .fullWidthListSeparators()
-                            .sideKickNavigationLinkIndicator()
                             .contextMenu {
                                 SwiftUI.Button {
                                     UIApplication.shared.open(InstalledApp.openAppURL(targetBundleIdentifier: app.resignedBundleIdentifier))
@@ -182,7 +186,7 @@ struct HomeView: View {
                         }
                     } header: {
                         HStack {
-                            Text("Active")
+                            Text("Installed")
                             Spacer()
                             SwiftUI.Button {
                                 Task { await refreshAllApps() }
@@ -195,23 +199,27 @@ struct HomeView: View {
                                     Text("Refresh All")
                                 }
                             }
-                            .font(.caption.weight(.medium))
+                            .font(.subheadline)
                             .disabled(isRefreshingAll || refreshingAppID != nil || filteredInstalledApps.isEmpty)
                         }
                     } footer: {
                         if let remainingAppIDs {
-                            Text("\(remainingAppIDs) App IDs Remaining")
-                                .frame(maxWidth: .infinity)
-                                .multilineTextAlignment(.center)
+                            Text("\(remainingAppIDs) App IDs available")
                         }
                     }
                 }
 
                 if installedApps.contains(where: { !$0.isActive }) {
-                    SwiftUI.Section("Offloaded") {
+                    SwiftUI.Section("Inactive") {
                         ForEach(installedApps.filter { !$0.isActive }) { app in
                             NavigationLink { AppManagementView(installedApp: app) } label: {
-                                LabeledContent(app.name, value: "Restore App")
+                                SideKickLibraryAppRow(
+                                    name: app.name,
+                                    versionText: "Version \(app.version)",
+                                    iconData: app.iconData,
+                                    metadata: { Text("Ready to restore").font(.subheadline).foregroundStyle(.secondary) },
+                                    status: { EmptyView() }
+                                )
                             }
                         }
                     }
@@ -232,7 +240,6 @@ struct HomeView: View {
                                 ImportedIPARow(app: app)
                             }
                             .fullWidthListSeparators()
-                            .sideKickNavigationLinkIndicator()
                             .contextMenu {
                                 SwiftUI.Button {
                                     managementImportedApp = app
@@ -433,20 +440,12 @@ struct HomeView: View {
             name: app.name,
             versionText: "Version \(app.version)",
             iconData: app.iconData,
-            metadata: { EmptyView() },
-            status: {
-                VStack(alignment: .center, spacing: 4) {
-                    Text("Expires in")
-                        .font(.caption2)
-                        .foregroundStyle(.secondary)
-                        .frame(width: 82, alignment: .center)
-                    Text("\(daysRemaining(for: app.expirationDate, now: expirationClock)) DAYS")
-                        .font(.subheadline.weight(.semibold))
-                        .foregroundStyle(.white)
-                        .frame(width: 82, height: 34)
-                        .background(expirationColor(for: app.expirationDate, now: expirationClock).opacity(0.84), in: .capsule)
-                }
-            }
+            metadata: {
+                Text("Signing \(SigningExpiry.description(until: app.expirationDate, now: expirationClock))")
+                    .font(.subheadline)
+                    .foregroundStyle(SigningExpiry.daysRemaining(until: app.expirationDate, now: expirationClock) <= 2 ? Color.orange : Color.secondary)
+            },
+            status: { EmptyView() }
         )
     }
 
@@ -625,16 +624,6 @@ struct HomeView: View {
             appRefreshErrorMessage = "Couldn’t refresh \(app.name). \(error.localizedDescription)"
         }
         await load()
-    }
-
-    private func daysRemaining(for date: Date, now: Date) -> Int {
-        SigningExpiry.daysRemaining(until: date, now: now)
-    }
-
-    private func expirationColor(for date: Date, now: Date) -> Color {
-        let days = min(max(daysRemaining(for: date, now: now), 1), 7)
-        let greenToRed = Double(days - 1) / 6
-        return Color(hue: greenToRed * 0.33, saturation: 0.82, brightness: 0.86)
     }
 
     private func importPendingIPA() async {

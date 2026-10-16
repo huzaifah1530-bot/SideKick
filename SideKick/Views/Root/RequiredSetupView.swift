@@ -15,7 +15,6 @@ final class SetupStatus {
     private(set) var backgroundRefreshRestricted = false
     private(set) var vpnAuthorized = false
     private(set) var pairingVerified = false
-    private(set) var refreshShortcutAdded = UserDefaults.standard.bool(forKey: "sidekick.setup.refresh-shortcut-added")
     private(set) var isRefreshing = false
     private(set) var isRequestingNotifications = false
     private(set) var isImportingPairing = false
@@ -101,13 +100,6 @@ final class SetupStatus {
     }
 
     private static let pairingVerifiedKey = "sidekick.setup.pairing-verified"
-    private static let refreshShortcutAddedKey = "sidekick.setup.refresh-shortcut-added"
-
-    func confirmRefreshShortcutAdded() {
-        refreshShortcutAdded = true
-        UserDefaults.standard.set(true, forKey: Self.refreshShortcutAddedKey)
-    }
-
     func updateReadyState() {
         isReady = UserDefaults.standard.bool(forKey: "sidekick.setup.completed")
     }
@@ -179,7 +171,7 @@ struct RequiredSetupView: View {
     @State private var credentials: (appleID: String, password: String)?
     @AppStorage("sidekick.setup.step") private var step = 0
 
-    private let lastStep = 6
+    private let lastStep = 3
 
     var body: some View {
         NavigationStack {
@@ -198,12 +190,9 @@ struct RequiredSetupView: View {
                 Group {
                     switch step {
                     case 0: welcomePage
-                    case 1: notificationsPage
-                    case 2: backgroundRefreshPage
-                    case 3: accountPage
-                    case 4: pairingPage
-                    case 5: vpnPage
-                    default: refreshAutomationPage
+                    case 1: accountPage
+                    case 2: pairingPage
+                    default: vpnPage
                     }
                 }
                 .id(step)
@@ -228,19 +217,6 @@ struct RequiredSetupView: View {
                     .buttonStyle(.borderedProminent)
                     .controlSize(.large)
                     .disabled(!canContinue || status.isBusy)
-                    if (step == 1 && !status.notificationsEnabled) || (step == 2 && !status.backgroundRefreshEnabled) {
-                        SwiftUI.Button("Not Now") {
-                            withAnimation(.easeInOut(duration: 0.2)) { step += 1 }
-                        }
-                        .frame(minHeight: 44)
-                        .disabled(status.isBusy)
-                    } else if step == lastStep {
-                        SwiftUI.Button("Do Later") {
-                            Task { await status.completeSetup() }
-                        }
-                        .frame(minHeight: 44)
-                        .disabled(status.isBusy)
-                    }
                 }
                 .frame(maxWidth: 500)
                 .padding(.horizontal, 24)
@@ -280,6 +256,7 @@ struct RequiredSetupView: View {
             .onChange(of: LocalVPNService.shared.preferredMode) { _, _ in
                 Task { await status.refresh() }
             }
+            .onAppear { step = min(max(step, 0), lastStep) }
             .sheet(isPresented: $isShowingSignIn, onDismiss: finishSignIn) {
                 AppleIDSignInSheet { appleID, password in credentials = (appleID, password) }
             }
@@ -297,9 +274,7 @@ struct RequiredSetupView: View {
     private var canContinue: Bool {
         switch step {
         case 0: true
-        case 1: status.notificationsEnabled
-        case 2: status.backgroundRefreshEnabled
-        case 3, 4, 5, 6: true
+        case 1, 2, 3: true
         default: false
         }
     }
@@ -308,54 +283,15 @@ struct RequiredSetupView: View {
         onboardingPage(
             symbol: "square.stack.3d.up.fill",
             title: "Welcome to SideKick",
-            message: "A few quick steps prepare this iPhone to install and refresh your apps. You can change these choices later in Settings."
+            message: "Set up an Apple Account and a connection to this iPhone. You can finish now and add anything you skip when you need it."
         )
-    }
-
-    private var notificationsPage: some View {
-        onboardingPage(
-            symbol: "bell.badge",
-            title: "Stay up to date",
-            message: "Get reminders before apps expire and notifications when a scheduled check finds a GitHub update. You can enable notifications later in Settings."
-        ) {
-            SwiftUI.Button(status.notificationsEnabled ? "Notifications Allowed" : "Allow Notifications") {
-                Task {
-                    await status.requestNotifications()
-                    if !status.notificationsEnabled {
-                        await UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
-                    }
-                }
-            }
-            .buttonStyle(.borderedProminent)
-            .disabled(status.notificationsEnabled || status.isBusy)
-        }
-    }
-
-    private var backgroundRefreshPage: some View {
-        onboardingPage(
-            symbol: "arrow.clockwise",
-            title: "Keep apps refreshed",
-            message: status.backgroundRefreshRestricted
-                ? "iOS currently restricts Background App Refresh on this device. SideKick can’t change this system setting."
-                : "Allow Background App Refresh so SideKick can check signing status and help keep your apps available."
-        ) {
-            if status.backgroundRefreshEnabled {
-                Label("Background App Refresh is On", systemImage: "checkmark.circle.fill")
-                    .foregroundStyle(.green)
-            } else if !status.backgroundRefreshRestricted {
-                SwiftUI.Button("Open Settings") {
-                    UIApplication.shared.open(URL(string: UIApplication.openSettingsURLString)!)
-                }
-                .buttonStyle(.borderedProminent)
-            }
-        }
     }
 
     private var accountPage: some View {
         onboardingPage(
             symbol: "person.crop.circle",
             title: "Choose a signing account",
-            message: "SideKick uses the Apple Account that signed this copy of SideKick to refresh it. You’ll choose an account for each app you install. You can add this account later when an install or refresh needs it."
+            message: "Add the Apple Account that signed SideKick. You can add it later if you’re not ready to sign in now."
         ) {
             if let account = status.selfSigningAccount {
                 Label(account.email, systemImage: "checkmark.circle.fill")
@@ -380,8 +316,8 @@ struct RequiredSetupView: View {
             symbol: "iphone.gen3.radiowaves.left.and.right",
             title: "Pair this iPhone",
             message: status.hasPairingFile
-                ? "Pairing file imported. Connect to this iPhone when an install or refresh operation needs it. You can finish setup now and verify later."
-                : "Import a pairing file when an install or refresh operation needs device access. iLoader can’t place the file because SideKick isn’t in its supported-app list yet. In iLoader choose Export, then AirDrop the file to this iPhone or save it in Files and import it here. Pairing files are sensitive; keep the transfer private."
+                ? "Pairing file imported. You can verify the connection now or when you first install or refresh an app."
+                : "A pairing file lets SideKick connect to this iPhone for installs and refreshes. You can import one now or later. Keep the file private."
         ) {
             SwiftUI.Button(status.hasPairingFile ? "Choose Pairing File Again" : "Import Pairing File") {
                 isChoosingPairingFile = true
@@ -399,8 +335,8 @@ struct RequiredSetupView: View {
             symbol: "network.badge.shield.half.filled",
             title: "Connect to this iPhone",
             message: LocalVPNService.shared.mode == .external
-                ? "Connect LocalDevVPN and verify this iPhone when an install or refresh operation needs device access. This works with free Apple Accounts. SideKick cannot disconnect another app’s VPN; turn it off in LocalDevVPN when finished."
-                : "Allow SideKick’s built-in VPN when a device operation needs it. It connects for that operation and disconnects when it finishes. Your internet traffic stays on its regular connection."
+                ? "Connect LocalDevVPN before verifying or installing apps. Disconnect it in LocalDevVPN when you finish."
+                : "Allow SideKick’s local VPN for installs and refreshes. It connects for each operation and disconnects afterward."
         ) {
             if LocalVPNService.shared.mode == .external {
                 SwiftUI.Button {
@@ -439,28 +375,6 @@ struct RequiredSetupView: View {
             }
             if status.isDeviceReady {
                 Label("iPhone Verified", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
-            }
-        }
-    }
-
-    private var refreshAutomationPage: some View {
-        onboardingPage(
-            symbol: "clock.arrow.circlepath",
-            title: "Optional daily refresh",
-            message: "The shortcut and a daily automation are separate. The button below only records that you added the shortcut; SideKick cannot confirm whether a daily automation exists. Scheduling is optional, and the guide is available later in Settings → App Refresh. Manual refresh is always available, and iOS controls when background work can run.") {
-            VStack(spacing: 12) {
-                Link("Get Shortcut", destination: URL(string: "https://www.icloud.com/shortcuts/2af57f665d434568a589f1e9b7d7f4d1")!)
-                .buttonStyle(.borderedProminent)
-                Link("Open Shortcuts", destination: URL(string: "shortcuts://")!)
-
-                SwiftUI.Button {
-                    status.confirmRefreshShortcutAdded()
-                } label: {
-                    Label(status.refreshShortcutAdded ? "Shortcut Added" : "I’ve Added the Shortcut",
-                          systemImage: status.refreshShortcutAdded ? "checkmark.circle.fill" : "checkmark.circle")
-                }
-                .buttonStyle(.bordered)
-                .disabled(status.refreshShortcutAdded)
             }
         }
     }

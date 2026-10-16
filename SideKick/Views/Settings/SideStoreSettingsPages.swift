@@ -4,6 +4,7 @@ import UIKit
 import CoreLocation
 
 struct RefreshSettingsView: View {
+    @AppStorage("sidekick.setup.refresh-shortcut-added") private var refreshShortcutAdded = false
     @AppStorage("isBackgroundRefreshEnabled") private var backgroundRefresh = true
     @AppStorage("isIdleTimeoutDisableEnabled") private var keepScreenAwake = true
     @AppStorage("isCellularRefreshEnabled") private var cellularRefresh = false
@@ -62,6 +63,10 @@ struct RefreshSettingsView: View {
             Section {
                 Link("Get Refresh Shortcut", destination: URL(string: "https://www.icloud.com/shortcuts/2af57f665d434568a589f1e9b7d7f4d1")!)
                 Link("Open Shortcuts", destination: URL(string: "shortcuts://")!)
+                SwiftUI.Button(refreshShortcutAdded ? "Shortcut Added" : "I've Added the Shortcut") {
+                    refreshShortcutAdded = true
+                }
+                .disabled(refreshShortcutAdded)
                 NavigationLink {
                     DailyRefreshAutomationGuideView()
                 } label: {

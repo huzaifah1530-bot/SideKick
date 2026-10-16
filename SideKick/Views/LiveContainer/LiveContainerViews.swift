@@ -56,7 +56,6 @@ struct LiveContainerLibrarySection: View {
                     .disabled(workingGuestID != nil || connection(for: app)?.isConnected != true)
                 }
                 .fullWidthListSeparators()
-                .sideKickNavigationLinkIndicator()
             }
             if let message {
                 Label(state.apps.isEmpty ? "Couldn’t Load LiveContainer Apps" : "Some LiveContainer Apps May Be Outdated", systemImage: "exclamationmark.circle")

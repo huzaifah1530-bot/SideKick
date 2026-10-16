@@ -59,8 +59,6 @@ struct GitHubUpdatesView: View {
                 if let error = environment.githubConfigurationError {
                     Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.secondary)
                 }
-                SwiftUI.Button("Check for Updates") { Task { await refresh() } }
-                    .disabled(environment.isCheckingGitHubUpdates)
             }
 
             if !queuedIPAs.isEmpty {
@@ -99,6 +97,15 @@ struct GitHubUpdatesView: View {
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Updates")
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                SwiftUI.Button { Task { await refresh() } } label: {
+                    Image(systemName: "arrow.clockwise")
+                }
+                .accessibilityLabel("Check for Updates")
+                .disabled(environment.isCheckingGitHubUpdates)
+            }
+        }
         .refreshable { await refresh() }
         .task { environment.requestGitHubUpdateCheck() }
     }
