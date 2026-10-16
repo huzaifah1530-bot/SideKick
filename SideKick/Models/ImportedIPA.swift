@@ -62,6 +62,16 @@ enum IPAImportError: LocalizedError {
 
 // Metadata edits move the same import; distinct installations retain distinct queues.
 enum IPAImportIndex {
+    static func completedSelfUpdates(in entries: [ImportedIPA], targetID: String,
+                                     version: String, build: String, executableIdentity: String) -> [ImportedIPA] {
+        guard !executableIdentity.isEmpty else { return [] }
+        return entries.filter {
+            $0.isUpdateQueued && $0.queuedForInstalledAppID == targetID &&
+                $0.version == version && $0.buildVersion == build &&
+                $0.executableIdentity == executableIdentity
+        }
+    }
+
     static func replacing(_ app: ImportedIPA, in entries: [ImportedIPA]) -> [ImportedIPA] {
         [app] + entries.filter {
             $0.id != app.id && !($0.bundleIdentifier == app.bundleIdentifier && $0.importedAt == app.importedAt)

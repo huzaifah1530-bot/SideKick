@@ -348,6 +348,14 @@ actor IPAImportStore {
         return try makeValidatedTemporaryCopy(of: sourceURL, reviewed: app)
     }
 
+    /// Only the running self binary is authoritative after an interrupted self-install.
+    func removeInstalledSelfUpdates(targetID: String, version: String, build: String, executableIdentity: String) throws {
+        for ipa in IPAImportIndex.completedSelfUpdates(in: try importedApps(), targetID: targetID,
+            version: version, build: build, executableIdentity: executableIdentity) {
+            try delete(ipa)
+        }
+    }
+
     func delete(_ app: ImportedIPA) throws {
         var entries = try importedApps()
         let removed = entries.filter { $0.id == app.id && $0.importedAt == app.importedAt }

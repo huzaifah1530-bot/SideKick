@@ -137,8 +137,14 @@ final class GitHubUpdateDownloadStore {
     }
 
     func validateQueuedFiles(ipaImportStore: IPAImportStore) async {
+        guard let imports = try? await ipaImportStore.importedApps() else { return }
         for (identifier, job) in jobs where !job.isDownloading {
             guard let ipa = job.queuedIPA else { continue }
+            if !imports.contains(where: { $0.id == ipa.id && $0.importedAt == ipa.importedAt }),
+               jobs[identifier]?.queuedIPA == ipa, tasks[identifier] == nil {
+                jobs.removeValue(forKey: identifier)
+                continue
+            }
             let available = await ipaImportStore.isManagedIPAAvailable(ipa)
             guard !available, jobs[identifier]?.queuedIPA == ipa, tasks[identifier] == nil else { continue }
             var updated = job

@@ -93,6 +93,16 @@ final class SideStoreOperationService {
            let binary = try? Data(contentsOf: binaryURL), let identity = GitHubExecutableIdentity.read(binary),
            let target = summaries.first(where: { $0.id == bundle.bundleIdentifier })?.updateTarget {
             _ = try? await GitHubUpdateConfigurationStore.shared.recoverSelfUpdate(for: target, executableIdentity: identity)
+            if let version = bundle.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String,
+               let build = bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String {
+                do {
+                    try await ipaStore.removeInstalledSelfUpdates(targetID: target.id, version: version,
+                        build: build, executableIdentity: identity)
+                } catch {
+                    // A failed index save keeps the queue intact for the next catalogue load.
+                    debugLog("[SideKick] Could not clear the completed self-update queue: \(error.localizedDescription)")
+                }
+            }
         }
         return summaries.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
@@ -194,6 +204,13 @@ final class SideStoreOperationService {
                 // Installation already succeeded. Keep any pending self-update
                 // receipt for next-launch recovery and report persistence separately.
                 debugLog("[SideKick] Installation succeeded, but its GitHub update receipt could not be saved: \(error.localizedDescription)")
+            }
+        }
+        if selfBinaryMatches, ipa.queuedForInstalledAppID != nil {
+            do { try await ipaStore.delete(ipa) }
+            catch {
+                // The app is installed. Cleanup failure must not report installation failure.
+                debugLog("[SideKick] Installation succeeded, but queued IPA cleanup failed: \(error.localizedDescription)")
             }
         }
         await ExpirationNotificationScheduler.update()
