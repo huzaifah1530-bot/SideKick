@@ -1,0 +1,88 @@
+diff --git a/SideStore/Views/Settings/TechyThings/HealthCheck/HealthCheckView.swift b/SideStore/Views/Settings/TechyThings/HealthCheck/HealthCheckView.swift
+--- a/SideStore/Views/Settings/TechyThings/HealthCheck/HealthCheckView.swift
++++ b/SideStore/Views/Settings/TechyThings/HealthCheck/HealthCheckView.swift
+@@ -10,6 +10,7 @@
+ import Minimuxer
+ 
+ struct HealthCheckView: View {
++    var readyTitle = "SideStore Ready"
+     @StateObject private var viewModel = HealthCheckViewModel()
+     
+     var body: some View {
+@@ -23,7 +24,7 @@
+                             Image(systemName: "checkmark.circle.fill")
+                                 .font(.system(size: 44))
+                                 .foregroundColor(.green)
+-                            Text("SideStore Ready")
++                            Text(readyTitle)
+                                 .font(.title2)
+                                 .fontWeight(.bold)
+                             Text(viewModel.connectionMode == .localVPN
+@@ -104,6 +105,7 @@
+             
+             // Section 4: Connection Configuration
+             Section(header: Text("Connection Configuration")) {
++                ConfigRow(label: "Device Service Port", value: viewModel.activeServicePort)
+                 HStack {
+                     Text("Connection Mode")
+                     Spacer()
+@@ -169,6 +171,7 @@
+         .task {
+             await viewModel.observeMetrics()
+         }
++        .refreshable { await viewModel.refreshMetrics() }
+     }
+ }
+ 
+diff --git a/SideStore/Views/Settings/TechyThings/HealthCheck/HealthCheckViewModel.swift b/SideStore/Views/Settings/TechyThings/HealthCheck/HealthCheckViewModel.swift
+--- a/SideStore/Views/Settings/TechyThings/HealthCheck/HealthCheckViewModel.swift
++++ b/SideStore/Views/Settings/TechyThings/HealthCheck/HealthCheckViewModel.swift
+@@ -44,6 +44,7 @@
+     @Published var remoteReachable = false
+     
+     @Published var activeProtocol = ""
++    @Published var activeServicePort = ""
+     @Published var isPingSuccessful = false
+     
+     @Published var isDDIMounted = false
+@@ -78,6 +79,7 @@
+         let remotePeerIp: String?
+         let remoteReachable: Bool
+         let protocolStr: String
++        let servicePort: String
+         let pingSuccess: Bool
+         let ddi: Bool
+         let pairingVerified: Bool
+@@ -132,17 +134,19 @@
+             tunnelIfaceIp: tunnelIfaceIp, tunnelIfaceSubnetMask: tunnelIfaceSubnetMask, tunnelPeerIp: tunnelPeerIp,
+             overrideTunnelPeerIp: overrideTunnelPeerIp, overrideTunnelPeerEffective: overrideTunnelPeerEffective,
+             remoteServerIp: remoteServerIp, remotePeerIp: remotePeerIp, remoteReachable: remoteReachable,
+-            protocolStr: protocolStr, pingSuccess: pingSuccess,
++            protocolStr: protocolStr, servicePort: String(minimuxer.gateway.servicePort), pingSuccess: pingSuccess,
+             ddi: ddi, pairingVerified: pairingVerified, isRpPairing: isRpPairing, isPairingLoaded: isPairingLoaded,
+             readyResult: readyResult, scanned: scanned
+         )
+     }
+ 
++    func refreshMetrics() async {
++        let metrics = await fetchMetrics()
++        updateUI(metrics: metrics, status: computeStatuses(metrics))
++    }
++
+     func observeMetrics() async {
+-        // Perform initial diagnostics load
+-        let initialMetrics = await self.fetchMetrics()
+-        let initialStatus = self.computeStatuses(initialMetrics)
+-        self.updateUI(metrics: initialMetrics, status: initialStatus)
++        await refreshMetrics()
+         
+         await withTaskGroup(of: Void.self) { group in
+             // Immediate Network & Interface Updates (Wi-Fi, interfaces, VPN tunnel presence)
+@@ -261,6 +265,7 @@
+         self.remoteReachable = metrics.remoteReachable
+         
+         self.activeProtocol = metrics.protocolStr
++        self.activeServicePort = metrics.servicePort
+         self.isPingSuccessful = metrics.pingSuccess
+         
+         self.isDDIMounted = metrics.ddi

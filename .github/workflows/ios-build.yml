@@ -81,6 +81,7 @@ jobs:
           git -C Vendor/SideStore/Dependencies/SideSign apply ../../../../patches/sidesign-auth-compatibility.patch
           git -C Vendor/SideStore apply ../../patches/sidestore-anisette-recovery.patch
           git -C Vendor/SideStore apply ../../patches/sidestore-diagnostics.patch
+          git -C Vendor/SideStore apply ../../patches/sidestore-health-check.patch
 
       - name: Test authentication patch composition and bounded recovery
         run: python3 -m unittest discover -s Tests/VendorRegression -p test_auth_compatibility_patch.py -v

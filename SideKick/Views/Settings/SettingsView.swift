@@ -31,6 +31,10 @@ struct SettingsView: View {
                 }
 
                 Section("Device & Services") {
+                    NavigationLink { HealthCheckView(readyTitle: "SideKick Ready") } label: {
+                        Label("Health Check", systemImage: "heart.text.square")
+                    }
+                    .fullWidthListSeparators()
                     NavigationLink { DiagnosticsView() } label: {
                         Label("Diagnostics", systemImage: "list.bullet.clipboard")
                     }

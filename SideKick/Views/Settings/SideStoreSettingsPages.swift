@@ -227,6 +227,14 @@ struct ConnectionSettingsView: View {
                     .font(.footnote)
                     .foregroundStyle(.secondary)
             }
+            Section {
+                NavigationLink { HealthCheckView(readyTitle: "SideKick Ready") } label: {
+                    Label("Health Check", systemImage: "heart.text.square")
+                }
+                Text("Check the VPN tunnel, device connection, pairing and active service port. Pull down on Health Check to run it again.")
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
         }
         .navigationTitle("Connection & Pairing")
         .navigationBarTitleDisplayMode(.inline)
