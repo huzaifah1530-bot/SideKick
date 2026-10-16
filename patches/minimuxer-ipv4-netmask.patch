@@ -1,0 +1,17 @@
+diff --git a/Sources/Services/NetworkIfaceScanner.swift b/Sources/Services/NetworkIfaceScanner.swift
+--- a/Sources/Services/NetworkIfaceScanner.swift
++++ b/Sources/Services/NetworkIfaceScanner.swift
+@@ -69,8 +69,12 @@ internal struct IPv4Info: Hashable, Sendable {
+         guard
+             let addr = ifa.ifa_addr,
+             let mask = ifa.ifa_netmask,
+             let hostRaw = sockaddrIPv4(UnsafePointer(addr)),
+-            let maskRaw = sockaddrIPv4(UnsafePointer(mask)),
++            // Darwin trims trailing zero bytes from netmasks, including /0's zero length.
++            // Decode only the declared bytes, as route masks already do; host validation stays strict.
++            mask.pointee.sa_family == UInt8(AF_INET) || mask.pointee.sa_family == UInt8(AF_UNSPEC),
++            mask.pointee.sa_len == 0 || (2...MemoryLayout<sockaddr_in>.size).contains(Int(mask.pointee.sa_len)),
++            let maskRaw = sockaddrNetmaskIPv4(UnsafeRawPointer(mask), saLen: Int(mask.pointee.sa_len)),
+             let hostStr = ipv4String(hostRaw),
+             let maskStr = ipv4String(maskRaw)
+         else { return nil }

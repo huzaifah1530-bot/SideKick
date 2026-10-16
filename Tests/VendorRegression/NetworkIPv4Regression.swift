@@ -3,10 +3,11 @@ import Darwin
 
 @main
 struct NetworkIPv4Regression {
-    static func info(maskBytes: [UInt8], family: UInt8 = UInt8(AF_INET), declaredLength: Int? = nil) -> IPv4Info? {
+    static func info(maskBytes: [UInt8], family: UInt8 = UInt8(AF_INET), declaredLength: Int? = nil,
+                     hostLength: UInt8 = UInt8(MemoryLayout<sockaddr_in>.size), hostFamily: UInt8 = UInt8(AF_INET)) -> IPv4Info? {
         var address = sockaddr_in()
-        address.sin_len = UInt8(MemoryLayout<sockaddr_in>.size)
-        address.sin_family = UInt8(AF_INET)
+        address.sin_len = hostLength
+        address.sin_family = hostFamily
         precondition(inet_pton(AF_INET, "10.7.1.1", &address.sin_addr) == 1)
         let length = declaredLength ?? maskBytes.count + 4
         let buffer = UnsafeMutableRawPointer.allocate(byteCount: max(2, max(length, maskBytes.count + 4)), alignment: MemoryLayout<sockaddr>.alignment)
@@ -42,6 +43,8 @@ struct NetworkIPv4Regression {
         precondition(info(maskBytes: [], declaredLength: 1) == nil)
         precondition(info(maskBytes: [], declaredLength: 17) == nil)
         precondition(info(maskBytes: [255], family: UInt8(AF_INET6)) == nil)
+        precondition(info(maskBytes: [255], hostLength: 5) == nil)
+        precondition(info(maskBytes: [255], hostFamily: UInt8(AF_UNSPEC)) == nil)
 
         var entries: UnsafeMutablePointer<ifaddrs>?
         precondition(getifaddrs(&entries) == 0)
