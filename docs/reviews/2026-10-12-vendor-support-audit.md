@@ -4,7 +4,7 @@ Scope: Vendor/SideStore except AltStore, AltStore.xcodeproj, SideStore. Audit on
 
 ## VP-001 — P2 — Substring self-app identity clashes with distinct app IDs
 
-Where: `Vendor/SideStore/Shared/Extensions/Bundle+AltStore.swift:112-115`; callers include `SideStore/Core/Operations/PipelineOperations/UninstallAppOperation.swift:28` and `CacheSigningCertOperation.swift:28`.
+Where: `Vendor/SideStore/Shared/Extensions/Bundle+AltStore.swift:112-115`; callers include `Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/UninstallAppOperation.swift:28` and `Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/CacheSigningCertOperation.swift:28`.
 
 Why/what: `contains(activeID)` and `contains(altstoreID)` treat any identifier containing the store ID as the store itself. For example, `com.sidekick.app.helper` is classified as SideKick when the active bundle is `com.sidekick.app`. The integration patch changes the identity constant but leaves this predicate intact. This makes distinct apps enter self-app protections/signing/cache paths; uninstall refuses apps misclassified as self. This is a concrete identity clash rather than merely legacy naming.
 
@@ -20,7 +20,7 @@ Fix suggestion: Resolve the root once, check its presented controller first, the
 
 ## VP-003 — P2 (retained upstream widget) — Pagination can force unwrap a missing state holder
 
-Where: `Vendor/SideStore/AltWidget/Intents/PaginationIntent.swift:60-66`, `AltWidget/Providers/ActiveAppsTimelineProvider.swift:54-58`, `AltWidget/Manager/PageInfoManager.swift:14-15`.
+Where: `Vendor/SideStore/AltWidget/Intents/PaginationIntent.swift:60-66`, `Vendor/SideStore/AltWidget/Providers/ActiveAppsTimelineProvider.swift:54-58`, `Vendor/SideStore/AltWidget/Manager/PageInfoManager.swift:14-15`.
 
 Why/what: Page state exists only in process memory. After an extension restart, a pagination intent reads no previous event and stores a new event with a direction but nil `dataHolder`. The next provider update enters the direction branch and force unwraps that nil holder, crashing instead of changing page. A new dispatch queue for each intent does not persist or serialize shared page state; parallel instances can also mutate the dictionary concurrently.
 
@@ -28,7 +28,7 @@ Fix suggestion: Persist only a stable page index per widget in the shared contai
 
 ## VP-004 — P3 (retained upstream widget) — Per-app countdown action refreshes every app
 
-Where: `Vendor/SideStore/AltWidget/Widgets/ActiveAppsWidget.swift:175-185`, `AltWidget/Extensions/View+AltWidget.swift:43-50`, `AltWidget/Widgets/AppDetailWidget.swift:35-36`.
+Where: `Vendor/SideStore/AltWidget/Widgets/ActiveAppsWidget.swift:175-185`, `Vendor/SideStore/AltWidget/Extensions/View+AltWidget.swift:43-50`, `Vendor/SideStore/AltWidget/Widgets/AppDetailWidget.swift:35-36`.
 
 Why/what: A countdown visually belongs to one app, and descriptions say tap the countdown to refresh it/them. Every countdown is wrapped in `RefreshAllAppsWidgetIntent`, so selecting one app's timer starts a global refresh. This is surprising when other apps require input, fail signing, or consume refresh time.
 
@@ -116,7 +116,7 @@ Fix suggestion: Apply prerequisites by connection mode and actual route requirem
 
 ## VP-015 — P2 — Dead heartbeat service remains wired into the composition root
 
-Where: `Vendor/SideStore/Dependencies/minimuxer/Sources/MinimuxerApi.swift:270,282`, `Sources/MinimuxerImpl.swift:36,51,61`, `Sources/Services/HeartbeatService.swift:58-82`.
+Where: `Vendor/SideStore/Dependencies/minimuxer/Sources/MinimuxerApi.swift:270,282`, `Vendor/SideStore/Dependencies/minimuxer/Sources/MinimuxerImpl.swift:36,51,61`, `Sources/Services/HeartbeatService.swift:58-82`.
 
 Why/what: The composition root creates and retains HeartbeatService, but no production call to heartbeat.start/stop exists anywhere in the dependency. Its lifecycle/status fields never participate in readiness, and the implementation never starts a keepalive. This is dead service wiring that suggests a capability the library does not activate; it also leaves an unchecked stop-insensitive waiting loop for any future reuse.
 
@@ -196,7 +196,7 @@ Fix suggestion: Implement a real upload/staging and required personalization seq
 
 ## VP-025 — P2 — Libimobiledevice profile dump returns XML where callers require a filesystem path
 
-Where: `Vendor/SideStore/Dependencies/minimuxer/DeviceGateway/libimobiledevice/LibimobiledeviceGateway.swift:709-729`; `Sources/MinimuxerImpl.swift:497-502`.
+Where: `Vendor/SideStore/Dependencies/minimuxer/DeviceGateway/libimobiledevice/LibimobiledeviceGateway.swift:709-729`; `Vendor/SideStore/Dependencies/minimuxer/Sources/MinimuxerImpl.swift:497-502`.
 
 Why/what: The lockdown profile dump returns the serialized XML response string, while its API and the idevice/RP paths return a directory. ZIP mode treats that XML as a filesystem path and tries to zip it, causing export failure. Writes in the other dump paths use try? and can silently return an empty/incomplete directory as successful.
 
@@ -233,3 +233,89 @@ Where: `Vendor/SideStore/Dependencies/minimuxer/DeviceGateway/libimobiledevice/L
 Why/what: IPA and app bundle uploads send each entire buffer with one afc_file_write and ignore bytesWritten. A successful short write is therefore reported as a completed upload, followed by installing a partial package. UInt32(data.count) also traps for files larger than its range. App bundle empty files skip writing altogether even if an old staged file already exists.
 
 Fix suggestion: Upload bounded chunks until the complete buffer has been acknowledged, reject zero-progress writes, and propagate errors with the path/offset. Explicitly truncate or recreate every staged destination, including empty files, and clean stale staged app content before reuse. Verify forced short writes and uploading a smaller/empty replacement file.
+
+## VP-030 — P2 — CLI signing deletes its source when output aliases the input app
+
+Where: `Vendor/SideStore/Dependencies/SideSign/CLI/CommandHandler.swift:98-104,167-172`.
+
+Why/what: An .app is signed directly in place, even when an output is requested. If --output resolves to the input app (a natural explicit in-place invocation), the handler removes that directory and then tries copying the now-deleted source. The CLI fails after destroying the input app. This is dormant upstream CLI code, not the SideKick iOS signing path.
+
+Fix suggestion: Compare standardized/resolved source and destination URLs before replacement. Treat identical paths as in-place signing, and use a temporary copied app plus an atomic final replacement for distinct output paths so output signing does not unexpectedly mutate the original.
+
+## VP-031 — P2 — CLI app signing silently ignores explicit entitlements
+
+Where: `Vendor/SideStore/Dependencies/SideSign/CLI/CommandHandler.swift:93-149,180-182`.
+
+Why/what: SignContext exposes an entitlementsPath and the CLI accepts it, but .ipa/.app signing never reads that option. Only the raw binary branch loads the requested entitlement file. Users can supply an override, receive successful app signing, and discover that the requested capabilities were not applied. This is upstream CLI-only behavior.
+
+Fix suggestion: Thread explicit entitlement overrides through AppBundleSigner with clear per-main-app/extension semantics, or reject the option for app/IPA targets with an actionable explanation. Verify the final signed entitlements match the requested override.
+
+## VP-032 — P2 — CLI JSON anisette output includes plaintext progress
+
+Where: `Vendor/SideStore/Dependencies/SideSign/CLI/CommandHandler.swift:722-744`.
+
+Why/what: --json normally suppresses progress, but provisioning fresh device data still prints an encryption prompt and 'Device data saved...' to stdout before the JSON document. Even with a supplied device-data password, the save message remains. Scripts parsing stdout as JSON fail on the first successful provisioning. This is upstream CLI-only behavior.
+
+Fix suggestion: Reserve stdout exclusively for the JSON result in JSON mode; send diagnostics to stderr and require explicit passwords in noninteractive execution. Verify stdout parses as exactly one JSON document for first-time and cached-device-data paths.
+
+## VP-033 — P2 — Anisette purge misclassifies real Macs as simulated devices
+
+Where: `Vendor/SideStore/Dependencies/SideSign/CLI/CommandHandler.swift:1064-1094`.
+
+Why/what: purge-anisette identifies simulated machines using broad name/model matches including every noncurrent device whose model contains 'mac' or whose name starts 'macbook'. Real account Macs satisfy these tests and are removed without a selection/confirmation step. The command's label promises removal of simulated anisette machines, so the mismatch is consequential. Dormant upstream CLI only.
+
+Fix suggestion: Track exact provisioned anisette identities and remove only those known IDs. If provenance is unavailable, list candidates and require an explicit device-ID selection, clearly distinguishing uncertain real devices from tracked simulated devices.
+
+## VP-034 — P2 — CLI certificate creation silently discards the supplied CSR
+
+Where: `Vendor/SideStore/Dependencies/SideSign/CLI/CommandHandler.swift:1108-1112`; `Vendor/SideStore/Dependencies/SideSign/CLI/CommandContext.swift:297`.
+
+Why/what: The create action carries a csrPath but the handler patterns that value as underscore and always calls addCertificate, which generates its own identity. A user supplying a CSR gets a different certificate/key relationship than requested. Dormant upstream CLI only.
+
+Fix suggestion: Load and validate an explicit CSR and route it to a certificate creation API that accepts CSR bytes; otherwise remove/reject the unsupported option. Verify the resulting certificate public key matches the supplied CSR.
+
+## VP-035 — P2 — CLI team selection does not select the team used for portal mutations
+
+Where: `Vendor/SideStore/Dependencies/SideSign/CLI/CommandHandler.swift:976-987,1099-1112,1154-1162,1186-1194,1240-1243,1519-1541`.
+
+Why/what: --using-team-id selects a saved session/device data file, but executePortalOperation does not pass or enforce a selected Team. Each device/certificate/App ID/group/profile handler fetches the account's teams and unconditionally uses teams.first. An account belonging to multiple teams can therefore register/revoke/delete resources on a different team than the explicitly selected one. Dormant upstream CLI only.
+
+Fix suggestion: Resolve a Team by options.teamID, or a persisted active-team identity, and pass that resolved Team into every operation. Reject a requested team absent from the authenticated account. Verify the same account with two teams mutates only the selected team.
+
+## VP-036 — P2 — Portal type shorthand clashes with global team selection
+
+Where: `Vendor/SideStore/Dependencies/SideSign/CLI/PortalCommandsParser.swift:54,77,101,139,572-573`.
+
+Why/what: The parser first scans all arguments as global options. -t is both global team index and certificate/profile type. Thus `dev certs create -t development` tries interpreting 'development' as a team index and enters team selection or fails before the type parser runs; numeric/other inputs can unexpectedly select a team. Dormant upstream CLI only.
+
+Fix suggestion: Give global team selection a distinct flag and parse each option in its subcommand context rather than scanning values multiple times. Reject unknown/missing values and add parser checks for type shorthand with and without a selected team.
+
+## VP-037 — P2 — Global logging flags consume command and verification aliases
+
+Where: `Vendor/SideStore/Dependencies/SideSign/CLI/main.swift:19-20,44,331-332,635-647`.
+
+Why/what: run removes every -v and -d token anywhere before parsing. Those same tokens are registered as verify/display commands, profile validate/dump actions, and deep verification. Consequently `verify app.ipa -d` silently performs shallow verification, and command/action shorthand can vanish entirely. Dormant upstream CLI only.
+
+Fix suggestion: Parse the command first and scope logging options separately; reserve unambiguous global long forms or accept globals only before the command. Verify deep mode is actually passed through for every advertised spelling, and each action alias reaches its intended handler.
+
+## VP-038 — P3 — SideSign build helper masks failed builds through tee
+
+Where: `Vendor/SideStore/Dependencies/SideSign/build.sh:2,7-18`.
+
+Why/what: set -e does not make the outer pipeline fail when the build group fails; tee can exit zero, so callers see success after swift build/copy failed. The helper's build result is inconsistent with direct CI builds. Dormant upstream helper; the SideKick workflow does not invoke it.
+
+Fix suggestion: Set Bash pipefail as well as errexit, or preserve the build group's PIPESTATUS explicitly. Verify a deliberately failing build returns nonzero while its complete log is retained.
+
+## VP-039 — P3 — CLI example catalogue contains unsupported flags and commands
+
+Where: `Vendor/SideStore/Dependencies/SideSign/sample-usages.sh:6-29,73-77,104-105,275-288,304-305,353`; `Vendor/SideStore/Dependencies/SideSign/CLI/main.swift:31-40,408-481,533-559`; `Vendor/SideStore/Dependencies/SideSign/CLI/PortalCommandsParser.swift:50-67,75-80`.
+
+Why/what: Examples use --devicedata-password and --output-p12, neither recognized by the parser, plus p12 info and check commands which do not exist. Interactive server and failover examples omit the required source catalogue URL. Users following the certificate-export example can create a portal certificate without exporting its identity because the output option is ignored. Dormant upstream documentation/sample script.
+
+Fix suggestion: Generate validated examples from the supported command registry, replace legacy flags with --machine-password/--output, remove or implement unsupported commands, and include catalogue URLs for selection/failover. Treat this as documentation rather than a runnable sequence of destructive account operations, and verify syntax with a no-network parser check.
+
+## Coverage and limitations
+
+The support coverage manifest contains 194 files. This worker completed 150 assigned files (25,037 text/metadata lines): 92 vendor support files, 39 minimuxer files, and 19 SideSign support/CLI files. The remaining 44 SideSign Sources files (8,609 lines) are delegated to the root reviewer and explicitly marked in this manifest; see the separate SideSign coverage. Every assigned text file was read through its final line in bounded line-numbered batches, except the minimuxer LICENSE, which was verified as an exact SHA256 duplicate of the fully read root license. Three .git indirection files were read; one PNG had signature, dimensions, size, and SHA256 inspected. A forced recursive actual-file inventory found no assigned file absent from the manifest.
+
+39 findings: 4 P1, 29 P2, 6 P3. This is static inspection on Windows. No Apple device/runtime, Xcode compilation, native memory sanitizer, network service, or upstream CLI account command was run. Remote binary dependencies were inspected only through local package declarations and pinned metadata, not downloaded. Widget, upstream CI/build helpers, and SideSign CLI findings are explicitly retained upstream or dormant paths rather than shipped SideKick UI defects. Existing production modifications owned by other workers were not changed by this worker.

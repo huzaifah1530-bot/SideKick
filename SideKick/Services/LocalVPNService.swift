@@ -21,7 +21,9 @@ final class LocalVPNService {
     private(set) var lastError: String?
     private(set) var preferredMode = LocalConnectionMode(rawValue: UserDefaults.standard.string(forKey: "sidekick.connection.mode") ?? "") ?? .external
     var mode: LocalConnectionMode { preferredMode == .builtIn && hasSupportedProfiles ? .builtIn : .external }
-    var isConnectionReady: Bool { mode == .builtIn ? isConfigured : externalConnected }
+    var isConnectionReady: Bool {
+        mode == .builtIn ? isConfigured : externalConnected
+    }
     var externalInstalled: Bool { UIApplication.shared.canOpenURL(Self.externalURL) }
     var externalConnected: Bool {
         Minimuxer.shared.network.activeInterfaces.contains {
@@ -88,13 +90,15 @@ final class LocalVPNService {
     }
 
     func refreshStatus() async {
+        // Re-scan after loading VPN preferences too. Network interface changes
+        // can lag behind the app switch that starts LocalDevVPN.
         await refreshStatus(allowDuringConfigurationMutation: false)
+        externalTunnelConnected = externalConnected
     }
 
     private func refreshStatus(allowDuringConfigurationMutation: Bool) async {
         guard allowDuringConfigurationMutation || !isMutatingConfiguration else { return }
         let revision = configurationRevision
-        externalTunnelConnected = externalConnected
         guard hasSupportedProfiles else { isConfigured = false; status = .invalid; return }
         do {
             guard let identifier = extensionBundleIdentifier else { throw LocalVPNError.missingExtension }
@@ -104,10 +108,6 @@ final class LocalVPNService {
             manager = configurations.first { ($0.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier == identifier }
             isConfigured = manager?.isEnabled == true
             status = manager?.connection.status ?? .invalid
-            // Clean up an operation interrupted by self-reinstallation or process exit.
-            if leases.isEmpty, status == .connected || status == .connecting || status == .reasserting {
-                manager?.connection.stopVPNTunnel()
-            }
         } catch {
             guard revision == configurationRevision,
                   allowDuringConfigurationMutation || !isMutatingConfiguration else { return }

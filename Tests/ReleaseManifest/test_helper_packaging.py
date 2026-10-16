@@ -29,7 +29,7 @@ class HelperPackagingTests(unittest.TestCase):
             }))
             ipa = root / 'SideBackup.ipa'
             subprocess.run(['ditto', '-c', '-k', '--keepParent', str(root / 'Payload'), str(ipa)], check=True)
-            subprocess.run([sys.executable, str(ROOT / 'scripts/package-transfer-helper.py'), str(ipa)], check=True)
+            subprocess.run([sys.executable, str(ROOT / 'scripts/package-backup-helper.py'), str(ipa)], check=True)
             unpacked = root / 'verified'
             subprocess.run(['ditto', '-x', '-k', str(ipa), str(unpacked)], check=True)
             result = subprocess.run(['codesign', '--display', '--entitlements', ':-', str(unpacked / 'Payload/SideBackup.app')],
@@ -38,12 +38,12 @@ class HelperPackagingTests(unittest.TestCase):
 
     def test_workflow_preserves_embedded_helper_group_request_before_both_packages(self):
         workflow = (ROOT / '.github/workflows/ios-build.yml').read_text()
-        call = 'python3 scripts/package-transfer-helper.py "$APP_PATH/SideBackup.ipa"'
+        call = 'python3 scripts/package-backup-helper.py "$APP_PATH/SideBackup.ipa"'
         self.assertIn(call, workflow)
         self.assertLess(workflow.index(call), workflow.index('cp -R "$APP_PATH" VPNPayload/Payload/'))
 
     def test_signed_helper_is_verified_and_failed_signing_keeps_original_archive(self):
-        script = ROOT / 'scripts/package-transfer-helper.py'
+        script = ROOT / 'scripts/package-backup-helper.py'
         self.assertTrue(script.exists(), 'Embedded helper packaging step is missing')
         spec = importlib.util.spec_from_file_location('helper_packaging', script)
         module = importlib.util.module_from_spec(spec)

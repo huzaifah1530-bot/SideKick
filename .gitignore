@@ -13,3 +13,12 @@ action-logs-*.zip
 .build/
 .swiftpm/
 __pycache__/
+
+# Graphify: share graph.json, GRAPH_REPORT.md and portable manifest.json.
+# Recreate visualization, caches and machine-specific state locally.
+/graphify-out/cache/
+/graphify-out/cost.json
+/graphify-out/graph.html
+/graphify-out/.*
+# Installer hook contains this clone's absolute executable path; guidance is in AGENTS.md.
+/.codex/hooks.json

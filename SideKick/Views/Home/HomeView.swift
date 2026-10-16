@@ -100,7 +100,7 @@ struct HomeView: View {
         var seenBundleIDs = Set<String>()
         return installedApps.filter { app in
             guard seenBundleIDs.insert(app.id.lowercased()).inserted else { return false }
-            return true
+            return app.isActive
         }
     }
 
@@ -140,7 +140,7 @@ struct HomeView: View {
                     }
                     .padding(.vertical, 24)
                     .listRowBackground(Color.clear)
-                } else if filteredInstalledApps.isEmpty && filteredImportedApps.isEmpty && guestApps.isEmpty && queuedManualUpdates.isEmpty && unresolvedQueuedManualUpdates.isEmpty {
+                } else if installedApps.isEmpty && filteredImportedApps.isEmpty && guestApps.isEmpty && queuedManualUpdates.isEmpty && unresolvedQueuedManualUpdates.isEmpty {
                     ContentUnavailableView(
                         "Your apps appear here",
                         systemImage: "square.stack.3d.up",
@@ -203,6 +203,16 @@ struct HomeView: View {
                             Text("\(remainingAppIDs) App IDs Remaining")
                                 .frame(maxWidth: .infinity)
                                 .multilineTextAlignment(.center)
+                        }
+                    }
+                }
+
+                if installedApps.contains(where: { !$0.isActive }) {
+                    SwiftUI.Section("Offloaded") {
+                        ForEach(installedApps.filter { !$0.isActive }) { app in
+                            NavigationLink { AppManagementView(installedApp: app) } label: {
+                                LabeledContent(app.name, value: "Restore App")
+                            }
                         }
                     }
                 }

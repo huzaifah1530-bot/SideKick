@@ -5,6 +5,7 @@ import UIKit
 /// The same saved import remains the retry record if the user leaves this page.
 struct LiveContainerImportView: View {
     let app: ImportedIPA
+    var opensOnArrival = false
     @Environment(AppEnvironment.self) private var environment
     @State private var catalogue = LiveContainerState()
     @State private var handoffURL: URL?
@@ -13,6 +14,7 @@ struct LiveContainerImportView: View {
     @State private var message: String?
     @State private var confirmedGuest: LiveContainerGuest?
     @State private var selectedGuest: LiveContainerGuest?
+    @State private var attemptedAutoOpen = false
 
     private var matches: [LiveContainerGuest] {
         catalogue.apps.filter { guest in
@@ -84,7 +86,12 @@ struct LiveContainerImportView: View {
         } message: {
             Text("Confirm only after LiveContainer finishes importing this file. Version labels alone cannot prove which GitHub build is installed.")
         }
-        .task { await rescan() }
+        .task {
+            if opensOnArrival && !attemptedAutoOpen {
+                attemptedAutoOpen = true
+                await share()
+            } else { await rescan() }
+        }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             Task { await rescan() }
         }
@@ -134,7 +141,7 @@ struct LiveContainerImportView: View {
                let saved = try await GitHubUpdateConfigurationStore.shared.configuration(for: guest.id) {
                 if saved.sourceIdentity == app.githubSourceIdentity {
                     confirmedGuest = guest
-                    message = saved.installedBuild?.key == app.githubUpdateKey
+                    message = app.githubUpdateKey != nil && saved.installedBuild?.key == app.githubUpdateKey
                         ? "GitHub updates are configured automatically for this guest."
                         : "The GitHub source is saved. The exact installed build could not be verified automatically; review the baseline in App Details."
                 } else {

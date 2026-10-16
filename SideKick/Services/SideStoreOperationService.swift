@@ -82,7 +82,8 @@ final class SideStoreOperationService {
                 iconData: iconData,
                 expirationDate: record.9,
                 contentFingerprint: record.11,
-                executableIdentity: record.10
+                executableIdentity: record.10,
+                isActive: record.0.isActive
             ))
         }
         let identities = Dictionary(grouping: summaries, by: \.bundleIdentifier).mapValues { $0.map(\.id) }
@@ -124,9 +125,9 @@ final class SideStoreOperationService {
         recoveryHandler: @escaping @MainActor @Sendable () -> Void = {},
         progressHandler: @escaping @MainActor @Sendable (Double) -> Void = { _ in }
     ) async throws {
-        guard !NativeAppTransferService.isRunning else { throw NativeTransferError.inUse }
-        if let target = ipa.queuedForInstalledAppID, NativeAppTransferService.hasUnfinishedTransfer(target) {
-            throw NativeTransferError.transferPending
+        guard !AppOffloadService.isRunning else { throw AppOffloadError.inUse }
+        if let target = ipa.queuedForInstalledAppID, AppOffloadService.blocksNativeOperations(target) {
+            throw AppOffloadError.restoreRequired
         }
         guard let presenter = UIApplication.shared.topViewController() else {
             throw SideStoreOperationError.presentationUnavailable
@@ -236,8 +237,8 @@ final class SideStoreOperationService {
         progressHandler: @escaping @MainActor @Sendable (Double) -> Void = { _ in }
     ) async throws {
         let presenter = UIApplication.shared.topViewController()
-        guard !NativeAppTransferService.isRunning else { throw NativeTransferError.inUse }
-        guard !NativeAppTransferService.hasUnfinishedTransfer(bundleIdentifier) else { throw NativeTransferError.transferPending }
+        guard !AppOffloadService.isRunning else { throw AppOffloadError.inUse }
+        guard !AppOffloadService.blocksNativeOperations(bundleIdentifier) else { throw AppOffloadError.restoreRequired }
         guard !requiresPresenter || presenter != nil else {
             throw SideStoreOperationError.presentationUnavailable
         }
@@ -304,8 +305,8 @@ final class SideStoreOperationService {
         using selectedAccount: SigningAccountSummary,
         progressHandler: @escaping @MainActor @Sendable (Double) -> Void = { _ in }
     ) async throws {
-        guard !NativeAppTransferService.isRunning else { throw NativeTransferError.inUse }
-        guard !NativeAppTransferService.hasUnfinishedTransfer(bundleIdentifier) else { throw NativeTransferError.transferPending }
+        guard !AppOffloadService.isRunning else { throw AppOffloadError.inUse }
+        guard !AppOffloadService.blocksNativeOperations(bundleIdentifier) else { throw AppOffloadError.restoreRequired }
         guard let presenter = UIApplication.shared.topViewController() else {
             throw SideStoreOperationError.presentationUnavailable
         }
@@ -377,8 +378,8 @@ final class SideStoreOperationService {
     }
 
     func enableJIT(bundleIdentifier: String) async throws {
-        guard !NativeAppTransferService.isRunning else { throw NativeTransferError.inUse }
-        guard !NativeAppTransferService.hasUnfinishedTransfer(bundleIdentifier) else { throw NativeTransferError.transferPending }
+        guard !AppOffloadService.isRunning else { throw AppOffloadError.inUse }
+        guard !AppOffloadService.blocksNativeOperations(bundleIdentifier) else { throw AppOffloadError.restoreRequired }
         let context = DatabaseManager.shared.viewContext
         guard let installedApp = try await context.perform({
             (try? context.fetch(InstalledApp.fetchRequest()))?.first { $0.resignedBundleIdentifier == bundleIdentifier }
@@ -402,7 +403,7 @@ final class SideStoreOperationService {
         progressHandler: @escaping @MainActor @Sendable (Int, Int) -> Void = { _, _ in }
     ) async -> QuietRefreshOutcome {
         let apps: [InstalledAppSummary]
-        do { apps = try await loadInstalledApps().filter { !NativeAppTransferService.hasUnfinishedTransfer($0.id) } }
+        do { apps = try await loadInstalledApps().filter { $0.isActive && !AppOffloadService.blocksNativeOperations($0.id) } }
         catch {
             debugLog("[SideKick] Couldn’t load installed apps for scheduled refresh: \(error.localizedDescription)")
             return QuietRefreshOutcome(succeeded: 0, attempted: 0, failure: .appListUnavailable,
@@ -576,6 +577,7 @@ struct InstalledAppSummary: Identifiable, Sendable {
     let expirationDate: Date
     var contentFingerprint: String? = nil
     var executableIdentity: String? = nil
+    var isActive: Bool = true
 
     var id: String { resignedBundleIdentifier }
 

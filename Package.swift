@@ -14,7 +14,7 @@ let package = Package(
             "Services/PairingSetupImporter.swift", "Services/ProgressFileDownload.swift", "Services/SideKickCertificateExport.swift",
             "Services/SideKickDataDirectory.swift", "Services/SideKickLogStorage.swift", "Services/SideKickStorageUsage.swift",
             "Services/SideStoreOperationService.swift", "Services/SigningAccountStore.swift", "Services/SigningExpiry.swift",
-            "Services/NativeAppTransferService.swift", "Services/SideKickDiagnostics.swift"
+            "Services/AppOffloadService.swift", "Services/SideKickDiagnostics.swift"
         ], sources: [
             "Models/GitHubBuildTracking.swift",
             "Models/ImportedIPA.swift",
@@ -30,11 +30,7 @@ let package = Package(
             "Services/LiveContainerScanner.swift",
             "Services/LiveContainerStore.swift",
             "Services/GitHubUpdateConfigurationStore.swift",
-            "Services/SideKickStorageCleanup.swift",
-            "Services/AppDataTransfer.swift",
-            "Services/AppCredentialTransfer.swift",
-            "Services/AppCredentialSigningPolicy.swift",
-            "Services/SystemAppCredentialStore.swift"
+            "Services/SideKickStorageCleanup.swift"
         ]),
         .testTarget(name: "SideKickCoreTests", dependencies: ["SideKickCore"], path: "Tests/SideKickCoreTests")
     ],

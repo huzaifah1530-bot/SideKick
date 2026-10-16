@@ -87,12 +87,6 @@ jobs:
       - name: Test shipping patch composition and dependency recovery
         run: python3 -m unittest discover -s Tests/VendorRegression -v
 
-      - name: Add native Files transfer helper
-        run: python3 scripts/embed-file-transfer.py Vendor/SideStore
-
-      - name: Add on-device login transfer helper
-        run: python3 scripts/embed-credential-transfer.py Vendor/SideStore
-
       - name: Test vendor audit regressions
         run: |
           python3 scripts/verify-sidestore-regressions.py
@@ -172,7 +166,7 @@ jobs:
           cp SideKickVPN/LICENSE "$APP_PATH/ThirdPartyLicenses/LocalDevVPN.txt"
           # SideSign retains only entitlement keys already requested by the helper.
           # Xcode signing is disabled above; preserve this request explicitly.
-          python3 scripts/package-transfer-helper.py "$APP_PATH/SideBackup.ipa"
+          python3 scripts/package-backup-helper.py "$APP_PATH/SideBackup.ipa"
           # Ad-hoc signatures preserve entitlement requests for IPA re-signers.
           # They are not provisioning profiles and do not make this IPA installable.
           if [ -d "$APP_PATH/Frameworks" ]; then

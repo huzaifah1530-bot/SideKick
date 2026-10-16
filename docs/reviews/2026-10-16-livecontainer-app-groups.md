@@ -1,3 +1,5 @@
+> Historical implementation: retired by the simpler SideStore offload flow. Data/credential migration described below is no longer shipped.
+
 # LiveContainer App Group transfer — 16 October 2026
 
 ## Reproduction and upstream findings

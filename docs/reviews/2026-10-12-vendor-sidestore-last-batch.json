@@ -1,22 +1,7 @@
 [
   {
-    "path": "Vendor/SideStore/SideStore/Utils/misc/xcmapping-diff-reporter/xcmapping-diff.py",
-    "end": 571,
-    "total": 571
-  },
-  {
-    "path": "Vendor/SideStore/SideStore/Utils/pagination/PaginationDataHolder.swift",
-    "end": 93,
-    "total": 93
-  },
-  {
-    "path": "Vendor/SideStore/SideStore/Views/Components/ActivityViewController.swift",
-    "end": 67,
-    "total": 67
-  },
-  {
-    "path": "Vendor/SideStore/SideStore/Views/Components/AppInfoView.swift",
-    "end": 368,
-    "total": 1050
+    "path": "Vendor/SideStore/SideStore/Views/Settings/Advanced/PairingFile/WirelessPair/WirelessPairViewModel.swift",
+    "total": 617,
+    "end": 617
   }
 ]

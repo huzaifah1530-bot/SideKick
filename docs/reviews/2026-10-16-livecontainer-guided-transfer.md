@@ -1,3 +1,5 @@
+> Historical implementation: retired by the simpler SideStore offload flow. Data/credential migration described below is no longer shipped.
+
 # Guided LiveContainer transfer — 16 October 2026
 
 The user confirmed build 125 resolved the local connection failure. During the next device test, tapping Create LiveContainer IPA for Spotify appeared to do nothing. The user requested a page-by-page flow instead of all transfer and recovery controls on one long form.

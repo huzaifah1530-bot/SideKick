@@ -1,0 +1,15 @@
+# Native offload and optional LiveContainer IPA
+
+Replaces the native-to-LiveContainer transfer wizard at the user's request. The Files transfer engine, App Group mapping, Keychain bridge, helper integration scripts and related obsolete tests are removed. LiveContainer guest discovery, ordinary IPA imports and GitHub updates remain.
+
+App Settings exposes Offload / Restore App. Offload runs the unmodified SideStore deactivate pipeline with modern backup support: stage SideBackup, back up app data, uninstall, mark inactive. It never sets the old file/credential-transfer request flags. A successful completion and an inactive installed record are both required before offering Get IPA for LiveContainer. Failures show recovery instead of the offer. Not Now keeps the native backup. Accepting packages a temporary copy of the retained source, saves a non-queued IPA, and opens the existing handoff share sheet once. This is a separate guest installation, with no data/session migration promise.
+
+Restore uses SideStore activate and its native backup. Interrupted active/helper operations can reinstall the retained original binary. Older transfer journals still expose binary recovery, with a clear warning that their external SideKickData files are not imported. Exported folders and old backups are not deleted.
+
+Offloaded apps appear separately in My Apps, remain manageable, and are excluded from scheduled native refresh, native GitHub update targets and expiry reminders. Operation guards still block updates during offload/recovery. IPA packaging runs off the main thread in a unique temporary directory while cleanup is locked; it does not create/delete archives beside retained signing sources. SideBackup still needs its App Group entitlement request preserved for normal backup; that packaging utility is renamed package-backup-helper.py.
+
+GitHub source settings are retained for the optional IPA. Since repackaging a retained source is not a download receipt, it does not assert an exact GitHub build. LiveContainer import can automatically attach that source without a build key, leaving the guest's installed baseline unverified. A regression covers source retention without an invented receipt.
+
+Portable integration checks cover upstream backup-before-uninstall ordering, ordinary deactivate/activate calls, success-only prompt placement, retired-helper absence, inactive app handling, and non-queued IPA preparation. Existing patch-composition, packaging, update, lifecycle and vendor regression checks remain. Swift core and iPhone behavior require Apple-toolchain/device verification. No build monitoring or release publishing is performed.
+
+Device checks: cancel offload; fail backup and confirm no IPA offer; complete backup/uninstall and decline the offer; retry Get IPA; import into LiveContainer; verify source settings attach; restore the native app and check its backup; restart during offload/recovery and verify recovery remains available. LiveContainer guest data is deliberately separate from the native restore backup.

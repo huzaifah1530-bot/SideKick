@@ -16,7 +16,10 @@ elif sys.argv[1]=='next':
             meta={'signature':data[:16].hex()}
             if ext=='.png': meta.update(width=struct.unpack('>I',data[16:20])[0],height=struct.unpack('>I',data[20:24])[0],bitDepth=data[24],colorType=data[25])
             if ext=='.ipa':
-                with zipfile.ZipFile(p) as z: meta['entries']=[{'name':i.filename,'bytes':i.file_size} for i in z.infolist()]
+                try:
+                    with zipfile.ZipFile(p) as z: meta['entries']=[{'name':i.filename,'bytes':i.file_size} for i in z.infolist()]
+                except zipfile.BadZipFile:
+                    meta['notZip']=True; meta['pointerText']=data.decode('utf-8') if data.startswith(b'version https://git-lfs') else None
             rec.update(status='reviewed',method='full bytes read; binary signature/dimensions or archive inventory; no visual/audio/runtime inspection',metadata=meta)
             txt=json.dumps({'file':rec['path'],'binaryMetadata':meta})
             print(txt); printed+=len(txt); s['cursor']+=1

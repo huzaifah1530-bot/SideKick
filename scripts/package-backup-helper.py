@@ -1,4 +1,4 @@
-"""Preserve SideBackup's App Group request before the on-device re-signer runs.
+"""Preserve the normal SideBackup App Group request before on-device re-signing.
 
 The placeholder below requests the entitlement key, not permission to access a
 container. SideSign replaces its values with the target's provisioned groups.

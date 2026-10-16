@@ -52,7 +52,7 @@ final class SigningAccountStore {
         let agent = try AnisetteConfiguration.validatedHeader(userAgent)
         guard SigningAccountOperationCoordinator.acquire() else { throw SigningAccountError.engineBusy }
         defer { SigningAccountOperationCoordinator.release() }
-        guard !AppManager.shared.isActivelyManagingAnyApp, !NativeAppTransferService.isRunning,
+        guard !AppManager.shared.isActivelyManagingAnyApp, !AppOffloadService.isRunning,
               !SideKickStorageCleanup.hasActiveOperations else {
             throw SigningAccountError.engineBusy
         }
@@ -85,7 +85,7 @@ final class SigningAccountStore {
     func resetAnisetteProvisioning() async throws {
         guard SigningAccountOperationCoordinator.acquire() else { throw SigningAccountError.engineBusy }
         defer { SigningAccountOperationCoordinator.release() }
-        guard !AppManager.shared.isActivelyManagingAnyApp, !NativeAppTransferService.isRunning,
+        guard !AppManager.shared.isActivelyManagingAnyApp, !AppOffloadService.isRunning,
               !SideKickStorageCleanup.hasActiveOperations else {
             throw SigningAccountError.engineBusy
         }

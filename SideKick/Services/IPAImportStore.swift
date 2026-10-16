@@ -150,7 +150,7 @@ actor IPAImportStore {
         }
     }
 
-    func importManagedIPA(from sourceURL: URL, expectedBundleIdentifiers: Set<String>, updateKey: String? = nil, repositoryURL: String? = nil, targetID: String? = nil, sourceIdentity: String? = nil, importConfiguration: GitHubUpdateConfiguration? = nil) throws -> ImportedIPA {
+    func importManagedIPA(from sourceURL: URL, expectedBundleIdentifiers: Set<String>, updateKey: String? = nil, repositoryURL: String? = nil, targetID: String? = nil, sourceIdentity: String? = nil, importConfiguration: GitHubUpdateConfiguration? = nil, queuedForUpdate: Bool = true) throws -> ImportedIPA {
         try Task.checkCancellation()
         let metadata = try readMetadata(from: sourceURL)
         let expected = expectedBundleIdentifiers.map { $0.lowercased() }
@@ -172,6 +172,7 @@ actor IPAImportStore {
                 importedAt: .now,
                 iconData: metadata.iconData,
                 buildVersion: metadata.buildVersion, executableIdentity: metadata.executableIdentity,
+                isQueuedForUpdate: queuedForUpdate,
                 queuedForInstalledAppID: targetID,
                 githubUpdateKey: updateKey,
                 githubSourceIdentity: sourceIdentity,

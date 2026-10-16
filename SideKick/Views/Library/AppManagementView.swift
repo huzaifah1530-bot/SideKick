@@ -140,7 +140,7 @@ struct AppManagementView: View {
                             .foregroundStyle(.secondary)
                     }
                 }
-            } else if let installedApp, !isQueuedTargetUnavailable {
+            } else if let installedApp, !isQueuedTargetUnavailable, installedApp.isActive {
                 Section(isQueueStateUnresolved ? "Queued Update" : pendingUpdateIPA == nil ? "Open" : "Update") {
                     if isQueueStateUnresolved {
                         Text("The queued update status is still being checked. You can open the app; update actions stay unavailable until the library can be checked.")
@@ -159,9 +159,9 @@ struct AppManagementView: View {
                 }
 
                 Section("Refresh") {
-                    if NativeAppTransferService.hasUnfinishedTransfer(installedApp.id) {
+                    if AppOffloadService.blocksNativeOperations(installedApp.id) {
                         NavigationLink {
-                            NativeAppTransferView(app: installedApp, accountStore: accountStore)
+                            AppOffloadView(app: installedApp, accountStore: accountStore)
                         } label: {
                             Label("Restore or Recover Native App", systemImage: "arrow.uturn.backward")
                         }
@@ -175,7 +175,7 @@ struct AppManagementView: View {
                     }
                     .buttonStyle(.borderedProminent)
                     .buttonBorderShape(.capsule)
-                    .disabled(NativeAppTransferService.hasUnfinishedTransfer(installedApp.id))
+                    .disabled(AppOffloadService.blocksNativeOperations(installedApp.id))
                     .fullWidthListSeparators()
 
                     NavigationLink {
@@ -186,6 +186,12 @@ struct AppManagementView: View {
                             .frame(maxWidth: .infinity, alignment: .leading)
                     }
                     .fullWidthListSeparators()
+                }
+            }
+
+            if let installedApp, !installedApp.isActive {
+                Section("Offloaded") {
+                    NavigationLink("Restore App") { AppOffloadView(app: installedApp, accountStore: accountStore) }
                 }
             }
 
@@ -251,9 +257,9 @@ struct AppManagementView: View {
                         .fullWidthListSeparators()
 
                         NavigationLink {
-                            NativeAppTransferView(app: installedApp, accountStore: accountStore)
+                            AppOffloadView(app: installedApp, accountStore: accountStore)
                         } label: {
-                            Label("Move to LiveContainer", systemImage: "arrow.left.arrow.right")
+                            Label("Offload / Restore App", systemImage: "arrow.left.arrow.right")
                         }
                         .fullWidthListSeparators()
 

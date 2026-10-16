@@ -47,9 +47,9 @@ final class AppEnvironment {
 
     init(ipaImportStore: IPAImportStore = IPAImportStore.shared) {
         self.ipaImportStore = ipaImportStore
-        // An interrupted helper request is recovered explicitly from its journal;
-        // it must not turn an unrelated later backup into a Files transfer.
-        if !NativeAppTransferService.isRunning {
+        // Clear request flags left by the retired transfer wizard. Offloading
+        // always uses SideStore's own backup flow.
+        if !AppOffloadService.isRunning {
             UserDefaults.standard.removeObject(forKey: "SideKickFileTransferRequest")
             UserDefaults.standard.removeObject(forKey: "SideKickCredentialTransferRequest")
         }
@@ -199,7 +199,7 @@ final class AppEnvironment {
                 && $0.isAvailable && $0.warning == nil
         }.map(\.updateTarget)
         var seen = Set<String>()
-        return (installedApps.map(\.updateTarget) + guests).filter { seen.insert($0.id).inserted }
+        return (installedApps.filter(\.isActive).map(\.updateTarget) + guests).filter { seen.insert($0.id).inserted }
     }
 
     var hasGitHubUpdateTargets: Bool { !updateTargets.isEmpty }

@@ -3,6 +3,27 @@ import XCTest
 @testable import SideKickCore
 
 final class LiveContainerImportTests: XCTestCase {
+    func testOffloadedIPAKeepsSourceWithoutInventingABuildReceipt() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = GitHubUpdateConfigurationStore(fileURL: root.appendingPathComponent("sources.json"))
+        let connection = connection()
+        let guest = guest(connection)
+        var app = ipa()
+        app.githubUpdateKey = nil
+        app.liveContainerHandoffRequested = true
+        var catalogue = LiveContainerState()
+        catalogue.connections = [connection]
+        catalogue.apps = [guest]
+        let linked = try await store.reconcileLiveContainerImports([app], catalogue: catalogue)
+        XCTAssertEqual(linked.count, 1)
+        let saved = try await store.configuration(for: guest.id)
+        XCTAssertEqual(saved?.sourceIdentity, app.githubSourceIdentity)
+        XCTAssertEqual(saved?.tokenID, "named-token")
+        XCTAssertNil(saved?.installedBuild)
+        XCTAssertNil(saved?.baselineUpdateKey)
+    }
+
     func testConfirmedGuestRetainsSourceAcrossRestartAndDoesNotConfigureNativeApp() async throws {
         let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
         defer { try? FileManager.default.removeItem(at: root) }

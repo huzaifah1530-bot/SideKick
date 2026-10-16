@@ -70,21 +70,6 @@ class IntegrationPatchTests(unittest.TestCase):
             if compiler := shutil.which("swiftc"):
                 for relative in ("SideStore/Core/Anisette/AnisetteProvider.swift", "SideStore/Core/Operations/StandaloneOperations/SignInOperation.swift"):
                     subprocess.run([compiler, "-frontend", "-parse", str(checkout / relative)], check=True)
-            result = subprocess.run([sys.executable, str(ROOT / "scripts/embed-file-transfer.py"), str(checkout)], capture_output=True, text=True)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            helper = (checkout / "SideBackup/SideBackupApp.swift").read_text(encoding="utf-8")
-            self.assertIn("enum AppDataTransfer", helper)
-            self.assertIn("performSideKickFileTransfer(restoring: true)", helper)
-            stage = (checkout / "SideStore/Core/Operations/PipelineOperations/StageBackupAppOperation.swift").read_text(encoding="utf-8")
-            self.assertIn('updates["CFBundleVersion"] = targetApp.buildVersion', stage)
-            self.assertIn('updates["SideKickSourceAppGroups"] = sourceGroups', stage)
-            self.assertIn('context.additionalEntitlements[.appGroups] = sourceGroups', stage)
-            self.assertNotIn('context.additionalEntitlements[.appGroups] = []', stage)
-            self.assertIn('entitled: Bundle.main.appGroups', helper)
-            self.assertIn('appGroups: groupContainers', helper)
-            if compiler := shutil.which("swiftc"):
-                parsed = subprocess.run([compiler, "-frontend", "-parse", str(checkout / "SideBackup/SideBackupApp.swift")], capture_output=True, text=True)
-                self.assertEqual(parsed.returncode, 0, parsed.stderr)
             for relative, patch_name in [
                 ("Dependencies/SideSign", "sidesign-audit-fixes.patch"),
                 ("Dependencies/minimuxer", "minimuxer-audit-fixes.patch"),
@@ -94,8 +79,6 @@ class IntegrationPatchTests(unittest.TestCase):
                 subprocess.run(["git", "init", "--quiet", str(dependency)], check=True)
                 content = (ROOT / "patches" / patch_name).read_text(encoding="utf-8")
                 paths = re.findall(r"^--- a/(.+)$", content, re.M)
-                if relative == "Dependencies/SideSign":
-                    paths.append("Sources/CodeSigning/CodeSignerAPI.swift")
                 for path in paths:
                     path = path.rstrip("\t\r")
                     target = dependency / path
@@ -104,21 +87,6 @@ class IntegrationPatchTests(unittest.TestCase):
                 patch_path.write_bytes(content.encode("utf-8"))
                 result = subprocess.run(["git", "-C", str(dependency), "apply", str(patch_path)], capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, result.stderr)
-            result = subprocess.run([sys.executable, str(ROOT / "scripts/embed-credential-transfer.py"), str(checkout)], capture_output=True, text=True)
-            self.assertEqual(result.returncode, 0, result.stderr)
-            helper = (checkout / "SideBackup/SideBackupApp.swift").read_text(encoding="utf-8")
-            self.assertIn("performSideKickCredentialTransfer()", helper)
-            self.assertIn("enum AppCredentialTransfer", helper)
-            signer = (checkout / "Dependencies/SideSign/Sources/CodeSigning/CodeSignerAPI.swift").read_text(encoding="utf-8")
-            self.assertIn('filteredEntitlements["keychain-access-groups"] = requested', signer)
-            self.assertIn('matchedProfile.entitlements["keychain-access-groups"]', signer)
-            cache = (checkout / "SideStore/Core/Operations/PipelineOperations/CacheResignedMetadataOperation.swift").read_text(encoding="utf-8")
-            self.assertIn('targetAppBundle.executableName != "SideBackup"', cache)
-            self.assertIn('CredentialTransferSigning.plist', cache)
-            if compiler := shutil.which("swiftc"):
-                for file in [checkout / "SideBackup/SideBackupApp.swift", checkout / "Dependencies/SideSign/Sources/CodeSigning/CodeSignerAPI.swift"]:
-                    parsed = subprocess.run([compiler, "-frontend", "-parse", str(file)], capture_output=True, text=True)
-                    self.assertEqual(parsed.returncode, 0, parsed.stderr)
             delegate = (checkout / "AltStore/AppDelegate.swift").read_text(encoding="utf-8")
             begin = delegate.index("private func prepareForBackgroundFetch()")
             end = delegate.index("\n    }", begin)

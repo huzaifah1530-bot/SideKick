@@ -203,13 +203,6 @@
     "lines": 20
   },
   {
-    "path": "docs/reviews/.altstore-reader.py",
-    "bytes": 7988,
-    "sha256": "3e12a7d0c9cf50a9cd964294d53eaf4b5430a125947453804e9bd8e0f762ce99",
-    "method": "full text read, including all line ranges; reference searches for findings",
-    "lines": 79
-  },
-  {
     "path": "SideKick/Views/Settings/SkippedGitHubUpdatesView.swift",
     "bytes": 3379,
     "sha256": "c0e5cd89f84568215c3fd08d9807f1967798469f2331d3dc0b1a7d74624a59a1",

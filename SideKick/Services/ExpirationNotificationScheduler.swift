@@ -17,14 +17,14 @@ enum ExpirationNotificationScheduler {
                    !installedApps.contains(where: { $0.bundleIdentifier == sideKickApp.bundleIdentifier }) {
                     installedApps.append(sideKickApp)
                 }
-                return installedApps.map { ($0.resignedBundleIdentifier, $0.name, $0.expirationDate) }
+                return installedApps.filter(\.isActive).map { ($0.resignedBundleIdentifier, $0.name, $0.expirationDate) }
             }
         } catch {
             debugLog("[SideKick] Could not load installed apps for expiry notifications; preserving existing reminders: \(error.localizedDescription)")
             return
         }
 
-        apps = apps.filter { !NativeAppTransferService.hasUnfinishedTransfer($0.0) }
+        apps = apps.filter { !AppOffloadService.blocksNativeOperations($0.0) }
         let center = UNUserNotificationCenter.current()
         let pending = await center.pendingNotificationRequests()
         let delivered = await center.deliveredNotifications()

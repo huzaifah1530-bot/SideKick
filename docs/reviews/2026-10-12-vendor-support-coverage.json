@@ -927,71 +927,71 @@
     "path": "Dependencies/SideSign/CLI/CommandContext.swift",
     "bytes": 11729,
     "lines": 395,
-    "readThrough": 92,
-    "method": "pending full line-numbered read"
+    "readThrough": 395,
+    "method": "full line-numbered text read"
   },
   {
     "path": "Dependencies/SideSign/CLI/CommandHandler.swift",
     "bytes": 94303,
     "lines": 1822,
-    "readThrough": 0,
-    "method": "pending full line-numbered read"
+    "readThrough": 1822,
+    "method": "full line-numbered text read"
   },
   {
     "path": "Dependencies/SideSign/CLI/DeviceDataManager.swift",
     "bytes": 6614,
     "lines": 181,
-    "readThrough": 0,
-    "method": "pending full line-numbered read"
+    "readThrough": 181,
+    "method": "full line-numbered text read"
   },
   {
     "path": "Dependencies/SideSign/CLI/PortalCommandsParser.swift",
     "bytes": 29368,
     "lines": 618,
-    "readThrough": 0,
-    "method": "pending full line-numbered read"
+    "readThrough": 618,
+    "method": "full line-numbered text read"
   },
   {
     "path": "Dependencies/SideSign/CLI/SecureInput.swift",
     "bytes": 1749,
     "lines": 60,
-    "readThrough": 0,
-    "method": "pending full line-numbered read"
+    "readThrough": 60,
+    "method": "full line-numbered text read"
   },
   {
     "path": "Dependencies/SideSign/CLI/SessionManager.swift",
     "bytes": 12293,
     "lines": 289,
-    "readThrough": 0,
-    "method": "pending full line-numbered read"
+    "readThrough": 289,
+    "method": "full line-numbered text read"
   },
   {
     "path": "Dependencies/SideSign/CLI/main.swift",
     "bytes": 26617,
     "lines": 707,
-    "readThrough": 0,
-    "method": "pending full line-numbered read"
+    "readThrough": 707,
+    "method": "full line-numbered text read"
   },
   {
     "path": "Dependencies/SideSign/Package.resolved",
     "bytes": 1784,
     "lines": 60,
-    "readThrough": 0,
-    "method": "pending full line-numbered read"
+    "readThrough": 60,
+    "method": "full line-numbered text read"
   },
   {
     "path": "Dependencies/SideSign/Package.swift",
     "bytes": 2465,
     "lines": 82,
-    "readThrough": 0,
-    "method": "pending full line-numbered read"
+    "readThrough": 82,
+    "method": "full line-numbered text read"
   },
   {
     "path": "Dependencies/SideSign/README.md",
     "bytes": 6876,
     "lines": 158,
-    "readThrough": 0,
-    "method": "pending full line-numbered read"
+    "readThrough": 158,
+    "method": "full line-numbered text read"
   },
   {
     "path": "Dependencies/SideSign/Sources/Anisette/AnisetteDataManager.swift",
@@ -1305,29 +1305,29 @@
     "path": "Dependencies/SideSign/Tests/SideSignTests/SideSignTests.swift",
     "bytes": 3902,
     "lines": 101,
-    "readThrough": 0,
-    "method": "pending full line-numbered read"
+    "readThrough": 101,
+    "method": "full line-numbered text read"
   },
   {
     "path": "Dependencies/SideSign/build.sh",
     "bytes": 473,
     "lines": 18,
-    "readThrough": 0,
-    "method": "pending full line-numbered read"
+    "readThrough": 18,
+    "method": "full line-numbered text read"
   },
   {
     "path": "Dependencies/SideSign/sample-usages.sh",
     "bytes": 19174,
     "lines": 459,
-    "readThrough": 0,
-    "method": "pending full line-numbered read"
+    "readThrough": 459,
+    "method": "full line-numbered text read"
   },
   {
     "path": "Dependencies/SideSign/specs/profile_endpoints_spec.py",
     "bytes": 13898,
     "lines": 291,
-    "readThrough": 0,
-    "method": "pending full line-numbered read"
+    "readThrough": 291,
+    "method": "full line-numbered text read"
   },
   {
     "path": "AltWidget/Assets.xcassets/SideStore.imageset/1024.png",

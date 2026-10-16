@@ -158,12 +158,28 @@ actor GitHubUpdateConfigurationStore {
         guard LiveContainerImportPolicy.matches(ipa, guest: guest, connection: connection) else {
             throw LiveContainerImportError.guestMismatch
         }
-        guard let origin = ipa.githubImportConfiguration, let key = ipa.githubUpdateKey, !key.isEmpty,
+        guard let origin = ipa.githubImportConfiguration,
               origin.sourceIdentity == ipa.githubSourceIdentity,
               !origin.repositoryURL.isEmpty, !origin.assetName.isEmpty else {
             throw LiveContainerImportError.missingSource
         }
-        return try recordSuccessfulImport(origin, key: key, for: guest.updateTarget)
+        if let key = ipa.githubUpdateKey, !key.isEmpty {
+            return try recordSuccessfulImport(origin, key: key, for: guest.updateTarget)
+        }
+        return try attachLiveContainerSource(origin, guest: guest)
+    }
+
+    private func attachLiveContainerSource(_ origin: GitHubUpdateConfiguration, guest: LiveContainerGuest) throws -> Bool {
+        if let existing = try configuration(for: guest.id) { return existing.hasSameSource(as: origin) }
+        var source = origin
+        source.bundleIdentifier = guest.id
+        source.baselineUpdateKey = nil
+        source.lastInstalledUpdateKey = nil
+        source.installedBuild = nil
+        source.pendingSelfUpdate = nil
+        source.clearDismissedUpdate()
+        try save(source)
+        return true
     }
 
     @discardableResult
@@ -183,27 +199,19 @@ actor GitHubUpdateConfigurationStore {
                 }.count == 1
             }
             guard let ipa = matching.first, let origin = ipa.githubImportConfiguration,
-                  let key = ipa.githubUpdateKey, !key.isEmpty,
                   origin.sourceIdentity == ipa.githubSourceIdentity,
                   Set(matching.compactMap(\.githubSourceIdentity)).count == 1,
-                  Set(matching.compactMap(\.githubUpdateKey)).count == 1 else { continue }
+                  Set(matching.map { $0.githubUpdateKey ?? "" }).count == 1 else { continue }
             let existing = try configuration(for: guest.id)
             guard existing == nil || existing?.hasSameSource(as: origin) == true else { continue }
-            if LiveContainerImportPolicy.verifiesBuild(ipa, guest: guest) {
+            if let key = ipa.githubUpdateKey, !key.isEmpty, LiveContainerImportPolicy.verifiesBuild(ipa, guest: guest) {
                 if existing?.installedBuild?.key != key || existing?.installedBuild?.observation != guest.updateTarget.observation {
                     _ = try recordSuccessfulImport(origin, key: key, for: guest.updateTarget)
                 }
             } else if existing == nil {
                 // Repository tracking is known even when LiveContainer changes the binary.
                 // Preserve it without inventing an installed-build receipt from version labels.
-                var source = origin
-                source.bundleIdentifier = guest.id
-                source.baselineUpdateKey = nil
-                source.lastInstalledUpdateKey = nil
-                source.installedBuild = nil
-                source.pendingSelfUpdate = nil
-                source.clearDismissedUpdate()
-                try save(source)
+                _ = try attachLiveContainerSource(origin, guest: guest)
             }
             linked.append(contentsOf: matching)
         }

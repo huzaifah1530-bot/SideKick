@@ -1,3 +1,5 @@
+> Historical implementation: retired by the simpler SideStore offload flow. Data/credential migration described below is no longer shipped.
+
 # LiveContainer login transfer
 
 The existing native transfer only copied files. A guest asking for sign-in is not evidence of lost Documents/Library data: native credentials can live in Keychain, outside both the sandbox and App Groups. This change adds a credential-copy pass before the user can confirm a complete move.
