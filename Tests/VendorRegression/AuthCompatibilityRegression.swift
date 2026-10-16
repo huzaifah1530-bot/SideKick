@@ -2,6 +2,7 @@ import Foundation
 
 private enum ProbeError: Error { case rejected, unavailable }
 private final class Attempts: @unchecked Sendable { var blobs: [Data?] = [] }
+private final class ResyncAttempts { var sends: [String] = []; var syncs = 0 }
 
 @main struct AuthCompatibilityRegression {
     static func main() async throws {
@@ -9,6 +10,61 @@ private final class Attempts: @unchecked Sendable { var blobs: [Data?] = [] }
         let encodedIdentifier = AuthCompatibility.remoteIdentifier(identifier)
         precondition(encodedIdentifier == "AAECAwQFBgcICQoLDA0ODw==")
         precondition(Data(base64Encoded: encodedIdentifier) == Data(identifier))
+        let challenge = Data([1, 2, 3])
+        let challengeStatus: [String: any Sendable] = ["ec": -22421, "hsc": 434, "X-Apple-I-MD-DATA": challenge]
+        precondition(AuthCompatibility.resyncPayload(status: challengeStatus) == challenge)
+        precondition(AuthCompatibility.resyncPayload(status: ["ec": -22421, "hsc": 434, "X-Apple-I-MD-DATA": "AQID"]) == challenge)
+        for status in [
+            ["ec": -22421, "hsc": 434],
+            ["ec": -22421, "hsc": 434, "X-Apple-I-MD-DATA": "invalid"],
+            ["ec": -22421, "hsc": 434, "X-Apple-I-MD-DATA": Data()],
+            ["ec": -90010, "hsc": 200, "X-Apple-I-MD-DATA": challenge],
+            ["ec": -22406, "hsc": 434, "X-Apple-I-MD-DATA": challenge]
+        ] as [[String: any Sendable]] {
+            precondition(AuthCompatibility.resyncPayload(status: status) == nil)
+            do {
+                try responsePolicy(status: status, dictionary: ["Status": status], requestParameters: ["o": "init"], allowAnisetteResync: true)
+                preconditionFailure("Invalid challenges and unrelated errors must still fail")
+            } catch { }
+        }
+        let wire = AuthCompatibility.resyncRequest(identifier: identifier, adiBlob: Data([4]), deviceID: "device", localUserID: "local", challenge: challenge)
+        precondition(wire == ["identifier": encodedIdentifier, "adi_pb": "BA==", "sim": "AQID", "device_id": "device", "md_lu": "local"])
+        // Exercise the production gate together with the real bounded orchestration.
+        let recovery = ResyncAttempts()
+        let recovered = try await AuthCompatibility.withResynchronization(initial: "old", request: { state, allow in
+            recovery.sends.append(state)
+            let status: [String: any Sendable] = state == "old" ? challengeStatus : ["ec": 0]
+            return try responsePolicy(status: status, dictionary: ["Status": status], requestParameters: ["o": "init", "A2k": Data([9])], allowAnisetteResync: allow)
+        }, resynchronize: { state, payload in
+            precondition(state == "old" && payload == challenge)
+            recovery.syncs += 1
+            return "fresh"
+        })
+        precondition(recovered.data == "fresh" && recovery.sends == ["old", "fresh"] && recovery.syncs == 1)
+        let repeated = ResyncAttempts()
+        do {
+            _ = try await AuthCompatibility.withResynchronization(initial: "old", request: { state, allow in
+                repeated.sends.append(state)
+                return try responsePolicy(status: challengeStatus, dictionary: ["Status": challengeStatus], requestParameters: ["o": "init"], allowAnisetteResync: allow)
+            }, resynchronize: { _, _ in repeated.syncs += 1; return "fresh" })
+            preconditionFailure("A repeated challenge must fail, not loop")
+        } catch { }
+        precondition(repeated.sends == ["old", "fresh"] && repeated.syncs == 1)
+        let failed = ResyncAttempts()
+        do {
+            _ = try await AuthCompatibility.withResynchronization(initial: "old", request: { state, allow in
+                failed.sends.append(state)
+                return try responsePolicy(status: challengeStatus, dictionary: ["Status": challengeStatus], requestParameters: ["o": "init"], allowAnisetteResync: allow)
+            }, resynchronize: { _, _ in failed.syncs += 1; throw ProbeError.unavailable })
+            preconditionFailure("A failed resync must not retry Apple")
+        } catch ProbeError.unavailable { }
+        precondition(failed.sends == ["old"] && failed.syncs == 1)
+        for operation in ["init", "complete", "apptokens"] {
+            do {
+                try responsePolicy(status: challengeStatus, dictionary: ["Status": challengeStatus], requestParameters: ["o": operation], allowAnisetteResync: operation != "init")
+                preconditionFailure("No callback, or any later-stage challenge, must retain the Apple error")
+            } catch { }
+        }
         precondition(AuthCompatibility.authType(statusType: nil, responseType: nil, statusCode: 409) == "pushedCode")
         precondition(AuthCompatibility.authType(statusType: "", responseType: nil, statusCode: 409) == "pushedCode")
         precondition(AuthCompatibility.authType(statusType: "", responseType: "sms", statusCode: 409) == "sms")
@@ -65,6 +121,6 @@ private final class Attempts: @unchecked Sendable { var blobs: [Data?] = [] }
             preconditionFailure("Unrelated errors must escape")
         } catch ProbeError.unavailable { }
         precondition(unavailable.blobs.count == 1)
-        print("Auth compatibility: pushed-code selection and bounded provisioning recovery passed")
+        print("Auth compatibility: pushed-code selection, bounded resynchronization and provisioning recovery passed")
     }
 }

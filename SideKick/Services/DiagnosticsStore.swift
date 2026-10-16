@@ -19,7 +19,7 @@ final class DiagnosticsStore: @unchecked Sendable {
         }
     }
     enum Stage: String, Codable, Sendable {
-        case authentication, anisette, authInit, authComplete, authTokens
+        case authentication, anisette, anisetteResync, authInit, authComplete, authTokens
         case twoFactor, twoFactorVerify, developerTeam, session
         case signing, installation, refresh, localConnection, github, lifecycle
 
@@ -27,6 +27,7 @@ final class DiagnosticsStore: @unchecked Sendable {
             switch self {
             case .authentication: "Apple sign-in"
             case .anisette: "Anisette generation"
+            case .anisetteResync: "Anisette resynchronization"
             case .authInit: "Apple handshake"
             case .authComplete: "Apple authentication response"
             case .authTokens: "Apple session tokens"
@@ -46,6 +47,7 @@ final class DiagnosticsStore: @unchecked Sendable {
         var help: String {
             switch self {
             case .anisette: return "Check the selected Anisette provider and its matching client configuration."
+            case .anisetteResync: return "The selected server must support Apple's Anisette resynchronization challenge. Keep the current provider and identity when reporting this failure."
             case .authInit, .authComplete, .authentication: return "Apple sign-in failed. Keep the stage and codes when reporting this; avoid repeated attempts."
             case .twoFactor, .twoFactorVerify: return "Check verification on a trusted Apple device. Wait if Apple limits attempts."
             case .authTokens, .session: return "Apple session creation or secure storage failed."

@@ -1,7 +1,7 @@
 diff --git a/SideStore/Core/Anisette/AnisetteProvider.swift b/SideStore/Core/Anisette/AnisetteProvider.swift
 --- a/SideStore/Core/Anisette/AnisetteProvider.swift
 +++ b/SideStore/Core/Anisette/AnisetteProvider.swift
-@@ -11,6 +11,18 @@
+@@ -11,12 +11,38 @@
  
  enum AnisetteProvider {
      static func fetch(handler: AnisetteServerHandler? = nil) async throws -> ALTAnisetteData {
@@ -20,6 +20,44 @@ diff --git a/SideStore/Core/Anisette/AnisetteProvider.swift b/SideStore/Core/Ani
          if UserDefaults.standard.useOnDeviceAnisette {
              debugLog("[AnisetteProvider] Fetching anisette via On-Device Anisette (ODA)...")
              return try await OnDeviceAnisetteManager.shared.fetchAnisetteData()
+         } else {
+             debugLog("[AnisetteProvider] Fetching anisette via remote server...")
+             return try await fetchRemote(handler: handler)
++        }
++    }
++
++    // Freeze the selected provider and provisioning before authentication starts.
++    static func resyncHandler(for data: ALTAnisetteData) async -> (@Sendable (ALTAnisetteData, Data) async throws -> ALTAnisetteData)? {
++        guard !UserDefaults.standard.useOnDeviceAnisette,
++              let url = URL(string: UserDefaults.standard.menuAnisetteURL), url.scheme == "https",
++              let encodedBlob = AnisetteConfigManager.shared.anisetteAdiBlob,
++              let blob = Data(base64Encoded: encodedBlob), !blob.isEmpty else { return nil }
++        let identifier = await AnisetteConfigManager.shared.resolveDeviceIdentifier()
++        guard UUID(uuidString: data.deviceID) == identifier else { return nil }
++        let provider = SideSign.RemoteAnisetteDataProvider(serverURL: url)
++        return { current, challenge in
++            try await provider.resynchronize(identifier: identifier, adiBlob: blob, data: current, challenge: challenge)
+         }
+     }
+ 
+diff --git a/SideStore/Core/Auth/DeveloperPortalProxy.swift b/SideStore/Core/Auth/DeveloperPortalProxy.swift
+--- a/SideStore/Core/Auth/DeveloperPortalProxy.swift
++++ b/SideStore/Core/Auth/DeveloperPortalProxy.swift
+@@ -256,12 +256,14 @@
+                 accountRepairHandler: DeveloperPortal.AccountRepairHandler = DeveloperPortal.defaultAccountRepairHandler,
+                 verificationHandler: DeveloperPortal.VerificationHandler?) async throws -> (ALTAccount, ALTAppleAPISession) 
+     {
++        let resyncHandler = await AnisetteProvider.resyncHandler(for: anisetteData)
+         let authSession = try await ALTAppleAPI.shared.authenticate(
+             appleID: appleID,
+             password: password,
+             anisetteData: anisetteData,
+             xcodeVersion: xcodeVersion,
+             machinePassword: machinePassword,
++            anisetteResyncHandler: resyncHandler,
+             accountRepairHandler: accountRepairHandler,
+             verificationHandler: verificationHandler
+         )
 diff --git a/SideStore/Core/Operations/StandaloneOperations/SignInOperation.swift b/SideStore/Core/Operations/StandaloneOperations/SignInOperation.swift
 --- a/SideStore/Core/Operations/StandaloneOperations/SignInOperation.swift
 +++ b/SideStore/Core/Operations/StandaloneOperations/SignInOperation.swift

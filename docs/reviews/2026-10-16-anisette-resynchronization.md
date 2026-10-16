@@ -1,0 +1,34 @@
+# Anisette resynchronization follow-up — 16 October 2026
+
+## Device evidence and scope
+
+After the user reported reinstalling with defaults, the 15 October 22:17:08 screenshot shows operation `4BCE1E1A-82FC-4D3E-AD76-C20D61F8C20B` failing at **initial Apple handshake: HTTP 200, ec=-22421, hsc=434**. The following `other / Code 3` is the outer Swift error wrapper for the same failure. This is still before password-proof completion, two-factor verification and developer-team selection. The screenshot does not expose the opaque resynchronization payload, so its presence on this particular response is not established.
+
+Build 119 corrected the remote UUID encoding but did not establish working device authentication. The intervening `-90010 / hsc=200` attempt was also unsuccessful; it does not qualify for this recovery path. Earlier investigation is in [the October 15 review](2026-10-15-auth-and-github-fixes.md).
+
+## References and source comparison
+
+- [isideload `apple_account.rs`](https://github.com/nab138/isideload/blob/main/isideload/src/auth/apple_account.rs) extracts `Status.X-Apple-I-MD-DATA` for hsc=434, resynchronizes its provider and repeats the initial request once with the original SRP public key. Its [remote v3 provider](https://github.com/nab138/isideload/blob/main/isideload/src/anisette/remote_v3/mod.rs) sends `sim`, `device_id` and `md_lu` alongside the existing Base64 identifier and provisioning blob.
+- [AltSign PR #61](https://github.com/rileytestut/AltSign/pull/61) independently proposes an optional resync callback and one initial-request replay. It remains unmerged; it is not represented as an upstream SideStore release fix. [AltStore PR #1834](https://github.com/altstoreio/AltStore/pull/1834) supplies the provider callback and reports a successful trusted-device sign-in in its author's environment, not ours.
+- [Loadstar PR #9](https://github.com/SirReaDy/loadstar/pull/9) describes the same exchange. Its earlier association of -90010 with client rejection remains observational.
+- The published [SideStore omnisette-server](https://github.com/SideStore/omnisette-server/blob/main/src/main.rs) only declares `identifier` and `adi_pb` in its headers input. Thus support cannot be assumed for every v3 server. A server may ignore the extension and produce headers without actually completing resynchronization; an eventual second Apple rejection must remain a failure.
+
+Sidekick's shipping SideSign response gate previously threw on every nonzero `ec`, including this actionable handshake challenge, before any provider callback could run. Matching headers and two-factor handling alone cannot execute a missing resync exchange. No changes to the CPD flag types, header identity, account-error bypasses or later-stage OTP policy are bundled into this fix.
+
+## Implementation and data flow
+
+The existing shipping patch chain remains authoritative; the dirty vendor checkout is untouched. The SideStore proxy captures the selected HTTPS remote server, persisted UUID and existing provisioning blob before authentication. A callback is offered only when remote mode is selected, a blob exists and the request's device UUID matches that provisioning identity. It never rotates servers or creates a new identity during this recovery.
+
+SideSign admits a response for recovery only when all of these hold: operation `init`, explicit callback available, **ec=-22421**, **hsc=434**, and a nonempty bounded challenge encoded as plist Data or valid Base64. Its Foundation-only compatibility helper calls the provider once and sends the initial request once more with the same SRP public key and refreshed Anisette fields. The second request has recovery disabled. Missing/malformed challenge data, unrelated Apple errors (including -90010), later-stage responses, provider failures and repeated challenges all propagate as failures. The recovered data also supplies the subsequent complete/token flow.
+
+The remote provider posts the opaque challenge as `sim` to the same `/v3/get_headers` origin, with the original provisioning identifier/blob and device/local-user identifiers. An ephemeral URLSession refuses redirects, performs no automatic HTTP retry and does not fall back to another server or a legacy shared identity. It accepts only a successful, bounded JSON headers response with the three expected nonempty Anisette fields. Provisioning is preserved. The old short-lived header cache is invalidated after fresh headers arrive.
+
+Diagnostics add an **Anisette resynchronization** stage with start, HTTP response, success/failure and safe numeric codes. Neither the challenge, provisioning data, request headers/body nor server response body enters persistent diagnostics or export. A successful provider stage means headers were obtained; only a subsequent accepted Apple response establishes handshake progress.
+
+## Verification and remaining limitations
+
+Regression coverage exercises the production response gate and compatibility orchestration: successful recovery, exactly one repeat, failure without an Apple retry, malformed/missing challenge, unrelated errors, no callback and later-stage challenges. The fixture checks the complete synthetic resync JSON payload. Source integration checks apply the shipping patch order, including the VPN embedding prerequisite, to clean temporary vendor archives and verify the callback wiring. Existing pushed-code and provisioning-recovery tests remain.
+
+Local Python patch-composition and release-manifest checks passed. Swift fixture execution, portable tests and the full iOS build require the macOS Actions runner; results will be recorded after that run. Device authentication and server resync support have not yet been verified. No successful login is claimed.
+
+For future work: Graphify describes the raw vendor checkout, while Actions applies these patches to the shipping sources. Inspect composed patches before assuming a graph-derived vendor implementation is the shipped one. Preserve the unrelated VPN/vendor/audit/Graphify setup work, keep `main`, and do not use subagents. The existing GitHub scheduling, newest-download handling, general diagnostics and Save/Don't Save guard are preserved.

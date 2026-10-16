@@ -3,6 +3,7 @@ import io
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tarfile
 import tempfile
 import unittest
@@ -11,6 +12,30 @@ ROOT = Path(__file__).resolve().parents[2]
 VENDOR = ROOT / 'Vendor/SideStore/Dependencies/SideSign'
 
 class AuthCompatibilityPatchTests(unittest.TestCase):
+    def test_sidestore_passes_frozen_remote_identity_to_resync(self):
+        vendor = ROOT / 'Vendor/SideStore'
+        with tempfile.TemporaryDirectory(prefix='sidekick-resync-wiring-') as tmp:
+            target = Path(tmp)
+            archive = subprocess.check_output(['git', '-C', str(vendor), 'archive', 'HEAD'])
+            with tarfile.open(fileobj=io.BytesIO(archive)) as files:
+                files.extractall(target, filter='data')
+            for name in ('sidestore-sidekick.patch', 'sidestore-certificate-error-classification.patch',
+                         'sidestore-use-account-certificate-for-refresh.patch', 'sidestore-compiler-workarounds.patch',
+                         'sidestore-view-body-compile.patch', 'sidestore-audit-fixes.patch',
+                         'sidestore-anisette-recovery.patch', 'sidestore-diagnostics.patch'):
+                if name == 'sidestore-audit-fixes.patch':
+                    subprocess.run([sys.executable, str(ROOT / 'scripts/embed-local-vpn.py'), str(target)], check=True, capture_output=True)
+                args = ['git', '-C', str(target), 'apply']
+                if name in ('sidestore-certificate-error-classification.patch', 'sidestore-use-account-certificate-for-refresh.patch'):
+                    args.append('--unidiff-zero')
+                applied = subprocess.run([*args, str(ROOT / 'patches' / name)], capture_output=True, text=True)
+                self.assertEqual(applied.returncode, 0, f'{name}: {applied.stderr}')
+            provider = (target / 'SideStore/Core/Anisette/AnisetteProvider.swift').read_text()
+            proxy = (target / 'SideStore/Core/Auth/DeveloperPortalProxy.swift').read_text()
+            self.assertIn('UUID(uuidString: data.deviceID) == identifier', provider)
+            self.assertIn('resynchronize(identifier: identifier, adiBlob: blob', provider)
+            self.assertIn('anisetteResyncHandler: resyncHandler', proxy)
+
     def test_patch_applies_after_audit_and_preserves_redaction(self):
         with tempfile.TemporaryDirectory(prefix='sidekick-auth-test-') as tmp:
             target = Path(tmp)
@@ -42,6 +67,15 @@ class AuthCompatibilityPatchTests(unittest.TestCase):
                              'Provisioning and get_headers must send the same Base64 UUID bytes')
             self.assertIn('resetProvisioningCache', manager)
             self.assertIn('AuthCompatibility.withProvisioningRecovery', manager)
+            self.assertIn('AuthCompatibility.withResynchronization', auth)
+            self.assertIn('allowAnisetteResync: allowResync', auth)
+            self.assertIn('AuthCompatibility.resyncPayload(status: status)', gate)
+            self.assertIn('AuthCompatibility.resyncRequest', remote)
+            self.assertIn('AuthenticationDiagnostics.record(.anisetteResync', remote)
+            self.assertIn('completionHandler(nil)', remote)
+            self.assertNotIn('jsonPayload: String(data:', remote)
+            self.assertIn('cpd["X-Apple-I-MD"] = data.oneTimePassword', auth)
+            self.assertIn('clientDictionary["X-Apple-I-MD"] = anisetteData.oneTimePassword', auth)
             if shutil.which('swiftc'):
                 # Compile the response gate extracted from the patched production method.
                 # Stub only its error types and logging; the branch and error dispatch are real.
@@ -60,9 +94,9 @@ struct DeveloperPortalError: Error {
 }
 enum ServerError: Error { case underlyingError(code: Int, message: String) }
 func debugLog(_ value: String) { }
-func responsePolicy(status: [String: any Sendable], dictionary: [String: any Sendable], requestParameters: [String: any Sendable], statusCode: Int = 200) throws {
+@discardableResult func responsePolicy(status: [String: any Sendable], dictionary: [String: any Sendable], requestParameters: [String: any Sendable], statusCode: Int = 200, allowAnisetteResync: Bool = false) throws -> [String: any Sendable] {
 let diagnosticStage = AuthenticationDiagnostics.Stage.authComplete
-''' + gate + '\n}\n')
+''' + gate + '\nreturn dictionary\n}\n')
                 changed_sources = [
                     'Sources/AuthCompatibility.swift', 'Sources/Constants.swift',
                     'Sources/DeveloperPortal/Authentication.swift',
