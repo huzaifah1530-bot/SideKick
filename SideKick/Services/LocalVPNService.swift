@@ -170,7 +170,7 @@ final class LocalVPNService {
             try Task.checkCancellation()
             if mode == .builtIn {
                 guard manager?.connection.status == .connected else { throw LocalVPNError.timeout }
-            } else if !externalConnected { throw LocalVPNError.externalNotConnected }
+            }
             return lease
         } catch {
             lastError = readable(error)
@@ -197,7 +197,7 @@ final class LocalVPNService {
     private func connect() async throws {
         try Task.checkCancellation()
         if mode == .external {
-            guard externalConnected else { throw LocalVPNError.externalNotConnected }
+            // Interface addresses are a UI hint; verify the paired device itself.
             try await prepareDeviceConnection()
             return
         }
