@@ -19,7 +19,10 @@ class HelperPackagingTests(unittest.TestCase):
             root = Path(directory)
             app = root / 'Payload/SideBackup.app'
             app.mkdir(parents=True)
-            shutil.copy2('/usr/bin/true', app / 'SideBackup')
+            # System binaries carry restricted macOS flags that a CI user cannot
+            # reproduce. The fixture needs executable bytes, not that metadata.
+            shutil.copyfile('/usr/bin/true', app / 'SideBackup')
+            (app / 'SideBackup').chmod(0o755)
             (app / 'Info.plist').write_bytes(plistlib.dumps({
                 'CFBundleExecutable': 'SideBackup', 'CFBundleIdentifier': 'com.sidekick.transfer-fixture',
                 'CFBundlePackageType': 'APPL', 'CFBundleVersion': '1',

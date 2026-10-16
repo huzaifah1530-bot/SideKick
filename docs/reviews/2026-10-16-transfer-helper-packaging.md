@@ -31,3 +31,11 @@ release was published. Device validation remains: install the next built IPA,
 recover Spotify's original binary if needed, then repeat Files export and verify
 the guest before considering offload. The separate restore/interruption issues
 identified during review are not addressed by this packaging fix.
+
+The user reported the first build failure. Inspection of that failed run showed
+all 78 Swift core tests passed; the macOS signing fixture then failed before
+signing because shutil.copy2 attempted to reproduce restricted system-binary
+flags (PermissionError from chflags). Copy only the binary bytes and explicitly
+set executable permissions instead. This preserves the actual signing test and
+its entitlement assertions; it does not skip or weaken them. The iOS build and
+packaging steps had not run. No subsequent build is monitored.
