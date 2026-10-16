@@ -67,20 +67,6 @@ index a511c44..987aa30 100644
  				LD_EXPORT_SYMBOLS = NO;
  				LD_RUNPATH_SEARCH_PATHS = (
  					"$(inherited)",
-diff --git a/AltStore/AltStoreFree.entitlements b/AltStore/AltStoreFree.entitlements
-index a1035f8..6631ffa 100644
---- a/AltStore/AltStoreFree.entitlements
-+++ b/AltStore/AltStoreFree.entitlements
-@@ -2,9 +2,5 @@
- <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
- <plist version="1.0">
- <dict>
--    <key>com.apple.security.application-groups</key>
--    <array>
--        <string>group.$(APP_GROUP_IDENTIFIER)</string>
--    </array>
- </dict>
- </plist>
 diff --git a/AltStore/AppDelegate.swift b/AltStore/AppDelegate.swift
 index eb41f3e..b4be693 100644
 --- a/AltStore/AppDelegate.swift

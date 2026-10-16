@@ -34,6 +34,7 @@ class IntegrationPatchTests(unittest.TestCase):
                 "SideStore/Core/Operations/PipelineOperations/RemoveBackupDataOperation.swift",
                 "AltWidget/Info.plist", "SideBackup/Info.plist",
                 "AltStore/Resources/ReleaseEntitlements.plist",
+                "AltStore/AltStoreFree.entitlements",
                 "SideStore/Core/Operations/PipelineOperations/RemoveAppExtensionsOperation.swift",
                 "SideStore/MaintenanceManager.swift", "SideStore/Utils/iostreams/ConsoleLog.swift",
                 "SideStore/Utils/common/FileOutputStream.swift",
@@ -87,6 +88,10 @@ class IntegrationPatchTests(unittest.TestCase):
             signing = (checkout / "SideStore/Core/Operations/PipelineOperations/ResignAppOperation.swift").read_text()
             self.assertIn('resignedAppBundle.executableName == "SideBackup"', signing)
             self.assertIn(').contains(expected)', signing)
+            self.assertIn('if resignedAppBundle.isAltStoreApp {', signing)
+            self.assertIn('existingGroup.map({ groups.contains($0) }) ?? true', signing)
+            self.assertLess(signing.index('if resignedAppBundle.isAltStoreApp {'), signing.index('return resignedAppBundle'))
+            self.assertIn('com.apple.security.application-groups', (checkout / 'AltStore/AltStoreFree.entitlements').read_text())
             helper = (checkout / "SideBackup/ContentView.swift").read_text()
             self.assertNotIn('Color("Background")', helper)
             self.assertIn('Activity Log', helper)
@@ -118,6 +123,40 @@ precondition(FakeBundle(appGroups: [Bundle.baseAltStoreAppGroupID], expected: ni
                 source = checkout / "BackupGroupFixture.swift"
                 source.write_text(fixture)
                 binary = checkout / "backup-group-fixture"
+                subprocess.run([compiler, str(source), "-o", str(binary)], check=True)
+                subprocess.run([str(binary)], check=True)
+                # Run the actual pre-install self-update guard against signed grants.
+                guard = re.search(r'        if resignedAppBundle.isAltStoreApp \{.*?^        \}', signing, re.S | re.M).group(0)
+                source.write_text('''import Foundation
+enum Entitlement: Hashable { case appGroups }
+struct Host { let altstoreAppGroup: String? }
+enum Bundle {
+    static let baseAltStoreAppGroupID = "group.com.sidekick.app.TEAM"
+    static var main = Host(altstoreAppGroup: nil)
+}
+enum OperationError: Error { case invalidParameters(String) }
+struct SignedApp {
+    let isAltStoreApp: Bool
+    let entitlements: [Entitlement: Any]
+}
+func validate(_ resignedAppBundle: SignedApp) throws {
+    GUARD
+}
+func accepts(_ groups: [String], isStore: Bool = true) -> Bool {
+    do {
+        try validate(SignedApp(isAltStoreApp: isStore, entitlements: [.appGroups: groups]))
+        return true
+    } catch { return false }
+}
+let group = Bundle.baseAltStoreAppGroupID
+precondition(accepts([group])) // repair a store that currently has no group
+precondition(!accepts([]))
+precondition(!accepts(["group.some.other.app"]))
+Bundle.main = Host(altstoreAppGroup: group + ".existing")
+precondition(!accepts([group])) // never orphan existing backups
+precondition(accepts([group, group + ".existing"]))
+precondition(accepts([], isStore: false)) // unrelated apps need no store group
+'''.replace('GUARD', guard))
                 subprocess.run([compiler, str(source), "-o", str(binary)], check=True)
                 subprocess.run([str(binary)], check=True)
             for relative, patch_name in [
