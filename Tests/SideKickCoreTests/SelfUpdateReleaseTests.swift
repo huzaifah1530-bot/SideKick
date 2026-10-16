@@ -11,7 +11,20 @@ final class SelfUpdateReleaseTests: XCTestCase {
         for vpn in [false, true] {
             let result = GitHubUpdateConfigurationStore.releaseDefault(for: "self", includesVPN: vpn)
             XCTAssertEqual(result.source, .latestRelease)
-            XCTAssertEqual(result.assetName, vpn ? "SideKick-vpn-unsigned.ipa" : "SideKick-unsigned.ipa")
+            XCTAssertEqual(result.assetName, vpn ? "SideKick+Vpn.read.release.description.ipa" : "SideKick.ipa")
+            XCTAssertNil(result.effectiveBaselineKey)
+        }
+    }
+
+    func testPreviousReleaseFilenameDefaultsAreCorrectedEvenAfterChannelMigration() {
+        for vpn in [false, true] {
+            var old = oldDefault()
+            old.source = .latestRelease
+            old.assetName = vpn ? "SideKick-vpn-unsigned.ipa" : "SideKick-unsigned.ipa"
+            old.selfUpdateReleaseMigrationApplied = true
+            let result = GitHubUpdateConfigurationStore.releaseDefault(for: old.id, includesVPN: vpn, replacing: old)
+            XCTAssertEqual(result.assetName, vpn ? "SideKick+Vpn.read.release.description.ipa" : "SideKick.ipa")
+            XCTAssertEqual(result.tokenID, old.tokenID)
             XCTAssertNil(result.effectiveBaselineKey)
         }
     }

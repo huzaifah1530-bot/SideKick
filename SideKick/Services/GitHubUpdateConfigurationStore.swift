@@ -71,11 +71,15 @@ actor GitHubUpdateConfigurationStore {
     static func releaseDefault(for targetID: String, includesVPN: Bool,
                                replacing existing: GitHubUpdateConfiguration? = nil) -> GitHubUpdateConfiguration {
         if let existing {
-            guard existing.selfUpdateReleaseMigrationApplied != true,
-                  GitHubSourceIdentity.repository(existing.repositoryURL) == GitHubSourceIdentity.repository(selfUpdateRepositoryURL),
-                  existing.source == .actionsArtifact,
-                  existing.workflowFile == "ios-build.yml", existing.branch == "main",
-                  ["SideKick-unsigned-ipa", "SideKick-vpn-unsigned-ipa"].contains(existing.assetName) else { return existing }
+            guard GitHubSourceIdentity.repository(existing.repositoryURL) == GitHubSourceIdentity.repository(selfUpdateRepositoryURL) else { return existing }
+            switch existing.source {
+            case .actionsArtifact:
+                guard existing.selfUpdateReleaseMigrationApplied != true,
+                      existing.workflowFile == "ios-build.yml", existing.branch == "main",
+                      ["SideKick-unsigned-ipa", "SideKick-vpn-unsigned-ipa"].contains(existing.assetName) else { return existing }
+            case .latestRelease:
+                guard ["SideKick-unsigned.ipa", "SideKick-vpn-unsigned.ipa"].contains(existing.assetName) else { return existing }
+            }
         }
 
         // Actions receipts and skipped keys cannot establish an installed release.
@@ -85,7 +89,7 @@ actor GitHubUpdateConfigurationStore {
             source: .latestRelease,
             workflowFile: "",
             branch: "",
-            assetName: includesVPN ? "SideKick-vpn-unsigned.ipa" : "SideKick-unsigned.ipa",
+            assetName: includesVPN ? "SideKick+Vpn.read.release.description.ipa" : "SideKick.ipa",
             baselineUpdateKey: nil,
             lastInstalledUpdateKey: nil,
             tokenID: existing?.tokenID,

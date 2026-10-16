@@ -20,7 +20,7 @@ SideKick uses code from [LocalDevVPN by seomin0610](https://github.com/seomin061
 
 ## Integration status
 
-SideKick’s own update checks use published GitHub Releases. The default release asset is `SideKick-unsigned.ipa` (`SideKick-vpn-unsigned.ipa` for the optional built-in VPN variant). Other apps can still use either releases or Actions artifacts. Changing this update source does not publish a release.
+SideKick’s own update checks use published GitHub Releases. The default release asset is `SideKick.ipa` (`SideKick+Vpn.read.release.description.ipa` for the optional built-in VPN variant). Other apps can still use either releases or Actions artifacts. Changing this update source does not publish a release.
 
 - **LiveContainer:** My Apps has a separate guest library with bookmarked read-only directory scanning, version/build metadata, connection recovery, launch requests, and existing GitHub source/token/update notifications. Link an actual Applications directory exposed in Files. Private App Group access is not assumed; snapshots are labelled and excluded from automatic checks/guest launches. Guest IPAs never enter SideKick's signing/install queue. See [integration behavior and validation limits](docs/livecontainer-integration.md).
 - Storage offers **Manage Cached & Temporary Files** with ownership explanations and explicit retained-source removal. Deleting a current extracted source can require reimporting an IPA before refresh. Recent/current-process temporary files are protected. Update options show all saved accounts: another team requires a separate source-based installation with separate data/credentials.
