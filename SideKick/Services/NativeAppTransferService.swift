@@ -40,13 +40,16 @@ final class NativeAppTransferService {
         }
     }
 
-    func retainDataFolder(_ url: URL) throws {
+    func retainDataFolder(_ url: URL) async throws {
         guard url.startAccessingSecurityScopedResource() else { throw AppDataTransferError.invalidFolder }
         defer { url.stopAccessingSecurityScopedResource() }
+        let installed = try await installedRecord()
+        let expectedGroups = (ALTApplication(fileURL: installed.fileURL)?.entitlements[.appGroups] as? [String]) ?? []
         let identity = try AppDataTransfer.readIdentity(at: url)
         guard identity.bundleIdentifier == app.id, identity.version == app.version, identity.build == app.buildVersion else {
             throw AppDataTransferError.identityMismatch
         }
+        guard Set(identity.appGroupIdentifiers ?? []) == Set(expectedGroups) else { throw AppDataTransferError.appGroupUnavailable }
         var updated = record
         updated.dataBookmark = try url.bookmarkData(options: [.minimalBookmark], includingResourceValuesForKeys: nil, relativeTo: nil)
         updated.guestVerified = false
@@ -62,9 +65,10 @@ final class NativeAppTransferService {
         guard let installed = try await context.perform({
             try context.fetch(InstalledApp.fetchRequest()).first { $0.resignedBundleIdentifier == self.app.id }
         }), let bundle = ALTApplication(fileURL: installed.fileURL) else { throw NativeTransferError.sourceMissing }
-        // The first version transfers the main app home only.
         let groups = bundle.entitlements[.appGroups] as? [String] ?? []
-        guard groups.isEmpty else { throw NativeTransferError.appGroups }
+        guard groups.count <= 64, groups.allSatisfy(AppDataTransfer.validGroupIdentifier) else {
+            throw AppDataTransferError.appGroupUnavailable
+        }
         guard bundle.version == app.version, bundle.buildVersion == app.buildVersion else {
             throw AppDataTransferError.identityMismatch
         }
@@ -127,7 +131,7 @@ final class NativeAppTransferService {
             var stale = false
             let folder = try URL(resolvingBookmarkData: bookmark, bookmarkDataIsStale: &stale)
             guard !stale else { throw AppDataTransferError.invalidFolder }
-            try retainDataFolder(folder)
+            try await retainDataFolder(folder)
             var updated = record; updated.guestVerified = true; record = updated
         }
         try SideKickStorageCleanup.beginOperation()
@@ -176,11 +180,10 @@ final class NativeAppTransferService {
 }
 
 enum NativeTransferError: LocalizedError {
-    case unsupported, appGroups, sourceMissing, inUse, unverified, transferPending
+    case unsupported, sourceMissing, inUse, unverified, transferPending
     var errorDescription: String? {
         switch self {
         case .unsupported: "SideKick and LiveContainer cannot be moved using this transfer."
-        case .appGroups: "This app uses App Groups. The first transfer version supports Documents and Library only; keep this app installed."
         case .sourceMissing: "The retained app source is unavailable. Import the original IPA before continuing."
         case .inUse: "Another transfer is running or the app cannot present the transfer screen."
         case .unverified: "Select the exported data folder and verify the guest in LiveContainer before freeing the native slot."

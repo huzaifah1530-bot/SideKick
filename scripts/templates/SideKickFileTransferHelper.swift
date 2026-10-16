@@ -47,7 +47,7 @@ extension AppState {
         progressFraction = 0
         progressText = restoring
             ? "Close the LiveContainer guest, then choose its SideKickData folder. Its current Documents and Library will replace this app’s files."
-            : "Choose a local folder in Files. A new SideKickData folder will be created there. Keychain and App Group data are not transferred."
+            : "Close any related apps using shared data, then choose a local folder in Files. A new SideKickData folder will include this app’s files and App Groups. Keychain logins are not copied."
         do {
             let url = try await SideKickTransferPicker.chooseFolder(title: restoring ? "Choose SideKickData folder" : "Choose export destination")
             guard url.startAccessingSecurityScopedResource() else { throw AppDataTransferError.invalidFolder }
@@ -58,14 +58,26 @@ extension AppState {
                 throw AppDataTransferError.identityMismatch
             }
             let home = URL(fileURLWithPath: NSHomeDirectory()).resolvingSymlinksInPath()
+            guard let originalGroups = Bundle.main.object(forInfoDictionaryKey: "SideKickSourceAppGroups") as? [String] else {
+                throw AppDataTransferError.appGroupUnavailable
+            }
+            let mappings = try AppDataTransfer.groupMappings(original: originalGroups, entitled: Bundle.main.appGroups)
+            var appGroups: [String: URL] = [:]
+            for (original, granted) in mappings {
+                guard let container = FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: granted) else {
+                    throw AppDataTransferError.appGroupUnavailable
+                }
+                appGroups[original] = container
+            }
+            let groupContainers = appGroups
             progressText = restoring ? "Restoring app files…" : "Copying and verifying app files…"
             // Files are copied while the original app binary is replaced by this
             // helper. The original application cannot be mutating its databases.
             try await Task.detached {
                 if restoring {
-                    _ = try AppDataTransfer.restore(live: url, home: home, identity: identity, version: version, build: build)
+                    _ = try AppDataTransfer.restore(live: url, home: home, identity: identity, version: version, build: build, appGroups: groupContainers)
                 } else {
-                    _ = try AppDataTransfer.export(home: home, destination: url, identity: identity, version: version, build: build)
+                    _ = try AppDataTransfer.export(home: home, destination: url, identity: identity, version: version, build: build, appGroups: groupContainers)
                 }
             }.value
             process(.success(()), errorTitle: "")

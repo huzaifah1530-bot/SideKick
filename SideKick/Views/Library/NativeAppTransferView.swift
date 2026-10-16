@@ -86,11 +86,14 @@ struct NativeAppTransferView: View {
             SwiftUI.Button("OK", role: .cancel) { errorMessage = nil }
         } message: { Text(errorMessage ?? "Please try again.") }
         .fileImporter(isPresented: $showFolderPicker, allowedContentTypes: [.folder]) { result in
-            do {
-                try service.retainDataFolder(result.get())
-                record = service.record
-                go(.verify)
-            } catch {
+            switch result {
+            case .success(let url):
+                work("Checking app data…", stage: .appDataTransfer) {
+                    try await service.retainDataFolder(url)
+                    record = service.record
+                    go(.verify)
+                }
+            case .failure(let error):
                 if !(error is CancellationError) { errorMessage = error.localizedDescription }
             }
         }
@@ -127,13 +130,14 @@ struct NativeAppTransferView: View {
                 }
             }
             Section {
-                Text("The next steps transfer saves and settings from Documents and Library. Keychain logins aren’t copied. Apps using App Groups are currently unsupported.")
+                Text("The next steps transfer Documents, Library and App Group files. Keychain logins aren’t copied, and native widgets/extensions may not work in LiveContainer.")
                     .font(.footnote).foregroundStyle(.secondary)
                 SwiftUI.Button("Restore or Recover an Earlier Transfer") { go(.restore) }
             }
         case .export:
             Section {
                 Text("Keep LocalDevVPN connected. SideKick will temporarily replace the native app with a file-transfer helper.")
+                Text("Close related apps that share this app’s data before continuing.")
                 Text("When asked, open the target app and choose a local folder outside its own folder. The helper creates a SideKickData folder, then SideKick reinstalls the original app.")
                 SwiftUI.Button("Export Native App Files") { run(.export) }
                     .buttonStyle(.borderedProminent)
@@ -149,6 +153,7 @@ struct NativeAppTransferView: View {
         case .verify:
             Section {
                 Text("In LiveContainer, open this app’s settings. Add the same SideKickData folder as external data storage and make it the active/default container.")
+                Text("For this container, turn on Isolate App Group. Shared files are included in the folder and need that setting to be used. Keep it on while using this transfer.")
                 Text("Launch the app there and check your saves and settings. Return here once they work.")
                 Toggle("My saves and settings work", isOn: Binding(
                     get: { record.guestVerified },
@@ -180,7 +185,7 @@ struct NativeAppTransferView: View {
         case .restore:
             Section {
                 Text("To bring your data back, close the app in LiveContainer first. Keep it on version \(app.version) (\(app.buildVersion)).")
-                Text("The helper asks for the current SideKickData folder, restores its Documents and Library, then reinstalls the native app. Keep that folder until you verify the result.")
+                Text("Close related native apps too. The helper asks for the current SideKickData folder, restores its app and App Group files, then reinstalls the native app. Keep that folder until you verify the result.")
                 SwiftUI.Button("Restore Latest Guest Files") { confirmRestore = true }
                     .buttonStyle(.borderedProminent)
             }

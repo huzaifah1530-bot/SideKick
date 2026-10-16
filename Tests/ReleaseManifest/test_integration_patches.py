@@ -77,6 +77,11 @@ class IntegrationPatchTests(unittest.TestCase):
             self.assertIn("performSideKickFileTransfer(restoring: true)", helper)
             stage = (checkout / "SideStore/Core/Operations/PipelineOperations/StageBackupAppOperation.swift").read_text(encoding="utf-8")
             self.assertIn('updates["CFBundleVersion"] = targetApp.buildVersion', stage)
+            self.assertIn('updates["SideKickSourceAppGroups"] = sourceGroups', stage)
+            self.assertIn('context.additionalEntitlements[.appGroups] = sourceGroups', stage)
+            self.assertNotIn('context.additionalEntitlements[.appGroups] = []', stage)
+            self.assertIn('entitled: Bundle.main.appGroups', helper)
+            self.assertIn('appGroups: groupContainers', helper)
             if compiler := shutil.which("swiftc"):
                 parsed = subprocess.run([compiler, "-frontend", "-parse", str(checkout / "SideBackup/SideBackupApp.swift")], capture_output=True, text=True)
                 self.assertEqual(parsed.returncode, 0, parsed.stderr)

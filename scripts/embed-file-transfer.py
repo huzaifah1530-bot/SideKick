@@ -17,15 +17,18 @@ def edit(relative, old, new):
 edit("SideStore/Core/Operations/PipelineOperations/StageBackupAppOperation.swift",
      '        context.additionalEntitlements[.appGroups] = targetAppGroups',
      '''        if UserDefaults.standard.bool(forKey: "SideKickFileTransferRequest") {
-            // Explicit file-only transfer. No synthetic shared App Group needed.
+            // Preserve the target's own groups so the helper can export their data.
+            // The synthetic SideStore backup group is unnecessary for this Files flow.
             updates["SideKickFileTransfer"] = true
             updates["SideKickSourceVersion"] = targetApp.version
             updates["SideKickSourceBuild"] = targetApp.buildVersion
+            let sourceGroups = (targetAppBundle?.entitlements[.appGroups] as? [String]) ?? []
+            updates["SideKickSourceAppGroups"] = sourceGroups
             // Installing the helper must not change the retained app's version
             // to SideBackup's own version, especially before deactivation.
             updates["CFBundleShortVersionString"] = targetApp.version
             updates["CFBundleVersion"] = targetApp.buildVersion
-            context.additionalEntitlements[.appGroups] = []
+            context.additionalEntitlements[.appGroups] = sourceGroups
         } else {
             context.additionalEntitlements[.appGroups] = targetAppGroups
         }''')

@@ -15,7 +15,9 @@
 
 ## Supported limits
 
-The inspected upstream source is `hugeBlack/LiveContainer` revision `882ece9ab4bae9e5dfe38f348d1572b8d0ddda55`. That repository describes itself as deprecated; its linked successor returned 404 during investigation. Arbitrary fork compatibility is not established.
+Native app transfer is experimental. The guided **Move to LiveContainer** flow supports main-app Documents, Library and accessible App Group files using a temporarily signed helper. When attaching the exported folder in LiveContainer, enable **Isolate App Group** for that container. Shared preferences are mapped into the guest's Library/Preferences and back on restore. Keep the native installation until saves/settings are verified; Keychain logins and native extension functionality are not transferred. See the [App Group implementation and device-validation requirements](reviews/2026-10-16-livecontainer-app-groups.md).
+
+The initial discovery implementation inspected `hugeBlack/LiveContainer` revision `882ece9ab4bae9e5dfe38f348d1572b8d0ddda55`. The App Group transfer work subsequently verified the official `LiveContainer/LiveContainer` 3.8.0 container and preference hooks. Arbitrary fork compatibility is not established.
 
 Discovery is read-only and only accesses granted, exposed directories. SideKick cannot unlock another app's sandbox or private App Group. Shared apps are discoverable only when their actual shared Applications directory is exposed through a provider. Exported copies must be identified as snapshots; they do not prove installed versions and cannot launch guests or run automatic update checks.
 
