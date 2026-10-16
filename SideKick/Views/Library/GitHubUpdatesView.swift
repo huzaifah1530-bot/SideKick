@@ -124,7 +124,12 @@ struct GitHubUpdatesView: View {
 
     private func row(_ configuration: GitHubUpdateConfiguration) -> some View {
         NavigationLink {
-            GitHubAppUpdateStatusView(configuration: configuration)
+            if let candidate = check(for: configuration)?.candidate,
+               let app = environment.installedApps.first(where: { $0.id == configuration.id }) {
+                GitHubUpdateDetailView(candidate: candidate, app: app)
+            } else {
+                GitHubAppUpdateStatusView(configuration: configuration)
+            }
         } label: {
             HStack(spacing: 12) {
                 GitHubUpdateAppIcon(data: icon(for: configuration))
