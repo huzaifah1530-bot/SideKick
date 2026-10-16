@@ -31,7 +31,10 @@ let package = Package(
             "Services/LiveContainerStore.swift",
             "Services/GitHubUpdateConfigurationStore.swift",
             "Services/SideKickStorageCleanup.swift",
-            "Services/AppDataTransfer.swift"
+            "Services/AppDataTransfer.swift",
+            "Services/AppCredentialTransfer.swift",
+            "Services/AppCredentialSigningPolicy.swift",
+            "Services/SystemAppCredentialStore.swift"
         ]),
         .testTarget(name: "SideKickCoreTests", dependencies: ["SideKickCore"], path: "Tests/SideKickCoreTests")
     ],

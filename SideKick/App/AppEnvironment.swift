@@ -51,6 +51,7 @@ final class AppEnvironment {
         // it must not turn an unrelated later backup into a Files transfer.
         if !NativeAppTransferService.isRunning {
             UserDefaults.standard.removeObject(forKey: "SideKickFileTransferRequest")
+            UserDefaults.standard.removeObject(forKey: "SideKickCredentialTransferRequest")
         }
     }
 

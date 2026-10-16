@@ -130,7 +130,7 @@ struct NativeAppTransferView: View {
                 }
             }
             Section {
-                Text("The next steps transfer Documents, Library and App Group files. Keychain logins aren’t copied, and native widgets/extensions may not work in LiveContainer.")
+                Text("The next steps transfer your files, then copy supported login credentials on this phone. Protected keys may prevent a complete transfer. Native widgets/extensions may not work in LiveContainer.")
                     .font(.footnote).foregroundStyle(.secondary)
                 SwiftUI.Button("Restore or Recover an Earlier Transfer") { go(.restore) }
             }
@@ -154,18 +154,24 @@ struct NativeAppTransferView: View {
             Section {
                 Text("In LiveContainer, open this app’s settings. Add the same SideKickData folder as external data storage and make it the active/default container.")
                 Text("For this container, turn on Isolate App Group. Shared files are included in the folder and need that setting to be used. Keep it on while using this transfer.")
-                Text("Launch the app there and check your saves and settings. Return here once they work.")
-                Toggle("My saves and settings work", isOn: Binding(
+                Text("Close the app in LiveContainer before transferring its login. SideKick temporarily opens the native transfer helper again, then reinstalls the original app. Choose the same active SideKickData folder when asked.")
+                SwiftUI.Button(record.loginDestination == nil ? "Transfer Login" : "Transfer Login Again") { run(.login) }
+                    .buttonStyle(.borderedProminent)
+                if record.loginDestination != nil {
+                    Label("Login transfer finished — test the app", systemImage: "checkmark.circle")
+                    Text("Launch the app in LiveContainer. Check that you are already signed in and your data is present. If it asks you to sign in, keep the native app: the move is incomplete.")
+                }
+                Toggle("My login and app data work", isOn: Binding(
                     get: { record.guestVerified },
                     set: { value in
                         record.guestVerified = value
                         service.record = record
                     }
                 ))
-                .disabled(record.dataBookmark == nil)
+                .disabled(record.dataBookmark == nil || record.loginDestination == nil)
                 SwiftUI.Button("Continue") { go(.finish) }
                     .buttonStyle(.borderedProminent)
-                    .disabled(!record.guestVerified || record.dataBookmark == nil)
+                    .disabled(!record.guestVerified || record.dataBookmark == nil || record.loginDestination == nil)
             }
         case .finish:
             Section {
@@ -177,7 +183,7 @@ struct NativeAppTransferView: View {
                     Text("You can now free the native app slot. SideKick makes another backup before removing the native installation.")
                     Text("Choose a different backup destination so the data folder used by LiveContainer stays unchanged.")
                     SwiftUI.Button("Free Native App Slot", role: .destructive) { confirmOffload = true }
-                        .disabled(!record.guestVerified || record.dataBookmark == nil)
+                        .disabled(!record.guestVerified || record.dataBookmark == nil || record.loginDestination == nil)
                     SwiftUI.Button("Keep Both for Now") { dismiss() }
                 }
                 SwiftUI.Button("Restore or Recover Native App") { go(.restore) }
@@ -219,6 +225,9 @@ struct NativeAppTransferView: View {
             await environment.reloadLocalCatalogues()
             switch action {
             case .export: go(.attach)
+            case .login:
+                go(.verify)
+                message = "Login credentials copied. Open the app in LiveContainer and check that your session works. Keep the native copy until you have checked."
             case .offload: go(.finish)
             case .restore, .recover:
                 message = "Native app reinstalled. Open it and check its data before deleting any exported files."
