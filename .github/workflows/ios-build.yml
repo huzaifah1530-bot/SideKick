@@ -83,8 +83,8 @@ jobs:
           git -C Vendor/SideStore apply ../../patches/sidestore-diagnostics.patch
           git -C Vendor/SideStore apply ../../patches/sidestore-health-check.patch
 
-      - name: Test authentication patch composition and bounded recovery
-        run: python3 -m unittest discover -s Tests/VendorRegression -p test_auth_compatibility_patch.py -v
+      - name: Test shipping patch composition and dependency recovery
+        run: python3 -m unittest discover -s Tests/VendorRegression -v
 
       - name: Add native Files transfer helper
         run: python3 scripts/embed-file-transfer.py Vendor/SideStore
