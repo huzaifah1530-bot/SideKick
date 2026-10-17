@@ -144,6 +144,8 @@ struct HomeView: View {
                                 GitHubUpdatesSummaryRow(queuedCount: queuedManualUpdates.count + unresolvedQueuedManualUpdates.count)
                             }
                         }
+                    } header: {
+                        Text("Overview")
                     }
                 } else if hasUpdateSources {
                     Section {
@@ -152,6 +154,8 @@ struct HomeView: View {
                         } label: {
                             GitHubUpdatesSummaryRow(queuedCount: queuedManualUpdates.count + unresolvedQueuedManualUpdates.count)
                         }
+                    } header: {
+                        Text("Overview")
                     }
                 }
 
