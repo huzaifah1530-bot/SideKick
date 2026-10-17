@@ -1,0 +1,56 @@
+Inspired by striker91n/SideKick commit 944b58eed152c9a7dfd12d94cc2c814e9a7452dc.
+Preserve strict explicit-peer selection and snapshot reachability inside the actor.
+
+--- a/Sources/Services/NetworkObserverService.swift
++++ b/Sources/Services/NetworkObserverService.swift
+@@ -117,26 +117,13 @@
+                     
+                     """)
+ 
+-                    let overrideIp = await manager.overridePeerIp
+-                    let isOverridden = !(overrideIp ?? "").isEmpty
+-
+-                    let effectiveIp = await isOverridden
+-                            ? (manager.isOverridePeerIpReachable ? overrideIp : nil)            // when override active, we don't question user intent
+-                            : (manager.isDerivedPeerIpReachable ? manager.derivedPeerIp : nil)  // only if not overriden, we try to use auto discovered
+-                    let effectivePeer = isOverridden ? "overridePeer" : "derivedPeerIp"
+-
+-                    if let peer = effectiveIp {
+-                        verboseLog("[minimuxer] [net] update device IP with effective tunnel peer: '\(effectivePeer)'")
+-                        await self.endpoint.update(peer)
+-                        self.proxyServer.notifyDeviceAttached(tunnelPeerIp: peer)
+-                    } else {
+-                        verboseLog("[minimuxer] [net] peer not available for \(info.name)")
+-                        await self.endpoint.clear()
+-                        self.proxyServer.notifyDeviceDetached()
+-                    }
+-
++                }
++                // A configured peer can be routed through a tunnel excluded by discovery.
++                if let peer = await manager.effectiveLocalVPNPeer() {
++                    await self.endpoint.update(peer)
++                    self.proxyServer.notifyDeviceAttached(tunnelPeerIp: peer)
+                 } else {
+-                    verboseLog("[minimuxer] [net] no local VPN interface detected")
++                    verboseLog("[minimuxer] [net] local VPN peer unavailable")
+                     await self.endpoint.clear()
+                     self.proxyServer.notifyDeviceDetached()
+                 }
+--- a/Sources/Services/DeviceConnectionManager.swift
++++ b/Sources/Services/DeviceConnectionManager.swift
+@@ -61,6 +61,15 @@
+     
+     func getPreferredConnectionMode() -> DeviceConnectionMode {
+         connectionConfigCache?.getConnectionMode() ?? .notConfigured
++    }
++
++    // Select from one actor-isolated state snapshot; do not silently switch devices
++    // when the user explicitly configured a peer that is currently unavailable.
++    func effectiveLocalVPNPeer() -> String? {
++        if let peer = overridePeerIp, !peer.isEmpty {
++            return isOverridePeerIpReachable ? peer : nil
++        }
++        return vpnIface != nil && isDerivedPeerIpReachable ? derivedPeerIp : nil
+     }
+ 
+     private func tcpProbe(_ ip: String?) async -> Bool {

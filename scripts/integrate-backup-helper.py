@@ -55,7 +55,17 @@ edit("SideBackup/ConsoleLog.swift",
 
 edit("SideStore/Core/Operations/PipelineOperations/ResignAppOperation.swift",
      '        self.debugLog("[ResignAppOperation] Resigned app',
-     '''        if resignedAppBundle.executableName == "SideBackup" {
+     '''        if resignedAppBundle.isAltStoreApp {
+            let groups = resignedAppBundle.entitlements[.appGroups] as? [String] ?? []
+            let existingGroup = Bundle.main.altstoreAppGroup
+            guard groups.contains(where: { $0.contains(Bundle.baseAltStoreAppGroupID) }),
+                  existingGroup.map({ groups.contains($0) }) ?? true else {
+                throw OperationError.invalidParameters("SideKick's update is missing its shared backup permission. The installed app has not been replaced. Use a SideKick build that preserves App Groups.")
+            }
+        }
+        // Foundation caches Bundle per path. Restore reuses App.app for the original app,
+        // so a cached executableName can still report the helper. Use the fresh Info.plist.
+        if resignedAppBundle.infoPlist["CFBundleExecutable"] as? String == "SideBackup" {
             guard let expected = resignedAppBundle.infoPlist["SideKickBackupAppGroup"] as? String,
                   (resignedAppBundle.entitlements[.appGroups] as? [String] ?? []).contains(expected) else {
                 throw OperationError.invalidParameters("The backup helper was signed without SideKick's shared backup group. The native app has not been replaced.")

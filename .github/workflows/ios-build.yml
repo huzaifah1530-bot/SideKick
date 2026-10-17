@@ -65,6 +65,7 @@ jobs:
           git -C Vendor/SideStore/Dependencies/SideSign apply ../../../../patches/sidesign-audit-fixes.patch
           git -C Vendor/SideStore/Dependencies/minimuxer apply ../../../../patches/minimuxer-audit-fixes.patch
           git -C Vendor/SideStore/Dependencies/minimuxer apply ../../../../patches/minimuxer-ipv4-netmask.patch
+          git -C Vendor/SideStore/Dependencies/minimuxer apply ../../../../patches/minimuxer-explicit-peer.patch
 
       - name: Apply Apple authentication compatibility after audited SideSign fixes
         run: |
@@ -78,7 +79,10 @@ jobs:
         run: python3 -m unittest discover -s Tests/VendorRegression -v
 
       - name: Apply SideKick backup helper integration
-        run: python3 scripts/integrate-backup-helper.py Vendor/SideStore
+        run: |
+          python3 scripts/integrate-backup-helper.py Vendor/SideStore
+          git -C Vendor/SideStore apply ../../patches/sidestore-signing-repairs.patch
+          git -C Vendor/SideStore/Dependencies/SideSign apply ../../../../patches/sidesign-required-app-groups.patch
 
       - name: Test vendor audit regressions
         run: |
@@ -168,7 +172,8 @@ jobs:
             done < <(find "$APP_PATH/Frameworks" -maxdepth 1 \( -name '*.framework' -o -name '*.dylib' \) -print0)
           fi
           codesign --force --sign - --entitlements SideKickVPN/SideKickVPN.entitlements "$VPN_PATH"
-          codesign --force --sign - --entitlements SideKickVPN/Host.entitlements "$APP_PATH"
+          python3 scripts/host-entitlements.py prepare SideKickVPN/Host.entitlements "$RUNNER_TEMP/sidekick-vpn.entitlements"
+          codesign --force --sign - --entitlements "$RUNNER_TEMP/sidekick-vpn.entitlements" "$APP_PATH"
 
           # Optional build for profiles that support Network Extensions.
           mkdir -p VPNPayload/Payload artifacts
@@ -176,17 +181,18 @@ jobs:
           (cd VPNPayload && zip -r -X ../artifacts/SideKick-vpn-unsigned.ipa Payload)
 
           # The default IPA works with free Apple IDs and external LocalDevVPN.
-          # Drop the extension AND the host's VPN entitlement requests.
+          # Remove only VPN requests; keep shared backup storage and other permissions.
           rm -rf "$VPN_PATH"
-          python3 - <<'PY'
-          import os, pathlib, plistlib
-          path = pathlib.Path(os.environ["RUNNER_TEMP"]) / "sidekick-external.entitlements"
-          path.write_bytes(plistlib.dumps({}))
-          PY
+          python3 scripts/host-entitlements.py prepare SideKickVPN/Host.entitlements "$RUNNER_TEMP/sidekick-external.entitlements" --external-vpn
           codesign --force --sign - --entitlements "$RUNNER_TEMP/sidekick-external.entitlements" "$APP_PATH"
           mkdir -p Payload
           cp -R "$APP_PATH" Payload/
           zip -r -X artifacts/SideKick-unsigned.ipa Payload
+
+      - name: Verify permission requests in both packaged IPAs
+        run: |
+          python3 scripts/host-entitlements.py verify artifacts/SideKick-unsigned.ipa "$RUNNER_TEMP/sidekick-external.entitlements"
+          python3 scripts/host-entitlements.py verify artifacts/SideKick-vpn-unsigned.ipa "$RUNNER_TEMP/sidekick-vpn.entitlements"
 
       - name: Create corresponding source archive
         run: |

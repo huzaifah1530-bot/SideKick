@@ -1,0 +1,198 @@
+--- a/SideStore/Core/Operations/PipelineOperations/PrepareAppExtensionBundleIDsOperation.swift
++++ b/SideStore/Core/Operations/PipelineOperations/PrepareAppExtensionBundleIDsOperation.swift
+@@ -18,12 +18,16 @@
+         }
+         try await super.executePreconditionCheck(parentProgress: parentProgress)
+         
++        self.context.appexBundleIds = nil
+         if self.context.useMainProfile {
+-            if let appBundle = self.context.targetAppBundle, let profile = self.context.provisioningProfiles?[self.context.bundleIdentifier] {
++            if let appBundle = self.context.targetAppBundle, let profile = self.context.provisioningProfiles?[self.context.targetBundleIdentifier] {
+                 var appexBundleIds: [String: String] = [:]
+                 for appex in appBundle.appExtensions {
+-                    appexBundleIds[appex.bundleIdentifier] = appex.bundleIdentifier
+-                        .replacingOccurrences(of: appBundle.bundleIdentifier, with: profile.bundleIdentifier)
++                    guard appex.bundleIdentifier.hasPrefix(appBundle.bundleIdentifier + ".") else {
++                        throw OperationError.invalidApp(reason: "An extension's bundle ID must be a child of its app's bundle ID.")
++                    }
++                    let suffix = appex.bundleIdentifier.dropFirst(appBundle.bundleIdentifier.count)
++                    appexBundleIds[appex.bundleIdentifier] = profile.bundleIdentifier + suffix
+                 }
+                 self.context.appexBundleIds = appexBundleIds
+             }
+--- a/SideStore/Core/Operations/PipelineOperations/ResignAppOperation.swift
++++ b/SideStore/Core/Operations/PipelineOperations/ResignAppOperation.swift
+@@ -58,7 +58,7 @@
+ 
+         let bundleIdentifier = context.targetBundleIdentifier
+         let finalBundleIdentifier: String
+-        if let profile = context.useMainProfile ? profiles.values.first : profiles[bundleIdentifier] {
++        if let profile = profiles[bundleIdentifier] {
+             finalBundleIdentifier = profile.bundleIdentifier
+         } else {
+             finalBundleIdentifier = bundleIdentifier
+@@ -114,14 +114,28 @@
+             try self.prepare(appExtension, bundleID: updatedAppExBundleId, profiles: profiles, appexBundleIds: appexBundleIds)
+         }
+         
++        guard let preparedApp = ALTApplication(fileURL: appBundleURL) else {
++            throw OperationError.invalidApp(reason: "Could not load the prepared app.")
++        }
++        try self.validateExtensionIdentifiers(in: preparedApp)
+         return appBundleURL
++    }
++
++    private func validateExtensionIdentifiers(in app: ALTApplication) throws {
++        var seen = Set<String>()
++        for appExtension in app.appExtensions {
++            let identifier = appExtension.bundleIdentifier
++            guard identifier.hasPrefix(app.bundleIdentifier + "."), seen.insert(identifier).inserted else {
++                throw OperationError.invalidApp(reason: "A kept extension has an invalid or duplicate bundle ID. Each extension must retain a unique child ID. If using an assigned profile, provide a matching extension profile or choose which extensions to remove.")
++            }
++        }
+     }
+     
+     private func prepare(_ appBundle: ALTApplication, bundleID identifier: String?, additionalInfoDictionaryValues: [String: Any] = [:], profiles: [String: ALTProvisioningProfile], appexBundleIds: [String: String]) throws {
+         guard let identifier else {
+             throw OperationError.invalidParameters("Bundle is missing bundle identifier.")
+         }
+-        guard let profile = context.useMainProfile ? profiles.values.first : profiles[identifier] else {
++        guard let profile = context.useMainProfile ? profiles[context.targetBundleIdentifier] : profiles[identifier] else {
+             throw OperationError.missingProvisioningProfile(reason: "No provisioning profile found for identifier '\(identifier)'.")
+         }
+         guard var parser = try? InfoPlistParser(plistURL: appBundle.infoPlistURL) else {
+@@ -129,7 +143,7 @@
+         }
+         var infoDictionary = parser.rawDictionary as [String: Any]
+         
+-        let newBundleID = appexBundleIds[identifier] ?? profile.bundleIdentifier
++        let newBundleID = appexBundleIds[appBundle.bundleIdentifier] ?? appexBundleIds[identifier] ?? profile.bundleIdentifier
+         infoDictionary[kCFBundleIdentifierKey as String] = newBundleID
+ 
+         // Fix-up BGTaskScheduler identifiers so they stay under the new bundle ID.
+@@ -190,7 +204,33 @@
+     
+     private func resignAppBundle(at fileURL: URL, team: ALTTeam, certificate: ALTCertificate, profiles: [ALTProvisioningProfile]) async throws -> URL {
+         let signer = ALTSigner(team: team, certificate: certificate)
+-        try await signer.signApp(at: fileURL, provisioningProfiles: profiles, progress: nil)
++        var requiredAppGroups: [String: [String]] = [:]
++        // Read the executable from the current Info.plist. Foundation caches Bundle per path,
++        // and restore re-stages the original app at the same App.app path the helper used.
++        if let app = ALTApplication(fileURL: fileURL), app.infoPlist["CFBundleExecutable"] as? String == "SideBackup" {
++            let grants = profiles.first(where: { $0.bundleIdentifier == app.bundleIdentifier })?.entitlements[.appGroups] as? [String] ?? []
++            guard let expected = app.infoPlist["SideKickBackupAppGroup"] as? String,
++                  expected == Bundle.main.altstoreAppGroup, grants.contains(expected) else {
++                throw OperationError.invalidParameters("The restore helper's signing profile must grant SideKick's existing shared backup group. Use the same signing team. The backup and installed app have not been changed.")
++            }
++            // Preparation removes the old signature. Restore its exact authorized request
++            // under the helper's adopted app ID, without granting it to unrelated apps.
++            requiredAppGroups[app.bundleIdentifier] = [expected]
++        }
++        if let app = ALTApplication(fileURL: fileURL), self.context.targetAppBundle?.isAltStoreApp == true || app.isAltStoreApp {
++            let grants = profiles.first(where: { $0.bundleIdentifier == app.bundleIdentifier })?.entitlements[.appGroups] as? [String] ?? []
++            let expected = app.bundleIdentifier == Bundle.Info.activeBundleIdentifier ? Bundle.main.altstoreAppGroup : nil
++            let required = expected.map { [$0] } ?? grants.filter {
++                $0 == Bundle.baseAltStoreAppGroupID || $0.hasPrefix(Bundle.baseAltStoreAppGroupID + ".")
++            }
++            guard !required.isEmpty, required.allSatisfy({ grants.contains($0) }) else {
++                throw OperationError.invalidParameters("The signing profile does not grant SideKick's shared backup group. Use the same signing team and a profile with App Groups enabled. The installed app has not been replaced.")
++            }
++            // Older retained sources can lack the request even when the live app has it.
++            // Pass only the exact manager bundle's profile-authorized backup groups.
++            requiredAppGroups[app.bundleIdentifier] = required
++        }
++        try await signer.signApp(at: fileURL, provisioningProfiles: profiles, progress: nil, requiredAppGroups: requiredAppGroups)
+         return fileURL
+     }
+     
+--- a/SideStore/Core/Operations/PipelineOperations/FetchProvisioningProfilesOperation.swift
++++ b/SideStore/Core/Operations/PipelineOperations/FetchProvisioningProfilesOperation.swift
+@@ -230,13 +230,27 @@
+         }
+     }
+     
++    private func backupGroup(for team: ALTTeam) -> String {
++        let activeTeam = ALTApplication(fileURL: Bundle.Info.activeBundleURL)?.provisioningProfile?.teamIdentifier
++        // A separate installation under another team gets its own group.
++        return (activeTeam == team.identifier ? Bundle.main.altstoreAppGroup : nil) ?? Bundle.baseAltStoreAppGroupID
++    }
++
++    private func requestedEntitlements(for targetAppBundle: ALTApplication, team: ALTTeam) -> [String: any Sendable] {
++        var entitlements = self.context.customEntitlementsByBundleID[targetAppBundle.bundleIdentifier]
++            ?? targetAppBundle.entitlements
++        for (key, value) in self.context.additionalEntitlements { entitlements[key] = value }
++        if !targetAppBundle.isExtension, targetAppBundle.isAltStoreApp {
++            var groups = entitlements[ALTEntitlement.appGroups.rawValue] as? [String] ?? []
++            let backupGroup = self.backupGroup(for: team)
++            if !groups.contains(backupGroup) { groups.append(backupGroup) }
++            entitlements[ALTEntitlement.appGroups.rawValue] = groups
++        }
++        return entitlements
++    }
++
+     func updateFeatures(for appID: ALTAppID, targetAppBundle: ALTApplication, team: ALTTeam) async throws -> ALTAppID {
+-        let bundleID = targetAppBundle.bundleIdentifier
+-        var entitlements = self.context.customEntitlementsByBundleID[bundleID]
+-            ?? targetAppBundle.entitlements
+-        for (key, value) in context.additionalEntitlements {
+-            entitlements[key] = value
+-        }
++        let entitlements = requestedEntitlements(for: targetAppBundle, team: team)
+         
+         guard let allowedFeatures = team.type.allowedFeatures else {
+             throw OperationError.invalidParameters("Cannot update features for unknown team type.")
+@@ -300,12 +314,7 @@
+     }
+     
+     func updateAppGroups(for appID: ALTAppID, targetAppBundle: ALTApplication, team: ALTTeam) async throws -> ALTAppID {
+-        let bundleID = targetAppBundle.bundleIdentifier
+-        var entitlements = self.context.customEntitlementsByBundleID[bundleID]
+-            ?? targetAppBundle.entitlements
+-        for (key, value) in self.context.additionalEntitlements {
+-            entitlements[key] = value
+-        }
++        let entitlements = requestedEntitlements(for: targetAppBundle, team: team)
+                 
+         guard var applicationGroups = entitlements[ALTEntitlement.appGroups.rawValue] as? [String], !applicationGroups.isEmpty else {
+             verboseLog("[FetchProvisioningProfiles] App ID \(appID.bundleIdentifier) has no app groups, skipping assignment.")
+@@ -333,7 +342,7 @@
+             }
+             
+             // Make sure we add .AltWidget for the widget
+-            var altStoreAppGroupID = Bundle.baseAltStoreAppGroupID
++            var altStoreAppGroupID = self.backupGroup(for: team)
+             for (_, group) in applicationGroups.enumerated() {
+                 if group.contains("AltWidget") {
+                     altStoreAppGroupID += ".AltWidget"
+@@ -420,6 +429,12 @@
+         }
+         #endif
+ 
++        if targetAppBundle.isAltStoreApp, groupIdentifier == Bundle.main.altstoreAppGroup {
++            guard ALTApplication(fileURL: Bundle.Info.activeBundleURL)?.provisioningProfile?.teamIdentifier == team.identifier else {
++                throw OperationError.invalidParameters("Re-signing SideKick must keep its signing team to preserve shared backup access.")
++            }
++            return groupIdentifier
++        }
+         let rawGroupID = groupIdentifier.hasPrefix("group.") ? String(groupIdentifier.dropFirst("group.".count)) : groupIdentifier
+         let targetBundleID = targetAppBundle.bundleIdentifier
+         let contextTargetBundleID = self.context.targetBundleIdentifier
+--- a/Shared/Extensions/Bundle+AltStore.swift
++++ b/Shared/Extensions/Bundle+AltStore.swift
+@@ -69,7 +69,7 @@
+ public extension Bundle
+ {
+     // @livecontainer
+-    @objc dynamic static let baseAltStoreAppGroupID = "group." + Bundle.Info.appbundleIdentifier
++    @objc dynamic static let baseAltStoreAppGroupID = "group.com.sidekick.app"
+ 
+     var appGroups: [String] {
+         guard let execURL = self.executableURL else { return [] }
+@@ -112,6 +112,6 @@
+         let matchesActiveBundle   = !activeID.isEmpty && self == activeID
+         let matchesAltStoreBundle = !altstoreID.isEmpty && self == altstoreID
+         
+-        return matchesActiveBundle || matchesAltStoreBundle
++        return matchesActiveBundle || matchesAltStoreBundle || self == "com.sidekick.app"
+     }
+ }
