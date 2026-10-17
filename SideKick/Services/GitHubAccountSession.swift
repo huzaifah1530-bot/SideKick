@@ -4,9 +4,9 @@ import Foundation
 /// (Settings → Developer settings → GitHub Apps). Neither value is secret.
 enum GitHubAppConfiguration {
     /// "Client ID" on the app's settings page (starts with "Iv").
-    static let clientID = ""
+    static let clientID = "Iv23liNJAemA3qF2Owxw"
     /// The app's URL name, as in github.com/apps/<slug>. Used for "Choose Repositories".
-    static let slug = ""
+    static let slug = "sidekick-huzaifah1530"
 
     static var isConfigured: Bool { !clientID.isEmpty }
     static var installURL: URL? { slug.isEmpty ? nil : URL(string: "https://github.com/apps/\(slug)/installations/new") }
