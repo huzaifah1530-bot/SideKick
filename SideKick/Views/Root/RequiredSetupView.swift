@@ -170,8 +170,11 @@ struct RequiredSetupView: View {
     @State private var isShowingSignIn = false
     @State private var credentials: (appleID: String, password: String)?
     @AppStorage("sidekick.setup.step") private var step = 0
+    @AppStorage("sidekick.setup.refresh-shortcut-added") private var refreshShortcutAdded = false
+    /// Set when setup is reopened from Settings: shows Close and runs this instead of ending setup.
+    var onFinish: (() -> Void)? = nil
 
-    private let lastStep = 3
+    private let lastStep = 5
 
     var body: some View {
         NavigationStack {
@@ -192,7 +195,9 @@ struct RequiredSetupView: View {
                     case 0: welcomePage
                     case 1: accountPage
                     case 2: pairingPage
-                    default: vpnPage
+                    case 3: vpnPage
+                    case 4: shortcutPage
+                    default: shortcutTestPage
                     }
                 }
                 .id(step)
@@ -202,7 +207,10 @@ struct RequiredSetupView: View {
                 VStack(spacing: 12) {
                     SwiftUI.Button {
                         if step == lastStep {
-                            Task { await status.completeSetup() }
+                            Task {
+                                await status.completeSetup()
+                                onFinish?()
+                            }
                         } else {
                             withAnimation(.easeInOut(duration: 0.2)) { step += 1 }
                         }
@@ -228,6 +236,12 @@ struct RequiredSetupView: View {
             .navigationTitle("SideKick Setup")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
+                if onFinish != nil {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        SwiftUI.Button("Close") { onFinish?() }
+                            .disabled(status.isBusy)
+                    }
+                }
                 if step > 0 {
                     ToolbarItem(placement: .topBarLeading) {
                         SwiftUI.Button {
@@ -373,6 +387,43 @@ struct RequiredSetupView: View {
             if status.isDeviceReady {
                 Label("iPhone Verified", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
             }
+        }
+    }
+
+    private var shortcutPage: some View {
+        onboardingPage(
+            symbol: "clock.arrow.circlepath",
+            title: "Refresh every day",
+            message: "Optional. A shortcut can refresh your apps on a schedule. Its SideKick step shows as not found when you add it; that’s expected and takes a minute to fix."
+        ) {
+            Link(destination: RefreshShortcut.downloadURL) {
+                Label("Get the Shortcut", systemImage: "1.circle")
+            }
+            .secondaryActionStyle()
+            NavigationLink { ShortcutRepairGuideView() } label: {
+                Label("Fix the SideKick Step", systemImage: "2.circle")
+            }
+            .secondaryActionStyle()
+            NavigationLink { DailyRefreshAutomationGuideView() } label: {
+                Label("Schedule It Daily", systemImage: "3.circle")
+            }
+            .secondaryActionStyle()
+            Toggle("I’ve Added the Shortcut", isOn: $refreshShortcutAdded)
+        }
+    }
+
+    private var shortcutTestPage: some View {
+        onboardingPage(
+            symbol: "checkmark.seal",
+            title: "Test the shortcut",
+            message: "Run it once to check the repaired SideKick step works. It connects LocalDevVPN, refreshes, then disconnects. Come back here when it finishes."
+        ) {
+            ShortcutTestPanel()
+                .secondaryActionStyle()
+            Text("Skipped the shortcut? Finish setup; you can test it later in Settings → App Refresh.")
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .multilineTextAlignment(.center)
         }
     }
 

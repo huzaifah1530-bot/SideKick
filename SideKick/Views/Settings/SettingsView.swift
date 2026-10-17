@@ -2,6 +2,9 @@ import SwiftUI
 import UIKit
 
 struct SettingsView: View {
+    @State private var isShowingSetup = false
+    @State private var setupStatus = SetupStatus()
+
     var body: some View {
         NavigationStack {
             List {
@@ -31,6 +34,14 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    SwiftUI.Button {
+                        UserDefaults.standard.set(0, forKey: "sidekick.setup.step")
+                        setupStatus = SetupStatus()
+                        isShowingSetup = true
+                    } label: {
+                        Label("Run Setup Again", systemImage: "wand.and.stars")
+                            .foregroundStyle(.primary)
+                    }
                     NavigationLink { AppearanceSettingsView() } label: {
                         Label("Appearance", systemImage: "paintpalette")
                     }
@@ -54,6 +65,10 @@ struct SettingsView: View {
             }
             .listStyle(.insetGrouped)
             .navigationTitle("Settings")
+            .fullScreenCover(isPresented: $isShowingSetup) {
+                RequiredSetupView(status: setupStatus) { isShowingSetup = false }
+                    .task { await setupStatus.refresh() }
+            }
         }
     }
 }

@@ -61,18 +61,32 @@ struct RefreshSettingsView: View {
             }
 
             Section {
-                Link("Get Refresh Shortcut", destination: URL(string: "https://www.icloud.com/shortcuts/2af57f665d434568a589f1e9b7d7f4d1")!)
-                Link("Open Shortcuts", destination: URL(string: "shortcuts://")!)
-                Toggle("I’ve Added the Shortcut", isOn: $refreshShortcutAdded)
+                Link(destination: RefreshShortcut.downloadURL) {
+                    Label("Get the Shortcut", systemImage: "1.circle")
+                }
+                .fullWidthListSeparators()
+                NavigationLink {
+                    ShortcutRepairGuideView()
+                } label: {
+                    Label("Fix the SideKick Step", systemImage: "2.circle")
+                }
+                .fullWidthListSeparators()
                 NavigationLink {
                     DailyRefreshAutomationGuideView()
                 } label: {
-                    Label("How to schedule daily refresh", systemImage: "list.number")
+                    Label("Schedule It Daily", systemImage: "3.circle")
                 }
+                .fullWidthListSeparators()
+                Link(destination: RefreshShortcut.shortcutsURL) {
+                    Label("Open Shortcuts", systemImage: "arrow.up.forward.app")
+                }
+                .fullWidthListSeparators()
+                Toggle("I’ve Added the Shortcut", isOn: $refreshShortcutAdded)
+                ShortcutTestPanel()
             } header: {
                 Text("Daily Automation")
             } footer: {
-                Text("Optional. Adding the shortcut doesn’t schedule it; set up a daily automation in Shortcuts.")
+                Text("Optional. After you add it, the shortcut’s SideKick step shows as not found. That’s expected; step 2 shows how to replace it.")
             }
         }
         .navigationTitle("App Refresh")
@@ -83,26 +97,30 @@ struct RefreshSettingsView: View {
     }
 }
 
-private struct DailyRefreshAutomationGuideView: View {
+struct DailyRefreshAutomationGuideView: View {
     var body: some View {
         List {
             Section {
-                Text("The refresh shortcut and its daily automation are separate. Installing the shortcut does not schedule it.")
-                Text("SideKick cannot read or confirm your personal automations. Check the Shortcuts app to see whether you created one.")
+                Text("The shortcut and its daily automation are separate. Adding the shortcut doesn’t schedule it.")
+                Text("SideKick can’t read or confirm your personal automations. Check the Shortcuts app to see whether you created one.")
                     .foregroundStyle(.secondary)
             }
             Section("Create a Daily Automation") {
                 Label("Open Shortcuts and choose Automation.", systemImage: "1.circle")
                 Label("Create a Time of Day automation and choose Daily.", systemImage: "2.circle")
-                Label("Choose Run Shortcut, then Refresh SideKick Apps.", systemImage: "3.circle")
-                Label("Set it to run immediately, then confirm.", systemImage: "4.circle")
+                Label("Choose Run Shortcut, then pick your repaired “Refresh SideKick Apps” shortcut.", systemImage: "3.circle")
+                Label("Turn on Run Immediately and turn off Notify When Run, then tap Done.", systemImage: "4.circle")
             }
             Section {
-                Text("You can skip automation and refresh from SideKick whenever you want. Background timing is controlled by iOS.")
-                    .foregroundStyle(.secondary)
+                Link(destination: RefreshShortcut.shortcutsURL) {
+                    Label("Open Shortcuts", systemImage: "arrow.up.forward.app")
+                }
+                .fullWidthListSeparators()
+            } footer: {
+                Text("Run Immediately lets it run without asking. You can skip automation and refresh from SideKick whenever you want; iOS controls background timing.")
             }
         }
-        .navigationTitle("Daily Refresh Guide")
+        .navigationTitle("Schedule It Daily")
         .navigationBarTitleDisplayMode(.inline)
     }
 }

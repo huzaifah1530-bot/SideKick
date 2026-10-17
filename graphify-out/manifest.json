@@ -330,15 +330,15 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Root/ContentView.swift": {
-    "mtime": 1792255253.33829,
-    "seen": 1792255292.1673195,
-    "ast_hash": "f6b301b6f0214f731a32157a6085a64b",
+    "mtime": 1792258777.2453966,
+    "seen": 1792260114.9145052,
+    "ast_hash": "47c502a50e9974e3175784a853c7aa0a",
     "semantic_hash": ""
   },
   "SideKick/Views/Root/RequiredSetupView.swift": {
-    "mtime": 1792244781.1470506,
-    "seen": 1792246536.670947,
-    "ast_hash": "c62fdf00716c27a46ebfac69d34d7bb5",
+    "mtime": 1792260079.3491447,
+    "seen": 1792260114.9145067,
+    "ast_hash": "72c294abd62f9a0561620ab626f7cc01",
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/GitHubAccountSettingsView.swift": {
@@ -366,15 +366,15 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/SettingsView.swift": {
-    "mtime": 1792255253.3297906,
-    "seen": 1792255292.1673408,
-    "ast_hash": "2104e9969b35891f878d8448ff65aa39",
+    "mtime": 1792260079.3501458,
+    "seen": 1792260114.9145215,
+    "ast_hash": "8298d55acc6f8a8733248f01d6b5be6a",
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/SideStoreSettingsPages.swift": {
-    "mtime": 1792245694.867589,
-    "seen": 1792246536.670963,
-    "ast_hash": "489108f2265e1348144f3cffd6d37593",
+    "mtime": 1792260079.3481448,
+    "seen": 1792260114.9145231,
+    "ast_hash": "795ac9fa91225908c89a34e40c3ba896",
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/SkippedGitHubUpdatesView.swift": {
@@ -3792,15 +3792,15 @@
     "semantic_hash": ""
   },
   "SideKick/Services/UnsavedSettingsCoordinator.swift": {
-    "mtime": 1792243852.3785307,
-    "seen": 1792246536.670904,
-    "ast_hash": "7fbd5007e614630eaaa84fdc9e1de3b8",
+    "mtime": 1792258777.2447345,
+    "seen": 1792260114.9144728,
+    "ast_hash": "9d27a6876f30b28f816cadbac16dc2e7",
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/UnsavedSettingsGuard.swift": {
-    "mtime": 1792096965.7543669,
-    "seen": 1792246536.6709692,
-    "ast_hash": "5051a90841933a2231a22c2672b7ee6e",
+    "mtime": 1792259585.2325113,
+    "seen": 1792260114.914528,
+    "ast_hash": "7e2c6f5b1218186cc4b74537dc1716dc",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_unsaved_settings.py": {
@@ -4005,6 +4005,18 @@
     "mtime": 1792255188.6511636,
     "seen": 1792255292.167336,
     "ast_hash": "95688021dc8822d9afaa44ae304613b0",
+    "semantic_hash": ""
+  },
+  "SideKick/Services/TabReselectGuard.swift": {
+    "mtime": 1792259585.2325113,
+    "seen": 1792260114.9144702,
+    "ast_hash": "011ea5550a97b9424a287d2c7ff218d1",
+    "semantic_hash": ""
+  },
+  "SideKick/Views/Settings/RefreshShortcutViews.swift": {
+    "mtime": 1792260055.6346939,
+    "seen": 1792260114.914519,
+    "ast_hash": "61b404ba35f251c6b2208dd0eb91ae96",
     "semantic_hash": ""
   }
 }
