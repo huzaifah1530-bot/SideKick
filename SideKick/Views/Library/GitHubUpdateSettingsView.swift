@@ -55,6 +55,30 @@ struct GitHubUpdateSettingsView: View {
     @State private var isDetectingSource = false
     @State private var detectionMessage: String?
     @State private var detectedRepository = ""
+    /// What's on disk (or the initial defaults for a new source). Leaving with a different draft
+    /// asks to save, like the other settings pages with a Save button.
+    @State private var savedDraft: Draft?
+
+    private struct Draft: Equatable {
+        let repositoryURL: String
+        let source: GitHubUpdateSource
+        let workflowFile: String
+        let branch: String
+        let assetName: String
+        let tokenID: String?
+        let baselineKey: String?
+    }
+
+    private var draft: Draft {
+        Draft(repositoryURL: repositoryURL.trimmingCharacters(in: .whitespacesAndNewlines), source: source,
+              workflowFile: source == .actionsArtifact ? workflowFile : "", branch: source == .actionsArtifact ? branch : "",
+              assetName: assetName, tokenID: tokenID, baselineKey: selectedBaselineKey)
+    }
+
+    private var isDirty: Bool {
+        guard let savedDraft else { return false }
+        return draft != savedDraft
+    }
 
     var body: some View {
         Form {
@@ -205,9 +229,9 @@ struct GitHubUpdateSettingsView: View {
         }
         .toolbar {
             ToolbarItem(placement: .confirmationAction) {
-                SwiftUI.Button("Save") { Task { await save() } }
+                SwiftUI.Button("Save") { Task { if await save() { dismiss() } } }
                     .fontWeight(.semibold)
-                    .disabled(repositoryURL.isEmpty)
+                    .disabled(repositoryURL.isEmpty || (hasSavedConfiguration && !isDirty))
             }
         }
         .confirmationDialog("Stop tracking updates?", isPresented: $isConfirmingRemoval, titleVisibility: .visible) {
@@ -220,6 +244,20 @@ struct GitHubUpdateSettingsView: View {
         } message: {
             Text("SideKick will stop checking GitHub for \(target.name). The installed app isn’t changed.")
         }
+        .guardUnsavedSettings(isDirty: isDirty, save: {
+            // The guard navigates away itself after a successful save.
+            await save()
+        }, discard: {
+            guard let savedDraft else { return }
+            repositoryURL = savedDraft.repositoryURL
+            source = savedDraft.source
+            workflowFile = savedDraft.workflowFile.isEmpty ? workflowFile : savedDraft.workflowFile
+            branch = savedDraft.branch
+            assetName = savedDraft.assetName
+            tokenID = savedDraft.tokenID
+            selectedBaselineKey = savedDraft.baselineKey
+            baselineWasEdited = false
+        })
         .navigationTitle("Update Source")
         .task(id: repositoryURL) {
             // Wait for typing to settle, then pick the source that actually publishes IPAs.
@@ -260,6 +298,12 @@ struct GitHubUpdateSettingsView: View {
                       let saved = try? await store.configuration(for: target.id),
                       saved.hasSameSource(as: draftConfiguration) else { return }
                 selectedBaselineKey = saved.effectiveBaselineKey
+                // Another screen saved a new installed build; that isn't an unsaved edit here.
+                if let current = savedDraft {
+                    savedDraft = Draft(repositoryURL: current.repositoryURL, source: current.source,
+                        workflowFile: current.workflowFile, branch: current.branch, assetName: current.assetName,
+                        tokenID: current.tokenID, baselineKey: saved.effectiveBaselineKey)
+                }
             }
         }
         .alert("GitHub Updates", isPresented: $showingMessage) {
@@ -274,6 +318,7 @@ struct GitHubUpdateSettingsView: View {
         do {
             guard let config = try await store.configuration(for: target.id) else {
                 loadedSource = sourceIdentity
+                savedDraft = draft
                 didFinishInitialLoad = true
                 historyTokenID = tokenID
                 hasHistoryTokenIdentity = true
@@ -290,6 +335,7 @@ struct GitHubUpdateSettingsView: View {
             installedNeedsConfirmation = config.installedBuild == nil || config.installedBuild?.observation != target.observation
             baselineWasEdited = false
             loadedSource = sourceIdentity
+            savedDraft = draft
             didFinishInitialLoad = true
             historyTokenID = tokenID
             hasHistoryTokenIdentity = true
@@ -304,13 +350,15 @@ struct GitHubUpdateSettingsView: View {
 
     }
 
+    /// Returns true when saved. Callers decide whether to leave the page.
     @MainActor
-    private func save() async {
+    @discardableResult
+    private func save() async -> Bool {
         guard let url = URL(string: repositoryURL), url.host?.lowercased() == "github.com",
               url.path.split(separator: "/").count >= 2 else {
             message = "Enter a valid GitHub repository URL."
             showingMessage = true
-            return
+            return false
         }
         do {
             let configuration = GitHubUpdateConfiguration(bundleIdentifier: target.id, repositoryURL: repositoryURL,
@@ -318,8 +366,14 @@ struct GitHubUpdateSettingsView: View {
                 lastInstalledUpdateKey: nil, tokenID: tokenID)
             try await store.saveSettings(configuration, baselineKey: selectedBaselineKey,
                 baselineWasEdited: baselineWasEdited, observation: target.observation)
-            dismiss()
-        } catch { message = error.localizedDescription; showingMessage = true }
+            savedDraft = draft
+            hasSavedConfiguration = true
+            return true
+        } catch {
+            message = error.localizedDescription
+            showingMessage = true
+            return false
+        }
     }
 
     @MainActor
