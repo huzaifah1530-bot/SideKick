@@ -86,7 +86,7 @@ struct AccountsView: View {
                 Section {
                     NavigationLink { GitHubAccountSettingsView() } label: {
                         HStack(spacing: Spacing.s) {
-                            AccountAvatar(email: githubAccount.username.isEmpty ? "G" : githubAccount.username, size: 44)
+                            AccountAvatar(kind: .github, id: githubAccount.username, size: 44)
                             VStack(alignment: .leading, spacing: 2) {
                                 Text(githubAccount.username.isEmpty ? "GitHub Account" : "@\(githubAccount.username)")
                                     .font(.body.weight(.semibold))
@@ -157,7 +157,7 @@ struct AccountsView: View {
     private func accountRow(_ account: SigningAccountSummary) -> some View {
         let needsSignIn = !account.hasSavedSession || account.rawTeamType == nil
         return HStack(spacing: Spacing.s) {
-            AccountAvatar(email: account.email, size: 44)
+            AccountAvatar(kind: .apple, id: account.email, size: 44)
             VStack(alignment: .leading, spacing: 2) {
                 Text(account.email)
                     .font(.body.weight(.semibold))
@@ -230,7 +230,7 @@ struct SigningAccountDetailView: View {
         List {
             Section {
                 VStack(spacing: Spacing.s) {
-                    AccountAvatar(email: currentAccount.email, size: 88)
+                    AccountAvatar(kind: .apple, id: currentAccount.email, size: 88)
                     VStack(spacing: Spacing.xxs) {
                         Text(currentAccount.email)
                             .font(.title3.weight(.bold))

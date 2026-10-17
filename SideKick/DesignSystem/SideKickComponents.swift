@@ -209,22 +209,61 @@ extension View {
 
 // MARK: - Account avatar
 
-/// Initial-letter avatar for Apple Accounts, tinted teal so accounts read as SideKick content.
+enum AccountAvatarKind: String {
+    case apple, github
+}
+
+/// Gives each account its own colour, picked at random from colours no other account uses yet.
+/// Colours only repeat once every colour is taken, and the choice is remembered per account.
+@MainActor
+enum AccountColorStore {
+    private static let key = "sidekick.accounts.avatar-colors"
+    static let palette: [Color] = [.red, .orange, .yellow, .green, .mint, .teal, .cyan, .blue, .indigo, .purple, .pink, .brown]
+
+    static func color(for kind: AccountAvatarKind, id: String) -> Color {
+        let accountKey = kind.rawValue + ":" + id.lowercased()
+        var assignments = UserDefaults.standard.dictionary(forKey: key) as? [String: Int] ?? [:]
+        if let index = assignments[accountKey], palette.indices.contains(index) { return palette[index] }
+        // Least-used colours first, so repeats only happen after every colour is in use.
+        var counts = [Int](repeating: 0, count: palette.count)
+        for index in assignments.values where palette.indices.contains(index) { counts[index] += 1 }
+        let fewest = counts.min() ?? 0
+        let choices = palette.indices.filter { counts[$0] == fewest }
+        let index = choices.randomElement() ?? 0
+        assignments[accountKey] = index
+        UserDefaults.standard.set(assignments, forKey: key)
+        return palette[index]
+    }
+}
+
+/// Coloured circle with the Apple or GitHub logo in whichever of black or white reads better.
 struct AccountAvatar: View {
-    let email: String
+    let kind: AccountAvatarKind
+    let id: String
     var size: CGFloat = 40
 
-    private var initial: String {
-        email.first.map { String($0).uppercased() } ?? "?"
+    var body: some View {
+        let background = AccountColorStore.color(for: kind, id: id)
+        let foreground: Color = RGBColor(background).prefersDarkText ? .black : .white
+        ZStack {
+            Circle().fill(background)
+            logo
+                .foregroundStyle(foreground)
+                .frame(width: size * (kind == .apple ? 0.46 : 0.52), height: size * (kind == .apple ? 0.46 : 0.52))
+                .offset(y: kind == .apple ? -size * 0.03 : 0)
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
     }
 
-    var body: some View {
-        Text(initial)
-            .font(size > 48 ? .title.weight(.semibold) : .headline)
-            .foregroundStyle(Color.sideKickAccent)
-            .frame(width: size, height: size)
-            .background(Color.sideKickAccentTint, in: Circle())
-            .accessibilityHidden(true)
+    @ViewBuilder
+    private var logo: some View {
+        switch kind {
+        case .apple:
+            Image(systemName: "apple.logo").resizable().scaledToFit()
+        case .github:
+            Image("GitHubMark").renderingMode(.template).resizable().scaledToFit()
+        }
     }
 }
 

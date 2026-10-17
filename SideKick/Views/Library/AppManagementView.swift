@@ -1174,7 +1174,7 @@ private struct AccountChoiceRow: View {
 
     var body: some View {
         HStack(spacing: Spacing.s) {
-            AccountAvatar(email: account.email)
+            AccountAvatar(kind: .apple, id: account.email)
             VStack(alignment: .leading, spacing: Spacing.xxs) {
                 Text(account.email)
                     .font(.body.weight(.semibold))

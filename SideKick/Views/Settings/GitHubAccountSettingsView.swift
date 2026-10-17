@@ -15,7 +15,7 @@ struct GitHubAccountSettingsView: View {
             Section {
                 if let account {
                     HStack(spacing: Spacing.s) {
-                        AccountAvatar(email: account.username.isEmpty ? "G" : account.username, size: 44)
+                        AccountAvatar(kind: .github, id: account.username, size: 44)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(account.username.isEmpty ? "GitHub Account" : "@\(account.username)")
                                 .font(.body.weight(.semibold))
