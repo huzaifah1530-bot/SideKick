@@ -1,0 +1,32 @@
+--- a/Sources/CodeSigning/CodeSignerAPI.swift
++++ b/Sources/CodeSigning/CodeSignerAPI.swift
+@@ -60,7 +60,11 @@
+         self.keyStore = keyStore
+     }
+ 
+-    public func signApp(at appURL: URL, provisioningProfiles profiles: [ProvisioningProfile], progress: Progress? = nil) async throws
++    public func signApp(at appURL: URL, provisioningProfiles profiles: [ProvisioningProfile], progress: Progress? = nil) async throws {
++        try await signApp(at: appURL, provisioningProfiles: profiles, progress: progress, requiredAppGroups: [:])
++    }
++
++    public func signApp(at appURL: URL, provisioningProfiles profiles: [ProvisioningProfile], progress: Progress? = nil, requiredAppGroups: [String: [String]]) async throws
+     {
+         debugLog("[SideSign] AppBundleSigner.signApp called")
+         verboseLog("[SideSign] URL: \(appURL.path), Profiles: \(profiles.map { "\($0.name) (\($0.bundleIdentifier))" })")
+@@ -95,7 +99,15 @@
+             var filteredEntitlements = matchedProfile.entitlements
+             verboseLog("[SideSign] Original profile entitlements: \(filteredEntitlements)")
+ 
+-            let applicationEntitlements = app.entitlements
++            var applicationEntitlements = app.entitlements
++            if let requestedGroups = requiredAppGroups[app.bundleIdentifier] {
++                let groupKey = "com.apple.security.application-groups"
++                let grantedGroups = matchedProfile.entitlements[groupKey] as? [String] ?? []
++                guard !requestedGroups.isEmpty, requestedGroups.allSatisfy({ grantedGroups.contains($0) }) else {
++                    throw SignerError.invalidApp(cause: "The profile does not authorize the required App Groups.")
++                }
++                applicationEntitlements[groupKey] = requestedGroups
++            }
+ 
+             for (key, _) in filteredEntitlements {
+                 if let applicationValue = applicationEntitlements[key] {
