@@ -8,6 +8,7 @@ struct ContentView: View {
     @State private var isForeground = false
     @State private var selectedTab = 0
     @State private var openedDownload: OpenedDownload?
+    private var appearance: AppearanceSettings { AppearanceSettings.shared }
     @State private var setupStatus = SetupStatus()
     @StateObject private var unsavedSettings = UnsavedSettingsCoordinator.shared
 
@@ -64,6 +65,8 @@ struct ContentView: View {
             await environment.startDatabase()
             if case .ready = environment.databaseState { await setupStatus.refresh() }
         }
+        .tint(appearance.accent)
+        .preferredColorScheme(appearance.mode.colorScheme)
         .onAppear(perform: applyWindowTint)
         .alert("Save changes?", isPresented: $unsavedSettings.isPresented) {
             SwiftUI.Button("Save") { Task { await unsavedSettings.saveAndLeave() } }
@@ -148,10 +151,7 @@ struct ContentView: View {
 
     /// UIKit-presented alerts, menus and share sheets read the window tint, not SwiftUI's.
     private func applyWindowTint() {
-        for scene in UIApplication.shared.connectedScenes {
-            guard let windowScene = scene as? UIWindowScene else { continue }
-            for window in windowScene.windows { window.tintColor = .sideKickAccent }
-        }
+        AppearanceSettings.shared.applyToWindows()
     }
 
     @ViewBuilder

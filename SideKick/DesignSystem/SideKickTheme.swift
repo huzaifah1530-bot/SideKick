@@ -2,22 +2,24 @@ import SwiftUI
 
 // MARK: - Colour
 
+@MainActor
 extension Color {
-    /// SideKick Teal. Light `#007A74` (5.2:1 on white), dark `#3DD6C6` (11.6:1 on black).
-    static let sideKickAccent = Color("SideKickAccent")
+    /// The accent: SideKick Teal by default (light `#007A74`, dark `#3DD6C6`), or the colour
+    /// chosen in Settings → Appearance. Reading it inside a view body subscribes to changes.
+    static var sideKickAccent: Color { AppearanceSettings.shared.accent }
     /// Label colour for content placed on a solid `sideKickAccent` fill.
-    /// White in light mode; deep teal in dark mode, where white on the light teal fails contrast.
-    static let sideKickOnAccent = Color("SideKickOnAccent")
-    /// Low-contrast teal surface for selected or highlighted content.
-    static let sideKickAccentTint = Color("SideKickAccentTint")
+    static var sideKickOnAccent: Color { AppearanceSettings.shared.onAccent }
+    /// Low-contrast accent surface for selected or highlighted content.
+    static var sideKickAccentTint: Color { AppearanceSettings.shared.accentTint }
 
     /// Kept for the SideStore host patch, which tints the root with `.sideKickBlue`.
-    static let sideKickBlue = sideKickAccent
-    static let sideKickCanvas = Color(uiColor: .systemGroupedBackground)
+    static var sideKickBlue: Color { sideKickAccent }
+    static var sideKickCanvas: Color { Color(uiColor: .systemGroupedBackground) }
 }
 
+@MainActor
 extension UIColor {
-    static let sideKickAccent = UIColor(named: "SideKickAccent") ?? .systemTeal
+    static var sideKickAccent: UIColor { AppearanceSettings.shared.accentUIColor }
 }
 
 // MARK: - Spacing

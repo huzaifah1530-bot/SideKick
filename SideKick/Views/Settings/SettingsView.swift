@@ -31,6 +31,9 @@ struct SettingsView: View {
                 }
 
                 Section {
+                    NavigationLink { AppearanceSettingsView() } label: {
+                        Label("Appearance", systemImage: "paintpalette")
+                    }
                     NavigationLink { AdvancedSettingsView() } label: {
                         Label("Advanced", systemImage: "wrench.and.screwdriver")
                     }
