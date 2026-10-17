@@ -2,6 +2,11 @@ import Foundation
 
 /// Uses a session delegate so download progress arrives during the transfer.
 /// The caller owns the returned temporary file and must remove it after importing.
+///
+/// Transfers run in a background `URLSession`, so iOS keeps downloading while SideKick is in
+/// the background or the screen is locked. Background sessions follow redirects without asking
+/// the delegate, so redirects are resolved first: that keeps a GitHub token from being sent on to
+/// a different host (such as GitHub's file storage). Needs proper testing on long downloads.
 final class ProgressFileDownload: NSObject, URLSessionDownloadDelegate, @unchecked Sendable {
     private let onProgress: @Sendable (GitHubDownloadProgress) -> Void
     private let lock = NSLock()
@@ -17,7 +22,10 @@ final class ProgressFileDownload: NSObject, URLSessionDownloadDelegate, @uncheck
     }
 
     func download(_ request: URLRequest) async throws -> (URL, URLResponse) {
-        try await withTaskCancellationHandler {
+        onProgress(GitHubDownloadProgress(bytesWritten: 0, totalBytesExpected: nil))
+        let resolved = try await RedirectResolver.resolve(request)
+        try Task.checkCancellation()
+        return try await withTaskCancellationHandler {
             try await withCheckedThrowingContinuation { continuation in
                 lock.lock()
                 if cancelled {
@@ -26,14 +34,16 @@ final class ProgressFileDownload: NSObject, URLSessionDownloadDelegate, @uncheck
                     return
                 }
                 self.continuation = continuation
-                let configuration = URLSessionConfiguration.ephemeral
+                let configuration = URLSessionConfiguration.background(
+                    withIdentifier: "sidekick.download.\(UUID().uuidString)")
+                configuration.isDiscretionary = false
+                configuration.sessionSendsLaunchEvents = false
                 configuration.urlCache = nil
                 let session = URLSession(configuration: configuration, delegate: self, delegateQueue: nil)
-                let task = session.downloadTask(with: request)
+                let task = session.downloadTask(with: resolved)
                 self.task = task
                 task.resume()
                 lock.unlock()
-                onProgress(GitHubDownloadProgress(bytesWritten: 0, totalBytesExpected: nil))
             }
         } onCancel: {
             self.lock.lock()
@@ -81,16 +91,50 @@ final class ProgressFileDownload: NSObject, URLSessionDownloadDelegate, @uncheck
             continuation?.resume(throwing: URLError(.cannotCreateFile))
         }
     }
+}
 
-    func urlSession(_ session: URLSession, task: URLSessionTask,
-                    willPerformHTTPRedirection response: HTTPURLResponse,
-                    newRequest request: URLRequest,
-                    completionHandler: @escaping (URLRequest?) -> Void) {
-        guard request.url?.scheme?.lowercased() == "https" else { completionHandler(nil); return }
-        var redirected = request
-        if request.url?.host?.lowercased() != task.originalRequest?.url?.host?.lowercased() {
-            redirected.setValue(nil, forHTTPHeaderField: "Authorization")
+/// Follows up to five HTTPS redirects with HEAD requests, dropping Authorization whenever the
+/// host changes, and returns the request for the final location.
+private enum RedirectResolver {
+    static func resolve(_ request: URLRequest) async throws -> URLRequest {
+        var current = request
+        let delegate = BlockRedirects()
+        let configuration = URLSessionConfiguration.ephemeral
+        configuration.urlCache = nil
+        let session = URLSession(configuration: configuration, delegate: delegate, delegateQueue: nil)
+        defer { session.finishTasksAndInvalidate() }
+        for _ in 0..<5 {
+            var probe = current
+            probe.httpMethod = "HEAD"
+            let response: URLResponse
+            do { (_, response) = try await session.data(for: probe) }
+            catch is CancellationError { throw CancellationError() }
+            catch {
+                // Some hosts reject HEAD. Download the current URL directly instead.
+                return current
+            }
+            guard let http = response as? HTTPURLResponse, (300..<400).contains(http.statusCode),
+                  let location = http.value(forHTTPHeaderField: "Location"),
+                  let next = URL(string: location, relativeTo: current.url)?.absoluteURL else {
+                return current
+            }
+            guard next.scheme?.lowercased() == "https" else { throw URLError(.secureConnectionFailed) }
+            var redirected = current
+            redirected.url = next
+            if next.host?.lowercased() != current.url?.host?.lowercased() {
+                redirected.setValue(nil, forHTTPHeaderField: "Authorization")
+            }
+            current = redirected
         }
-        completionHandler(redirected)
+        return current
+    }
+
+    private final class BlockRedirects: NSObject, URLSessionTaskDelegate, @unchecked Sendable {
+        func urlSession(_ session: URLSession, task: URLSessionTask,
+                        willPerformHTTPRedirection response: HTTPURLResponse,
+                        newRequest request: URLRequest,
+                        completionHandler: @escaping (URLRequest?) -> Void) {
+            completionHandler(nil)
+        }
     }
 }

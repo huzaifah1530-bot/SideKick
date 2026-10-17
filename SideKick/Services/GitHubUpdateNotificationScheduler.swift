@@ -13,6 +13,7 @@ enum GitHubUpdateNotificationRouteStore {
     private static let pendingRouteKey = "sidekick.github-update.pending-route"
 
     static func recordTap(userInfo: [AnyHashable: Any]) {
+        if RefreshFailureReport.recordTapIfFailure(userInfo: userInfo) { return }
         guard let bundleIdentifier = userInfo["bundleIdentifier"] as? String,
               !bundleIdentifier.isEmpty, bundleIdentifier.count <= 512,
               let updateKey = userInfo["updateKey"] as? String,

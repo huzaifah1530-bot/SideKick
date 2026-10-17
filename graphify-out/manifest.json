@@ -1,8 +1,8 @@
 {
   "Package.swift": {
-    "mtime": 1792179288.4190834,
-    "seen": 1792246536.6707804,
-    "ast_hash": "6a9611fc74842bf25fa084abdc7ddc13",
+    "mtime": 1792253434.1683562,
+    "seen": 1792253464.2400715,
+    "ast_hash": "887c0a2edb6107a2137dc333a70f503b",
     "semantic_hash": ""
   },
   "SideKickVPN/CIDRValidator.swift": {
@@ -90,9 +90,9 @@
     "semantic_hash": ""
   },
   "SideKick/Services/DailyRefreshShortcut.swift": {
-    "mtime": 1791827482.7626224,
-    "seen": 1792246536.6708357,
-    "ast_hash": "ca8b998ea3d17470e6d54d9077895185",
+    "mtime": 1792253094.3423088,
+    "seen": 1792253464.2401109,
+    "ast_hash": "4a461930ca867e625b5bbbdb75aa96a5",
     "semantic_hash": ""
   },
   "SideKick/Services/ExpirationNotificationScheduler.swift": {
@@ -144,9 +144,9 @@
     "semantic_hash": ""
   },
   "SideKick/Services/GitHubUpdateNotificationScheduler.swift": {
-    "mtime": 1791826606.2100413,
-    "seen": 1792246536.6708605,
-    "ast_hash": "d0386984a2bb3a810b183455251c6a3c",
+    "mtime": 1792253094.3428156,
+    "seen": 1792253464.240126,
+    "ast_hash": "e7786352a6a5b1b8570d8b7d13f51009",
     "semantic_hash": ""
   },
   "SideKick/Services/GitHubUpdateScanner.swift": {
@@ -192,9 +192,9 @@
     "semantic_hash": ""
   },
   "SideKick/Services/ProgressFileDownload.swift": {
-    "mtime": 1791637330.8912206,
-    "seen": 1792246536.67088,
-    "ast_hash": "15ffcb17a872007f69a977e8f1ae93c5",
+    "mtime": 1792252946.3967717,
+    "seen": 1792253464.2401385,
+    "ast_hash": "07c19999ee217f2338e500934ba25a89",
     "semantic_hash": ""
   },
   "SideKick/Services/SideKickCertificateExport.swift": {
@@ -282,9 +282,9 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Library/AppManagementView.swift": {
-    "mtime": 1792245291.6146128,
-    "seen": 1792246536.6709201,
-    "ast_hash": "0709eb6e5b7154ead61c721c81ac1ce4",
+    "mtime": 1792253434.1673563,
+    "seen": 1792253464.240168,
+    "ast_hash": "179b8493f59179ec40c7b0e5c7273746",
     "semantic_hash": ""
   },
   "SideKick/Views/Library/GitHubRepositoryImportView.swift": {
@@ -330,9 +330,9 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Root/ContentView.swift": {
-    "mtime": 1792251946.0860894,
-    "seen": 1792252018.9401395,
-    "ast_hash": "417f85c0a032646313a6a22aff5ef704",
+    "mtime": 1792253417.7392137,
+    "seen": 1792253464.240183,
+    "ast_hash": "3826b780a65a9abc5bed575ca25dcfef",
     "semantic_hash": ""
   },
   "SideKick/Views/Root/RequiredSetupView.swift": {
@@ -462,9 +462,9 @@
     "semantic_hash": ""
   },
   "Tests/VendorRegression/test_auth_compatibility_patch.py": {
-    "mtime": 1792246256.6088746,
-    "seen": 1792246536.6710417,
-    "ast_hash": "770f3456ef9cf445a282b473634942b8",
+    "mtime": 1792253056.0565863,
+    "seen": 1792253464.2402446,
+    "ast_hash": "f61690643d55e57e3c7ce2a34a44825f",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/App Detail/AppContentViewController.swift": {
@@ -3516,9 +3516,9 @@
     "semantic_hash": ""
   },
   ".github/workflows/ios-build.yml": {
-    "mtime": 1792246494.8718712,
-    "seen": 1792246536.6742673,
-    "ast_hash": "96f12738d5d7021ffb9c89224a1260a1",
+    "mtime": 1792253056.0565863,
+    "seen": 1792253464.2412436,
+    "ast_hash": "3c829faae8bb0f36f0c0a3f272b44aad",
     "semantic_hash": ""
   },
   "AGENTS.md": {
@@ -3975,6 +3975,24 @@
     "mtime": 1792251946.0829804,
     "seen": 1792252018.9401226,
     "ast_hash": "21affacf95d764e15c180a51d5afafb6",
+    "semantic_hash": ""
+  },
+  "SideKick/Services/RefreshFailureReport.swift": {
+    "mtime": 1792253078.7154953,
+    "seen": 1792253464.2401402,
+    "ast_hash": "844decf00a9bf80aab958cd59962bd0c",
+    "semantic_hash": ""
+  },
+  "SideKick/Services/UpdateSuccessRecord.swift": {
+    "mtime": 1792253384.0448084,
+    "seen": 1792253464.2401564,
+    "ast_hash": "ce9540b0311754997cebe73c45f92484",
+    "semantic_hash": ""
+  },
+  "SideKick/Views/Root/StatusSheets.swift": {
+    "mtime": 1792253400.7235854,
+    "seen": 1792253464.2401855,
+    "ast_hash": "839ac90f630fa237cf8b217b67182005",
     "semantic_hash": ""
   }
 }

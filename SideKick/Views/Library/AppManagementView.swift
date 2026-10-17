@@ -1237,6 +1237,7 @@ enum InstallStartState: Equatable {
 }
 
 struct InstallConsoleView: View {
+    @Environment(AppEnvironment.self) private var environment
     let app: ImportedIPA
     let account: SigningAccountSummary
     let accountStore: SigningAccountStore
@@ -1309,6 +1310,7 @@ struct InstallConsoleView: View {
     @MainActor
     private func runInstall() async {
         guard startState.begin() else { return }
+        if isUpdate { await recordPendingUpdate() }
         failure = nil
         stageSummary = isUpdate ? "Updating \(app.name)" : "Installing \(app.name)"
         append("Starting install · \(Date.now.formatted(date: .omitted, time: .standard))")
@@ -1340,6 +1342,7 @@ struct InstallConsoleView: View {
         } catch {
             failure = error.localizedDescription
             stageSummary = isUpdate ? "Couldn’t update \(app.name)" : "Couldn’t install \(app.name)"
+            if isUpdate { UpdateSuccessRecord.remove(bundleIdentifier: updateTargetBundleID) }
             append("ERROR · \(error.localizedDescription)")
             if let importError = error as? IPAImportError, case .sourceFileMissing = importError {
                 await onSourceMissing?()
@@ -1351,6 +1354,36 @@ struct InstallConsoleView: View {
     @MainActor
     private func append(_ message: String) {
         lines.append("[\(Date.now.formatted(date: .omitted, time: .standard))] \(message)")
+    }
+
+    private var installedTarget: InstalledAppSummary? {
+        if let id = app.queuedForInstalledAppID, let match = environment.installedApps.first(where: { $0.id == id }) { return match }
+        let matches = environment.installedApps.filter { $0.updateMatchingBundleIdentifiers.contains(app.bundleIdentifier.lowercased()) }
+        return matches.count == 1 ? matches.first : nil
+    }
+
+    private var updateTargetBundleID: String { installedTarget?.id ?? app.bundleIdentifier }
+
+    /// Saves old → new version (and release notes for GitHub releases) so SideKick can show
+    /// "Successfully Updated" once the new version is running, even if this update replaced SideKick.
+    @MainActor
+    private func recordPendingUpdate() async {
+        var record = UpdateSuccessRecord(
+            bundleIdentifier: updateTargetBundleID,
+            appName: app.name,
+            oldVersion: installedTarget.map { $0.buildVersion.isEmpty || $0.buildVersion == $0.version ? $0.version : "\($0.version) (\($0.buildVersion))" } ?? "Previous version",
+            newVersion: app.version,
+            newBuild: app.buildVersion ?? app.version,
+            iconData: app.iconData,
+            startedAt: .now
+        )
+        let tokenID = app.githubImportConfiguration?.tokenID
+        let token = try? GitHubCredentialStore().load(id: tokenID)
+        if let notes = await UpdateSuccessRecord.releaseNotes(updateKey: app.githubUpdateKey, repositoryURL: app.githubRepositoryURL, token: token) {
+            record.releaseTitle = notes.title
+            record.releaseNotes = notes.body
+        }
+        record.save()
     }
 
     @MainActor

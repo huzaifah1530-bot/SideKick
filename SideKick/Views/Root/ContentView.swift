@@ -8,6 +8,8 @@ struct ContentView: View {
     @State private var isForeground = false
     @State private var selectedTab = 0
     @State private var openedDownload: OpenedDownload?
+    @State private var completedUpdate: UpdateSuccessRecord?
+    @State private var refreshFailure: RefreshFailureReport?
     private var appearance: AppearanceSettings { AppearanceSettings.shared }
     @State private var setupStatus = SetupStatus()
     @StateObject private var unsavedSettings = UnsavedSettingsCoordinator.shared
@@ -39,6 +41,23 @@ struct ContentView: View {
                             .padding(.bottom, 72)
                             .animation(.smooth, value: environment.githubUpdateDownloads.activeJobIDs)
                             .animation(.smooth, value: environment.importDownloads.activeJobIDs)
+                    }
+                    .sheet(item: $completedUpdate, onDismiss: { checkCompletedUpdate() }) { record in
+                        UpdateSuccessSheet(record: record)
+                            .onAppear { UpdateSuccessRecord.remove(record) }
+                    }
+                    .sheet(item: $refreshFailure) { report in
+                        RefreshFailureSheet(report: report)
+                    }
+                    .onChange(of: environment.installedApps.map { "\($0.id)|\($0.version)|\($0.buildVersion)" }) { _, _ in
+                        checkCompletedUpdate()
+                    }
+                    .onAppear {
+                        checkCompletedUpdate()
+                        if let report = RefreshFailureReport.consumePendingTap() { refreshFailure = report }
+                    }
+                    .onReceive(NotificationCenter.default.publisher(for: RefreshFailureReport.tappedNotification)) { _ in
+                        if let report = RefreshFailureReport.consumePendingTap() { refreshFailure = report }
                     }
                     .sheet(item: $openedDownload) { item in
                         NavigationStack {
@@ -134,6 +153,13 @@ struct ContentView: View {
             }
     }
 
+    private func checkCompletedUpdate() {
+        guard completedUpdate == nil else { return }
+        completedUpdate = UpdateSuccessRecord.completed(installed: environment.installedApps.map {
+            (bundleIdentifier: $0.id, version: $0.version, build: $0.buildVersion)
+        })
+    }
+
     @ViewBuilder
     private func downloadPage(_ id: String) -> some View {
         if id.hasPrefix("import:"), let uuid = UUID(uuidString: String(id.dropFirst(7))) {
@@ -195,4 +221,8 @@ struct ContentView: View {
 
 private struct OpenedDownload: Identifiable {
     let id: String
+}
+
+extension RefreshFailureReport: Identifiable {
+    var id: Date { date }
 }

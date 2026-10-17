@@ -8,23 +8,17 @@ struct RefreshManagedAppsIntent: AppIntent {
     )
     static let openAppWhenRun = false
 
+    /// Never throws. A thrown error stops the whole shortcut, so the automation's next step
+    /// ("turn off VPN") would never run and the VPN would stay on. Failures are reported
+    /// through a notification and the returned text instead.
     func perform() async throws -> some ReturnsValue<String> {
         let result = await DailyRefreshAutomation.run()
         let status = "outcome=\(result.outcome.rawValue); succeeded=\(result.succeeded); attempted=\(result.attempted)"
-        switch result.outcome {
-        case .partialFailure, .operationUnavailable, .connectionUnavailable, .appListUnavailable:
-            throw RefreshAutomationFailure(
-                outcome: result.outcome,
-                succeeded: result.succeeded,
-                attempted: result.attempted
-            )
-        case .success, .alreadyRefreshed, .noEligibleApps:
-            return .result(value: status)
-        }
+        return .result(value: status)
     }
 }
 
-private struct RefreshAutomationFailure: LocalizedError {
+struct RefreshAutomationFailure: LocalizedError {
     let outcome: RefreshShortcutOutcome
     let succeeded: Int
     let attempted: Int
@@ -79,18 +73,54 @@ private enum DailyRefreshAutomation {
 
             let store = SigningAccountStore()
             await store.reload()
-            let outcome = await SideStoreOperationService(accountStore: store, ipaStore: IPAImportStore.shared)
-                .refreshAllManagedAppsQuietly()
+            let service = SideStoreOperationService(accountStore: store, ipaStore: IPAImportStore.shared)
+            let outcome = await service.refreshAllManagedAppsQuietly()
             guard outcome.succeeded == outcome.attempted, outcome.attempted > 0 else {
-                return (shortcutOutcome(for: outcome.failure), outcome.succeeded, outcome.attempted)
+                let result = shortcutOutcome(for: outcome.failure)
+                if result != .noEligibleApps {
+                    let items = outcome.appResults.filter { !$0.succeeded }.map {
+                        RefreshFailureReport.Item(appName: $0.appName, message: $0.failureMessage ?? "Refresh failed.")
+                    }
+                    await reportFailure(
+                        summary: RefreshAutomationFailure(outcome: result, succeeded: outcome.succeeded, attempted: outcome.attempted)
+                            .errorDescription ?? "The refresh didn’t finish.",
+                        detail: outcome.failureMessage,
+                        items: items,
+                        service: service
+                    )
+                }
+                return (result, outcome.succeeded, outcome.attempted)
             }
             UserDefaults.standard.set(Date.now, forKey: lastSuccessfulRunKey)
+            RefreshFailureReport.clear()
             return (.success, outcome.succeeded, outcome.attempted)
         } catch {
-            // The two daily Shortcuts automations are a silent retry window, not user-facing alerts.
             debugLog("[SideKick] Scheduled refresh did not complete: \(error.localizedDescription)")
-            return (error is LocalVPNError ? .connectionUnavailable : .operationUnavailable, 0, 0)
+            let result: RefreshShortcutOutcome = error is LocalVPNError ? .connectionUnavailable : .operationUnavailable
+            await reportFailure(
+                summary: RefreshAutomationFailure(outcome: result, succeeded: 0, attempted: 0).errorDescription ?? "The refresh didn’t start.",
+                detail: error.localizedDescription,
+                items: [],
+                service: SideStoreOperationService(accountStore: SigningAccountStore(), ipaStore: IPAImportStore.shared)
+            )
+            return (result, 0, 0)
         }
+    }
+
+    /// Saves what went wrong and notifies only when the soonest-expiring app has 4 days or fewer.
+    private static func reportFailure(summary: String, detail: String?, items: [RefreshFailureReport.Item],
+                                      service: SideStoreOperationService) async {
+        let apps = await service.installedApps().filter(\.isActive)
+        let soonest = apps.min { $0.expirationDate < $1.expirationDate }
+        let days = soonest.map { $0.expirationDate <= .now ? 0 : SigningExpiry.daysRemaining(until: $0.expirationDate) } ?? 7
+        var allItems = items
+        if allItems.isEmpty, let detail, !detail.isEmpty {
+            allItems = [RefreshFailureReport.Item(appName: "Refresh", message: detail)]
+        }
+        let report = RefreshFailureReport(date: .now, summary: summary, items: allItems,
+                                          soonestDays: days, soonestAppName: soonest?.name)
+        report.save()
+        await report.notifyIfNeeded()
     }
 
     private static func shortcutOutcome(for failure: QuietRefreshOutcome.Failure?) -> RefreshShortcutOutcome {

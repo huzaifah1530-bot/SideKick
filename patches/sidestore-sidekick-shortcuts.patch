@@ -1,0 +1,36 @@
+diff --git a/AltStore/Intents/App Intents/AppShortcuts.swift b/AltStore/Intents/App Intents/AppShortcuts.swift
+index 7beb1f6..6c3f783 100644
+--- a/AltStore/Intents/App Intents/AppShortcuts.swift	
++++ b/AltStore/Intents/App Intents/AppShortcuts.swift	
+@@ -12,16 +12,6 @@ import AppIntents
+ public struct ShortcutsProvider: AppShortcutsProvider
+ {
+     public static var appShortcuts: [AppShortcut] {
+-        AppShortcut(intent: RefreshAllAppsIntent(),
+-                    phrases: [
+-                        "Refresh \(.applicationName)",
+-                        "Refresh \(.applicationName) apps",
+-                        "Refresh my \(.applicationName) apps",
+-                        "Refresh apps with \(.applicationName)",
+-                    ],
+-                    shortTitle: "Refresh All Apps",
+-                    systemImageName: "arrow.triangle.2.circlepath")
+-
+         AppShortcut(intent: InstallIPAIntent(),
+                     phrases: [
+                         "Install IPA with \(.applicationName)",
+diff --git a/AltStore/Intents/App Intents/RefreshAllAppsIntent.swift b/AltStore/Intents/App Intents/RefreshAllAppsIntent.swift
+index 11b9bfb..42b532e 100644
+--- a/AltStore/Intents/App Intents/RefreshAllAppsIntent.swift	
++++ b/AltStore/Intents/App Intents/RefreshAllAppsIntent.swift	
+@@ -102,6 +102,10 @@ extension RefreshAllAppsIntent
+ @available(iOS 17.0, tvOS 17.0, *)
+ struct RefreshAllAppsIntent: AppIntent, CustomIntentMigratedAppIntent, PredictableIntent, ProgressReportingIntent, ForegroundContinuableIntent
+ {
++    // SideKick exposes its own "Refresh SideKick Apps" action; hide this duplicate from Shortcuts.
++    // The widget still runs it directly. Needs proper testing on existing user shortcuts.
++    static var isDiscoverable: Bool { false }
++
+     static let intentClassName = "RefreshAllIntent"
+     
+     static var title: LocalizedStringResource = "Refresh All Apps"
