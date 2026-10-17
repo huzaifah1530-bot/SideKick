@@ -152,6 +152,8 @@ struct URLImportView: View {
                         Text("Checking the downloaded IPA after transfer…")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
+                    SwiftUI.Button("Cancel Download", role: .cancel) { cancelDirectDownload() }
+                        .font(.body.weight(.semibold))
                 } else if let importedApp {
                     Label(
                         importedAsUpdate ? "Update queued for \(importedApp.name)" : "\(importedApp.name) is ready to install",
@@ -166,6 +168,11 @@ struct URLImportView: View {
                         }
                     } label: {
                         Label(importedAsUpdate ? "Review update" : "Review \(importedApp.name)", systemImage: "app")
+                    }
+                    SwiftUI.Button(role: .destructive) {
+                        Task { await deleteImportedApp(importedApp) }
+                    } label: {
+                        Label("Delete IPA", systemImage: "trash")
                     }
                 } else {
                     SwiftUI.Button {
@@ -254,6 +261,26 @@ struct URLImportView: View {
             pendingPreparedIPA = nil
             Task { await environment.ipaImportStore.discardPreparedIPA(app) }
         }
+    }
+
+    @MainActor
+    private func cancelDirectDownload() {
+        directDownloadID = nil
+        directDownloadTask?.cancel()
+        directDownloadTask = nil
+        isDownloading = false
+        downloadProgress = nil
+        if let app = pendingPreparedIPA { discardPendingPreparedIPA(app) }
+    }
+
+    @MainActor
+    private func deleteImportedApp(_ app: ImportedIPA) async {
+        do {
+            try await environment.ipaImportStore.delete(app)
+            importedApp = nil
+            importedAsUpdate = false
+            await onImported(app)
+        } catch { errorMessage = error.localizedDescription }
     }
 
     @MainActor

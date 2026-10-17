@@ -276,6 +276,12 @@ private struct GitHubRepositoryDownloadView: View {
                 if let importedApp {
                     Label("Ready to install", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
                     NavigationLink { AppManagementView(importedApp: importedApp) } label: { Label("Review App", systemImage: "app") }
+                    SwiftUI.Button(role: .destructive) {
+                        Task {
+                            do { try await environment.ipaImportStore.delete(importedApp); self.importedApp = nil }
+                            catch { errorMessage = error.localizedDescription }
+                        }
+                    } label: { Label("Delete IPA", systemImage: "trash") }
                 } else if task != nil {
                     ProgressView(value: progress?.fractionCompleted)
                     Text(progress.map { ByteCountFormatter.string(fromByteCount: $0.bytesWritten, countStyle: .file) + " downloaded" } ?? "Starting download…")

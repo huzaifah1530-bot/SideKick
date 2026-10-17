@@ -966,13 +966,19 @@ private struct SigningStatusRow: View {
     let isDisabled: Bool
     let refreshAll: () -> Void
 
+    /// Whole days only, so apps signed a few hours apart still read as the same day.
+    private func days(_ app: InstalledAppSummary) -> Int {
+        SigningExpiry.daysRemaining(until: app.expirationDate, now: now)
+    }
     private var soonest: InstalledAppSummary? { apps.min { $0.expirationDate < $1.expirationDate } }
-    private var soonestDays: Int { soonest.map { SigningExpiry.daysRemaining(until: $0.expirationDate, now: now) } ?? 7 }
+    private var soonestDays: Int { soonest.map(days) ?? 7 }
     private var hasExpired: Bool { soonest.map { $0.expirationDate <= now } ?? false }
+    private var allSameDay: Bool { Set(apps.map(days)).count <= 1 }
+    private static let warningThreshold = 4
 
     private var tone: StatusTone {
         if hasExpired { return .critical }
-        return soonestDays <= 2 ? .warning : .success
+        return soonestDays < Self.warningThreshold ? .warning : .success
     }
 
     private var title: String {
@@ -981,19 +987,22 @@ private struct SigningStatusRow: View {
             return "Refreshing apps"
         }
         if hasExpired { return "An app has expired" }
-        return soonestDays <= 2 ? "An app expires soon" : "All apps signed"
+        return soonestDays < Self.warningThreshold ? "Refresh soon" : "All apps signed"
     }
+
+    private var dayText: String { soonestDays == 1 ? "1 day" : "\(soonestDays) days" }
 
     private var subtitle: String {
         guard let soonest else { return "" }
         if isRefreshing { return "Keep SideKick open until this finishes" }
         if hasExpired { return "Refresh \(soonest.name) to use it again" }
-        return "\(soonest.name) expires \(SigningExpiry.description(until: soonest.expirationDate, now: now))"
+        if apps.count > 1 && allSameDay { return "All apps expire in \(dayText)" }
+        return "\(soonest.name) expires in \(dayText)"
     }
 
     var body: some View {
         HStack(spacing: Spacing.s) {
-            Image(systemName: tone == .success ? "checkmark.seal.fill" : "exclamationmark.circle.fill")
+            Image(systemName: tone == .success ? "checkmark.seal.fill" : "exclamationmark.triangle.fill")
                 .font(.title3)
                 .foregroundStyle(isRefreshing ? Color.sideKickAccent : tone.color)
                 .frame(width: 32)

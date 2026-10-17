@@ -293,3 +293,96 @@ struct RefreshActivityAccessory: View {
         .accessibilityHint("Shows My Apps")
     }
 }
+
+// MARK: - Floating downloads button
+
+extension View {
+    @ViewBuilder
+    func floatingGlassCircle() -> some View {
+        if #available(iOS 26, *) {
+            self.glassEffect(.regular.interactive(), in: .circle)
+        } else {
+            self.background(.regularMaterial, in: Circle())
+                .overlay(Circle().strokeBorder(Color.primary.opacity(0.1), lineWidth: 0.5))
+        }
+    }
+}
+
+/// Downloads that keep running after you leave their page collapse into this button.
+/// One download opens its page directly; several open a menu with each one's progress.
+struct ActiveDownloadsButton: View {
+    @Environment(AppEnvironment.self) private var environment
+    let open: (String) -> Void
+
+    private var store: GitHubUpdateDownloadStore { environment.githubUpdateDownloads }
+    private var ids: [String] { store.activeJobIDs }
+
+    var body: some View {
+        if !ids.isEmpty {
+            Group {
+                if ids.count == 1 {
+                    SwiftUI.Button { open(ids[0]) } label: { ring }
+                        .accessibilityLabel("\(name(ids[0])), \(status(ids[0]))")
+                } else {
+                    Menu {
+                        ForEach(ids, id: \.self) { id in
+                            SwiftUI.Button { open(id) } label: {
+                                Text(name(id))
+                                Text(status(id))
+                            }
+                        }
+                    } label: { ring }
+                    .accessibilityLabel("\(ids.count) downloads")
+                }
+            }
+            .buttonStyle(.plain)
+            .transition(.scale.combined(with: .opacity))
+        }
+    }
+
+    private var ring: some View {
+        let downloading = ids.compactMap { store.jobs[$0] }.filter(\.isDownloading)
+        let progress = downloading.isEmpty ? 1 : downloading.map { $0.progress ?? 0 }.reduce(0, +) / Double(downloading.count)
+        return ZStack {
+            Circle().stroke(Color.primary.opacity(0.12), lineWidth: 3)
+            Circle()
+                .trim(from: 0, to: max(progress, 0.02))
+                .stroke(Color.sideKickAccent, style: StrokeStyle(lineWidth: 3, lineCap: .round))
+                .rotationEffect(.degrees(-90))
+                .animation(.smooth, value: progress)
+            Image(systemName: downloading.isEmpty ? "checkmark" : "arrow.down")
+                .font(.headline)
+                .foregroundStyle(Color.sideKickAccent)
+        }
+        .padding(Spacing.s)
+        .frame(width: 56, height: 56)
+        .floatingGlassCircle()
+        .overlay(alignment: .topTrailing) {
+            if ids.count > 1 {
+                Text("\(ids.count)")
+                    .font(.caption2.weight(.bold))
+                    .foregroundStyle(Color.sideKickOnAccent)
+                    .frame(minWidth: 18, minHeight: 18)
+                    .background(Color.sideKickAccent, in: Circle())
+                    .offset(x: 2, y: -2)
+            }
+        }
+        .contentShape(Circle())
+    }
+
+    private func name(_ id: String) -> String {
+        guard let candidate = store.candidates[id] else { return "Download" }
+        return environment.installedApps.first { $0.id == candidate.bundleIdentifier }?.name
+            ?? environment.liveContainerState.apps.first { $0.id == candidate.bundleIdentifier }?.name
+            ?? candidate.appName
+    }
+
+    private func status(_ id: String) -> String {
+        guard let job = store.jobs[id] else { return "" }
+        if job.isDownloading {
+            guard let progress = job.progress else { return "Starting…" }
+            return "Downloading · \(Int(progress * 100))%"
+        }
+        return "Ready to install"
+    }
+}

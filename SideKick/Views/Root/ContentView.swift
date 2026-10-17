@@ -7,6 +7,7 @@ struct ContentView: View {
     @Environment(AppEnvironment.self) private var environment
     @State private var isForeground = false
     @State private var selectedTab = 0
+    @State private var openedDownload: OpenedDownload?
     @State private var setupStatus = SetupStatus()
     @StateObject private var unsavedSettings = UnsavedSettingsCoordinator.shared
 
@@ -30,6 +31,22 @@ struct ContentView: View {
                     }
                     .refreshActivityAccessory(environment.refreshActivity) {
                         unsavedSettings.requestNavigation { selectedTab = 0 }
+                    }
+                    .overlay(alignment: .bottomTrailing) {
+                        ActiveDownloadsButton { id in openedDownload = OpenedDownload(id: id) }
+                            .padding(.trailing, Spacing.m)
+                            .padding(.bottom, 72)
+                            .animation(.smooth, value: environment.githubUpdateDownloads.activeJobIDs)
+                    }
+                    .sheet(item: $openedDownload) { item in
+                        NavigationStack {
+                            downloadPage(item.id)
+                                .toolbar {
+                                    ToolbarItem(placement: .cancellationAction) {
+                                        SwiftUI.Button("Done") { openedDownload = nil }
+                                    }
+                                }
+                        }
                     }
                 } else {
                     RequiredSetupView(status: setupStatus)
@@ -113,6 +130,22 @@ struct ContentView: View {
             }
     }
 
+    @ViewBuilder
+    private func downloadPage(_ id: String) -> some View {
+        if let candidate = environment.githubUpdateDownloads.candidates[id] {
+            if candidate.targetKind == .liveContainer {
+                LiveContainerGuestDetailView(guestID: candidate.bundleIdentifier)
+            } else if let app = environment.installedApps.first(where: { $0.id == candidate.bundleIdentifier }) {
+                GitHubUpdateDetailView(candidate: candidate, app: app)
+            } else {
+                ContentUnavailableView("App Not Found", systemImage: "app.dashed",
+                    description: Text("The app this download was for is no longer installed."))
+            }
+        } else {
+            ContentUnavailableView("Download Finished", systemImage: "checkmark.circle")
+        }
+    }
+
     /// UIKit-presented alerts, menus and share sheets read the window tint, not SwiftUI's.
     private func applyWindowTint() {
         for scene in UIApplication.shared.connectedScenes {
@@ -155,4 +188,8 @@ struct ContentView: View {
             EmptyView()
         }
     }
+}
+
+private struct OpenedDownload: Identifiable {
+    let id: String
 }

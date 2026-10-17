@@ -23,6 +23,8 @@ struct GitHubUpdateDetailView: View {
     @State private var buildHistoryPage = 0
     @State private var hasMoreBuilds = true
     @State private var installedBuildKey: String?
+    @State private var isShowingInstall = false
+    @State private var isConfirmingDelete = false
 
     private let configurationStore = GitHubUpdateConfigurationStore.shared
 
@@ -66,6 +68,25 @@ struct GitHubUpdateDetailView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .safeAreaInset(edge: .bottom) {
+            if !showsDetails && !isVersionSelection {
+                BottomActionBar { reviewActions }
+            }
+        }
+        .navigationDestination(isPresented: $isShowingInstall) {
+            if let queuedIPA = downloadJob?.queuedIPA { installDestination(for: queuedIPA) }
+        }
+        .onAppear { environment.githubUpdateDownloads.visibleJobID = selectedCandidate.id }
+        .onDisappear {
+            if environment.githubUpdateDownloads.visibleJobID == selectedCandidate.id {
+                environment.githubUpdateDownloads.visibleJobID = nil
+            }
+        }
+        .confirmationDialog("Delete downloaded IPA?", isPresented: $isConfirmingDelete, titleVisibility: .visible) {
+            SwiftUI.Button("Delete IPA", role: .destructive) { Task { await deleteDownloadedIPA() } }
+        } message: {
+            Text("You can download it again later. The installed app isn’t changed.")
+        }
         .toolbar { reviewToolbar }
         .navigationTitle(isVersionSelection ? "Install Version" : showsDetails ? "Builds" : "Update")
         .navigationBarTitleDisplayMode(.inline)
@@ -185,6 +206,7 @@ struct GitHubUpdateDetailView: View {
                 onDownload: { startDownload() },
                 onCancel: { environment.githubUpdateDownloads.cancelDownload(for: selectedCandidate) },
                 onSkip: { Task { await resolveUpdate(markInstalled: false) } },
+                onDelete: { isConfirmingDelete = true },
                 allowsSkip: !isVersionSelection && selectedCandidate.updateKey == candidate.updateKey,
                 isDisabled: isLoadingToken
             ) {
@@ -262,22 +284,6 @@ struct GitHubUpdateDetailView: View {
             }
         }
 
-        Section {
-            GitHubUpdateDownloadControls(
-                job: downloadJob,
-                onDownload: { startDownload() },
-                onCancel: { environment.githubUpdateDownloads.cancelDownload(for: selectedCandidate) },
-                onSkip: {},
-                allowsSkip: false,
-                isDisabled: isLoadingToken
-            ) {
-                if let queuedIPA = downloadJob?.queuedIPA { installAction(for: queuedIPA) }
-            }
-        } footer: {
-            if downloadJob?.queuedIPA == nil {
-                Text("Nothing installs until you tap Install Update.")
-            }
-        }
     }
 
     private var installedBuildText: String {
@@ -316,38 +322,95 @@ struct GitHubUpdateDetailView: View {
         }
     }
 
+    /// List-row form, used inside Builds & Details.
     @ViewBuilder
     private func installAction(for queuedIPA: ImportedIPA) -> some View {
+        NavigationLink { installDestination(for: queuedIPA) } label: {
+            Label(account == nil ? "Reconnect Account to Install" : (isVersionSelection ? "Install This Version" : "Install Update"),
+                  systemImage: account == nil ? "person.crop.circle.badge.exclamationmark" : "arrow.down.circle.fill")
+                .font(.body.weight(.semibold))
+                .foregroundStyle(Color.sideKickAccent)
+        }
+    }
+
+    @ViewBuilder
+    private func installDestination(for queuedIPA: ImportedIPA) -> some View {
         if let account {
-            NavigationLink {
-                InstallConsoleView(
-                    app: queuedIPA,
-                    account: account,
-                    accountStore: accountStore,
-                    ipaStore: environment.ipaImportStore,
-                    isUpdate: true,
-                    onInstalled: { await finishUpdate(queuedIPA) },
-                    onSourceMissing: { await validateDownload() }
-                )
-            } label: {
-                ActionLabel(isVersionSelection ? "Install This Version" : "Install Update")
-            }
-            .primaryActionStyle()
+            InstallConsoleView(
+                app: queuedIPA,
+                account: account,
+                accountStore: accountStore,
+                ipaStore: environment.ipaImportStore,
+                isUpdate: true,
+                onInstalled: { await finishUpdate(queuedIPA) },
+                onSourceMissing: { await validateDownload() }
+            )
         } else if let installedTeamAccount = eligibleAccounts.first(where: {
             $0.accountIdentifier == app.accountIdentifier && $0.teamIdentifier == app.teamIdentifier
         }) {
-            NavigationLink {
-                SigningAccountDetailView(account: installedTeamAccount, accountStore: accountStore)
-            } label: {
-                ActionLabel("Reconnect Account to Install", systemImage: "person.crop.circle.badge.exclamationmark")
-            }
-            .primaryActionStyle()
+            SigningAccountDetailView(account: installedTeamAccount, accountStore: accountStore)
         } else {
-            NavigationLink { AccountsView() } label: {
-                ActionLabel("Add Account for Team \(app.teamIdentifier)", systemImage: "person.crop.circle.badge.plus")
+            AccountsView()
+        }
+    }
+
+    /// Bottom actions for the review screen: download → progress + Cancel → Update / Re-download + Delete IPA.
+    @ViewBuilder
+    private var reviewActions: some View {
+        if let job = downloadJob, job.isDownloading {
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                HStack {
+                    Text("Downloading").font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Text(job.progress.map { "\(Int($0 * 100))%" } ?? "Starting…")
+                        .font(.subheadline.monospacedDigit()).foregroundStyle(.secondary)
+                }
+                ProgressView(value: job.progress ?? 0).tint(.sideKickAccent)
+            }
+            .accessibilityElement(children: .combine)
+            SwiftUI.Button { environment.githubUpdateDownloads.cancelDownload(for: selectedCandidate) } label: {
+                ActionLabel("Cancel Download")
+            }
+            .secondaryActionStyle()
+            .tint(.red)
+        } else if downloadJob?.queuedIPA != nil {
+            HStack(spacing: Spacing.s) {
+                SwiftUI.Button { isShowingInstall = true } label: {
+                    ActionLabel(account == nil ? "Reconnect" : (isVersionSelection ? "Install" : "Update"))
+                }
+                .primaryActionStyle()
+                SwiftUI.Button { startDownload() } label: {
+                    ActionLabel("Re-download", systemImage: "arrow.clockwise")
+                }
+                .secondaryActionStyle()
+                .tint(.sideKickAccent)
+                .disabled(isLoadingToken)
+            }
+            SwiftUI.Button("Delete IPA", role: .destructive) { isConfirmingDelete = true }
+                .font(.body.weight(.semibold))
+                .frame(minHeight: 44)
+        } else {
+            if let message = downloadJob?.errorMessage {
+                Label(message, systemImage: "exclamationmark.triangle.fill")
+                    .font(.footnote).foregroundStyle(.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            SwiftUI.Button { startDownload() } label: {
+                ActionLabel(downloadJob?.errorMessage == nil ? "Download Update" : "Try Again", systemImage: "arrow.down.circle")
             }
             .primaryActionStyle()
+            .disabled(isLoadingToken)
         }
+    }
+
+    @MainActor
+    private func deleteDownloadedIPA() async {
+        do {
+            try await environment.githubUpdateDownloads.discardDownload(for: selectedCandidate, ipaImportStore: environment.ipaImportStore)
+            if let leftover = matchingQueuedIPA(in: (try? await environment.ipaImportStore.importedApps()) ?? []) {
+                try await environment.ipaImportStore.delete(leftover)
+            }
+        } catch { errorMessage = error.localizedDescription }
     }
 
     @MainActor
@@ -507,6 +570,7 @@ struct GitHubUpdateDownloadControls<FinalAction: View>: View {
     let onDownload: () -> Void
     let onCancel: () -> Void
     let onSkip: () -> Void
+    let onDelete: (() -> Void)?
     let allowsSkip: Bool
     let isDisabled: Bool
     let isSkipDisabled: Bool
@@ -518,6 +582,7 @@ struct GitHubUpdateDownloadControls<FinalAction: View>: View {
         onDownload: @escaping () -> Void,
         onCancel: @escaping () -> Void,
         onSkip: @escaping () -> Void,
+        onDelete: (() -> Void)? = nil,
         allowsSkip: Bool = true,
         isDisabled: Bool = false,
         isSkipDisabled: Bool = false,
@@ -527,6 +592,7 @@ struct GitHubUpdateDownloadControls<FinalAction: View>: View {
         self.onDownload = onDownload
         self.onCancel = onCancel
         self.onSkip = onSkip
+        self.onDelete = onDelete
         self.allowsSkip = allowsSkip
         self.isDisabled = isDisabled
         self.isSkipDisabled = isSkipDisabled
@@ -572,10 +638,11 @@ struct GitHubUpdateDownloadControls<FinalAction: View>: View {
                 actionButton("Try Again", action: onDownload)
             } else if job?.queuedIPA != nil {
                 finalAction().disabled(isDisabled)
-                SwiftUI.Button("Download Again", action: onDownload)
-                    .font(.subheadline.weight(.semibold))
-                    .frame(maxWidth: .infinity)
+                SwiftUI.Button { onDownload() } label: { Label("Re-download IPA", systemImage: "arrow.clockwise") }
                     .disabled(isDisabled)
+                if let onDelete {
+                    SwiftUI.Button(role: .destructive, action: onDelete) { Label("Delete IPA", systemImage: "trash") }
+                }
             } else {
                 actionButton("Download IPA", action: onDownload).disabled(isDisabled)
             }

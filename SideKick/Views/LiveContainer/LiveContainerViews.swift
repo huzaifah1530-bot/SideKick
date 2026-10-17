@@ -553,6 +553,13 @@ struct LiveContainerGuestDetailView: View {
             } else { ContentUnavailableView("App Not Found", systemImage: "app.dashed") }
         }
         .listStyle(.insetGrouped)
+        .onChange(of: candidate?.id) { _, id in environment.githubUpdateDownloads.visibleJobID = id }
+        .onAppear { if let id = candidate?.id { environment.githubUpdateDownloads.visibleJobID = id } }
+        .onDisappear {
+            if let id = candidate?.id, environment.githubUpdateDownloads.visibleJobID == id {
+                environment.githubUpdateDownloads.visibleJobID = nil
+            }
+        }
         .navigationTitle(guest?.name ?? "LiveContainer App")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
@@ -651,6 +658,12 @@ struct LiveContainerGuestDetailView: View {
                 onDownload: { Task { await updateInLiveContainer(candidate, handoffIfQueued: false) } },
                 onCancel: { environment.githubUpdateDownloads.cancelDownload(for: candidate) },
                 onSkip: { Task { await resolve(markInstalled: false) } },
+                onDelete: {
+                    Task {
+                        do { try await environment.githubUpdateDownloads.discardDownload(for: candidate, ipaImportStore: environment.ipaImportStore) }
+                        catch { message = error.localizedDescription }
+                    }
+                },
                 isDisabled: working || isCheckingUpdates || !canCheckUpdates,
                 isSkipDisabled: working || isCheckingUpdates
             ) {

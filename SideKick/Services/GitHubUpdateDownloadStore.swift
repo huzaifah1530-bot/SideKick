@@ -14,6 +14,20 @@ struct GitHubUpdateDownloadJob: Equatable {
 @Observable
 final class GitHubUpdateDownloadStore {
     private(set) var jobs: [String: GitHubUpdateDownloadJob] = [:]
+    /// What each job downloads, so the floating downloads button can reopen its page.
+    private(set) var candidates: [String: GitHubUpdateCandidate] = [:]
+    /// Jobs started this session, in start order. Restored queued files aren't "active downloads".
+    private(set) var sessionJobIDs: [String] = []
+    /// The job whose page is on screen; the floating button hides it so it isn't shown twice.
+    var visibleJobID: String?
+
+    /// Downloads to surface in the floating button: running, or finished and waiting to install.
+    var activeJobIDs: [String] {
+        sessionJobIDs.filter { id in
+            guard id != visibleJobID, let job = jobs[id] else { return false }
+            return job.isDownloading || job.queuedIPA != nil
+        }
+    }
     @ObservationIgnored private var generations: [String: UUID] = [:]
     @ObservationIgnored private var tasks: [String: Task<Void, Never>] = [:]
     @ObservationIgnored private var forgettingGuestTargets: Set<String> = []
@@ -30,6 +44,8 @@ final class GitHubUpdateDownloadStore {
         let generation = UUID()
         let previousQueuedIPA = jobs[candidate.id]?.queuedIPA
         generations[candidate.id] = generation
+        candidates[candidate.id] = candidate
+        if !sessionJobIDs.contains(candidate.id) { sessionJobIDs.append(candidate.id) }
         jobs[candidate.id] = GitHubUpdateDownloadJob(
             progress: nil,
             bytesWritten: 0,
@@ -89,7 +105,17 @@ final class GitHubUpdateDownloadStore {
                 guard self.generations[candidate.id] == generation else { return }
                 let message: String
                 if Task.isCancelled || error is CancellationError || (error as? URLError)?.code == .cancelled {
-                    message = "Download canceled. Tap Try Again to restart."
+                    // Canceling just stops: return to the previous state with no error.
+                    if let previous = self.jobs[candidate.id]?.queuedIPA {
+                        self.jobs[candidate.id] = GitHubUpdateDownloadJob(progress: 1, bytesWritten: 0, totalBytesExpected: nil,
+                            isDownloading: false, queuedIPA: previous, errorMessage: nil)
+                    } else {
+                        self.jobs[candidate.id] = nil
+                        self.sessionJobIDs.removeAll { $0 == candidate.id }
+                    }
+                    self.tasks[candidate.id] = nil
+                    self.generations[candidate.id] = nil
+                    return
                 } else {
                     message = error.localizedDescription
                 }
@@ -114,6 +140,15 @@ final class GitHubUpdateDownloadStore {
         tasks[candidate.id]?.cancel()
         tasks[candidate.id] = nil
         jobs[candidate.id] = nil
+        candidates[candidate.id] = nil
+        sessionJobIDs.removeAll { $0 == candidate.id }
+    }
+
+    /// Cancels a running download, or deletes a finished one's IPA, and forgets the job.
+    func discardDownload(for candidate: GitHubUpdateCandidate, ipaImportStore: IPAImportStore) async throws {
+        let queued = jobs[candidate.id]?.queuedIPA
+        removeJob(for: candidate)
+        if let queued { try await ipaImportStore.delete(queued) }
     }
 
     /// Blocks new work, cancels and joins in-flight downloads, then removes
