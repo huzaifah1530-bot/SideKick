@@ -32,6 +32,7 @@ struct ContentView: View {
                             SettingsView()
                         }
                     }
+                    .onAppear(perform: installTabReselectGuard)
                     .refreshActivityAccessory(environment.refreshActivity) {
                         unsavedSettings.requestNavigation { selectedTab = 0 }
                     }
@@ -183,6 +184,20 @@ struct ContentView: View {
     /// UIKit-presented alerts, menus and share sheets read the window tint, not SwiftUI's.
     private func applyWindowTint() {
         AppearanceSettings.shared.applyToWindows()
+        installTabReselectGuard()
+    }
+
+    /// The tab bar is created after the first layout pass, so retry briefly until it exists.
+    private func installTabReselectGuard() {
+        Task { @MainActor in
+            for _ in 0..<10 {
+                let windows = UIApplication.shared.connectedScenes
+                    .compactMap { $0 as? UIWindowScene }
+                    .flatMap(\.windows)
+                TabReselectGuard.install(in: windows)
+                try? await Task.sleep(for: .milliseconds(300))
+            }
+        }
     }
 
     @ViewBuilder

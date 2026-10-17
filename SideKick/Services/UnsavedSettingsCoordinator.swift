@@ -14,6 +14,8 @@ import Combine
     private var draft: Draft?
     private var pendingNavigation: (() -> Void)?
 
+    var hasUnsavedChanges: Bool { draft?.isDirty == true }
+
     func register(owner: UUID, isDirty: Bool, save: @escaping () async -> Bool, discard: @escaping () -> Void) {
         draft = Draft(owner: owner, isDirty: isDirty, save: save, discard: discard)
     }
