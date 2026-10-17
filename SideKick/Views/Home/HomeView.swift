@@ -2,6 +2,11 @@ import SwiftUI
 import UniformTypeIdentifiers
 import UIKit
 
+private enum HomeContextRoute: Hashable {
+    case update(String), updateSource(String), resign(String), offload(String)
+    case install(String), liveContainer(String), share(String)
+}
+
 private struct QueuedManualUpdate: Identifiable {
     let ipa: ImportedIPA
     let installedApp: InstalledAppSummary
@@ -33,6 +38,8 @@ struct HomeView: View {
     @State private var notificationNavigationPath: [GitHubUpdateNotificationRoute] = []
     @State private var isRoutingUpdateNotification = false
     @State private var expirationClock = Date.now
+    @State private var ipaPendingRemoval: ImportedIPA?
+    @State private var contextRoute: HomeContextRoute?
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.scenePhase) private var scenePhase
 
@@ -43,6 +50,10 @@ struct HomeView: View {
     private var hasLoadedLocalApps: Bool { environment.hasLoadedLocalApps }
     private var isLoadingLocalApps: Bool { environment.isLoadingLocalApps }
     private var localLoadError: String? { environment.localLoadError }
+    private var hasUpdateSources: Bool {
+        !environment.githubConfigurations.isEmpty || !githubChecks.isEmpty || environment.githubConfigurationError != nil
+            || !queuedManualUpdates.isEmpty || !unresolvedQueuedManualUpdates.isEmpty
+    }
     private var isImportReviewActive: Bool {
         viewModel.isImporting || ipaAwaitingUpdateChoice != nil || isQueueingSelectedIPA
     }
@@ -113,20 +124,38 @@ struct HomeView: View {
                     .padding(.vertical, 8)
                     .listRowBackground(Color.clear)
                 }
-                if !environment.githubConfigurations.isEmpty || !githubChecks.isEmpty || environment.githubConfigurationError != nil || !queuedManualUpdates.isEmpty || !unresolvedQueuedManualUpdates.isEmpty {
+                if hasLoadedLocalApps, !filteredInstalledApps.isEmpty {
+                    Section {
+                        SigningStatusRow(
+                            apps: filteredInstalledApps,
+                            now: expirationClock,
+                            isRefreshing: isRefreshingAll,
+                            progress: refreshAllProgress,
+                            isDisabled: isRefreshingAll || refreshingAppID != nil,
+                            refreshAll: { Task { await refreshAllApps() } }
+                        )
+                        if hasUpdateSources {
+                            NavigationLink {
+                                GitHubUpdatesView(queuedIPAs: queuedManualUpdates.map(\.ipa) + unresolvedQueuedManualUpdates)
+                            } label: {
+                                GitHubUpdatesSummaryRow(queuedCount: queuedManualUpdates.count + unresolvedQueuedManualUpdates.count)
+                            }
+                        }
+                    }
+                } else if hasUpdateSources {
                     Section {
                         NavigationLink {
                             GitHubUpdatesView(queuedIPAs: queuedManualUpdates.map(\.ipa) + unresolvedQueuedManualUpdates)
                         } label: {
                             GitHubUpdatesSummaryRow(queuedCount: queuedManualUpdates.count + unresolvedQueuedManualUpdates.count)
                         }
-                        .fullWidthListSeparators()
                     }
                 }
 
                 if let localLoadError {
                     Section {
-                        Label("Couldn’t Load Your Apps", systemImage: "exclamationmark.circle")
+                        Label("Couldn’t Load Your Apps", systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
                         Text(localLoadError).font(.footnote).foregroundStyle(.secondary)
                         SwiftUI.Button("Try Again") { Task { await load() } }
                             .disabled(isLoadingLocalApps)
@@ -141,12 +170,19 @@ struct HomeView: View {
                     .listRowBackground(Color.clear)
                 } else if installedApps.isEmpty && filteredImportedApps.isEmpty && guestApps.isEmpty && queuedManualUpdates.isEmpty && unresolvedQueuedManualUpdates.isEmpty {
                     ContentUnavailableView {
-                        Label("No Apps Yet", systemImage: "square.stack.3d.up")
+                        Label("No Apps Yet", systemImage: "app.badge.checkmark")
                     } description: {
-                        Text("Import an IPA to get started.")
+                        Text("Import an IPA to sign and install it on this iPhone.")
                     } actions: {
-                        SwiftUI.Button("Import from Files") { showingImporter = true }
-                            .buttonStyle(.borderedProminent)
+                        SwiftUI.Button { showingImporter = true } label: {
+                            Text("Import from Files").font(.headline).padding(.horizontal, Spacing.m)
+                        }
+                        .primaryActionStyle()
+                        SwiftUI.Button("Import from URL") {
+                            incomingShareURL = nil
+                            showingURLImport = true
+                        }
+                        .font(.body.weight(.semibold))
                     }
                     .listRowBackground(Color.clear)
                 }
@@ -159,60 +195,39 @@ struct HomeView: View {
                             } label: {
                                 installedAppRow(app)
                             }
-                            .fullWidthListSeparators()
-                            .contextMenu {
-                                SwiftUI.Button {
-                                    UIApplication.shared.open(InstalledApp.openAppURL(targetBundleIdentifier: app.resignedBundleIdentifier))
-                                } label: {
-                                    Label("Open", systemImage: "arrow.up.forward.app")
-                                }
+                            .contextMenu { installedAppMenu(app) }
+                            .swipeActions(edge: .leading) {
                                 SwiftUI.Button {
                                     Task { await refreshInstalledApp(app) }
                                 } label: {
-                                    Label("Refresh Signing", systemImage: "arrow.clockwise")
+                                    Label("Refresh", systemImage: "arrow.clockwise")
                                 }
+                                .tint(.sideKickAccent)
                                 .disabled(isRefreshingAll || refreshingAppID != nil)
-                                Divider()
-                                SwiftUI.Button {
-                                    managementApp = app
-                                    showingManagementApp = true
-                                } label: {
-                                    Label("More Options", systemImage: "ellipsis.circle")
-                                }
                             }
                         }
                     } header: {
-                        HStack {
-                            Text("Installed")
-                            Spacer()
-                            SwiftUI.Button {
-                                Task { await refreshAllApps() }
-                            } label: {
-                                if isRefreshingAll {
-                                    if let refreshAllProgress {
-                                        Text("\(refreshAllProgress.completed)/\(refreshAllProgress.total)")
-                                    } else { ProgressView() }
-                                } else {
-                                    Text("Refresh All")
-                                }
-                            }
-                            .font(.subheadline)
-                            .disabled(isRefreshingAll || refreshingAppID != nil || filteredInstalledApps.isEmpty)
-                        }
+                        Text("Installed")
                     }
                 }
 
                 if installedApps.contains(where: { !$0.isActive }) {
-                    SwiftUI.Section("Inactive") {
+                    SwiftUI.Section("Offloaded") {
                         ForEach(installedApps.filter { !$0.isActive }) { app in
                             NavigationLink { AppManagementView(installedApp: app) } label: {
                                 SideKickLibraryAppRow(
                                     name: app.name,
-                                    versionText: "Version \(app.version)",
+                                    versionText: app.version,
                                     iconData: app.iconData,
-                                    metadata: { Text("Ready to restore").font(.subheadline).foregroundStyle(.secondary) },
-                                    status: { EmptyView() }
+                                    metadata: { EmptyView() },
+                                    status: { Image(systemName: "icloud.and.arrow.down").foregroundStyle(.secondary).accessibilityLabel("Offloaded") }
                                 )
+                            }
+                            .contextMenu {
+                                SwiftUI.Button { contextRoute = .offload(app.id) } label: {
+                                    Label("Restore App", systemImage: "arrow.down.circle")
+                                }
+                                copyMenuItem("Copy Bundle ID", value: app.bundleIdentifier)
                             }
                         }
                     }
@@ -232,18 +247,30 @@ struct HomeView: View {
                             } label: {
                                 ImportedIPARow(app: app)
                             }
-                            .fullWidthListSeparators()
                             .contextMenu {
-                                SwiftUI.Button {
-                                    managementImportedApp = app
-                                    showingImportedManagement = true
-                                } label: {
-                                    Label("More Options", systemImage: "ellipsis.circle")
+                                SwiftUI.Button { contextRoute = .install(app.id) } label: {
+                                    Label("Install…", systemImage: "arrow.down.circle")
                                 }
+                                .disabled(accountStore.accounts.isEmpty)
+                                SwiftUI.Button { contextRoute = .liveContainer(app.id) } label: {
+                                    Label("Install in LiveContainer…", systemImage: "square.stack.3d.up")
+                                }
+                                SwiftUI.Button { contextRoute = .share(app.id) } label: {
+                                    Label("Share IPA…", systemImage: "square.and.arrow.up")
+                                }
+                                copyMenuItem("Copy Bundle ID", value: app.bundleIdentifier)
+                                Divider()
                                 SwiftUI.Button(role: .destructive) {
-                                    Task { await viewModel.delete(app) }
+                                    ipaPendingRemoval = app
                                 } label: {
-                                    Label("Remove Imported IPA", systemImage: "trash")
+                                    Label("Remove IPA", systemImage: "trash")
+                                }
+                            }
+                            .swipeActions {
+                                SwiftUI.Button(role: .destructive) {
+                                    ipaPendingRemoval = app
+                                } label: {
+                                    Label("Remove", systemImage: "trash")
                                 }
                             }
                         }
@@ -251,8 +278,23 @@ struct HomeView: View {
                 }
             }
             .listStyle(.insetGrouped)
-            .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("My Apps")
+            .navigationDestination(item: $contextRoute) { route in
+                contextDestination(route)
+            }
+            .confirmationDialog(
+                "Remove \(ipaPendingRemoval?.name ?? "IPA")?",
+                isPresented: Binding(get: { ipaPendingRemoval != nil }, set: { if !$0 { ipaPendingRemoval = nil } }),
+                titleVisibility: .visible
+            ) {
+                SwiftUI.Button("Remove IPA", role: .destructive) {
+                    guard let app = ipaPendingRemoval else { return }
+                    ipaPendingRemoval = nil
+                    Task { await viewModel.delete(app) }
+                }
+            } message: {
+                Text("This removes the imported IPA from SideKick.")
+            }
             .navigationDestination(for: GitHubUpdateNotificationRoute.self) { route in
                 notificationUpdateDestination(for: route)
             }
@@ -284,7 +326,7 @@ struct HomeView: View {
                     } label: {
                         Image(systemName: "plus")
                     }
-                    .accessibilityLabel("Add App")
+                    .accessibilityLabel("Import App")
                     .disabled(isImportReviewActive)
                 }
             }
@@ -422,18 +464,120 @@ struct HomeView: View {
         }
     }
 
+    // MARK: Long-press menus
+
+    @ViewBuilder
+    private func installedAppMenu(_ app: InstalledAppSummary) -> some View {
+        let candidate = githubUpdates.first { $0.bundleIdentifier == app.id && $0.targetKind != .liveContainer }
+        let queued = queuedManualUpdates.first { $0.installedApp.id == app.id }
+        let hasSource = environment.githubConfigurations.contains { $0.id == app.id }
+        let isBusy = isRefreshingAll || refreshingAppID != nil
+
+        Section {
+            SwiftUI.Button {
+                UIApplication.shared.open(InstalledApp.openAppURL(targetBundleIdentifier: app.resignedBundleIdentifier))
+            } label: {
+                Label("Open", systemImage: "arrow.up.forward.app")
+            }
+            SwiftUI.Button {
+                Task { await refreshInstalledApp(app) }
+            } label: {
+                Label("Refresh", systemImage: "arrow.clockwise")
+            }
+            .disabled(isBusy)
+            if queued != nil || candidate != nil {
+                SwiftUI.Button { contextRoute = .update(app.id) } label: {
+                    Label(queued.map { "Update to \($0.ipa.version)" } ?? "Review Update", systemImage: "arrow.down.circle")
+                }
+            }
+        }
+        Section {
+            if hasSource {
+                SwiftUI.Button {
+                    environment.requestGitHubUpdateCheck(force: true)
+                } label: {
+                    Label("Check for Updates", systemImage: "arrow.triangle.2.circlepath")
+                }
+                .disabled(environment.isCheckingGitHubUpdates)
+            }
+            SwiftUI.Button { contextRoute = .updateSource(app.id) } label: {
+                Label(hasSource ? "Update Source…" : "Track GitHub Updates…", systemImage: "arrow.down.app")
+            }
+        }
+        Section {
+            SwiftUI.Button { contextRoute = .resign(app.id) } label: {
+                Label("Re-sign…", systemImage: "signature")
+            }
+            SwiftUI.Button { contextRoute = .offload(app.id) } label: {
+                Label("Offload…", systemImage: "icloud.and.arrow.up")
+            }
+            .disabled(isBusy)
+            copyMenuItem("Copy Bundle ID", value: app.bundleIdentifier)
+        }
+    }
+
+    private func copyMenuItem(_ title: String, value: String) -> some View {
+        SwiftUI.Button {
+            UIPasteboard.general.string = value
+        } label: {
+            Label(title, systemImage: "doc.on.doc")
+        }
+    }
+
+    @ViewBuilder
+    private func contextDestination(_ route: HomeContextRoute) -> some View {
+        switch route {
+        case .update(let id):
+            if let queued = queuedManualUpdates.first(where: { $0.installedApp.id == id }) {
+                AppManagementView(installedApp: queued.installedApp)
+            } else if let app = installedApps.first(where: { $0.id == id }),
+                      let candidate = githubUpdates.first(where: { $0.bundleIdentifier == id }) {
+                GitHubUpdateDetailView(candidate: candidate, app: app)
+            } else {
+                ContentUnavailableView("Update Unavailable", systemImage: "arrow.down.circle")
+            }
+        case .updateSource(let id):
+            if let app = installedApps.first(where: { $0.id == id }) { GitHubUpdateSettingsView(app: app) }
+        case .resign(let id):
+            if let app = installedApps.first(where: { $0.id == id }) {
+                ResignOptionsView(app: app, accountStore: accountStore)
+            }
+        case .offload(let id):
+            if let app = installedApps.first(where: { $0.id == id }) {
+                AppOffloadView(app: app, accountStore: accountStore)
+            }
+        case .install(let id):
+            if let ipa = viewModel.importedApps.first(where: { $0.id == id }) {
+                InstallAccountSelectionView(app: ipa, accountStore: accountStore, ipaStore: environment.ipaImportStore, isUpdate: false, onInstalled: nil)
+            }
+        case .liveContainer(let id):
+            if let ipa = viewModel.importedApps.first(where: { $0.id == id }) { LiveContainerImportView(app: ipa) }
+        case .share(let id):
+            if let ipa = viewModel.importedApps.first(where: { $0.id == id }) { ShareIPAView(app: ipa) }
+        }
+    }
+
     @ViewBuilder
     private func installedAppRow(_ app: InstalledAppSummary) -> some View {
+        let daysRemaining = SigningExpiry.daysRemaining(until: app.expirationDate, now: expirationClock)
         SideKickLibraryAppRow(
             name: app.name,
-            versionText: "Version \(app.version)",
+            versionText: app.version,
             iconData: app.iconData,
-            metadata: {
-                Text("Signing \(SigningExpiry.description(until: app.expirationDate, now: expirationClock))")
-                    .font(.subheadline)
-                    .foregroundStyle(SigningExpiry.daysRemaining(until: app.expirationDate, now: expirationClock) <= 2 ? Color.orange : Color.secondary)
-            },
-            status: { EmptyView() }
+            metadata: { EmptyView() },
+            status: {
+                if refreshingAppID == app.id {
+                    ProgressView().accessibilityLabel("Refreshing")
+                } else if app.expirationDate <= expirationClock {
+                    StatusBadge(title: "Expired", systemImage: "xmark.circle.fill", tone: .critical)
+                } else if daysRemaining <= 2 {
+                    StatusBadge(
+                        title: SigningExpiry.description(until: app.expirationDate, now: expirationClock).capitalizedFirst,
+                        systemImage: "exclamationmark.circle.fill",
+                        tone: .warning
+                    )
+                }
+            }
         )
     }
 
@@ -511,13 +655,16 @@ struct HomeView: View {
         viewModel.noticeMessage = nil
         isRefreshingAll = true
         refreshAllProgress = nil
+        environment.refreshActivity = RefreshActivity(title: "Refreshing apps", completed: 0, total: filteredInstalledApps.count)
         defer {
             isRefreshingAll = false
             refreshAllProgress = nil
+            environment.refreshActivity = nil
         }
         let service = SideStoreOperationService(accountStore: accountStore, ipaStore: environment.ipaImportStore)
         let result = await service.refreshAllManagedAppsQuietly { completed, total in
             refreshAllProgress = (completed, total)
+            environment.refreshActivity = RefreshActivity(title: "Refreshing apps", completed: completed, total: total)
         }
         await load()
         refreshAllOutcome = result
@@ -536,13 +683,16 @@ struct HomeView: View {
         }
         isRetryingRefreshFailures = true
         retryRefreshProgress = nil
+        environment.refreshActivity = RefreshActivity(title: "Retrying failed apps", completed: 0, total: failures.count)
         defer {
             isRetryingRefreshFailures = false
             retryRefreshProgress = nil
+            environment.refreshActivity = nil
         }
         let retried = await SideStoreOperationService(accountStore: accountStore, ipaStore: environment.ipaImportStore)
             .retryFailedManagedApps(failures) { completed, total in
                 retryRefreshProgress = (completed, total)
+                environment.refreshActivity = RefreshActivity(title: "Retrying failed apps", completed: completed, total: total)
             }
         var updated = current
         let retriedByID = Dictionary(uniqueKeysWithValues: retried.map { ($0.id, $0) })
@@ -789,4 +939,75 @@ private struct RefreshAllResultsView: View {
             .font(.footnote)
         }
     }
+}
+
+/// Answers "is anything about to expire?" and offers the one action that fixes it.
+private struct SigningStatusRow: View {
+    let apps: [InstalledAppSummary]
+    let now: Date
+    let isRefreshing: Bool
+    let progress: (completed: Int, total: Int)?
+    let isDisabled: Bool
+    let refreshAll: () -> Void
+
+    private var soonest: InstalledAppSummary? { apps.min { $0.expirationDate < $1.expirationDate } }
+    private var soonestDays: Int { soonest.map { SigningExpiry.daysRemaining(until: $0.expirationDate, now: now) } ?? 7 }
+    private var hasExpired: Bool { soonest.map { $0.expirationDate <= now } ?? false }
+
+    private var tone: StatusTone {
+        if hasExpired { return .critical }
+        return soonestDays <= 2 ? .warning : .success
+    }
+
+    private var title: String {
+        if isRefreshing {
+            if let progress { return "Refreshing \(progress.completed) of \(progress.total)" }
+            return "Refreshing apps"
+        }
+        if hasExpired { return "An app has expired" }
+        return soonestDays <= 2 ? "An app expires soon" : "All apps signed"
+    }
+
+    private var subtitle: String {
+        guard let soonest else { return "" }
+        if isRefreshing { return "Keep SideKick open until this finishes" }
+        if hasExpired { return "Refresh \(soonest.name) to use it again" }
+        return "\(soonest.name) expires \(SigningExpiry.description(until: soonest.expirationDate, now: now))"
+    }
+
+    var body: some View {
+        HStack(spacing: Spacing.s) {
+            Image(systemName: tone == .success ? "checkmark.seal.fill" : "exclamationmark.circle.fill")
+                .font(.title3)
+                .foregroundStyle(isRefreshing ? Color.sideKickAccent : tone.color)
+                .frame(width: 32)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(.body.weight(.semibold))
+                Text(subtitle)
+                    .font(.subheadline)
+                    .foregroundStyle(.secondary)
+                    .lineLimit(2)
+            }
+            Spacer(minLength: Spacing.xs)
+            SwiftUI.Button(action: refreshAll) {
+                if isRefreshing {
+                    ProgressView()
+                } else {
+                    Text("Refresh All").font(.subheadline.weight(.semibold))
+                }
+            }
+            .buttonStyle(.bordered)
+            .buttonBorderShape(.capsule)
+            .tint(.sideKickAccent)
+            .disabled(isDisabled)
+            .accessibilityLabel("Refresh All Apps")
+        }
+        .padding(.vertical, Spacing.xxs)
+        .accessibilityElement(children: .contain)
+    }
+}
+
+private extension String {
+    var capitalizedFirst: String { prefix(1).uppercased() + dropFirst() }
 }

@@ -143,7 +143,7 @@ precondition(FakeBundle(appGroups: [Bundle.baseAltStoreAppGroupID], expected: ni
             self.assertNotIn("requestAuthorization", delegate[begin:end])
             self.assertIn("GitHubUpdateNotificationRouteStore.recordTap", delegate)
             self.assertIn("try SideKickDataDirectory.prepareBeforeDatabaseStart()", delegate)
-            self.assertIn("MARKETING_VERSION = 0.8.0", (checkout / "Build.xcconfig").read_text(encoding="utf-8"))
+            self.assertIn("MARKETING_VERSION = 0.9.0", (checkout / "Build.xcconfig").read_text(encoding="utf-8"))
             project = (checkout / "AltStore.xcodeproj/project.pbxproj").read_text(encoding="utf-8")
             self.assertIn("App/SideKickApp.swift,", project)
             self.assertIn("path = ../../SideKick;", project)

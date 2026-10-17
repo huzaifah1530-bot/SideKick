@@ -14,30 +14,65 @@ struct AppOffloadView: View {
     @State private var consoleAction: AppOffloadAction?
     private var service: AppOffloadService { AppOffloadService(app: app, accounts: accountStore) }
 
+    private var state: (symbol: String, tone: StatusTone, title: String, message: String) {
+        if AppOffloadService.needsLegacyRecovery(app.id) {
+            return ("exclamationmark.arrow.circlepath", .warning, "Recovery Needed",
+                    "An earlier transfer didn’t finish. Reinstall the original app first. Exported SideKickData folders are kept.")
+        }
+        if offloaded {
+            return ("icloud.and.arrow.down", .accent, "Offloaded",
+                    "\(app.name) is backed up and removed from this iPhone. Restore it any time.")
+        }
+        if AppOffloadService.blocksNativeOperations(app.id) {
+            return ("exclamationmark.arrow.circlepath", .warning, "Recovery Needed",
+                    "The previous operation didn’t finish. Recover the app before trying again.")
+        }
+        return ("arrow.down.app", .neutral, "Offload \(app.name)",
+                "Backs up the app, then removes it to free an App ID slot. You can restore it later.")
+    }
+
     var body: some View {
-        Form {
-            Section {
-                Text(app.name).font(.headline)
-                if working { ProgressView("Preparing IPA…") }
+        ScrollView {
+            VStack(spacing: Spacing.m) {
+                StatusSymbol(systemImage: state.symbol, tone: state.tone)
+                Text(state.title)
+                    .font(.title2.weight(.bold))
+                    .multilineTextAlignment(.center)
+                    .accessibilityAddTraits(.isHeader)
+                Text(state.message)
+                    .font(.body)
+                    .foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center)
+                if working { ProgressView("Preparing IPA…").padding(.top, Spacing.xs) }
+            }
+            .frame(maxWidth: SideKickLayout.readableWidth)
+            .padding(.horizontal, Spacing.l)
+            .padding(.top, Spacing.xxl)
+            .frame(maxWidth: .infinity)
+        }
+        .background(Color.sideKickCanvas)
+        .safeAreaInset(edge: .bottom) {
+            BottomActionBar {
                 if AppOffloadService.needsLegacyRecovery(app.id) {
-                    Text("An earlier transfer needs recovery. Reinstall the original app first. Any exported SideKickData folders are kept; this action does not import their files.")
-                    SwiftUI.Button("Recover Original App") { consoleAction = .restore }
+                    SwiftUI.Button { consoleAction = .restore } label: { ActionLabel("Recover Original App") }
+                        .primaryActionStyle()
                 } else if offloaded {
-                    Label("App offloaded", systemImage: "checkmark.circle")
-                    Text("Its native backup is kept for restoring the app.")
-                    SwiftUI.Button("Restore App") { consoleAction = .restore }
+                    SwiftUI.Button { consoleAction = .restore } label: { ActionLabel("Restore App", systemImage: "arrow.down.circle") }
+                        .primaryActionStyle()
                     SwiftUI.Button("Get IPA for LiveContainer") { prepareIPA() }
+                        .font(.body.weight(.semibold))
+                        .frame(minHeight: 44)
                 } else if AppOffloadService.blocksNativeOperations(app.id) {
-                    Text("The previous operation did not finish. Recover the native app before trying again.")
-                    SwiftUI.Button("Recover App") { consoleAction = .restore }
+                    SwiftUI.Button { consoleAction = .restore } label: { ActionLabel("Recover App") }
+                        .primaryActionStyle()
                 } else {
-                    Text("Back up this app and remove its native installation to free an app slot. You can restore it later.")
-                    SwiftUI.Button("Offload App", role: .destructive) { confirmOffload = true }
+                    SwiftUI.Button { confirmOffload = true } label: { ActionLabel("Offload App") }
+                        .primaryActionStyle()
                 }
             }
         }
         .disabled(working || !loaded)
-        .navigationTitle("Offload App")
+        .navigationTitle("Offload")
         .navigationBarTitleDisplayMode(.inline)
         .navigationBarBackButtonHidden(working)
         .interactiveDismissDisabled(working)
@@ -66,9 +101,7 @@ struct AppOffloadView: View {
                 }
             }
         }
-        .alert("App action failed", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
-            SwiftUI.Button("OK", role: .cancel) { errorMessage = nil }
-        } message: { Text(errorMessage ?? "") }
+        .messageAlert("Couldn’t Continue", message: $errorMessage)
     }
 
     private func prepareIPA() {
@@ -103,7 +136,7 @@ private struct AppOffloadConsoleView: View {
     @State private var lastPercent = -5
 
     var body: some View {
-        OperationStatusView(title: action == .restore || recovering ? "Restore Status" : "Offload Status",
+        OperationStatusView(title: isRestoring ? "Restore" : "Offload",
             appName: app.name, stageSummary: summary, progress: progress, isRunning: running,
             failure: failure, lines: lines, account: nil, accountStore: nil,
             onRetry: {
@@ -111,7 +144,8 @@ private struct AppOffloadConsoleView: View {
                 running = true
                 recovering = AppOffloadService.blocksNativeOperations(app.id)
                 Task { await run() }
-            }, onClose: { onClose(failure == nil) }, expandActivityInitially: true)
+            }, onClose: { onClose(failure == nil) },
+            stages: isRestoring ? ["Prepare", "Sign", "Restore", "Done"] : ["Back Up", "Verify", "Remove", "Done"])
         .task {
             guard !started else { return }
             started = true
@@ -119,30 +153,29 @@ private struct AppOffloadConsoleView: View {
         }
     }
 
+    private var isRestoring: Bool { action == .restore || recovering }
+
     @MainActor private func run() async {
         running = true; failure = nil; progress = 0; lastPercent = -5
         let id = UUID(); runID = id
         let restoring = action == .restore || recovering
+        summary = restoring ? "Restoring \(app.name)" : "Offloading \(app.name)"
         append(restoring ? "Starting native app recovery or restore" : "Starting app offload")
         do {
             let service = AppOffloadService(app: app, accounts: accountStore)
             try await service.perform(restoring: restoring, stageHandler: { message in
                 guard running, runID == id else { return }
-                summary = message; append(message)
+                append(message)
             }, progressHandler: { value in
                 guard running, runID == id else { return }
                 progress = min(max(value, 0), 1)
-                let percent = Int(progress * 100)
-                if percent >= lastPercent + 5 {
-                    lastPercent = percent; append("Pipeline progress · \(percent)%")
-                }
             })
             progress = 1
-            summary = restoring ? "Native app restored." : "App offloaded. Its native backup is kept."
-            append(summary)
+            summary = restoring ? "\(app.name) is restored" : "\(app.name) is offloaded"
+            append(restoring ? "Native app restored" : "App offloaded; native backup kept")
         } catch {
             failure = error.localizedDescription
-            summary = "SideKick couldn’t finish this operation."
+            summary = restoring ? "Couldn’t restore \(app.name)" : "Couldn’t offload \(app.name)"
             append("ERROR · " + error.localizedDescription)
         }
         running = false

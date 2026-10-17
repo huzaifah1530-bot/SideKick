@@ -6,11 +6,14 @@ struct GitHubUpdatesSummaryRow: View {
     @Environment(AppEnvironment.self) private var environment
 
     var body: some View {
-        HStack(spacing: 12) {
-            Image(systemName: "arrow.down.app.fill")
-                .font(.title2).foregroundStyle(Color.sideKickAccent)
-                .frame(width: 42, height: 42)
-            VStack(alignment: .leading, spacing: 4) {
+        let hasUpdates = summary.availableCount > 0 || queuedCount > 0
+        HStack(spacing: Spacing.s) {
+            Image(systemName: hasUpdates ? "arrow.down.circle.fill" : "arrow.down.circle")
+                .font(.title3)
+                .foregroundStyle(hasUpdates ? Color.sideKickAccent : Color.secondary)
+                .frame(width: 32)
+                .accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
                 Text("Updates").font(.body.weight(.semibold))
                 Text(queuedCount > 0 ? "\(queuedCount) downloaded · \(summary.title)" : summary.title)
                     .font(.subheadline).foregroundStyle(.secondary)
@@ -19,10 +22,16 @@ struct GitHubUpdatesSummaryRow: View {
             if environment.isCheckingGitHubUpdates {
                 ProgressView().accessibilityLabel("Checking GitHub")
             } else if summary.availableCount > 0 {
-                Text("\(summary.availableCount)").font(.body.weight(.semibold)).foregroundStyle(Color.sideKickAccent)
+                Text("\(summary.availableCount)")
+                    .font(.subheadline.weight(.semibold).monospacedDigit())
+                    .foregroundStyle(Color.sideKickOnAccent)
+                    .padding(.horizontal, Spacing.xs)
+                    .frame(minWidth: 24, minHeight: 24)
+                    .background(Color.sideKickAccent, in: Capsule())
+                    .accessibilityLabel("\(summary.availableCount) available")
             }
         }
-        .padding(.vertical, 5)
+        .padding(.vertical, Spacing.xxs)
     }
 
     private var summary: GitHubUpdateSummary {
@@ -35,6 +44,9 @@ struct GitHubUpdatesSummaryRow: View {
 struct GitHubUpdatesView: View {
     let queuedIPAs: [ImportedIPA]
     @Environment(AppEnvironment.self) private var environment
+    @Environment(\.openURL) private var openURL
+    @State private var sourceConfigurationID: String?
+    @State private var statusConfigurationID: String?
 
     private var configurations: [GitHubUpdateConfiguration] {
         environment.githubConfigurations.sorted {
@@ -45,19 +57,20 @@ struct GitHubUpdatesView: View {
     var body: some View {
         List {
             Section {
-                HStack(spacing: 10) {
-                    if environment.isCheckingGitHubUpdates { ProgressView() }
-                    Text(summary.title).font(.headline)
+                VStack(alignment: .leading, spacing: 2) {
+                    HStack(spacing: Spacing.xs) {
+                        if environment.isCheckingGitHubUpdates { ProgressView() }
+                        Text(summary.title).font(.title3.weight(.semibold))
+                    }
+                    if let date = environment.lastGitHubCheckFinishedAt {
+                        Text("Checked \(date.formatted(.relative(presentation: .named)))")
+                            .font(.subheadline).foregroundStyle(.secondary)
+                    }
                 }
-                if let date = environment.lastGitHubCheckFinishedAt {
-                    Text("Last check finished \(date.formatted(date: .abbreviated, time: .shortened))")
-                        .font(.footnote).foregroundStyle(.secondary)
-                } else {
-                    Text("GitHub is checked on launch. Pull down to check again.")
-                        .font(.footnote).foregroundStyle(.secondary)
-                }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: 0, leading: Spacing.xxs, bottom: 0, trailing: Spacing.xxs))
                 if let error = environment.githubConfigurationError {
-                    Label(error, systemImage: "exclamationmark.triangle").foregroundStyle(.secondary)
+                    Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
                 }
             }
 
@@ -69,30 +82,39 @@ struct GitHubUpdatesView: View {
                                 AppManagementView(installedApp: installed)
                             } else { AppManagementView(queuedUpdate: ipa) }
                         } label: {
-                            VStack(alignment: .leading, spacing: 4) {
-                                Text(ipa.name).fontWeight(.semibold)
-                                Text("Version \(ipa.version) · \(installedApp(for: ipa) == nil ? "Review installation target" : "Ready to install")")
-                                    .font(.subheadline).foregroundStyle(.secondary)
+                            SideKickLibraryAppRow(
+                                name: ipa.name,
+                                versionText: installedApp(for: ipa) == nil ? "\(ipa.version) · Choose which app to update" : "\(ipa.version) · Ready to install",
+                                iconData: ipa.iconData,
+                                metadata: { EmptyView() },
+                                status: { EmptyView() }
+                            )
+                        }
+                        .contextMenu {
+                            if let installed = installedApp(for: ipa) {
+                                SwiftUI.Button {
+                                    UIApplication.shared.open(InstalledApp.openAppURL(targetBundleIdentifier: installed.resignedBundleIdentifier))
+                                } label: {
+                                    Label("Open Current Version", systemImage: "arrow.up.forward.app")
+                                }
+                            }
+                            SwiftUI.Button {
+                                UIPasteboard.general.string = ipa.bundleIdentifier
+                            } label: {
+                                Label("Copy Bundle ID", systemImage: "doc.on.doc")
                             }
                         }
                     }
                 }
             }
 
-            rows("Available Updates", states: [.updateAvailable])
-            rows("Review Installed Build", states: [.unknownInstalledBuild, .indeterminate])
-            rows("Current", states: [.current, .installedAhead])
-            rows("Skipped", states: [.skipped])
-            rows("Needs Attention", states: [.failed, .noMatchingDownload])
-            let pending = configurations.filter { check(for: $0) == nil }
-            if !pending.isEmpty {
-                Section("Waiting to Check") { ForEach(pending) { configuration in row(configuration) } }
-            }
+            rows("Available", states: [.updateAvailable])
+            rows("Needs Attention", states: [.failed, .noMatchingDownload, .unknownInstalledBuild, .indeterminate])
+            rows("Up to Date", states: [.current, .installedAhead, .skipped], includeUnchecked: true)
             if configurations.isEmpty, environment.githubConfigurationError == nil {
-                Section {
-                    ContentUnavailableView("No GitHub Sources", systemImage: "arrow.down.app",
-                        description: Text("Open an app in My Apps and choose GitHub Updates to track its builds."))
-                }
+                ContentUnavailableView("No Update Sources", systemImage: "arrow.down.circle",
+                    description: Text("Open an app in My Apps and choose GitHub Updates to track its builds."))
+                    .listRowBackground(Color.clear)
             }
         }
         .listStyle(.insetGrouped)
@@ -107,6 +129,16 @@ struct GitHubUpdatesView: View {
             }
         }
         .refreshable { await refresh() }
+        .navigationDestination(item: $sourceConfigurationID) { id in
+            if let target = updateTarget(for: id) {
+                GitHubUpdateSettingsView(target: target)
+            }
+        }
+        .navigationDestination(item: $statusConfigurationID) { id in
+            if let configuration = configurations.first(where: { $0.id == id }) {
+                GitHubAppUpdateStatusView(configuration: configuration)
+            }
+        }
         .task { environment.requestGitHubUpdateCheck() }
     }
 
@@ -115,8 +147,8 @@ struct GitHubUpdatesView: View {
             isChecking: environment.isCheckingGitHubUpdates, configurationFailed: environment.githubConfigurationError != nil)
     }
 
-    @ViewBuilder private func rows(_ title: String, states: Set<GitHubCheckState>) -> some View {
-        let matches = configurations.filter { configuration in check(for: configuration).map { states.contains($0.state) } ?? false }
+    @ViewBuilder private func rows(_ title: String, states: Set<GitHubCheckState>, includeUnchecked: Bool = false) -> some View {
+        let matches = configurations.filter { configuration in check(for: configuration).map { states.contains($0.state) } ?? includeUnchecked }
         if !matches.isEmpty {
             Section(title) { ForEach(matches) { configuration in row(configuration) } }
         }
@@ -131,24 +163,82 @@ struct GitHubUpdatesView: View {
                 GitHubAppUpdateStatusView(configuration: configuration)
             }
         } label: {
-            HStack(spacing: 12) {
-                GitHubUpdateAppIcon(data: icon(for: configuration))
-                VStack(alignment: .leading, spacing: 4) {
-                    Text(name(for: configuration)).font(.body.weight(.semibold))
-                    Text(check(for: configuration)?.state.title ?? "Not Checked Yet")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                    if let installed = configuration.installedBuildLabel {
-                        Text("\(check(for: configuration)?.state == .unknownInstalledBuild ? "Last confirmed" : "Installed"): \(installed)")
-                            .font(.footnote).foregroundStyle(.secondary)
-                    }
-                    if let build = check(for: configuration)?.latestBuild {
-                        Text("Latest: \(build.version)").font(.footnote).foregroundStyle(.secondary)
+            let result = check(for: configuration)
+            SideKickLibraryAppRow(
+                name: name(for: configuration),
+                versionText: rowSubtitle(configuration, result: result),
+                iconData: icon(for: configuration),
+                metadata: { EmptyView() },
+                status: {
+                    switch result?.state {
+                    case .updateAvailable?:
+                        StatusBadge(title: "Update", systemImage: "arrow.down.circle.fill", tone: .accent)
+                    case .failed?, .noMatchingDownload?:
+                        Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange).accessibilityLabel("Needs attention")
+                    case .skipped?:
+                        Text("Skipped").font(.subheadline).foregroundStyle(.secondary)
+                    default:
+                        EmptyView()
                     }
                 }
-            }
-            .padding(.vertical, 4)
+            )
         }
-        .fullWidthListSeparators()
+        .contextMenu { updateMenu(configuration) }
+    }
+
+    @ViewBuilder
+    private func updateMenu(_ configuration: GitHubUpdateConfiguration) -> some View {
+        let result = check(for: configuration)
+        let installed = environment.installedApps.first { $0.id == configuration.id }
+        Section {
+            if result?.candidate != nil {
+                SwiftUI.Button { statusConfigurationID = configuration.id } label: {
+                    Label("Review Update", systemImage: "arrow.down.circle")
+                }
+            }
+            SwiftUI.Button {
+                Task { await refresh() }
+            } label: {
+                Label("Check Now", systemImage: "arrow.triangle.2.circlepath")
+            }
+            .disabled(environment.isCheckingGitHubUpdates)
+            if let installed {
+                SwiftUI.Button {
+                    UIApplication.shared.open(InstalledApp.openAppURL(targetBundleIdentifier: installed.resignedBundleIdentifier))
+                } label: {
+                    Label("Open App", systemImage: "arrow.up.forward.app")
+                }
+            }
+        }
+        Section {
+            SwiftUI.Button { sourceConfigurationID = configuration.id } label: {
+                Label("Update Source…", systemImage: "slider.horizontal.3")
+            }
+            if let url = URL(string: configuration.repositoryURL) {
+                SwiftUI.Button { openURL(url) } label: {
+                    Label("View on GitHub", systemImage: "safari")
+                }
+                SwiftUI.Button {
+                    UIPasteboard.general.string = configuration.repositoryURL
+                } label: {
+                    Label("Copy Repository Link", systemImage: "link")
+                }
+            }
+        }
+    }
+
+    private func updateTarget(for id: String) -> GitHubUpdateTarget? {
+        environment.installedApps.first { $0.id == id }?.updateTarget
+            ?? environment.liveContainerState.apps.first { $0.id == id }?.updateTarget
+    }
+
+    private func rowSubtitle(_ configuration: GitHubUpdateConfiguration, result: GitHubCheckResult?) -> String {
+        guard let result else { return "Not checked yet" }
+        if result.state == .updateAvailable, let build = result.latestBuild { return build.version }
+        if let installed = configuration.installedBuildLabel, result.state == .current || result.state == .installedAhead {
+            return installed
+        }
+        return result.state.title
     }
 
     private func check(for configuration: GitHubUpdateConfiguration) -> GitHubCheckResult? {
@@ -188,6 +278,10 @@ private struct GitHubAppUpdateStatusView: View {
         environment.installedApps.first { $0.id == configuration.id }?.updateTarget
             ?? environment.liveContainerState.apps.first { $0.id == configuration.id }?.updateTarget
     }
+    private var targetIconData: Data? {
+        environment.installedApps.first { $0.id == configuration.id }?.iconData
+            ?? environment.liveContainerState.apps.first { $0.id == configuration.id }?.iconData
+    }
     private var check: GitHubCheckResult? {
         environment.githubChecks.first {
             $0.targetID == configuration.id && ($0.checkedConfiguration == currentConfiguration
@@ -198,29 +292,45 @@ private struct GitHubAppUpdateStatusView: View {
         List {
             if let target, let source = currentConfiguration {
                 Section {
-                    Text(check?.state.title ?? "Not Checked Yet").font(.headline)
-                    if let check {
-                        Text(check.state.message).font(.subheadline).foregroundStyle(.secondary)
+                    DetailHeader(iconData: targetIconData, title: target.name, subtitle: target.version) {
+                        statusBadge
                     }
+                    if let check {
+                        Text(check.state.message)
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: .infinity)
+                    }
+                    if let candidate = check?.candidate {
+                        installLink(candidate)
+                            .padding(.top, Spacing.xs)
+                    }
+                }
+                .listRowBackground(Color.clear)
+                .listRowSeparator(.hidden)
+
+                Section {
                     LabeledContent("Installed", value: target.version)
                     if let build = check?.latestBuild {
                         LabeledContent("Latest", value: build.version)
                     }
-                    if check?.state == .unknownInstalledBuild {
-                        Text("Confirm the exact build you installed. Version names alone do not identify a GitHub build.")
-                            .font(.footnote).foregroundStyle(.secondary)
-                    }
                     if check?.state == .failed, let detail = check?.detail {
                         Text(detail).font(.footnote).foregroundStyle(.secondary).textSelection(.enabled)
                     }
-                    if let candidate = check?.candidate {
-                        installLink(candidate)
-                    }
-                    SwiftUI.Button("Check Again") {
+                    SwiftUI.Button {
                         Task { await environment.gitHubSettingsChanged(); await environment.awaitPendingGitHubChecks() }
-                    }.disabled(environment.isCheckingGitHubUpdates)
-                } header: {
-                    Text("Status")
+                    } label: {
+                        HStack {
+                            Text("Check Again")
+                            if environment.isCheckingGitHubUpdates { Spacer(); ProgressView() }
+                        }
+                    }
+                    .disabled(environment.isCheckingGitHubUpdates)
+                } footer: {
+                    if check?.state == .unknownInstalledBuild {
+                        Text("Version names alone don’t identify a GitHub build. Confirm the build you installed in Update Source.")
+                    }
                 }
                 Section {
                     DisclosureGroup("Build Details") {
@@ -240,7 +350,7 @@ private struct GitHubAppUpdateStatusView: View {
                             LabeledContent("Checked", value: date.formatted(date: .abbreviated, time: .shortened))
                         }
                     }
-                    NavigationLink("Versions & GitHub Source") { GitHubUpdateSettingsView(target: target) }
+                    NavigationLink("Update Source") { GitHubUpdateSettingsView(target: target) }
                 }
             } else {
                 ContentUnavailableView("App Unavailable", systemImage: "app.dashed",
@@ -252,26 +362,27 @@ private struct GitHubAppUpdateStatusView: View {
         .navigationBarTitleDisplayMode(.inline)
     }
 
-    @ViewBuilder private func installLink(_ candidate: GitHubUpdateCandidate) -> some View {
-        if candidate.targetKind == .liveContainer {
-            NavigationLink("Review in LiveContainer") { LiveContainerGuestDetailView(guestID: candidate.bundleIdentifier) }
-        } else if let app = environment.installedApps.first(where: { $0.id == candidate.bundleIdentifier }) {
-            NavigationLink(candidate.isKnownNewer ? "Review Update" : "Review Available Build") {
-                GitHubUpdateDetailView(candidate: candidate, app: app)
-            }
+    @ViewBuilder private var statusBadge: some View {
+        switch check?.state {
+        case .updateAvailable?: StatusBadge(title: "Update available", systemImage: "arrow.down.circle.fill", tone: .accent)
+        case .current?, .installedAhead?: StatusBadge(title: "Up to date", systemImage: "checkmark.circle.fill", tone: .success)
+        case .failed?, .noMatchingDownload?: StatusBadge(title: check?.state.title ?? "Needs attention", systemImage: "exclamationmark.triangle.fill", tone: .warning)
+        case .some(let state): StatusBadge(title: state.title, systemImage: "questionmark.circle", tone: .neutral)
+        case nil: StatusBadge(title: "Not checked yet", systemImage: "clock", tone: .neutral)
         }
     }
-}
 
-private struct GitHubUpdateAppIcon: View {
-    let data: Data?
-    var body: some View {
-        Group {
-            if let data, let image = UIImage(data: data) { Image(uiImage: image).resizable().scaledToFit() }
-            else { Image(systemName: "app.fill").resizable().scaledToFit().foregroundStyle(Color.sideKickAccent).padding(7) }
+    @ViewBuilder private func installLink(_ candidate: GitHubUpdateCandidate) -> some View {
+        if candidate.targetKind == .liveContainer {
+            NavigationLink { LiveContainerGuestDetailView(guestID: candidate.bundleIdentifier) } label: {
+                ActionLabel("Review in LiveContainer")
+            }
+            .primaryActionStyle()
+        } else if let app = environment.installedApps.first(where: { $0.id == candidate.bundleIdentifier }) {
+            NavigationLink { GitHubUpdateDetailView(candidate: candidate, app: app) } label: {
+                ActionLabel(candidate.isKnownNewer ? "Review Update" : "Review Build")
+            }
+            .primaryActionStyle()
         }
-        .frame(width: 44, height: 44)
-        .clipShape(.rect(cornerRadius: 10))
-        .accessibilityHidden(true)
     }
 }

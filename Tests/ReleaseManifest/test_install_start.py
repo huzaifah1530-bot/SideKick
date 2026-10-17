@@ -12,7 +12,7 @@ class InstallStartTests(unittest.TestCase):
         source = (ROOT / 'SideKick/Views/Library/AppManagementView.swift').read_text()
         console = source[source.index('struct InstallConsoleView:'):]
         self.assertIn('if startState == .awaitingConfirmation', console)
-        self.assertIn('Ready to Update', console)
+        self.assertIn('ActionLabel(isUpdate ? "Update" : "Install")', console)
         self.assertIn('startState.confirm()', console)
         self.assertNotIn('showingInstallConfirmation', console)
         self.assertIn('guard startState.begin() else { return }', console)

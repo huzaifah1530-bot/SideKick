@@ -8,6 +8,14 @@ enum DatabaseStartupState: Equatable {
 }
 
 @MainActor
+struct RefreshActivity: Equatable {
+    var title: String
+    var completed: Int
+    var total: Int
+
+    var fraction: Double { total > 0 ? Double(completed) / Double(total) : 0 }
+}
+
 @Observable
 final class AppEnvironment {
     let ipaImportStore: IPAImportStore
@@ -28,6 +36,8 @@ final class AppEnvironment {
     private(set) var githubConfigurations: [GitHubUpdateConfiguration] = []
     private(set) var githubConfigurationError: String?
     private(set) var lastGitHubCheckFinishedAt: Date?
+    /// A running multi-app refresh, shown above the tab bar so it stays visible on every tab.
+    var refreshActivity: RefreshActivity?
     var githubUpdateCheckFailed: Bool { githubChecks.contains { $0.state == .failed } }
     @ObservationIgnored private var databaseStartupTask: Task<Void, Never>?
     @ObservationIgnored private var maintenanceTask: Task<Void, Never>?

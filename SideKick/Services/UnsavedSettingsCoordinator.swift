@@ -43,6 +43,12 @@ import Combine
         navigate()
     }
 
+    /// Keeps the user on the edited screen with their draft intact.
+    func stay() {
+        isPresented = false
+        pendingNavigation = nil
+    }
+
     func discardAndLeave() {
         guard !isSaving, let draft, let navigate = pendingNavigation else { return }
         isPresented = false

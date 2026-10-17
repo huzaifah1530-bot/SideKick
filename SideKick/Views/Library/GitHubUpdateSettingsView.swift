@@ -48,32 +48,52 @@ struct GitHubUpdateSettingsView: View {
         _assetName = State(initialValue: isSideKick ? defaultSelfUpdateAsset : "")
     }
 
+    @State private var isConfirmingRemoval = false
+    @State private var hasSavedConfiguration = false
+
     var body: some View {
         Form {
             Section {
-                TextField("https://github.com/owner/repository", text: $repositoryURL)
+                TextField("github.com/owner/repository", text: $repositoryURL)
                     .keyboardType(.URL)
+                    .textContentType(.URL)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                 GitHubTokenSelectionLink(selection: $tokenID)
-                Picker("Update source", selection: $source) {
+            } header: {
+                Text("Repository")
+            } footer: {
+                Text("SideKick checks for new builds and asks before downloading anything.")
+            }
+
+            Section {
+                Picker("Builds from", selection: $source) {
                     ForEach(GitHubUpdateSource.allCases) { option in Text(option.title).tag(option) }
                 }
                 if source == .actionsArtifact {
-                    TextField("Workflow file or ID", text: $workflowFile)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
-                    TextField("Branch (blank for all)", text: $branch)
+                    LabeledContent("Workflow") {
+                        TextField("build.yml", text: $workflowFile)
+                            .multilineTextAlignment(.trailing)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                    }
+                    LabeledContent("Branch") {
+                        TextField("All branches", text: $branch)
+                            .multilineTextAlignment(.trailing)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                    }
+                }
+                LabeledContent(source == .latestRelease ? "IPA name" : "Artifact") {
+                    TextField("Any", text: $assetName)
+                        .multilineTextAlignment(.trailing)
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                 }
-                TextField(source == .latestRelease ? "IPA asset name (optional)" : "Artifact name (optional)", text: $assetName)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
             } header: {
-                Text("Update source")
+                Text("Builds")
             } footer: {
-                Text("SideKick checks this GitHub repository for a newer IPA. A matching update is shown for your approval; it is never downloaded in the background. For Actions, the selected workflow must publish the IPA as a downloadable artifact. Use * in the asset name for changing version numbers.")
+                Text("Use * in the name to match changing version numbers.")
             }
 
             if !repositoryURL.isEmpty {
@@ -83,7 +103,7 @@ struct GitHubUpdateSettingsView: View {
                             Task { await loadHistory() }
                         } label: {
                             HStack {
-                                Text("Load Build History")
+                                Text("Find Installed Build")
                                 Spacer()
                                 if isLoadingHistory { ProgressView() }
                             }
@@ -100,41 +120,73 @@ struct GitHubUpdateSettingsView: View {
                                 selectedKey: Binding(get: { selectedBaselineKey }, set: { selectedBaselineKey = $0; baselineWasEdited = true })
                             )
                         } label: {
-                            LabeledContent(
-                                "Versions & Installed Build",
-                                value: selectedBaselineKey.flatMap { selectedKey in
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Installed Build")
+                                Text(selectedBaselineKey.flatMap { selectedKey in
                                     history.first(where: { $0.key == selectedKey }).map(historyLabel)
-                                } ?? selectedBaselineKey.map { "Saved build: \($0)" } ?? "Choose a version"
-                            )
+                                } ?? (selectedBaselineKey == nil ? "Not confirmed" : "Saved build"))
+                                    .font(.subheadline)
+                                    .foregroundStyle(selectedBaselineKey == nil ? Color.orange : Color.secondary)
+                                    .lineLimit(2)
+                            }
                         }
-                        .fullWidthListSeparators()
-                        Text(installedNeedsConfirmation ? "Previous tracking or changed app files need confirmation. Choose the build you actually installed, or leave it unknown." : "Only choose a build you actually installed. Checking or downloading a build does not mark it installed.")
-                            .font(.footnote).foregroundStyle(.secondary)
-                        SwiftUI.Button("Reload versions") { Task { await loadHistory(forceRefresh: true) } }
                     }
-                    SwiftUI.Button("I Don’t Know the Installed Build") { selectedBaselineKey = nil; baselineWasEdited = true }
-                    SwiftUI.Button("Load older versions") { Task { await loadHistory(append: true) } }
-                        .disabled(isLoadingHistory || history.isEmpty)
+                    if isLoadingHistory && !history.isEmpty {
+                        ProgressView().frame(maxWidth: .infinity)
+                    }
                 } header: {
-                    Text("Installed Version")
+                    HStack {
+                        Text("Installed Build")
+                        Spacer()
+                        Menu {
+                            SwiftUI.Button { Task { await loadHistory(forceRefresh: true) } } label: {
+                                Label("Reload Builds", systemImage: "arrow.clockwise")
+                            }
+                            SwiftUI.Button { Task { await loadHistory(append: true) } } label: {
+                                Label("Load Older Builds", systemImage: "clock.arrow.circlepath")
+                            }
+                            .disabled(isLoadingHistory || history.isEmpty)
+                            SwiftUI.Button { selectedBaselineKey = nil; baselineWasEdited = true } label: {
+                                Label("I Don’t Know", systemImage: "questionmark.circle")
+                            }
+                        } label: {
+                            Image(systemName: "ellipsis.circle")
+                                .font(.body)
+                        }
+                        .accessibilityLabel("Installed Build Options")
+                        .textCase(nil)
+                    }
                 } footer: {
-                    Text("SideKick compares release or build history from this source. The version label in the IPA doesn’t need to match GitHub’s tag or build number.")
+                    Text(installedNeedsConfirmation
+                         ? "Confirm the build you actually installed, or leave it unknown."
+                         : "Only choose a build you installed. Downloading doesn’t mark it installed.")
                 }
             }
 
-            if !repositoryURL.isEmpty {
+            if hasSavedConfiguration {
                 Section {
-                    SwiftUI.Button("Save GitHub Update Settings") { Task { await save() } }
-                    SwiftUI.Button("Remove GitHub Update Settings", role: .destructive) {
-                        Task {
-                            do { try await store.remove(bundleIdentifier: target.id); dismiss() }
-                            catch { message = error.localizedDescription; showingMessage = true }
-                        }
-                    }
+                    SwiftUI.Button("Stop Tracking Updates", role: .destructive) { isConfirmingRemoval = true }
                 }
             }
         }
-        .navigationTitle("GitHub Updates")
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                SwiftUI.Button("Save") { Task { await save() } }
+                    .fontWeight(.semibold)
+                    .disabled(repositoryURL.isEmpty)
+            }
+        }
+        .confirmationDialog("Stop tracking updates?", isPresented: $isConfirmingRemoval, titleVisibility: .visible) {
+            SwiftUI.Button("Stop Tracking", role: .destructive) {
+                Task {
+                    do { try await store.remove(bundleIdentifier: target.id); dismiss() }
+                    catch { message = error.localizedDescription; showingMessage = true }
+                }
+            }
+        } message: {
+            Text("SideKick will stop checking GitHub for \(target.name). The installed app isn’t changed.")
+        }
+        .navigationTitle("Update Source")
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
         .onChange(of: sourceIdentity) { _, value in
@@ -187,6 +239,7 @@ struct GitHubUpdateSettingsView: View {
                 hasHistoryTokenIdentity = true
                 return
             }
+            hasSavedConfiguration = true
             if !tokenChangedDuringInitialLoad { tokenID = config.tokenID }
             repositoryURL = config.repositoryURL
             source = config.source

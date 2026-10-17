@@ -208,21 +208,21 @@ struct RequiredSetupView: View {
                         }
                     } label: {
                         HStack(spacing: 10) {
-                            if status.isBusy { ProgressView().tint(.white) }
+                            if status.isBusy { ProgressView() }
                             Text(step == 0 ? "Get Started" : step == lastStep ? "Finish Setup" : "Continue")
                                 .font(.headline)
                         }
                         .frame(maxWidth: .infinity, minHeight: 28)
                     }
-                    .buttonStyle(.borderedProminent)
-                    .controlSize(.large)
-                    .disabled(!canContinue || status.isBusy)
+                    .primaryActionStyle()
+                    .disabled(status.isBusy)
                 }
                 .frame(maxWidth: 500)
                 .padding(.horizontal, 24)
                 .padding(.top, 16)
                 .padding(.bottom, 20)
-                .background(.bar)
+                .frame(maxWidth: .infinity)
+                .floatingBarBackground()
             }
             .background(Color(uiColor: .systemBackground))
             .navigationTitle("SideKick Setup")
@@ -271,14 +271,6 @@ struct RequiredSetupView: View {
         }
     }
 
-    private var canContinue: Bool {
-        switch step {
-        case 0: true
-        case 1, 2, 3: true
-        default: false
-        }
-    }
-
     private var welcomePage: some View {
         onboardingPage(
             symbol: "square.stack.3d.up.fill",
@@ -301,7 +293,8 @@ struct RequiredSetupView: View {
                     .frame(maxWidth: .infinity, minHeight: 52)
             } else {
                 SwiftUI.Button("Add Apple Account") { isShowingSignIn = true }
-                    .buttonStyle(.borderedProminent)
+                    .secondaryActionStyle()
+                .tint(.sideKickAccent)
                     .disabled(status.isBusy)
                 if !status.accounts.accounts.isEmpty {
                     Text("Use the Apple Account that signed this copy of SideKick.")
@@ -322,7 +315,8 @@ struct RequiredSetupView: View {
             SwiftUI.Button(status.hasPairingFile ? "Choose Pairing File Again" : "Import Pairing File") {
                 isChoosingPairingFile = true
             }
-            .buttonStyle(.borderedProminent)
+            .secondaryActionStyle()
+                .tint(.sideKickAccent)
             .disabled(status.isBusy)
             if status.isImportingPairing { ProgressView("Importing pairing file…") }
             Link("How to create a pairing file", destination: AppConstants.URLs.pairingDocumentation)
@@ -345,7 +339,8 @@ struct RequiredSetupView: View {
                 } label: {
                     Label(LocalVPNService.shared.externalInstalled ? "Connect LocalDevVPN" : "Get LocalDevVPN", systemImage: "arrow.up.forward.app")
                 }
-                .buttonStyle(.borderedProminent)
+                .secondaryActionStyle()
+                .tint(.sideKickAccent)
                 .disabled(status.isBusy)
                 Label(LocalVPNService.shared.externalTunnelConnected ? "Local Tunnel Connected" : "Connect Before Verifying",
                     systemImage: LocalVPNService.shared.externalTunnelConnected ? "checkmark.circle.fill" : "network.slash")
@@ -354,7 +349,8 @@ struct RequiredSetupView: View {
                 SwiftUI.Button { Task { await status.authorizeLocalConnection() } } label: {
                     Label("Allow Built-in VPN", systemImage: "checkmark.shield")
                 }
-                .buttonStyle(.borderedProminent)
+                .secondaryActionStyle()
+                .tint(.sideKickAccent)
                 .disabled(status.isBusy)
             } else {
                 Label("VPN Permission Saved", systemImage: "checkmark.shield.fill").foregroundStyle(.green)
@@ -370,7 +366,8 @@ struct RequiredSetupView: View {
                 SwiftUI.Button { Task { await status.verifyPairing() } } label: {
                     Label("Verify This iPhone", systemImage: "iphone.gen3.radiowaves.left.and.right")
                 }
-                .buttonStyle(.borderedProminent)
+                .secondaryActionStyle()
+                .tint(.sideKickAccent)
                 .disabled(status.isBusy)
             }
             if status.isDeviceReady {
@@ -389,7 +386,8 @@ struct RequiredSetupView: View {
             VStack(spacing: 28) {
                 VStack(spacing: 20) {
                     Image(systemName: symbol)
-                        .font(.system(size: 56, weight: .regular))
+                        .font(.largeTitle.weight(.regular))
+                        .imageScale(.large)
                         .foregroundStyle(.tint)
                         .frame(height: 84)
                         .accessibilityHidden(true)
@@ -409,7 +407,7 @@ struct RequiredSetupView: View {
                     .padding(step == 0 ? 0 : 24)
                     .background {
                         if step != 0 {
-                            RoundedRectangle(cornerRadius: 24).fill(Color(uiColor: .secondarySystemGroupedBackground))
+                            RoundedRectangle(cornerRadius: 20, style: .continuous).fill(Color(uiColor: .secondarySystemGroupedBackground))
                         }
                     }
             }

@@ -26,7 +26,7 @@ struct RefreshSettingsView: View {
                     NavigationLink {
                         CellularShortcutSettingsView()
                     } label: {
-                        Label("Cellular Refresh Shortcuts", systemImage: "square.stack.3d.up")
+                        Label("Cellular Refresh Shortcuts", systemImage: "antenna.radiowaves.left.and.right")
                     }
                     .fullWidthListSeparators()
                 }
@@ -57,25 +57,22 @@ struct RefreshSettingsView: View {
             } header: {
                 Text("Background keep-alive")
             } footer: {
-                Text("SideStore’s background service can help keep its refresh helper available. iOS may still pause background work.")
+                Text("Helps keep SideKick’s refresh helper available. iOS may still pause background work.")
             }
 
             Section {
                 Link("Get Refresh Shortcut", destination: URL(string: "https://www.icloud.com/shortcuts/2af57f665d434568a589f1e9b7d7f4d1")!)
                 Link("Open Shortcuts", destination: URL(string: "shortcuts://")!)
-                SwiftUI.Button(refreshShortcutAdded ? "Shortcut Added" : "I've Added the Shortcut") {
-                    refreshShortcutAdded = true
-                }
-                .disabled(refreshShortcutAdded)
+                Toggle("I’ve Added the Shortcut", isOn: $refreshShortcutAdded)
                 NavigationLink {
                     DailyRefreshAutomationGuideView()
                 } label: {
                     Label("How to schedule daily refresh", systemImage: "list.number")
                 }
             } header: {
-                Text("Optional daily automation")
+                Text("Daily Automation")
             } footer: {
-                Text("Adding the shortcut does not schedule it, and SideKick cannot verify whether a personal automation was created. Daily scheduling is optional; you can also refresh manually. iOS controls when background work runs.")
+                Text("Optional. Adding the shortcut doesn’t schedule it; set up a daily automation in Shortcuts.")
             }
         }
         .navigationTitle("App Refresh")
@@ -94,11 +91,11 @@ private struct DailyRefreshAutomationGuideView: View {
                 Text("SideKick cannot read or confirm your personal automations. Check the Shortcuts app to see whether you created one.")
                     .foregroundStyle(.secondary)
             }
-            Section("Create a daily automation") {
-                LabeledContent("1", value: "Open Shortcuts and choose Automation.")
-                LabeledContent("2", value: "Create a Time of Day automation and choose Daily.")
-                LabeledContent("3", value: "Choose Run Shortcut, then select Refresh SideKick Apps.")
-                LabeledContent("4", value: "Set it to run immediately, if that option is shown, and confirm.")
+            Section("Create a Daily Automation") {
+                Label("Open Shortcuts and choose Automation.", systemImage: "1.circle")
+                Label("Create a Time of Day automation and choose Daily.", systemImage: "2.circle")
+                Label("Choose Run Shortcut, then Refresh SideKick Apps.", systemImage: "3.circle")
+                Label("Set it to run immediately, then confirm.", systemImage: "4.circle")
             }
             Section {
                 Text("You can skip automation and refresh from SideKick whenever you want. Background timing is controlled by iOS.")
@@ -152,7 +149,7 @@ struct InstallSigningSettingsView: View {
             Section {
                 Toggle("Prefer the resigned IPA", isOn: $preferResignedIPA)
                 Toggle("Save a copy of resigned apps", isOn: $exportResignedApp)
-                Toggle("Disable SideStore app limit", isOn: $disableAppLimit)
+                Toggle("Remove 3-App Limit", isOn: $disableAppLimit)
                     .disabled(!UserDefaults.standard.isCowExploitSupported && ProcessInfo().sparseRestorePatched)
             } header: {
                 Text("Signing")
@@ -162,11 +159,6 @@ struct InstallSigningSettingsView: View {
                     : "The app limit option depends on iOS and account type. Saving resigned apps keeps an extra IPA in Files → SideKick → ResignedApps.")
             }
 
-            Section("Certificates and profiles") {
-                Text("Apple Developer certificates, provisioning profiles, and App IDs are managed per Apple ID in the Accounts tab.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
         }
         .navigationTitle("Install & Signing")
         .navigationBarTitleDisplayMode(.inline)
@@ -188,67 +180,56 @@ struct ConnectionSettingsView: View {
 
     var body: some View {
         Form {
-            Section {
-                NavigationLink { LocalConnectionSettingsView() } label: {
-                    Label("Local Connection", systemImage: "network.badge.shield.half.filled")
+            Section("Pairing File") {
+                LabeledContent("Status") {
+                    Label(PairingFileManager.shared.hasPairingFile() ? "Imported" : "Not set up",
+                          systemImage: PairingFileManager.shared.hasPairingFile() ? "checkmark.circle.fill" : "circle.dashed")
+                        .foregroundStyle(PairingFileManager.shared.hasPairingFile() ? Color.green : Color.secondary)
                 }
-                .fullWidthListSeparators()
-                Toggle("Retry remote pairing ports automatically", isOn: $autoRetryPort)
-                Toggle("Automatic port selection", isOn: $isAutomaticPortDraft)
-                LabeledContent("Fixed remote pairing port") {
-                    TextField("1–65,535", text: $fixedPortDraft)
-                        .keyboardType(.numberPad)
-                        .multilineTextAlignment(.trailing)
-                        .disabled(isAutomaticPortDraft)
-                }
-                if !isAutomaticPortDraft, !isValidFixedPortDraft {
-                    Text("Enter a whole number from 1 to 65,535.")
-                        .font(.footnote)
-                        .foregroundStyle(.red)
-                }
-                if !isAutomaticPortDraft {
-                    Stepper(value: Binding<Int>(
-                        get: { validatedFixedPortDraft ?? 1 },
-                        set: { fixedPortDraft = String($0) }
-                    ), in: 1...65_535) {
-                        LabeledContent("Adjust fixed port", value: validatedFixedPortDraft.map(String.init) ?? "Enter a port")
-                    }
-                }
-                SwiftUI.Button("Save Port") {
-                    _ = savePort()
-                }
-                .disabled(isAutomaticPortDraft ? portOverride == 0 : validatedFixedPortDraft == nil)
-            } header: {
-                Text("Pairing")
-            } footer: {
-                Text("Set the port to Automatic unless your pairing setup requires a fixed port. Choose LocalDevVPN for free Apple Accounts, or the optional built-in VPN when your signing profiles support it.")
+                SwiftUI.Button(PairingFileManager.shared.hasPairingFile() ? "Replace Pairing File…" : "Import Pairing File…") { isChoosingPairingFile = true }
+                Link("How to Get a Pairing File", destination: AppConstants.URLs.pairingDocumentation)
             }
 
-            Section("Pairing file") {
-                LabeledContent("Status", value: PairingFileManager.shared.hasPairingFile() ? "Ready" : "Not set up")
-                SwiftUI.Button("Import or replace pairing file…") { isChoosingPairingFile = true }
-                Link("How to get a pairing file", destination: AppConstants.URLs.pairingDocumentation)
-                Text("This file is a private trust record for this iPhone. Keep it secure and import one created for this device.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
             Section {
-                NavigationLink { HealthCheckView(readyTitle: "SideKick Ready") } label: {
-                    Label("Health Check", systemImage: "heart.text.square")
+                Toggle("Retry ports automatically", isOn: $autoRetryPort)
+                Picker("Port", selection: $isAutomaticPortDraft) {
+                    Text("Automatic").tag(true)
+                    Text("Custom").tag(false)
                 }
-                Text("Check the VPN tunnel, device connection, pairing and active service port. Pull down on Health Check to run it again.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
+                if !isAutomaticPortDraft {
+                    LabeledContent("Custom Port") {
+                        TextField("1–65535", text: $fixedPortDraft)
+                            .keyboardType(.numberPad)
+                            .multilineTextAlignment(.trailing)
+                            .foregroundStyle(isValidFixedPortDraft || fixedPortDraft.isEmpty ? Color.primary : Color.red)
+                    }
+                }
+            } header: {
+                Text("Remote Pairing Port")
+            } footer: {
+                if !isAutomaticPortDraft, !fixedPortDraft.isEmpty, !isValidFixedPortDraft {
+                    Label("Enter a number from 1 to 65535.", systemImage: "exclamationmark.circle")
+                        .foregroundStyle(.red)
+                } else {
+                    Text("Keep this on Automatic unless your setup needs a fixed port. The pairing file is private to this iPhone.")
+                }
             }
         }
-        .navigationTitle("Connection & Pairing")
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                SwiftUI.Button("Save") { _ = savePort() }
+                    .fontWeight(.semibold)
+                    .disabled(!isPortDraftDirty || (!isAutomaticPortDraft && validatedFixedPortDraft == nil))
+            }
+        }
+        .navigationTitle("Pairing")
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: portOverride) { _, value in
             isAutomaticPortDraft = value == 0
             fixedPortDraft = value == 0 ? "" : String(value)
             syncMinimuxerBackendFromUserDefaults()
         }
-        .guardUnsavedSettings(isDirty: portDraftLoaded && (isAutomaticPortDraft ? portOverride != 0 : fixedPortDraft != String(portOverride)), save: {
+        .guardUnsavedSettings(isDirty: isPortDraftDirty, save: {
             savePort()
         }, discard: {
             isAutomaticPortDraft = portOverride == 0
@@ -280,6 +261,10 @@ struct ConnectionSettingsView: View {
         } message: {
             Text(pairingStatus ?? "")
         }
+    }
+
+    private var isPortDraftDirty: Bool {
+        portDraftLoaded && (isAutomaticPortDraft ? portOverride != 0 : fixedPortDraft != String(portOverride))
     }
 
     private func savePort() -> Bool {
@@ -325,7 +310,7 @@ struct ConnectionSettingsView: View {
                     ? (vpn.externalInstalled ? "Connect LocalDevVPN" : "Get LocalDevVPN")
                     : (vpn.isConfigured ? "Verify Device Connection" : "Allow Built-in VPN")
                 pairingRecoveryAction = recovery
-                let instruction = "In Settings → Connection & Pairing → Local Connection, choose \(recovery), then retry."
+                let instruction = "In Settings → Connection, choose \(recovery), then retry."
                 pairingStatus = "Pairing file imported. SideKick couldn’t reach the iPhone yet. \(instruction) Check that this pairing file belongs to your iPhone.\n\n\(error.localizedDescription)"
             }
         } catch {
@@ -363,12 +348,14 @@ struct AnisetteSettingsView: View {
     var body: some View {
         Form {
             Section {
-                Toggle("Generate Anisette on this device", isOn: $useOnDeviceAnisette)
-                TextField("Server URL", text: $server)
-                    .keyboardType(.URL)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                SwiftUI.Button("Use Windows Anisette server") {
+                Toggle("Generate on This iPhone", isOn: $useOnDeviceAnisette)
+                if !useOnDeviceAnisette {
+                    TextField("Server URL", text: $server)
+                        .keyboardType(.URL)
+                        .textInputAutocapitalization(.never)
+                        .autocorrectionDisabled()
+                }
+                SwiftUI.Button("Use Windows Anisette Server") {
                     server = AnisetteConfiguration.windowsServer
                     useOnDeviceAnisette = false
                     clientInfo = AnisetteConfiguration.windowsClientInfo
@@ -386,9 +373,9 @@ struct AnisetteSettingsView: View {
                 }
                 .fullWidthListSeparators()
             } header: {
-                Text("Authentication data")
+                Text("Authentication Data")
             } footer: {
-                Text("The Windows preset selects a remote server with matching authentication headers. Save to apply your changes. Switching providers or headers regenerates authentication data; your saved accounts and certificates are kept.")
+                Text("Changing the provider regenerates authentication data. Accounts and certificates are kept.")
             }
 
             Section {
@@ -398,24 +385,30 @@ struct AnisetteSettingsView: View {
                 TextField("User agent", text: $userAgent, axis: .vertical)
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
-                SwiftUI.Button("Save Authentication Settings") {
-                    Task { _ = await saveAuthenticationSettings() }
-                }
             } header: {
-                Text("Custom authentication headers")
+                Text("Custom Headers")
             } footer: {
-                Text("Leave a header empty to use the compatibility default. Use a matching client information and user agent pair for your server.")
+                Text("Leave empty to use the defaults. Use a matching pair for your server.")
             }
             Section {
                 SwiftUI.Button("Regenerate Authentication Data", role: .destructive) { showReset = true }
             } footer: {
-                Text("Clears saved Anisette provisioning data and creates fresh data at the next sign-in. Saved accounts, certificates and installed app records are kept.")
-            }
-            if let message {
-                Section { Text(message).font(.footnote) }
+                Text("Creates fresh data at the next sign-in.")
             }
         }
         .disabled(isSaving || !settingsLoaded)
+        .toolbar {
+            ToolbarItem(placement: .confirmationAction) {
+                if isSaving {
+                    ProgressView()
+                } else {
+                    SwiftUI.Button("Save") { Task { _ = await saveAuthenticationSettings() } }
+                        .fontWeight(.semibold)
+                        .disabled(!settingsLoaded || savedDraft == draft)
+                }
+            }
+        }
+        .messageAlert("Anisette", message: $message)
         .guardUnsavedSettings(isDirty: settingsLoaded && savedDraft != draft, save: {
             await saveAuthenticationSettings()
         }, discard: {
@@ -458,7 +451,6 @@ struct AnisetteSettingsView: View {
             try await SigningAccountStore().saveAnisetteConfiguration(server: server,
                 clientInfo: clientInfo, userAgent: userAgent, onDevice: useOnDeviceAnisette)
             savedDraft = draft
-            message = "Authentication settings saved."
             return true
         } catch {
             message = error.localizedDescription
@@ -486,6 +478,7 @@ struct SettingsStorageView: View {
     @State private var isShowingClearReview = false
     @State private var selectedRemovalKeys = Set<String>()
     @State private var errorMessage: String?
+    @State private var cleanReport: String?
 
     var body: some View {
         List {
@@ -500,9 +493,8 @@ struct SettingsStorageView: View {
         .refreshable { await reload() }
         .onReceive(NotificationCenter.default.publisher(for: .sideKickStorageDidChange)) { _ in Task { await reload() } }
         .sheet(isPresented: $isShowingClearReview) { clearReviewSheet }
-        .alert("Storage", isPresented: Binding(get: { errorMessage != nil }, set: { if !$0 { errorMessage = nil } })) {
-            SwiftUI.Button("OK", role: .cancel) { errorMessage = nil }
-        } message: { Text(errorMessage ?? "") }
+        .messageAlert("Couldn’t Update Storage", message: $errorMessage)
+        .messageAlert("Storage Cleaned", message: $cleanReport)
     }
 
     private var allAppDataSection: some View {
@@ -522,16 +514,15 @@ struct SettingsStorageView: View {
                 .fullWidthListSeparators()
             }
         } header: { Text("All App Data") } footer: {
-            Text("Includes hidden files, databases, logs, caches and temporary downloads. Tap a folder to see what takes space. iOS Storage may update later or count shared storage differently.")
+            Text("Tap a folder to see what’s using space. iOS Storage may count differently.")
         }
     }
 
     private var importedIPAsSection: some View {
         Section {
-            LabeledContent("Items", value: "\(importedApps.count)")
-            LabeledContent("Downloaded IPA copies", value: storageUsage.formatted(storageUsage.importedIPAs))
+            LabeledContent("Downloaded IPAs", value: "\(removableImportedApps.count) · \(storageUsage.formatted(storageUsage.importedIPAs))")
             if storageUsage.importedIPAs > 0 {
-                SwiftUI.Button("Remove downloaded IPA copies", role: .destructive) {
+                SwiftUI.Button("Review Downloaded IPAs…") {
                     selectedRemovalKeys.removeAll()
                     isShowingClearReview = true
                 }
@@ -539,7 +530,7 @@ struct SettingsStorageView: View {
         } header: {
             Text("Imported IPAs")
         } footer: {
-            Text("This removes IPA copies stored by SideKick. Files linked from the Files app remain in their original location.")
+            Text("Files you opened from the Files app stay where they are.")
         }
     }
 
@@ -553,17 +544,16 @@ struct SettingsStorageView: View {
             }
             SwiftUI.Button { Task { await cleanUnusedFiles() } } label: {
                 HStack {
-                    Label("Clean Unused Files", systemImage: "trash")
+                    Label("Clean Unused Files", systemImage: "sparkles")
                     Spacer()
                     if isCleaning { ProgressView() }
                 }
             }
             .disabled(isCleaning)
-            .fullWidthListSeparators()
         } header: {
             Text("Signing & Temporary Files")
         } footer: {
-            Text("SideKick keeps the current extracted source for each app so it can re-sign it. Extracted apps can be larger than their compressed IPAs. SideKick automatically removes completed install files and expired unused sources. Recent sources are kept for 24 hours for recovery. Clean Unused Files also clears disposable network caches. Saved resigned IPAs and app records are kept.")
+            Text("SideKick keeps each app’s source so it can re-sign it. Cleaning removes expired sources and caches; recent sources are kept for 24 hours.")
         }
     }
 
@@ -585,16 +575,27 @@ struct SettingsStorageView: View {
 
     private var clearReviewExplanation: some View {
         Section {
-            Text("Removing these \(selectedRemovalApps.count) selected copies also deletes their SideKick import records. The selection may include queued updates or IPAs shown under Ready to Install. To restore an entry later, download or import its IPA again and re-queue it if needed. Installed apps and files in Files are not affected.")
+            Text("Removed IPAs disappear from Ready to Install and downloaded updates. Installed apps aren’t affected.")
                 .font(.footnote)
                 .foregroundStyle(.secondary)
         }
     }
 
     private var removableIPAsSection: some View {
-        Section("Downloaded IPA copies (\(selectedRemovalApps.count) selected)") {
+        Section {
             ForEach(Array(removableImportedApps.enumerated()), id: \.offset) { entry in
                 removalRow(for: entry.element)
+            }
+        } header: {
+            HStack {
+                Text("\(selectedRemovalApps.count) of \(removableImportedApps.count) Selected")
+                Spacer()
+                SwiftUI.Button(selectedRemovalApps.count == removableImportedApps.count ? "Deselect All" : "Select All") {
+                    if selectedRemovalApps.count == removableImportedApps.count { selectedRemovalKeys.removeAll() }
+                    else { selectedRemovalKeys = Set(removableImportedApps.map(removalKey(for:))) }
+                }
+                .font(.subheadline.weight(.semibold))
+                .textCase(nil)
             }
         }
     }
@@ -608,16 +609,19 @@ struct SettingsStorageView: View {
             HStack {
                 VStack(alignment: .leading, spacing: 3) {
                     Text(app.name).foregroundStyle(.primary)
-                    Text("Version \(app.version) · \(app.isUpdateQueued ? "Queued for update" : "Imported IPA")")
-                        .font(.footnote).foregroundStyle(.secondary)
+                    Text("\(app.version) · \(app.isUpdateQueued ? "Downloaded update" : "Ready to install")")
+                        .font(.subheadline).foregroundStyle(.secondary)
                 }
                 Spacer()
                 Image(systemName: selectedRemovalKeys.contains(key) ? "checkmark.circle.fill" : "circle")
-                    .foregroundStyle(selectedRemovalKeys.contains(key) ? Color.accentColor : Color.secondary)
+                    .font(.title3)
+                    .foregroundStyle(selectedRemovalKeys.contains(key) ? Color.sideKickAccent : Color.secondary)
+                    .accessibilityHidden(true)
             }
             .contentShape(Rectangle())
         }
         .buttonStyle(.plain)
+        .accessibilityAddTraits(selectedRemovalKeys.contains(key) ? .isSelected : [])
     }
 
     @ToolbarContentBuilder
@@ -683,7 +687,7 @@ struct SettingsStorageView: View {
             let report = try await SideKickStorageCleanup.cleanUnused(downloads: environment.githubUpdateDownloads)
             try await environment.ipaImportStore.cleanupOrphanedManagedIPAs()
             await reload()
-            errorMessage = report
+            cleanReport = report
         } catch { errorMessage = error.localizedDescription }
     }
 }

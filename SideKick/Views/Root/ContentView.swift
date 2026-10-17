@@ -18,15 +18,19 @@ struct ContentView: View {
                         guard tab != selectedTab else { return }
                         unsavedSettings.requestNavigation { selectedTab = tab }
                     })) {
-                        HomeView(viewModel: HomeViewModel(store: environment.ipaImportStore))
-                            .tabItem { Label("Apps", systemImage: "square.stack.3d.up") }
-                            .tag(0)
-                        AccountsView(showsNavigationStack: true)
-                            .tabItem { Label("Accounts", systemImage: "person.2.fill") }
-                            .tag(1)
-                        SettingsView()
-                            .tabItem { Label("Settings", systemImage: "gearshape.fill") }
-                            .tag(2)
+                        Tab("Apps", systemImage: "app.badge.checkmark", value: 0) {
+                            HomeView(viewModel: HomeViewModel(store: environment.ipaImportStore))
+                        }
+                        Tab("Accounts", systemImage: "person.crop.circle", value: 1) {
+                            AccountsView(showsNavigationStack: true)
+                        }
+                        Tab("Settings", systemImage: "gear", value: 2) {
+                            SettingsView()
+                        }
+                    }
+                    .minimizingTabBarOnScroll()
+                    .refreshActivityAccessory(environment.refreshActivity) {
+                        unsavedSettings.requestNavigation { selectedTab = 0 }
                     }
                 } else {
                     RequiredSetupView(status: setupStatus)
@@ -44,12 +48,14 @@ struct ContentView: View {
             await environment.startDatabase()
             if case .ready = environment.databaseState { await setupStatus.refresh() }
         }
+        .onAppear(perform: applyWindowTint)
         .alert("Save changes?", isPresented: $unsavedSettings.isPresented) {
             SwiftUI.Button("Save") { Task { await unsavedSettings.saveAndLeave() } }
                 .keyboardShortcut(.defaultAction)
             SwiftUI.Button("Don’t Save") { unsavedSettings.discardAndLeave() }
+            SwiftUI.Button("Keep Editing", role: .cancel) { unsavedSettings.stay() }
         } message: {
-            Text("You have unsaved settings. Save them before leaving, or discard your changes.")
+            Text("Your changes haven’t been saved.")
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didEnterBackgroundNotification)) { _ in
             isForeground = false
@@ -108,36 +114,46 @@ struct ContentView: View {
             }
     }
 
+    /// UIKit-presented alerts, menus and share sheets read the window tint, not SwiftUI's.
+    private func applyWindowTint() {
+        for scene in UIApplication.shared.connectedScenes {
+            guard let windowScene = scene as? UIWindowScene else { continue }
+            for window in windowScene.windows { window.tintColor = .sideKickAccent }
+        }
+    }
+
     @ViewBuilder
     private var databaseStatusView: some View {
-        VStack(spacing: 18) {
-            switch environment.databaseState {
-            case .starting:
-                ProgressView("Opening SideKick data…")
-            case .failed(let message):
-                Image(systemName: "externaldrive.badge.exclamationmark")
-                    .font(.system(size: 42))
-                    .foregroundStyle(.orange)
-                Text("SideKick couldn’t open its local data")
-                    .font(.title2.weight(.semibold))
-                    .multilineTextAlignment(.center)
-                Text("SideKick keeps its signing data in the app’s private storage. It couldn’t start the local database; no data has been reset.\n\n\(message)")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-                    .textSelection(.enabled)
-                SwiftUI.Button("Try Again") {
+        switch environment.databaseState {
+        case .starting:
+            ProgressView("Opening SideKick…")
+                .frame(maxWidth: .infinity, maxHeight: .infinity)
+                .background(Color.sideKickCanvas)
+        case .failed(let message):
+            ContentUnavailableView {
+                Label("Couldn’t Open SideKick’s Data", systemImage: "externaldrive.badge.exclamationmark")
+            } description: {
+                VStack(spacing: Spacing.xs) {
+                    Text("Nothing has been reset. Try again, or restart the app.")
+                    Text(message)
+                        .font(.footnote)
+                        .foregroundStyle(.secondary)
+                        .textSelection(.enabled)
+                }
+            } actions: {
+                SwiftUI.Button {
                     Task {
                         await environment.startDatabase()
                         if case .ready = environment.databaseState { await setupStatus.refresh() }
                     }
+                } label: {
+                    Text("Try Again").font(.headline).padding(.horizontal, Spacing.l)
                 }
-                .buttonStyle(.bordered)
-            case .ready:
-                EmptyView()
+                .primaryActionStyle()
             }
+            .background(Color.sideKickCanvas)
+        case .ready:
+            EmptyView()
         }
-        .padding(24)
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
-        .background(Color.sideKickCanvas)
     }
 }

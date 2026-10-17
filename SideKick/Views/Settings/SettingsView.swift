@@ -5,41 +5,48 @@ struct SettingsView: View {
     var body: some View {
         NavigationStack {
             List {
-                Section("Apps") {
+                Section {
                     NavigationLink { RefreshSettingsView() } label: {
                         Label("App Refresh", systemImage: "arrow.clockwise")
                     }
                     NavigationLink { InstallSigningSettingsView() } label: {
                         Label("Install & Signing", systemImage: "signature")
                     }
-                    NavigationLink { LocalConnectionSettingsView() } label: {
-                        Label("Local Connection", systemImage: "network")
-                    }
                     NavigationLink { PermissionsSettingsView() } label: {
-                        Label("Permissions", systemImage: "bell.badge")
+                        Label("Notifications", systemImage: "bell.badge")
                     }
+                } header: {
+                    Text("Signing")
                 }
 
-                Section("Integrations") {
+                Section {
+                    NavigationLink { LocalConnectionSettingsView() } label: {
+                        Label("Connection", systemImage: "network")
+                    }
                     NavigationLink { LiveContainerConnectionsView() } label: {
                         Label("LiveContainer", systemImage: "square.stack.3d.up")
                     }
+                } header: {
+                    Text("Connections")
                 }
 
-                Section("Tools") {
-                    NavigationLink { HealthCheckView(readyTitle: "SideKick Ready") } label: {
-                        Label("Health Check", systemImage: "heart.text.square")
-                    }
+                Section {
                     NavigationLink { AdvancedSettingsView() } label: {
-                        Label("Advanced", systemImage: "gearshape.2")
+                        Label("Advanced", systemImage: "wrench.and.screwdriver")
                     }
                 }
 
-                Section("About") {
+                Section {
                     LabeledContent("Version", value: Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Unknown")
-                    Link(destination: URL(string: "https://github.com/huzaifah1530-bot/SideKick")!) {
-                        Label("SideKick on GitHub", systemImage: "arrow.up.right")
+                    if let url = URL(string: "https://github.com/huzaifah1530-bot/SideKick") {
+                        Link(destination: url) {
+                            Label("SideKick on GitHub", systemImage: "safari")
+                        }
                     }
+                } header: {
+                    Text("About")
+                } footer: {
+                    Text("SideKick uses open-source signing components. Their licenses are in the project source.")
                 }
             }
             .listStyle(.insetGrouped)
@@ -67,11 +74,11 @@ private struct PermissionsSettingsView: View {
                 }
                 Link("Open iOS Settings", destination: URL(string: UIApplication.openSettingsURLString)!)
             } footer: {
-                Text("Notifications can remind you before apps expire. iOS decides when background refresh runs.")
+                Text("SideKick reminds you before apps expire. iOS decides when background refresh runs.")
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle("Permissions")
+        .navigationTitle("Notifications")
         .navigationBarTitleDisplayMode(.inline)
         .task { await status.refresh() }
         .onChange(of: scenePhase) { _, phase in
@@ -91,9 +98,9 @@ private struct PermissionsSettingsView: View {
 private struct AdvancedSettingsView: View {
     var body: some View {
         List {
-            Section("Connection") {
+            Section("Signing Services") {
                 NavigationLink { ConnectionSettingsView() } label: {
-                    Label("Pairing & Ports", systemImage: "network.badge.shield.half.filled")
+                    Label("Pairing", systemImage: "iphone.gen3.radiowaves.left.and.right")
                 }
                 NavigationLink { AnisetteSettingsView() } label: {
                     Label("Anisette", systemImage: "lock.shield")
@@ -105,14 +112,14 @@ private struct AdvancedSettingsView: View {
                     Label("Skipped Updates", systemImage: "arrow.uturn.backward")
                 }
                 NavigationLink { GitHubAccountSettingsView() } label: {
-                    Label("GitHub Tokens", systemImage: "chevron.left.forwardslash.chevron.right")
-                }
-                NavigationLink { GitHubDiagnosticsView() } label: {
-                    Label("GitHub Update Logs", systemImage: "list.bullet.clipboard")
+                    Label("GitHub Tokens", systemImage: "key")
                 }
             }
 
             Section("Troubleshooting") {
+                NavigationLink { HealthCheckView(readyTitle: "SideKick Ready") } label: {
+                    Label("Health Check", systemImage: "stethoscope")
+                }
                 NavigationLink { DiagnosticsView() } label: {
                     Label("Diagnostics", systemImage: "list.bullet.clipboard")
                 }
@@ -121,11 +128,6 @@ private struct AdvancedSettingsView: View {
                 }
             }
 
-            Section("Open Source") {
-                Text("SideKick uses open-source signing components. Their notices and licenses are available in the project source.")
-                    .font(.footnote)
-                    .foregroundStyle(.secondary)
-            }
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Advanced")

@@ -23,7 +23,7 @@ class AuthCompatibilityPatchTests(unittest.TestCase):
                          'sidestore-use-account-certificate-for-refresh.patch', 'sidestore-compiler-workarounds.patch',
                          'sidestore-view-body-compile.patch', 'sidestore-audit-fixes.patch',
                          'sidestore-anisette-recovery.patch', 'sidestore-diagnostics.patch',
-                         'sidestore-health-check.patch'):
+                         'sidestore-health-check.patch', 'sidestore-sidekick-styling.patch'):
                 if name == 'sidestore-audit-fixes.patch':
                     subprocess.run([sys.executable, str(ROOT / 'scripts/embed-local-vpn.py'), str(target)], check=True, capture_output=True)
                 args = ['git', '-C', str(target), 'apply']

@@ -1,0 +1,95 @@
+diff --git a/AltStore/Settings/AnisetteServerList.swift b/AltStore/Settings/AnisetteServerList.swift
+index b9148a8..3548dcc 100644
+--- a/AltStore/Settings/AnisetteServerList.swift
++++ b/AltStore/Settings/AnisetteServerList.swift
+@@ -289,7 +289,7 @@ struct AnisetteServersView: View {
+                     } else {
+                         VStack(spacing: 12) {
+                             Image(systemName: viewModel.isNoInternet ? "wifi.slash" : "antenna.radiowaves.left.and.right.slash")
+-                                .font(.system(size: 36))
++                                .font(.largeTitle)
+                                 .foregroundColor(.orange)
+                                 .padding(.top, 4)
+ 
+@@ -379,7 +379,7 @@ struct AnisetteServersView: View {
+                             } label: {
+                                 Label(item.isHidden ? "Unhide" : "Hide", systemImage: item.isHidden ? "eye" : "eye.slash")
+                             }
+-                            .tint(item.isHidden ? .blue : .orange)
++                            .tint(item.isHidden ? .accentColor : .orange)
+                         }
+                         #endif
+                     }
+diff --git a/SideStore/Views/Settings/Advanced/JIT/SideJITServerConfigView.swift b/SideStore/Views/Settings/Advanced/JIT/SideJITServerConfigView.swift
+index dcd7db8..3341634 100644
+--- a/SideStore/Views/Settings/Advanced/JIT/SideJITServerConfigView.swift
++++ b/SideStore/Views/Settings/Advanced/JIT/SideJITServerConfigView.swift
+@@ -97,7 +97,7 @@ struct SideJITServerConfigView: View {
+         #else
+         .listStyle(.grouped)
+         #endif
+-        .navigationTitle("SideJITServer")
++        .navigationTitle("JIT Server")
+         .overlay(
+             Group {
+                 if showCopiedToast {
+@@ -117,7 +117,7 @@ struct SideJITServerConfigView: View {
+             Toggle(isOn: $isServerEnabled) {
+                 HStack(spacing: 12) {
+                     Image(systemName: "bolt.fill")
+-                        .font(.system(size: 20, weight: .semibold))
++                        .font(.title3.weight(.semibold))
+                         .foregroundColor(.accentColor)
+                         .frame(width: 32, height: 32)
+                         .background(Color.accentColor.opacity(0.15))
+@@ -164,7 +164,7 @@ struct SideJITServerConfigView: View {
+                     .layoutPriority(1)
+                 Spacer()
+                 Text(!isServerEnabled ? "Disabled" : (resolvedAddress.isEmpty ? "Resolving…" : resolvedAddress))
+-                    .font(.system(size: 13, design: .monospaced))
++                    .font(.system(.footnote, design: .monospaced))
+                     .foregroundColor((!isServerEnabled || resolvedAddress.isEmpty) ? .secondary : .primary)
+                     .lineLimit(1)
+                     .minimumScaleFactor(0.7)
+@@ -199,7 +199,7 @@ struct SideJITServerConfigView: View {
+         ) {
+             HStack {
+                 TextField(AppConstants.SideJIT.defaultServerURL, text: $customAddress)
+-                    .font(.system(size: 12.5, design: .monospaced))
++                    .font(.system(.caption, design: .monospaced))
+                     .minimumScaleFactor(0.7)
+                     .lineLimit(1)
+                     .autocapitalization(.none)
+diff --git a/SideStore/Views/Settings/TechyThings/HealthCheck/HealthCheckView.swift b/SideStore/Views/Settings/TechyThings/HealthCheck/HealthCheckView.swift
+index c2df8f6..074bba3 100644
+--- a/SideStore/Views/Settings/TechyThings/HealthCheck/HealthCheckView.swift
++++ b/SideStore/Views/Settings/TechyThings/HealthCheck/HealthCheckView.swift
+@@ -22,7 +22,7 @@ struct HealthCheckView: View {
+                         switch result {
+                         case .success:
+                             Image(systemName: "checkmark.circle.fill")
+-                                .font(.system(size: 44))
++                                .font(.largeTitle)
+                                 .foregroundColor(.green)
+                             Text(readyTitle)
+                                 .font(.title2)
+@@ -36,7 +36,7 @@ struct HealthCheckView: View {
+                             .multilineTextAlignment(.center)
+                         case .failure(let err):
+                             Image(systemName: "exclamationmark.triangle.fill")
+-                                .font(.system(size: 44))
++                                .font(.largeTitle)
+                                 .foregroundColor(.orange)
+                             Text("Action Required")
+                                 .font(.title2)
+@@ -269,8 +269,8 @@ struct InterfaceRow: View {
+                     .fontWeight(.medium)
+                     .padding(.horizontal, 6)
+                     .padding(.vertical, 2)
+-                    .background(iface.type.isVPN ? Color.blue.opacity(0.15) : Color.gray.opacity(0.15))
+-                    .foregroundColor(iface.type.isVPN ? .blue : .primary)
++                    .background(iface.type.isVPN ? Color.accentColor.opacity(0.15) : Color.gray.opacity(0.15))
++                    .foregroundColor(iface.type.isVPN ? .accentColor : .primary)
+                     .cornerRadius(4)
+                 
+                 Spacer()

@@ -6,9 +6,9 @@ struct ImportedIPARow: View {
     var body: some View {
         SideKickLibraryAppRow(
             name: app.name,
-            versionText: "Version \(app.version)",
+            versionText: app.version,
             iconData: app.iconData,
-            metadata: { Text("Ready to install").font(.subheadline).foregroundStyle(.secondary) },
+            metadata: { EmptyView() },
             status: { EmptyView() }
         )
     }

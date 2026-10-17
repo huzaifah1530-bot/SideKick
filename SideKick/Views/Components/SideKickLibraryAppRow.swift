@@ -23,23 +23,13 @@ struct SideKickLibraryAppRow<Metadata: View, Status: View>: View {
     }
 
     var body: some View {
-        HStack(spacing: 12) {
-            Group {
-                if let iconData, let icon = UIImage(data: iconData) {
-                    Image(uiImage: icon).resizable().scaledToFit()
-                } else {
-                    Image(systemName: "app.fill")
-                        .resizable().scaledToFit().padding(12)
-                        .foregroundStyle(.white)
-                        .background(Color.sideKickAccent.gradient)
-                }
-            }
-            .frame(width: 52, height: 52)
-            .clipShape(.rect(cornerRadius: 12))
-            .accessibilityHidden(true)
+        HStack(spacing: Spacing.s) {
+            SideKickAppIcon(data: iconData, size: .list)
 
-            VStack(alignment: .leading, spacing: 4) {
-                Text(name).font(.body.weight(.semibold))
+            VStack(alignment: .leading, spacing: 2) {
+                Text(name)
+                    .font(.body.weight(.semibold))
+                    .lineLimit(1)
                 Text(versionText)
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
@@ -50,6 +40,6 @@ struct SideKickLibraryAppRow<Metadata: View, Status: View>: View {
 
             status
         }
-        .padding(.vertical, 4)
+        .padding(.vertical, Spacing.xxs)
     }
 }

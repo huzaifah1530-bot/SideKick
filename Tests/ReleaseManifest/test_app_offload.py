@@ -36,10 +36,10 @@ class AppOffloadTests(unittest.TestCase):
         home = (ROOT / 'SideKick/Views/Home/HomeView.swift').read_text()
         runtime = (ROOT / 'SideKick/Services/SideStoreOperationService.swift').read_text()
         service = (ROOT / 'SideKick/Services/AppOffloadService.swift').read_text()
-        self.assertIn('SwiftUI.Section("Inactive")', home)
+        self.assertIn('SwiftUI.Section("Offloaded")', home)
         self.assertIn('ForEach(installedApps.filter { !$0.isActive })', home)
         self.assertIn('NavigationLink { AppManagementView(installedApp: app) }', home)
-        self.assertIn('Ready to restore', home)
+        self.assertIn('Label("Restore App"', home)
         self.assertIn('$0.isActive && !AppOffloadService.blocksNativeOperations', runtime)
         self.assertIn('SideKick.transfer.', service)  # Retain interrupted old-transfer recovery.
         self.assertIn('importConfiguration: configuration', service)

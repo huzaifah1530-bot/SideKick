@@ -43,8 +43,9 @@ struct AccountsView: View {
             }
             if let loadError = accountStore.loadError {
                 Section {
-                    Label(loadError, systemImage: "exclamationmark.triangle")
-                        .foregroundStyle(.secondary)
+                    Label("Couldn’t Load Accounts", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                    Text(loadError).font(.footnote).foregroundStyle(.secondary)
                     SwiftUI.Button("Try Again") { Task { await accountStore.reload() } }
                 }
             }
@@ -58,26 +59,28 @@ struct AccountsView: View {
                 } description: {
                     Text("Add an Apple Account to sign and install apps.")
                 } actions: {
-                    SwiftUI.Button("Add Apple Account") { isShowingSignIn = true }
-                        .buttonStyle(.borderedProminent)
+                    SwiftUI.Button { isShowingSignIn = true } label: {
+                        Text("Add Apple Account").font(.headline).padding(.horizontal, Spacing.m)
+                    }
+                    .primaryActionStyle()
                 }
                 .listRowBackground(Color.clear)
             } else {
-                Section("Apple Accounts") {
+                Section {
                     ForEach(accountStore.accounts) { account in
                         NavigationLink {
                             SigningAccountDetailView(account: account, accountStore: accountStore)
                         } label: {
                             accountRow(account)
                         }
-                        .fullWidthListSeparators()
                     }
+                } footer: {
+                    Text("Apps are signed with these accounts. Passwords are stored in the iOS Keychain.")
                 }
             }
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Accounts")
-        .background(Color(uiColor: .systemGroupedBackground))
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 SwiftUI.Button {
@@ -99,7 +102,7 @@ struct AccountsView: View {
                 submittedCredentials = (appleID, password)
             }
         }
-        .alert("Couldn’t add Apple Account", isPresented: Binding(
+        .alert("Couldn’t Add Apple Account", isPresented: Binding(
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
         )) {
@@ -121,21 +124,27 @@ struct AccountsView: View {
     }
 
     private func accountRow(_ account: SigningAccountSummary) -> some View {
-        HStack {
-            VStack(alignment: .leading, spacing: 3) {
+        let needsSignIn = !account.hasSavedSession || account.rawTeamType == nil
+        return HStack(spacing: Spacing.s) {
+            AccountAvatar(email: account.email, size: 44)
+            VStack(alignment: .leading, spacing: 2) {
                 Text(account.email)
-                    .foregroundStyle(.primary)
-                Text(account.teamName.isEmpty ? account.teamType : account.teamName)
+                    .font(.body.weight(.semibold))
+                    .lineLimit(1)
+                Text(needsSignIn ? "Sign in required" : (account.teamName.isEmpty ? account.teamType : "\(account.teamName) · \(account.teamType)"))
                     .font(.subheadline)
-                    .foregroundStyle(.secondary)
-                if !account.hasSavedSession || account.rawTeamType == nil {
-                    Label("Sign in required", systemImage: "person.crop.circle.badge.exclamationmark")
-                        .font(.subheadline).foregroundStyle(.orange)
-                }
+                    .foregroundStyle(needsSignIn ? Color.orange : Color.secondary)
+                    .lineLimit(1)
             }
-            Spacer()
+            Spacer(minLength: 0)
+            if needsSignIn {
+                Image(systemName: "exclamationmark.circle.fill")
+                    .foregroundStyle(.orange)
+                    .accessibilityHidden(true)
+            }
         }
-        .padding(.vertical, 3)
+        .padding(.vertical, Spacing.xxs)
+        .accessibilityElement(children: .combine)
     }
 
     private func beginSignIn() {
@@ -185,20 +194,53 @@ struct SigningAccountDetailView: View {
     var body: some View {
         List {
             Section {
-                LabeledContent("Apple ID", value: currentAccount.email)
-                LabeledContent("Team", value: currentAccount.teamName)
-                LabeledContent("Account type", value: currentAccount.teamType)
-            }
-
-            Section {
-                if forceReconnect || !currentAccount.hasSavedSession || currentAccount.rawTeamType == nil {
-                    SwiftUI.Button { isShowingReconnect = true } label: {
-                        Label("Sign In Again", systemImage: "person.crop.circle.badge.checkmark")
+                VStack(spacing: Spacing.s) {
+                    AccountAvatar(email: currentAccount.email, size: 88)
+                    VStack(spacing: Spacing.xxs) {
+                        Text(currentAccount.email)
+                            .font(.title3.weight(.bold))
+                            .multilineTextAlignment(.center)
+                            .textSelection(.enabled)
+                            .accessibilityAddTraits(.isHeader)
+                        Text([currentAccount.teamName, currentAccount.teamType].filter { !$0.isEmpty }.joined(separator: " · "))
+                            .font(.subheadline)
+                            .foregroundStyle(.secondary)
+                            .multilineTextAlignment(.center)
                     }
-                    .disabled(accountStore.isWorking)
-                    Text("Sign in again to use this account on this device.")
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
+                    if needsReconnect {
+                        SwiftUI.Button { isShowingReconnect = true } label: {
+                            ActionLabel("Sign In Again", systemImage: "person.crop.circle.badge.checkmark", isWorking: accountStore.isWorking)
+                        }
+                        .primaryActionStyle()
+                        .disabled(accountStore.isWorking)
+                        .padding(.top, Spacing.xs)
+                    }
+                }
+                .frame(maxWidth: .infinity)
+                .padding(.vertical, Spacing.xs)
+            }
+            .listRowBackground(Color.clear)
+
+            if currentAccount.hasSavedSession, currentAccount.isFreeAccount, let inventory {
+                Section {
+                    let remaining = max(10 - inventory.appIDs.count, 0)
+                    VStack(alignment: .leading, spacing: Spacing.xs) {
+                        HStack(alignment: .firstTextBaseline) {
+                            Text("\(remaining)")
+                                .font(.title.weight(.bold).monospacedDigit())
+                            Text("of 10 App IDs left")
+                                .font(.subheadline)
+                                .foregroundStyle(.secondary)
+                        }
+                        Gauge(value: Double(remaining), in: 0...10) { EmptyView() }
+                            .gaugeStyle(.linearCapacity)
+                            .tint(remaining <= 2 ? Color.orange : Color.sideKickAccent)
+                    }
+                    .padding(.vertical, Spacing.xxs)
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityLabel("\(remaining) of 10 App IDs left")
+                } footer: {
+                    Text("Free accounts can register 10 App IDs per week. Each app and extension uses one.")
                 }
             }
 
@@ -208,21 +250,15 @@ struct SigningAccountDetailView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                 } else if let inventory {
-                    if currentAccount.isFreeAccount {
-                        LabeledContent(
-                            "App IDs available",
-                            value: "\(max(10 - inventory.appIDs.count, 0)) of 10"
-                        )
-                    }
                     NavigationLink {
                         AccountAppIDListView(appIDs: inventory.appIDs)
                     } label: {
-                        LabeledContent("Registered App IDs", value: "\(inventory.appIDs.count)")
+                        LabeledContent("App IDs", value: "\(inventory.appIDs.count)")
                     }
                     NavigationLink {
                         AccountProfileListView(profiles: inventory.profiles)
                     } label: {
-                        LabeledContent("Provisioning Profiles", value: "\(inventory.profiles.count)")
+                        LabeledContent("Profiles", value: "\(inventory.profiles.count)")
                     }
                     NavigationLink {
                         AccountCertificateListView(
@@ -251,31 +287,28 @@ struct SigningAccountDetailView: View {
                         .foregroundStyle(.secondary)
                 }
             } header: {
-                Text("Apple Developer")
-            } footer: {
-                Text("Live Apple Developer records; profiles and certificates don’t prove an app is installed.")
+                Text("Developer Resources")
             }
 
             Section {
-                SwiftUI.Button("Remove Apple ID", role: .destructive) {
+                SwiftUI.Button("Remove Account", role: .destructive) {
                     isConfirmingRemoval = true
                 }
                 .disabled(accountStore.isWorking)
             } footer: {
-                Text("This removes the saved account from SideKick. Apps already installed on your iPhone are not deleted.")
+                Text("Installed apps stay on your iPhone.")
             }
         }
         .listStyle(.insetGrouped)
-        .background(Color(uiColor: .systemGroupedBackground))
-        .navigationTitle("Apple ID")
+        .navigationTitle("Apple Account")
         .navigationBarTitleDisplayMode(.inline)
         .sheet(isPresented: $isShowingReconnect, onDismiss: reconnect) {
             AppleIDSignInSheet { appleID, password in reconnectCredentials = (appleID, password) }
         }
         .task { await loadInventory() }
         .refreshable { await loadInventory() }
-        .confirmationDialog("Remove this Apple ID?", isPresented: $isConfirmingRemoval, titleVisibility: .visible) {
-            SwiftUI.Button("Remove Apple ID", role: .destructive) {
+        .confirmationDialog("Remove this Apple Account?", isPresented: $isConfirmingRemoval, titleVisibility: .visible) {
+            SwiftUI.Button("Remove Account", role: .destructive) {
                 Task {
                     do {
                         try await accountStore.remove(account)
@@ -287,7 +320,7 @@ struct SigningAccountDetailView: View {
             }
             SwiftUI.Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Its saved signing session will also be removed from this device.")
+            Text("Its saved sign-in is removed from this iPhone. Installed apps aren’t deleted.")
         }
         .alert("Apple Account", isPresented: Binding(
             get: { errorMessage != nil },
@@ -299,13 +332,17 @@ struct SigningAccountDetailView: View {
         }
     }
 
+    private var needsReconnect: Bool {
+        forceReconnect || !currentAccount.hasSavedSession || currentAccount.rawTeamType == nil
+    }
+
     private func reconnect() {
         guard let credentials = reconnectCredentials else { return }
         reconnectCredentials = nil
         Task {
             do {
                 guard credentials.appleID.caseInsensitiveCompare(account.email) == .orderedSame else {
-                    errorMessage = "Sign in with \(account.email) to reconnect this account. Use Add Apple ID for another account."
+                    errorMessage = "Sign in with \(account.email) to reconnect this account. To use a different account, add it from Accounts."
                     return
                 }
                 try await accountStore.addAccount(appleID: credentials.appleID, password: credentials.password)

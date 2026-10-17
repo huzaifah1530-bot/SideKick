@@ -72,6 +72,7 @@ jobs:
           git -C Vendor/SideStore apply ../../patches/sidestore-anisette-recovery.patch
           git -C Vendor/SideStore apply ../../patches/sidestore-diagnostics.patch
           git -C Vendor/SideStore apply ../../patches/sidestore-health-check.patch
+          git -C Vendor/SideStore apply ../../patches/sidestore-sidekick-styling.patch
 
       - name: Test shipping patch composition and dependency recovery
         run: python3 -m unittest discover -s Tests/VendorRegression -v

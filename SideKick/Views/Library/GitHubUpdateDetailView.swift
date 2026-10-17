@@ -66,7 +66,8 @@ struct GitHubUpdateDetailView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle(isVersionSelection ? "Install Version" : showsDetails ? "Update Details" : "Review Update")
+        .toolbar { reviewToolbar }
+        .navigationTitle(isVersionSelection ? "Install Version" : showsDetails ? "Builds" : "Update")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { Task { await accountStore.reload() } }
         .onReceive(NotificationCenter.default.publisher(for: .sideKickSigningAccountsDidChange)) { _ in
@@ -88,11 +89,11 @@ struct GitHubUpdateDetailView: View {
         .onReceive(NotificationCenter.default.publisher(for: .sideKickImportedIPAsDidChange)) { _ in
             Task { await validateDownload() }
         }
-        .alert("Already installed this build?", isPresented: $isConfirmingInstalledBuild) {
-            SwiftUI.Button("Mark as Installed") { Task { await resolveUpdate(markInstalled: true) } }
+        .alert("Installed this exact build?", isPresented: $isConfirmingInstalledBuild) {
+            SwiftUI.Button("I’ve Installed It") { Task { await resolveUpdate(markInstalled: true) } }
             SwiftUI.Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Only choose this if you installed this exact GitHub release or build. Matching version names alone do not identify an Actions build.")
+            Text("Only confirm if you installed this GitHub build. A matching version name isn’t enough.")
         }
         .confirmationDialog("Skip this build?", isPresented: $isConfirmingSkip, titleVisibility: .visible) {
             SwiftUI.Button("Skip Build", role: .destructive) { Task { await resolveUpdate(markInstalled: false) } }
@@ -113,49 +114,29 @@ struct GitHubUpdateDetailView: View {
             Section { Text("The installed GitHub build is unverified. Review this downloadable build or confirm the build you already installed.").foregroundStyle(.secondary) }
         }
         Section {
-            GitHubTokenSelectionLink(selection: $tokenID).disabled(downloadJob?.isDownloading == true)
-            if selectedCandidate.source == .actionsArtifact {
-                Text("Actions builds require a GitHub token with Actions: read access to this repository. For private repositories, include the repository and ensure the organization has approved the token.")
-                    .font(.footnote).foregroundStyle(.secondary)
-            }
+            DetailHeader(iconData: app.iconData, title: app.name, subtitle: selectedCandidate.newVersion)
         }
+        .listRowBackground(Color.clear)
+
         if let errorMessage {
             Section {
-                Label(errorMessage, systemImage: "exclamationmark.triangle")
+                Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
                     .font(.footnote).foregroundStyle(.red).textSelection(.enabled)
             }
         }
 
         Section {
-            HStack(spacing: 15) {
-                if let data = app.iconData, let image = UIImage(data: data) {
-                    Image(uiImage: image).resizable().scaledToFit().frame(width: 72, height: 72)
-                        .clipShape(.rect(cornerRadius: 16))
-                } else {
-                    Image(systemName: "app.fill").font(.system(size: 34)).foregroundStyle(.white)
-                        .frame(width: 72, height: 72).background(Color.sideKickAccent.gradient, in: .rect(cornerRadius: 16))
-                }
-                VStack(alignment: .leading, spacing: 5) {
-                    Text(app.name).font(.title3.weight(.semibold))
-                    Text(app.version == downloadJob?.queuedIPA?.version && app.buildVersion == downloadJob?.queuedIPA?.buildVersion
-                        ? "Version \(app.version) · Build \(app.buildVersion)"
-                        : "\(app.version) (\(app.buildVersion))  →  \(downloadJob?.queuedIPA?.version ?? selectedCandidate.newVersion) (\(downloadJob?.queuedIPA?.buildVersion ?? "unknown build"))")
-                        .foregroundStyle(.secondary)
-                    if selectedCandidate.source == .actionsArtifact {
-                        Text(selectedCandidate.newVersion)
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                    }
-                }
-            }
-            .padding(.vertical, 5)
-        }
-
-        Section("Update") {
+            LabeledContent("Installed", value: installedBuildText)
+            LabeledContent("Selected", value: downloadJob?.queuedIPA.map { "\($0.version) (\($0.buildVersion))" } ?? selectedCandidate.newVersion)
+            LabeledContent("Release", value: selectedCandidate.title).lineLimit(3)
+            LabeledContent("File", value: selectedCandidate.assetName).lineLimit(2)
             LabeledContent("Source", value: selectedCandidate.source.title)
-            LabeledContent("GitHub", value: selectedCandidate.title).lineLimit(2)
-            LabeledContent("Download", value: selectedCandidate.assetName).lineLimit(2)
-            LabeledContent("Signing account", value: account?.email ?? app.accountEmail)
+            LabeledContent("Apple Account", value: account?.email ?? app.accountEmail)
+            GitHubTokenSelectionLink(selection: $tokenID).disabled(downloadJob?.isDownloading == true)
+        } footer: {
+            if selectedCandidate.source == .actionsArtifact {
+                Text("Actions builds need a GitHub token with Actions read access.")
+            }
         }
 
         if !isVersionSelection { Section {
@@ -172,14 +153,13 @@ struct GitHubUpdateDetailView: View {
                         Spacer()
                         if build.updateKey == selectedCandidate.updateKey {
                             Image(systemName: "checkmark.circle.fill").foregroundStyle(Color.sideKickAccent)
+                                .accessibilityLabel("Selected")
                         } else if build.updateKey == installedBuildKey {
-                            Text("INSTALLED").font(.caption.weight(.semibold)).foregroundStyle(.secondary)
+                            StatusBadge(title: "Installed", systemImage: "checkmark", tone: .neutral)
                         }
                     }
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
-                .fullWidthListSeparators()
             }
             if hasMoreBuilds {
                 SwiftUI.Button {
@@ -192,12 +172,11 @@ struct GitHubUpdateDetailView: View {
                     }
                 }
                 .disabled(isLoadingBuilds)
-                .fullWidthListSeparators()
             }
         } header: {
-            Text("Available Builds")
+            Text("Other Builds")
         } footer: {
-            Text("Choose any discovered IPA build to install it. SideKick records it as installed only after installation succeeds.")
+            Text("A build is recorded as installed only after it installs.")
         } }
 
         Section("Download") {
@@ -215,7 +194,7 @@ struct GitHubUpdateDetailView: View {
             }
         }
 
-        Section("Update Options") {
+        Section {
             if downloadJob?.isDownloading != true {
                 if let queuedIPA = downloadJob?.queuedIPA {
                     NavigationLink {
@@ -229,70 +208,57 @@ struct GitHubUpdateDetailView: View {
                             currentTeamIdentifier: app.teamIdentifier
                         )
                     } label: {
-                        Label("Options", systemImage: "slider.horizontal.3")
+                        Label("Update with Another Account…", systemImage: "person.2")
                     }
-                    .fullWidthListSeparators()
                 }
                 if installedBuildIsUnconfirmed {
                     SwiftUI.Button { isConfirmingInstalledBuild = true } label: {
-                        Label("Already Installed This Build", systemImage: "checkmark.circle")
+                        Label("I’ve Installed This Build", systemImage: "checkmark.circle")
                     }
-                    .foregroundStyle(.green)
-                    .fullWidthListSeparators()
                 }
             }
             NavigationLink {
                 GitHubUpdateSettingsView(app: app)
             } label: {
-                Label("Update Source & Installed Version", systemImage: "chevron.left.forwardslash.chevron.right")
+                Label("Update Source", systemImage: "arrow.down.app")
             }
-            .fullWidthListSeparators()
         }
     }
 
     @ViewBuilder
     private var reviewContent: some View {
         Section {
-            HStack(spacing: 14) {
-                if let data = app.iconData, let image = UIImage(data: data) {
-                    Image(uiImage: image).resizable().scaledToFit()
-                        .frame(width: 56, height: 56).clipShape(.rect(cornerRadius: 12))
-                } else {
-                    Image(systemName: "app.fill")
-                        .font(.title2).foregroundStyle(Color.sideKickAccent)
-                        .frame(width: 56, height: 56)
-                }
-                VStack(alignment: .leading, spacing: 3) {
-                    Text(app.name).font(.headline)
-                    Text(selectedCandidate.isKnownNewer ? "Update available" : "Build available to review")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                }
+            DetailHeader(iconData: app.iconData, title: app.name, subtitle: selectedCandidate.title) {
+                StatusBadge(
+                    title: selectedCandidate.isKnownNewer ? "Update available" : "Build to review",
+                    systemImage: selectedCandidate.isKnownNewer ? "arrow.down.circle.fill" : "questionmark.circle",
+                    tone: selectedCandidate.isKnownNewer ? .accent : .neutral
+                )
             }
-            .padding(.vertical, 4)
         }
+        .listRowBackground(Color.clear)
 
         Section {
-            LabeledContent("Installed", value: "\(app.version) (\(app.buildVersion))")
-            if let label = environment.githubConfigurations.first(where: { $0.id == app.id })?.installedBuildLabel {
-                LabeledContent("GitHub build", value: label)
-            } else if installedBuildIsUnconfirmed {
-                LabeledContent("GitHub build", value: "Unconfirmed")
-            }
+            LabeledContent("Installed", value: installedBuildText)
             LabeledContent("Available", value: selectedCandidate.newVersion)
-            Text(selectedCandidate.title)
-                .font(.subheadline).foregroundStyle(.secondary)
-        } header: {
-            Text("Builds")
         } footer: {
             if installedBuildIsUnconfirmed {
-                Text("The installed version doesn't identify the exact GitHub build. Confirm it only if you installed this build yourself.")
+                Text("SideKick can’t tell which GitHub build you installed. If it’s this one, choose I’ve Installed This Build from the menu.")
             }
         }
 
         if let errorMessage {
             Section {
-                Label(errorMessage, systemImage: "exclamationmark.triangle")
+                Label(errorMessage, systemImage: "exclamationmark.triangle.fill")
                     .font(.footnote).foregroundStyle(.red).textSelection(.enabled)
+            }
+        }
+
+        if selectedCandidate.source == .actionsArtifact, tokenID == nil, !isLoadingToken {
+            Section {
+                GitHubTokenSelectionLink(selection: $tokenID).disabled(downloadJob?.isDownloading == true)
+            } footer: {
+                Text("Actions builds need a GitHub token with Actions read access.")
             }
         }
 
@@ -307,28 +273,45 @@ struct GitHubUpdateDetailView: View {
             ) {
                 if let queuedIPA = downloadJob?.queuedIPA { installAction(for: queuedIPA) }
             }
-            if installedBuildIsUnconfirmed && downloadJob?.isDownloading != true {
-                SwiftUI.Button { isConfirmingInstalledBuild = true } label: {
-                    Label("Already Installed This Build", systemImage: "checkmark.circle")
-                }
-                .foregroundStyle(.green)
-            }
-            if downloadJob?.isDownloading != true {
-                SwiftUI.Button(role: .destructive) { isConfirmingSkip = true } label: {
-                    Label("Skip This Build", systemImage: "forward.end")
-                }
-            }
-        } header: {
-            Text("Choose an Action")
         } footer: {
-            Text("Downloading prepares the IPA. Installation starts only when you choose Install Update.")
+            if downloadJob?.queuedIPA == nil {
+                Text("Nothing installs until you tap Install Update.")
+            }
         }
+    }
 
-        Section {
-            NavigationLink {
-                GitHubUpdateDetailView(candidate: candidate, app: app, showsDetails: true)
-            } label: {
-                Label("Details & More Options", systemImage: "slider.horizontal.3")
+    private var installedBuildText: String {
+        if let label = environment.githubConfigurations.first(where: { $0.id == app.id })?.installedBuildLabel {
+            return label
+        }
+        return "\(app.version) (\(app.buildVersion))"
+    }
+
+    @ToolbarContentBuilder
+    private var reviewToolbar: some ToolbarContent {
+        if !showsDetails && !isVersionSelection {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    NavigationLink {
+                        GitHubUpdateDetailView(candidate: candidate, app: app, showsDetails: true)
+                    } label: {
+                        Label("Other Builds & Details", systemImage: "list.bullet")
+                    }
+                    if installedBuildIsUnconfirmed && downloadJob?.isDownloading != true {
+                        SwiftUI.Button { isConfirmingInstalledBuild = true } label: {
+                            Label("I’ve Installed This Build", systemImage: "checkmark.circle")
+                        }
+                    }
+                    if downloadJob?.isDownloading != true {
+                        Divider()
+                        SwiftUI.Button(role: .destructive) { isConfirmingSkip = true } label: {
+                            Label("Skip This Build", systemImage: "forward.end")
+                        }
+                    }
+                } label: {
+                    Image(systemName: "ellipsis")
+                }
+                .accessibilityLabel("More")
             }
         }
     }
@@ -347,29 +330,23 @@ struct GitHubUpdateDetailView: View {
                     onSourceMissing: { await validateDownload() }
                 )
             } label: {
-                Label(isVersionSelection ? "Install This Version" : "Install Update", systemImage: "arrow.down.app.fill")
-                    .fontWeight(.semibold)
-                    .foregroundStyle(Color.sideKickAccent)
+                ActionLabel(isVersionSelection ? "Install This Version" : "Install Update")
             }
-            .fullWidthListSeparators()
+            .primaryActionStyle()
+        } else if let installedTeamAccount = eligibleAccounts.first(where: {
+            $0.accountIdentifier == app.accountIdentifier && $0.teamIdentifier == app.teamIdentifier
+        }) {
+            NavigationLink {
+                SigningAccountDetailView(account: installedTeamAccount, accountStore: accountStore)
+            } label: {
+                ActionLabel("Reconnect Account to Install", systemImage: "person.crop.circle.badge.exclamationmark")
+            }
+            .primaryActionStyle()
         } else {
-            VStack(alignment: .leading, spacing: 8) {
-                if let installedTeamAccount = eligibleAccounts.first(where: {
-                    $0.accountIdentifier == app.accountIdentifier && $0.teamIdentifier == app.teamIdentifier
-                }) {
-                    NavigationLink {
-                        SigningAccountDetailView(account: installedTeamAccount, accountStore: accountStore)
-                    } label: {
-                        Label("Reconnect the Apple account for this installed team", systemImage: "person.crop.circle.badge.exclamationmark")
-                    }
-                } else {
-                    NavigationLink { AccountsView() } label: {
-                        Label("Add the Apple account for the installed team", systemImage: "person.crop.circle.badge.plus")
-                    }
-                }
-                Text("The installed app uses team \(app.teamIdentifier). Use Details to choose another team for a separate installation.")
-                    .font(.footnote).foregroundStyle(.secondary)
+            NavigationLink { AccountsView() } label: {
+                ActionLabel("Add Account for Team \(app.teamIdentifier)", systemImage: "person.crop.circle.badge.plus")
             }
+            .primaryActionStyle()
         }
     }
 
@@ -583,20 +560,22 @@ struct GitHubUpdateDownloadControls<FinalAction: View>: View {
                         Text("The server did not report a file size; download activity is still shown above.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
-                    Text("You can leave this page; the download will continue.")
+                    Text("You can leave this screen; the download continues.")
                         .font(.footnote).foregroundStyle(.secondary)
                     SwiftUI.Button("Cancel Download", role: .cancel, action: onCancel)
+                        .font(.body.weight(.semibold))
                 }
-                .padding(16)
-                .background(Color(uiColor: .secondarySystemGroupedBackground), in: .rect(cornerRadius: 17))
             } else if let message = job?.errorMessage {
-                Label(message, systemImage: "exclamationmark.triangle")
+                Label(message, systemImage: "exclamationmark.triangle.fill")
                     .font(.footnote).foregroundStyle(.red).textSelection(.enabled)
                 if job?.queuedIPA != nil { finalAction().disabled(isDisabled) }
                 actionButton("Try Again", action: onDownload)
             } else if job?.queuedIPA != nil {
                 finalAction().disabled(isDisabled)
-                actionButton("Download Again", action: onDownload).disabled(isDisabled)
+                SwiftUI.Button("Download Again", action: onDownload)
+                    .font(.subheadline.weight(.semibold))
+                    .frame(maxWidth: .infinity)
+                    .disabled(isDisabled)
             } else {
                 actionButton("Download IPA", action: onDownload).disabled(isDisabled)
             }
@@ -618,12 +597,9 @@ struct GitHubUpdateDownloadControls<FinalAction: View>: View {
 
     private func actionButton(_ title: String, action: @escaping () -> Void) -> some View {
         SwiftUI.Button(action: action) {
-            Label(title, systemImage: "arrow.down.circle")
-                .fontWeight(.semibold)
-                .frame(maxWidth: .infinity)
+            ActionLabel(title, systemImage: "arrow.down.circle")
         }
-        .buttonStyle(.borderedProminent)
-        .tint(Color.sideKickAccent)
+        .primaryActionStyle()
     }
 }
 
@@ -635,7 +611,7 @@ private struct DownloadProgressBar: View {
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.primary.opacity(0.10))
                 Capsule()
-                    .fill(Color.sideKickAccentGradient)
+                    .fill(Color.sideKickAccent)
                     .frame(width: geometry.size.width * min(max(progress, 0), 1))
             }
         }
