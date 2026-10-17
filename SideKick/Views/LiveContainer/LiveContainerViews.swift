@@ -367,39 +367,7 @@ struct LiveContainerGuestDetailView: View {
                     }.padding(.vertical, 8)
                 }
                 if let candidate {
-                    Section(candidate.isKnownNewer ? "Update Available" : "Review Build") {
-                        LabeledContent("Installed", value: "\(guest.version) (\(guest.build))")
-                        LabeledContent("Available", value: candidate.newVersion)
-                        Text(candidate.title).font(.subheadline).foregroundStyle(.secondary)
-                        GitHubUpdateDownloadControls(
-                            job: downloadJob,
-                            onDownload: { Task { await updateInLiveContainer(candidate, handoffIfQueued: false) } },
-                            onCancel: { environment.githubUpdateDownloads.cancelDownload(for: candidate) },
-                            onSkip: { Task { await resolve(markInstalled: false) } },
-                            isDisabled: working || isCheckingUpdates || !canCheckUpdates,
-                            isSkipDisabled: working || isCheckingUpdates
-                        ) {
-                            SwiftUI.Button { Task { await updateInLiveContainer(candidate) } } label: {
-                                Label("Send to LiveContainer", systemImage: "square.and.arrow.up")
-                                    .fontWeight(.semibold)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        if canConfirmInstalledBuild {
-                            SwiftUI.Button { markingInstalled = true } label: {
-                                Label("I Installed This Build", systemImage: "checkmark.circle")
-                            }
-                            .foregroundStyle(.green)
-                            .disabled(working || isCheckingUpdates)
-                        }
-                        if !canCheckUpdates {
-                            Label(updateEligibilityMessage, systemImage: "exclamationmark.triangle")
-                                .font(.footnote)
-                                .foregroundStyle(.orange)
-                        }
-                    } footer: {
-                        Text("Download the IPA, send it to LiveContainer, then confirm only after installation finishes.")
-                    }
+                    updateReviewSection(for: guest, candidate: candidate)
                 }
                 Section {
                     SwiftUI.Button { Task { await launch() } } label: { Label("Open in LiveContainer", systemImage: "play.circle") }
@@ -485,6 +453,44 @@ struct LiveContainerGuestDetailView: View {
             SwiftUI.Button("Remove Guest", role: .destructive) { Task { await removeUnavailableGuest() } }
         } message: {
             Text("This removes the unavailable guest’s cached metadata and GitHub update settings from SideKick. Its LiveContainer files are not changed.")
+        }
+    }
+
+    private func updateReviewSection(for guest: LiveContainerGuest, candidate: GitHubUpdateCandidate) -> some View {
+        Section {
+            LabeledContent("Installed", value: "\(guest.version) (\(guest.build))")
+            LabeledContent("Available", value: candidate.newVersion)
+            Text(candidate.title).font(.subheadline).foregroundStyle(.secondary)
+            GitHubUpdateDownloadControls(
+                job: downloadJob,
+                onDownload: { Task { await updateInLiveContainer(candidate, handoffIfQueued: false) } },
+                onCancel: { environment.githubUpdateDownloads.cancelDownload(for: candidate) },
+                onSkip: { Task { await resolve(markInstalled: false) } },
+                isDisabled: working || isCheckingUpdates || !canCheckUpdates,
+                isSkipDisabled: working || isCheckingUpdates
+            ) {
+                SwiftUI.Button { Task { await updateInLiveContainer(candidate) } } label: {
+                    Label("Send to LiveContainer", systemImage: "square.and.arrow.up")
+                        .fontWeight(.semibold)
+                }
+                .buttonStyle(.plain)
+            }
+            if canConfirmInstalledBuild {
+                SwiftUI.Button { markingInstalled = true } label: {
+                    Label("I Installed This Build", systemImage: "checkmark.circle")
+                }
+                .foregroundStyle(.green)
+                .disabled(working || isCheckingUpdates)
+            }
+            if !canCheckUpdates {
+                Label(updateEligibilityMessage, systemImage: "exclamationmark.triangle")
+                    .font(.footnote)
+                    .foregroundStyle(.orange)
+            }
+        } header: {
+            Text(candidate.isKnownNewer ? "Update Available" : "Review Build")
+        } footer: {
+            Text("Download the IPA, send it to LiveContainer, then confirm only after installation finishes.")
         }
     }
 
