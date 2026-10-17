@@ -9,6 +9,8 @@ struct AccountsView: View {
     @State private var isShowingSignIn = false
     @State private var isShowingDiagnostics = false
     @State private var submittedCredentials: (appleID: String, password: String)?
+    @State private var githubAccount: GitHubCredentialStore.Credential?
+    @State private var isShowingGitHubSignIn = false
 
     init(showsNavigationStack: Bool = false) {
         self.showsNavigationStack = showsNavigationStack
@@ -53,11 +55,11 @@ struct AccountsView: View {
                 ProgressView("Loading Apple Accounts…")
                     .frame(maxWidth: .infinity)
                     .listRowBackground(Color.clear)
-            } else if accountStore.accounts.isEmpty && accountStore.loadError == nil && !accountStore.isWorking {
+            } else if accountStore.accounts.isEmpty && githubAccount == nil && accountStore.loadError == nil && !accountStore.isWorking {
                 ContentUnavailableView {
                     Label("No Apple Accounts", systemImage: "person.crop.circle")
                 } description: {
-                    Text("Add an Apple Account to sign and install apps.")
+                    Text("Add an Apple Account to sign and install apps, or sign in with GitHub to check for updates.")
                 } actions: {
                     SwiftUI.Button { isShowingSignIn = true } label: {
                         Text("Add Apple Account").font(.headline).padding(.horizontal, Spacing.m)
@@ -65,7 +67,7 @@ struct AccountsView: View {
                     .primaryActionStyle()
                 }
                 .listRowBackground(Color.clear)
-            } else {
+            } else if !accountStore.accounts.isEmpty {
                 Section {
                     ForEach(accountStore.accounts) { account in
                         NavigationLink {
@@ -74,22 +76,51 @@ struct AccountsView: View {
                             accountRow(account)
                         }
                     }
+                } header: {
+                    Text("Apple Accounts")
                 } footer: {
                     Text("Apps are signed with these accounts. Passwords are stored in the iOS Keychain.")
+                }
+            }
+            if let githubAccount {
+                Section {
+                    NavigationLink { GitHubAccountSettingsView() } label: {
+                        HStack(spacing: Spacing.s) {
+                            AccountAvatar(email: githubAccount.username.isEmpty ? "G" : githubAccount.username, size: 44)
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(githubAccount.username.isEmpty ? "GitHub Account" : "@\(githubAccount.username)")
+                                    .font(.body.weight(.semibold))
+                                Text("Read-only · used for update checks")
+                                    .font(.subheadline).foregroundStyle(.secondary)
+                            }
+                        }
+                        .padding(.vertical, Spacing.xxs)
+                    }
+                } header: {
+                    Text("GitHub")
                 }
             }
         }
         .listStyle(.insetGrouped)
         .navigationTitle("Accounts")
+        .sheet(isPresented: $isShowingGitHubSignIn, onDismiss: reloadGitHub) { GitHubSignInSheet() }
+        .onAppear(perform: reloadGitHub)
+        .onReceive(NotificationCenter.default.publisher(for: .sideKickGitHubSettingsDidChange)) { _ in reloadGitHub() }
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
-                SwiftUI.Button {
-                    isShowingSignIn = true
+                Menu {
+                    SwiftUI.Button { isShowingSignIn = true } label: {
+                        Label("Apple Account", systemImage: "apple.logo")
+                    }
+                    .disabled(accountStore.isWorking)
+                    SwiftUI.Button { isShowingGitHubSignIn = true } label: {
+                        Label("GitHub Account", systemImage: "chevron.left.forwardslash.chevron.right")
+                    }
+                    .disabled(!GitHubAppConfiguration.isConfigured || githubAccount != nil)
                 } label: {
                     Image(systemName: "plus")
                 }
-                .accessibilityLabel("Add Apple Account")
-                .disabled(accountStore.isWorking)
+                .accessibilityLabel("Add Account")
             }
         }
         .task {
@@ -145,6 +176,10 @@ struct AccountsView: View {
         }
         .padding(.vertical, Spacing.xxs)
         .accessibilityElement(children: .combine)
+    }
+
+    private func reloadGitHub() {
+        githubAccount = GitHubAccountSession.account
     }
 
     private func beginSignIn() {

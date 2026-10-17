@@ -252,9 +252,9 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Accounts/AccountsView.swift": {
-    "mtime": 1792244549.3491611,
-    "seen": 1792246536.6709087,
-    "ast_hash": "d608ff9bfe64e7bfd34ddcd79407da8d",
+    "mtime": 1792255314.3338406,
+    "seen": 1792255362.692388,
+    "ast_hash": "a0bed85cb0827715904bbac0fba75d44",
     "semantic_hash": ""
   },
   "SideKick/Views/Accounts/AppleIDSignInSheet.swift": {
