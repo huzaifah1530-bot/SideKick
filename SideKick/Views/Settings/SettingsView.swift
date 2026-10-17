@@ -26,7 +26,7 @@ struct SettingsView: View {
                     }
                 }
 
-                Section {
+                Section("Tools") {
                     NavigationLink { HealthCheckView(readyTitle: "SideKick Ready") } label: {
                         Label("Health Check", systemImage: "heart.text.square")
                     }

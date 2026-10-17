@@ -133,7 +133,7 @@ struct GitHubUpdateDetailView: View {
                         .clipShape(.rect(cornerRadius: 16))
                 } else {
                     Image(systemName: "app.fill").font(.system(size: 34)).foregroundStyle(.white)
-                        .frame(width: 72, height: 72).background(.blue.gradient, in: .rect(cornerRadius: 16))
+                        .frame(width: 72, height: 72).background(Color.sideKickAccent.gradient, in: .rect(cornerRadius: 16))
                 }
                 VStack(alignment: .leading, spacing: 5) {
                     Text(app.name).font(.title3.weight(.semibold))
@@ -349,7 +349,7 @@ struct GitHubUpdateDetailView: View {
             } label: {
                 Label(isVersionSelection ? "Install This Version" : "Install Update", systemImage: "arrow.down.app.fill")
                     .fontWeight(.semibold)
-                    .foregroundStyle(.blue)
+                    .foregroundStyle(Color.sideKickAccent)
             }
             .fullWidthListSeparators()
         } else {
@@ -623,7 +623,7 @@ struct GitHubUpdateDownloadControls<FinalAction: View>: View {
                 .frame(maxWidth: .infinity)
         }
         .buttonStyle(.borderedProminent)
-        .tint(.blue)
+        .tint(Color.sideKickAccent)
     }
 }
 

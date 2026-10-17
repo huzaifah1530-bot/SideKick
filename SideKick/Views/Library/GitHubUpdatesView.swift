@@ -197,37 +197,50 @@ private struct GitHubAppUpdateStatusView: View {
     var body: some View {
         List {
             if let target, let source = currentConfiguration {
-                Section("Installed") {
-                    LabeledContent("App", value: target.name)
-                    LabeledContent("Version", value: target.version)
-                    LabeledContent("GitHub build", value: source.installedBuildLabel
-                        ?? (source.installedBuild == nil ? "Unconfirmed" : "Confirmed release"))
+                Section {
+                    Text(check?.state.title ?? "Not Checked Yet").font(.headline)
+                    if let check {
+                        Text(check.state.message).font(.subheadline).foregroundStyle(.secondary)
+                    }
+                    LabeledContent("Installed", value: target.version)
+                    if let build = check?.latestBuild {
+                        LabeledContent("Latest", value: build.version)
+                    }
                     if check?.state == .unknownInstalledBuild {
                         Text("Confirm the exact build you installed. Version names alone do not identify a GitHub build.")
                             .font(.footnote).foregroundStyle(.secondary)
                     }
-                }
-                Section("Latest on GitHub") {
-                    Text(check?.state.title ?? "Not Checked Yet").font(.headline)
-                    if let build = check?.latestBuild {
-                        Text(build.title)
-                        LabeledContent("File", value: build.assetName)
-                        if let date = build.date { LabeledContent("Published", value: date.formatted(date: .abbreviated, time: .shortened)) }
+                    if check?.state == .failed, let detail = check?.detail {
+                        Text(detail).font(.footnote).foregroundStyle(.secondary).textSelection(.enabled)
                     }
-                    if let detail = check?.detail { Text(detail).foregroundStyle(.secondary).textSelection(.enabled) }
                     if let candidate = check?.candidate {
                         installLink(candidate)
                     }
-                    if let date = check?.checkedAt {
-                        Text("Checked \(date.formatted(date: .abbreviated, time: .shortened))")
-                            .font(.footnote).foregroundStyle(.secondary)
-                    }
-                }
-                Section {
-                    NavigationLink("Versions & GitHub Source") { GitHubUpdateSettingsView(target: target) }
                     SwiftUI.Button("Check Again") {
                         Task { await environment.gitHubSettingsChanged(); await environment.awaitPendingGitHubChecks() }
                     }.disabled(environment.isCheckingGitHubUpdates)
+                } header: {
+                    Text("Status")
+                }
+                Section {
+                    DisclosureGroup("Build Details") {
+                        LabeledContent("GitHub build", value: source.installedBuildLabel
+                            ?? (source.installedBuild == nil ? "Unconfirmed" : "Confirmed release"))
+                        if let build = check?.latestBuild {
+                            Text(build.title)
+                            LabeledContent("File", value: build.assetName)
+                            if let date = build.date {
+                                LabeledContent("Published", value: date.formatted(date: .abbreviated, time: .shortened))
+                            }
+                        }
+                        if check?.state != .failed, let detail = check?.detail {
+                            Text(detail).foregroundStyle(.secondary).textSelection(.enabled)
+                        }
+                        if let date = check?.checkedAt {
+                            LabeledContent("Checked", value: date.formatted(date: .abbreviated, time: .shortened))
+                        }
+                    }
+                    NavigationLink("Versions & GitHub Source") { GitHubUpdateSettingsView(target: target) }
                 }
             } else {
                 ContentUnavailableView("App Unavailable", systemImage: "app.dashed",

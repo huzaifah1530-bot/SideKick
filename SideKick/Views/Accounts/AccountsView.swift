@@ -4,6 +4,7 @@ import SideSign
 struct AccountsView: View {
     let showsNavigationStack: Bool
     @State private var accountStore = SigningAccountStore()
+    @State private var hasLoadedAccounts = false
     @State private var errorMessage: String?
     @State private var isShowingSignIn = false
     @State private var isShowingDiagnostics = false
@@ -47,7 +48,11 @@ struct AccountsView: View {
                     SwiftUI.Button("Try Again") { Task { await accountStore.reload() } }
                 }
             }
-            if accountStore.accounts.isEmpty {
+            if !hasLoadedAccounts && accountStore.accounts.isEmpty {
+                ProgressView("Loading Apple Accounts…")
+                    .frame(maxWidth: .infinity)
+                    .listRowBackground(Color.clear)
+            } else if accountStore.accounts.isEmpty && accountStore.loadError == nil && !accountStore.isWorking {
                 ContentUnavailableView {
                     Label("No Apple Accounts", systemImage: "person.crop.circle")
                 } description: {
@@ -84,7 +89,10 @@ struct AccountsView: View {
                 .disabled(accountStore.isWorking)
             }
         }
-        .task { await accountStore.reload() }
+        .task {
+            await accountStore.reload()
+            hasLoadedAccounts = true
+        }
         .refreshable { await accountStore.reload() }
         .sheet(isPresented: $isShowingSignIn, onDismiss: beginSignIn) {
             AppleIDSignInSheet { appleID, password in

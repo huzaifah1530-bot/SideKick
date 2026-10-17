@@ -18,7 +18,6 @@ struct HomeView: View {
     @State private var isQueueingSelectedIPA = false
     @State private var matchingInstallationsForUpdateChoice: [InstalledAppSummary] = []
     @State private var accountStore = SigningAccountStore()
-    @State private var remainingAppIDs: Int?
     @State private var isRefreshingAll = false
     @State private var refreshAllProgress: (completed: Int, total: Int)?
     @State private var refreshAllOutcome: QuietRefreshOutcome?
@@ -33,8 +32,6 @@ struct HomeView: View {
     @State private var showingImportedManagement = false
     @State private var notificationNavigationPath: [GitHubUpdateNotificationRoute] = []
     @State private var isRoutingUpdateNotification = false
-    @State private var appIDCapacityTask: Task<Void, Never>?
-    @State private var capacityGeneration = UUID()
     @State private var expirationClock = Date.now
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.scenePhase) private var scenePhase
@@ -202,10 +199,6 @@ struct HomeView: View {
                             .font(.subheadline)
                             .disabled(isRefreshingAll || refreshingAppID != nil || filteredInstalledApps.isEmpty)
                         }
-                    } footer: {
-                        if let remainingAppIDs {
-                            Text("\(remainingAppIDs) App IDs available")
-                        }
                     }
                 }
 
@@ -325,17 +318,12 @@ struct HomeView: View {
                     viewModel.errorMessage = error.localizedDescription
                 }
             }
-            .task { await viewModel.load(); startAppIDCapacityCheck() }
+            .task { await viewModel.load() }
             .task { await openPendingUpdateNotification() }
             .onChange(of: scenePhase) { _, phase in
-                if phase == .background { cancelBackgroundChecks() }
-                else if phase == .active {
-                    startAppIDCapacityCheck()
+                if phase == .active {
                     Task { await openPendingUpdateNotification() }
                 }
-            }
-            .onDisappear {
-                cancelBackgroundChecks()
             }
             .task {
                 if let url = SideKickShareLink.consumePendingURL() {
@@ -455,21 +443,6 @@ struct HomeView: View {
         expirationClock = .now
         environment.scheduleMaintenance()
         environment.rescanLiveContainerApps()
-        guard scenePhase != .background else { return }
-        startAppIDCapacityCheck()
-    }
-
-    private func startAppIDCapacityCheck() {
-        appIDCapacityTask?.cancel()
-        let generation = UUID()
-        capacityGeneration = generation
-        appIDCapacityTask = Task { await loadAppIDCapacity(generation: generation) }
-    }
-
-    private func cancelBackgroundChecks() {
-        capacityGeneration = UUID()
-        appIDCapacityTask?.cancel()
-        appIDCapacityTask = nil
     }
 
     private func openPendingUpdateNotification() async {
@@ -530,36 +503,6 @@ struct HomeView: View {
         // Notifications delivered by an earlier build lacked sourceIdentity;
         // only route those when the exact notified build remains current.
         return candidate.updateKey == route.updateKey
-    }
-
-    private func loadAppIDCapacity(generation: UUID) async {
-        defer {
-            if capacityGeneration == generation { appIDCapacityTask = nil }
-        }
-        let capacityStore = SigningAccountStore()
-        await capacityStore.reload()
-        guard !Task.isCancelled, capacityGeneration == generation else { return }
-        let eligibleAccounts = capacityStore.accounts.filter { $0.isFreeAccount && $0.hasSavedSession }
-        guard !eligibleAccounts.isEmpty else {
-            remainingAppIDs = nil
-            return
-        }
-
-        var totalRemaining = 0
-        var loadedInventoryCount = 0
-        for account in eligibleAccounts {
-            guard !Task.isCancelled, capacityGeneration == generation else { return }
-            do {
-                let inventory = try await capacityStore.fetchDeveloperInventory(for: account)
-                totalRemaining += max(10 - inventory.appIDs.count, 0)
-                loadedInventoryCount += 1
-            } catch {
-                guard !Task.isCancelled, capacityGeneration == generation else { return }
-                debugLog("[SideKick] Couldn’t check App ID capacity for \(account.email): \(error.localizedDescription)")
-            }
-        }
-        guard !Task.isCancelled, capacityGeneration == generation else { return }
-        remainingAppIDs = loadedInventoryCount > 0 ? totalRemaining : nil
     }
 
     private func refreshAllApps() async {

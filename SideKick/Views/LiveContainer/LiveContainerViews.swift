@@ -19,13 +19,16 @@ struct LiveContainerLibrarySection: View {
                 } label: {
                     SideKickLibraryAppRow(
                         name: app.name,
-                        versionText: "Version \(app.version)",
+                        versionText: app.build == app.version
+                            ? "Version \(app.version)"
+                            : "Version \(app.version) · Build \(app.build)",
                         iconData: app.iconData,
                         metadata: {
-                            Text("Build \(app.build)").font(.caption).foregroundStyle(.secondary)
                             if let connection = state.connections.first(where: { $0.id == app.connectionID }) {
-                                Text(connection.storageKind == .snapshot ? "Snapshot · \(connection.name)" : connection.name)
-                                    .font(.caption).foregroundStyle(.secondary)
+                                if connection.storageKind == .snapshot || state.connections.count > 1 {
+                                    Text(connection.storageKind == .snapshot ? "Snapshot · \(connection.name)" : connection.name)
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
                                 if !connection.isConnected || connection.error != nil {
                                     Text("Reconnect to scan").font(.caption).foregroundStyle(.orange)
                                 }
@@ -326,6 +329,10 @@ struct LiveContainerGuestDetailView: View {
         candidate.flatMap { environment.githubUpdateDownloads.jobs[$0.id] }
     }
 
+    private var canConfirmInstalledBuild: Bool {
+        checkState == .unknownInstalledBuild || downloadJob?.queuedIPA != nil
+    }
+
     private var canCheckUpdates: Bool {
         guard let guest = self.guest else { return false }
         return !isBeingForgotten && connection?.isConnected == true && connection?.error == nil
@@ -359,6 +366,41 @@ struct LiveContainerGuestDetailView: View {
                         }
                     }.padding(.vertical, 8)
                 }
+                if let candidate {
+                    Section(candidate.isKnownNewer ? "Update Available" : "Review Build") {
+                        LabeledContent("Installed", value: "\(guest.version) (\(guest.build))")
+                        LabeledContent("Available", value: candidate.newVersion)
+                        Text(candidate.title).font(.subheadline).foregroundStyle(.secondary)
+                        GitHubUpdateDownloadControls(
+                            job: downloadJob,
+                            onDownload: { Task { await updateInLiveContainer(candidate, handoffIfQueued: false) } },
+                            onCancel: { environment.githubUpdateDownloads.cancelDownload(for: candidate) },
+                            onSkip: { Task { await resolve(markInstalled: false) } },
+                            isDisabled: working || isCheckingUpdates || !canCheckUpdates,
+                            isSkipDisabled: working || isCheckingUpdates
+                        ) {
+                            SwiftUI.Button { Task { await updateInLiveContainer(candidate) } } label: {
+                                Label("Send to LiveContainer", systemImage: "square.and.arrow.up")
+                                    .fontWeight(.semibold)
+                            }
+                            .buttonStyle(.plain)
+                        }
+                        if canConfirmInstalledBuild {
+                            SwiftUI.Button { markingInstalled = true } label: {
+                                Label("I Installed This Build", systemImage: "checkmark.circle")
+                            }
+                            .foregroundStyle(.green)
+                            .disabled(working || isCheckingUpdates)
+                        }
+                        if !canCheckUpdates {
+                            Label(updateEligibilityMessage, systemImage: "exclamationmark.triangle")
+                                .font(.footnote)
+                                .foregroundStyle(.orange)
+                        }
+                    } footer: {
+                        Text("Download the IPA, send it to LiveContainer, then confirm only after installation finishes.")
+                    }
+                }
                 Section {
                     SwiftUI.Button { Task { await launch() } } label: { Label("Open in LiveContainer", systemImage: "play.circle") }
                         .disabled(working || connection?.isConnected != true || connection?.storageKind == .snapshot || !guest.isAvailable || guest.warning != nil)
@@ -387,32 +429,9 @@ struct LiveContainerGuestDetailView: View {
                         }
                     }
                     if let candidate {
-                        GitHubUpdateDownloadControls(
-                            job: downloadJob,
-                            onDownload: { Task { await updateInLiveContainer(candidate, handoffIfQueued: false) } },
-                            onCancel: { environment.githubUpdateDownloads.cancelDownload(for: candidate) },
-                            onSkip: { Task { await resolve(markInstalled: false) } },
-                            isDisabled: working || isCheckingUpdates || !canCheckUpdates,
-                            isSkipDisabled: working || isCheckingUpdates
-                        ) {
-                            SwiftUI.Button { Task { await updateInLiveContainer(candidate) } } label: {
-                                Label("Send to LiveContainer", systemImage: "square.and.arrow.up")
-                                    .fontWeight(.semibold)
-                            }
-                            .buttonStyle(.plain)
-                        }
-                        if !canCheckUpdates {
-                            Label(updateEligibilityMessage, systemImage: "exclamationmark.triangle")
-                                .font(.footnote)
-                                .foregroundStyle(.orange)
-                        }
-                        LabeledContent("Available", value: candidate.newVersion)
                         if let url = URL(string: candidate.repositoryURL ?? "https://github.com") {
                             Link(destination: url) { Label("View on GitHub", systemImage: "arrow.up.right.square") }
                         }
-                        SwiftUI.Button { markingInstalled = true } label: { Label("Already Installed This Build", systemImage: "checkmark.circle") }
-                            .disabled(working || isCheckingUpdates)
-                        Text("Download the IPA, then send it through the share sheet and choose LiveContainer to start installing it. Confirm this build after installation finishes.").font(.footnote).foregroundStyle(.secondary)
                     } else if configuration != nil { Text(hasChecked ? checkState.message : "Check this source for newer builds.").foregroundStyle(.secondary) }
                     if isCheckingUpdates { ProgressView("Checking for updates…") }
                     else if working { ProgressView() }
@@ -458,7 +477,7 @@ struct LiveContainerGuestDetailView: View {
         .alert("LiveContainer", isPresented: Binding(get: { message != nil }, set: { if !$0 { message = nil } })) {
             SwiftUI.Button("OK", role: .cancel) { message = nil }
         } message: { Text(message ?? "") }
-        .alert("Already installed this exact build?", isPresented: $markingInstalled) {
+        .alert("Installed this exact build in LiveContainer?", isPresented: $markingInstalled) {
             SwiftUI.Button("Mark as Installed") { Task { await resolve(markInstalled: true) } }
             SwiftUI.Button("Cancel", role: .cancel) { }
         } message: { Text("Confirm only after installing this exact GitHub release or workflow build in LiveContainer. A matching version label alone is insufficient.") }
@@ -751,6 +770,10 @@ struct LiveContainerGuestDetailView: View {
 
     @MainActor private func resolve(markInstalled: Bool) async {
         guard !working, !isCheckingUpdates, let candidate, let source = candidate.sourceIdentity else { return }
+        guard !markInstalled || canConfirmInstalledBuild else {
+            message = "Download and install this build in LiveContainer before confirming it, or set the installed build in Update Source & Installed Build."
+            return
+        }
         guard canCheckUpdates else { message = updateEligibilityMessage; return }
         working = true
         defer { working = false }
@@ -846,7 +869,7 @@ private struct LiveContainerGuestIcon: View {
     var body: some View {
         Group {
             if let data, let image = UIImage(data: data) { Image(uiImage: image).resizable().scaledToFit() }
-            else { Image(systemName: "app.fill").resizable().scaledToFit().padding(12).foregroundStyle(.white).background(.blue.gradient) }
+            else { Image(systemName: "app.fill").resizable().scaledToFit().padding(12).foregroundStyle(.white).background(Color.sideKickAccent.gradient) }
         }.clipShape(.rect(cornerRadius: 12))
     }
 }
