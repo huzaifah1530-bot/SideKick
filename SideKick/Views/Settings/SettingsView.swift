@@ -115,7 +115,7 @@ private struct AdvancedSettingsView: View {
                     Label("Skipped Updates", systemImage: "arrow.uturn.backward")
                 }
                 NavigationLink { GitHubAccountSettingsView() } label: {
-                    Label("GitHub Tokens", systemImage: "key")
+                    Label("GitHub", systemImage: "person.crop.circle.badge.checkmark")
                 }
             }
 

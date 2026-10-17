@@ -62,6 +62,7 @@ private enum DailyRefreshAutomation {
             }
             // GitHub needs internet access, not a local tunnel. Check on every
             // shortcut run, including retries and days already refreshed.
+            await GitHubAccountSession.refreshIfNeeded()
             await GitHubUpdateScanner.scanAndNotify()
             let calendar = Calendar.current
             if let lastSuccessfulRun = UserDefaults.standard.object(forKey: lastSuccessfulRunKey) as? Date,

@@ -13,7 +13,11 @@ struct GitHubTokenPickerView: View {
                 row("Use Default Token", subtitle: "Uses the default in Settings", id: nil, symbol: "key")
                 row("Public Access", subtitle: "No token; public releases only", id: GitHubCredentialStore.publicAccessID, symbol: "globe")
                 ForEach(credentials) { credential in
-                    row(credential.label, subtitle: credential.username.isEmpty ? "Saved token" : "@\(credential.username)", id: credential.id, symbol: "key.fill")
+                    if credential.isGitHubAccount {
+                        row("GitHub Account", subtitle: credential.username.isEmpty ? "Signed in" : "@\(credential.username) · read-only", id: credential.id, symbol: "person.crop.circle.fill")
+                    } else {
+                        row(credential.label, subtitle: credential.username.isEmpty ? "Saved token" : "@\(credential.username)", id: credential.id, symbol: "key.fill")
+                    }
                 }
             }
             Section {
@@ -30,7 +34,7 @@ struct GitHubTokenPickerView: View {
             }
             if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
         }
-        .navigationTitle("Choose GitHub Token")
+        .navigationTitle("GitHub Access")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear(perform: reloadCredentials)
         .onReceive(NotificationCenter.default.publisher(for: .sideKickGitHubSettingsDidChange)) { _ in

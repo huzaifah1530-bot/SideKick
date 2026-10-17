@@ -60,7 +60,7 @@ struct AppManagementView: View {
     }
 
     private enum Route: Hashable {
-        case refreshAccount, resign, offload, jit, liveContainer
+        case refreshAccount, resign, offload, jit, liveContainer, install, addAccount
     }
 
     @State private var route: Route?
@@ -108,6 +108,24 @@ struct AppManagementView: View {
                 }
             }
 
+            if let importedApp {
+                Section {
+                    LabeledContent("Version", value: importedApp.buildVersion.map { $0 == importedApp.version ? importedApp.version : "\(importedApp.version) (\($0))" } ?? importedApp.version)
+                    LabeledContent("Bundle ID", value: bundleIdentifier).lineLimit(1).textSelection(.enabled)
+                    if let repository = importedApp.githubRepositoryURL, let url = URL(string: repository) {
+                        LabeledContent("Source", value: url.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")))
+                    }
+                    LabeledContent("Imported", value: importedApp.formattedImportDate)
+                } header: {
+                    Text("Details")
+                } footer: {
+                    if importedApp.githubImportConfiguration != nil {
+                        Text("After you install it, SideKick checks this GitHub source for updates.")
+                    }
+                }
+            }
+
+            if importedApp == nil {
             Section {
                 DisclosureGroup("Details") {
                     LabeledContent("Bundle ID", value: bundleIdentifier)
@@ -125,6 +143,7 @@ struct AppManagementView: View {
                         LabeledContent("Downloaded update", value: pendingUpdateIPA.version)
                     }
                 }
+            }
             }
         }
         .listStyle(.insetGrouped)
@@ -193,26 +212,21 @@ struct AppManagementView: View {
 
     @ViewBuilder
     private var primaryActions: some View {
-        if let importedApp {
-            if accountStore.accounts.isEmpty {
-                NavigationLink { AccountsView() } label: {
-                    ActionLabel("Add Apple Account to Install", systemImage: "person.crop.circle.badge.plus")
-                }
-                .primaryActionStyle()
-            } else {
-                NavigationLink {
-                    InstallAccountSelectionView(
-                        app: importedApp,
-                        accountStore: accountStore,
-                        ipaStore: environment.ipaImportStore,
-                        isUpdate: false,
-                        onInstalled: nil
-                    )
-                } label: {
-                    ActionLabel("Install")
+        if importedApp != nil {
+            // Buttons, not NavigationLinks: a link inside a List row renders as a plain row
+            // with a chevron and ignores the button style.
+            HStack(spacing: Spacing.s) {
+                SwiftUI.Button { route = accountStore.accounts.isEmpty ? .addAccount : .install } label: {
+                    ActionLabel(accountStore.accounts.isEmpty ? "Add Account" : "Install")
                 }
                 .primaryActionStyle()
                 .disabled(accountStore.isWorking)
+
+                SwiftUI.Button { route = .liveContainer } label: {
+                    ActionLabel("LiveContainer", systemImage: "square.stack.3d.up")
+                }
+                .secondaryActionStyle()
+                .tint(.sideKickAccent)
             }
         } else if let installedApp, !isQueuedTargetUnavailable {
             if !installedApp.isActive || AppOffloadService.blocksNativeOperations(installedApp.id) {
@@ -331,7 +345,7 @@ struct AppManagementView: View {
                 }
             }
         }
-        if (importedApp ?? pendingUpdateIPA ?? requiredQueuedIPA) != nil {
+        if importedApp == nil, (pendingUpdateIPA ?? requiredQueuedIPA) != nil {
             Section {
                 SwiftUI.Button { route = .liveContainer } label: {
                     Label("Install in LiveContainer…", systemImage: "square.stack.3d.up")
@@ -360,6 +374,13 @@ struct AppManagementView: View {
             if let installedApp { JITEnableView(app: installedApp) }
         case .liveContainer:
             if let ipa = importedApp ?? pendingUpdateIPA ?? requiredQueuedIPA { LiveContainerImportView(app: ipa) }
+        case .install:
+            if let importedApp {
+                InstallAccountSelectionView(app: importedApp, accountStore: accountStore,
+                    ipaStore: environment.ipaImportStore, isUpdate: false, onInstalled: nil)
+            }
+        case .addAccount:
+            AccountsView()
         }
     }
 

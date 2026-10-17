@@ -84,6 +84,7 @@ struct ContentView: View {
             else { environment.pauseGitHubChecks() }
             await environment.startDatabase()
             if case .ready = environment.databaseState { await setupStatus.refresh() }
+            await GitHubAccountSession.refreshIfNeeded()
         }
         .tint(appearance.accent)
         .preferredColorScheme(appearance.mode.colorScheme)
@@ -102,6 +103,7 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             isForeground = true
+            Task { await GitHubAccountSession.refreshIfNeeded() }
             environment.resumeGitHubChecks()
             guard case .ready = environment.databaseState else { return }
             Task {

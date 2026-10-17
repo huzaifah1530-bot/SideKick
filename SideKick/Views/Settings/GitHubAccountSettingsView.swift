@@ -5,10 +5,58 @@ struct GitHubAccountSettingsView: View {
     @State private var defaultID: String?
     @State private var errorMessage: String?
 
+    @State private var isShowingSignIn = false
+    @State private var isConfirmingSignOut = false
+    private var account: GitHubCredentialStore.Credential? { credentials.first(where: \.isGitHubAccount) }
+    private var tokens: [GitHubCredentialStore.Credential] { credentials.filter { !$0.isGitHubAccount } }
+
     var body: some View {
         List {
             Section {
-                ForEach(credentials) { credential in
+                if let account {
+                    HStack(spacing: Spacing.s) {
+                        AccountAvatar(email: account.username.isEmpty ? "G" : account.username, size: 44)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(account.username.isEmpty ? "GitHub Account" : "@\(account.username)")
+                                .font(.body.weight(.semibold))
+                            Text(defaultID == account.id ? "Signed in · Default" : "Signed in")
+                                .font(.subheadline).foregroundStyle(.secondary)
+                        }
+                    }
+                    .padding(.vertical, Spacing.xxs)
+                    if let installURL = GitHubAppConfiguration.installURL {
+                        Link(destination: installURL) {
+                            Label("Choose Private Repositories…", systemImage: "lock.open")
+                        }
+                    }
+                    if defaultID != account.id {
+                        SwiftUI.Button("Use as Default") {
+                            do { try GitHubCredentialStore().setDefault(account.id); reload() }
+                            catch { errorMessage = error.localizedDescription }
+                        }
+                    }
+                    SwiftUI.Button("Sign Out", role: .destructive) { isConfirmingSignOut = true }
+                } else {
+                    SwiftUI.Button { isShowingSignIn = true } label: {
+                        Label("Sign in with GitHub", systemImage: "person.crop.circle.badge.plus")
+                            .font(.body.weight(.semibold))
+                    }
+                    .disabled(!GitHubAppConfiguration.isConfigured)
+                }
+            } header: {
+                Text("GitHub Account")
+            } footer: {
+                if !GitHubAppConfiguration.isConfigured {
+                    Text("GitHub sign-in isn’t set up in this build yet. You can still use tokens below.")
+                } else if account == nil {
+                    Text("Read-only access to any public repository. To include your private repositories, choose them after signing in.")
+                } else {
+                    Text("Read-only. Private repositories are included once you choose them on GitHub.")
+                }
+            }
+
+            Section {
+                ForEach(tokens) { credential in
                     NavigationLink {
                         GitHubTokenEditorView(credential: credential)
                     } label: {
@@ -31,7 +79,7 @@ struct GitHubAccountSettingsView: View {
                     GitHubTokenEditorView(credential: nil)
                 } label: { Label("Add Token", systemImage: "plus.circle") }
             } header: { Text("Tokens") } footer: {
-                Text("Give each token a name. Tokens are stored in iOS Keychain. Each app can use its own token, and you can choose another when downloading.")
+                Text("Optional. Use a token for repositories the GitHub account can’t reach. Stored in the iOS Keychain.")
             }
             Section {
                 NavigationLink {
@@ -49,8 +97,17 @@ struct GitHubAccountSettingsView: View {
             }
             if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
         }
-        .navigationTitle("GitHub Tokens")
+        .navigationTitle("GitHub")
         .navigationBarTitleDisplayMode(.inline)
+        .sheet(isPresented: $isShowingSignIn, onDismiss: reload) { GitHubSignInSheet() }
+        .confirmationDialog("Sign out of GitHub?", isPresented: $isConfirmingSignOut, titleVisibility: .visible) {
+            SwiftUI.Button("Sign Out", role: .destructive) {
+                do { try GitHubAccountSession.signOut(); reload() }
+                catch { errorMessage = error.localizedDescription }
+            }
+        } message: {
+            Text("Apps set to use your GitHub account fall back to public access until you sign in again or choose a token.")
+        }
         .onAppear { reload() }
         .onReceive(NotificationCenter.default.publisher(for: .sideKickGitHubSettingsDidChange)) { _ in
             reload()
@@ -161,6 +218,10 @@ struct GitHubTokenSelectionLink: View {
     }
     private func reload() {
         if selection == GitHubCredentialStore.publicAccessID { label = "Public Access"; return }
+        if selection == GitHubAccountSession.credentialID {
+            label = GitHubAccountSession.account.map { $0.username.isEmpty ? "GitHub Account" : "@\($0.username)" } ?? "Signed Out"
+            return
+        }
         guard let selection else { label = "Use Default Token"; return }
         do { label = try GitHubCredentialStore().all().first { $0.id == selection }?.label ?? "Token Removed" }
         catch { label = "Token Unavailable" }

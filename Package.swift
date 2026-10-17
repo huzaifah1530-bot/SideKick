@@ -15,7 +15,8 @@ let package = Package(
             "Services/SideKickDataDirectory.swift", "Services/SideKickLogStorage.swift", "Services/SideKickStorageUsage.swift",
             "Services/SideStoreOperationService.swift", "Services/SigningAccountStore.swift", "Services/SigningExpiry.swift",
             "Services/AppOffloadService.swift", "Services/SideKickDiagnostics.swift",
-            "Services/IPAImportDownloadStore.swift", "Services/RefreshFailureReport.swift", "Services/UpdateSuccessRecord.swift"
+            "Services/IPAImportDownloadStore.swift", "Services/RefreshFailureReport.swift", "Services/UpdateSuccessRecord.swift",
+            "Services/GitHubAccountSession.swift"
         ], sources: [
             "Models/GitHubBuildTracking.swift",
             "Models/ImportedIPA.swift",

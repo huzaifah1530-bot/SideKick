@@ -9,6 +9,11 @@ struct GitHubCredentialStore {
         var label: String
         var username: String
         var token: String
+        /// Set only for the signed-in GitHub account, whose token renews every 8 hours.
+        var refreshToken: String? = nil
+        var expiresAt: Date? = nil
+
+        var isGitHubAccount: Bool { id == "github-account" }
     }
     private struct Vault: Codable {
         var credentials: [Credential] = []
@@ -29,10 +34,12 @@ struct GitHubCredentialStore {
         return credential.token
     }
 
-    func save(label: String, username: String, token: String, id: String? = nil) throws {
+    func save(label: String, username: String, token: String, id: String? = nil,
+              refreshToken: String? = nil, expiresAt: Date? = nil) throws {
         var vault = try readVault()
         let isFirstCredential = id == nil && vault.credentials.isEmpty
-        let credential = Credential(id: id ?? UUID().uuidString, label: label, username: username, token: token)
+        let credential = Credential(id: id ?? UUID().uuidString, label: label, username: username, token: token,
+                                    refreshToken: refreshToken, expiresAt: expiresAt)
         vault.credentials.removeAll { $0.id == credential.id }
         vault.credentials.append(credential)
         if isFirstCredential && vault.defaultID == nil { vault.defaultID = credential.id }
