@@ -47,7 +47,7 @@ enum SideKickLayout {
 enum StatusTone {
     case neutral, accent, success, warning, critical
 
-    var color: Color {
+    @MainActor var color: Color {
         switch self {
         case .neutral: .secondary
         case .accent: .sideKickAccent
