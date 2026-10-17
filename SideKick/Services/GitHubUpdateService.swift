@@ -25,10 +25,51 @@ actor GitHubUpdateService {
     private let historyClient = GitHubHistoryClient()
     private let historyStore = GitHubHistoryStore.shared
 
+    /// A workflow plus the IPA artifacts its recent successful runs produced.
+    struct WorkflowSummary: Identifiable, Sendable {
+        let workflow: Workflow
+        let ipaArtifactNames: [String]
+        var id: Int { workflow.id }
+        var buildsIPA: Bool { !ipaArtifactNames.isEmpty }
+    }
+
+    /// Lists every workflow and checks which ones actually publish IPA artifacts.
+    func workflowSummaries(_ url: String, token: String?) async throws -> [WorkflowSummary] {
+        var all: [Workflow] = []
+        var page = 1
+        while page <= 5 {
+            let batch = try await workflows(url, token: token, page: page)
+            all += batch
+            if batch.count < 100 { break }
+            page += 1
+        }
+        let client = historyClient
+        return try await withThrowingTaskGroup(of: (Int, WorkflowSummary).self) { group in
+            for (index, workflow) in all.enumerated() {
+                group.addTask {
+                    // A workflow we can't inspect is treated as not producing IPAs, not as a failure.
+                    let names = (try? await client.recentIPAArtifactNames(repositoryURL: url, workflow: String(workflow.id), token: token)) ?? []
+                    return (index, WorkflowSummary(workflow: workflow, ipaArtifactNames: names))
+                }
+            }
+            var results: [(Int, WorkflowSummary)] = []
+            for try await item in group { results.append(item) }
+            return results.sorted { $0.0 < $1.0 }.map(\.1)
+        }
+    }
+
+    /// True when the repository's recent releases include at least one IPA asset.
+    func releasesContainIPA(_ url: String, token: String?) async throws -> Bool {
+        let configuration = GitHubUpdateConfiguration(bundleIdentifier: "", repositoryURL: url,
+            source: .latestRelease, workflowFile: "", branch: "", assetName: "", lastInstalledUpdateKey: nil)
+        return try await !historyClient.page(configuration: configuration, token: token, page: 1, allowMultiple: true).builds.isEmpty
+    }
+
     func importChoices(repositoryURL: String, source: GitHubUpdateSource, workflow: String, branch: String, token: String?, page: Int) async throws -> GitHubImportPage {
         let configuration = GitHubUpdateConfiguration(bundleIdentifier: "", repositoryURL: repositoryURL,
             source: source, workflowFile: workflow, branch: branch, assetName: "", lastInstalledUpdateKey: nil)
-        let result = try await historyClient.page(configuration: configuration, token: token, page: page, allowMultiple: true)
+        let result = try await historyClient.page(configuration: configuration, token: token, page: page, allowMultiple: true,
+            requireIPAArtifact: source == .actionsArtifact)
         return GitHubImportPage(choices: result.builds.map { build in
             GitHubImportChoice(candidate: GitHubUpdateCandidate(bundleIdentifier: "", appName: build.title,
                 currentVersion: "", newVersion: build.version, title: build.title, assetName: build.assetName,

@@ -20,72 +20,101 @@ struct GitHubRepositoryImportView: View {
 
     private var requestKey: String { "\(source.rawValue)|\(tokenID ?? "default")|\(workflowID)|\(branch)|\(reloadID)" }
 
+    @State private var didChooseSource = false
+    @State private var isDetectingSource = true
+    @State private var releasesHaveIPA: Bool?
+
     var body: some View {
         List {
             Section {
                 Text(repositoryURL.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")))
                     .font(.headline).textSelection(.enabled)
                 GitHubTokenSelectionLink(selection: $tokenID)
-                Picker("Source", selection: $source) {
+                Picker("Source", selection: Binding(get: { source }, set: { source = $0; didChooseSource = true })) {
                     Text("Releases").tag(GitHubUpdateSource.latestRelease)
-                    Text("Actions Builds").tag(GitHubUpdateSource.actionsArtifact)
-                }.pickerStyle(.segmented)
-                if source == .actionsArtifact {
-                    Text("Actions Builds requires a token with Actions: read access to this repository. For private repositories, include the repository in the token; organization tokens may need approval.")
-                        .font(.footnote).foregroundStyle(.secondary)
+                    Text("Actions").tag(GitHubUpdateSource.actionsArtifact)
                 }
+                .pickerStyle(.segmented)
+                .disabled(isDetectingSource)
                 if source == .actionsArtifact {
                     NavigationLink {
                         GitHubWorkflowPickerView(repositoryURL: repositoryURL.absoluteString, tokenID: tokenID, selection: $workflowID, selectedName: $workflowName)
                     } label: {
-                        LabeledContent("Workflow", value: workflowName.isEmpty ? "Choose Workflow" : workflowName)
+                        LabeledContent("Workflow", value: workflowName.isEmpty ? "Choose" : workflowName)
                     }
-                    HStack {
-                        Text("Branch")
-                        TextField("Repository branch", text: $branchDraft)
+                    LabeledContent("Branch") {
+                        TextField("Default branch", text: $branchDraft)
                             .multilineTextAlignment(.trailing)
                             .textInputAutocapitalization(.never).autocorrectionDisabled()
-                            .onSubmit { branch = branchDraft.trimmingCharacters(in: .whitespacesAndNewlines) }
+                            .submitLabel(.search)
+                            .onSubmit { branch = branchDraft.trimmingCharacters(in: .whitespacesAndNewlines); reloadID = UUID() }
                     }
-                    SwiftUI.Button("Load Branch Builds") { branch = branchDraft.trimmingCharacters(in: .whitespacesAndNewlines); reloadID = UUID() }
                 }
             } header: { Text("Repository") } footer: {
-                Text("Choose the IPA you want. After installation, SideKick tracks this exact release or build and uses this token for future update checks. Actions artifacts need a GitHub token and must contain an IPA.")
+                if isDetectingSource {
+                    Text("Checking where this repository publishes IPAs…")
+                } else if releasesHaveIPA == false && source == .actionsArtifact {
+                    Text("This repository’s releases don’t include IPAs, so SideKick switched to Actions. Downloading Actions builds needs a GitHub token.")
+                } else if source == .actionsArtifact {
+                    Text("Only builds that produced an IPA artifact are shown. Downloading needs a GitHub token.")
+                } else {
+                    Text("SideKick tracks the build you install and checks the same source for updates.")
+                }
             }
             Section {
                 ForEach(choices) { choice in
                     NavigationLink {
                         GitHubRepositoryDownloadView(choice: choice, tokenID: tokenID, onImported: onImported)
                     } label: {
-                        VStack(alignment: .leading, spacing: 5) {
-                            Text(choice.candidate.title).font(.body.weight(.medium))
-                            Text(choice.candidate.assetName).font(.subheadline).foregroundStyle(.secondary)
-                            if let date = choice.date {
-                                Text(date.formatted(date: .abbreviated, time: .shortened)).font(.caption).foregroundStyle(.secondary)
-                            }
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(choice.candidate.title).font(.body.weight(.semibold)).lineLimit(2)
+                            Text([choice.candidate.assetName, choice.date?.formatted(date: .abbreviated, time: .omitted)].compactMap { $0 }.joined(separator: " · "))
+                                .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
                         }
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .padding(.vertical, Spacing.xxs)
                     }
-                    .fullWidthListSeparators()
                 }
-                if isLoading { HStack { ProgressView(); Text("Finding downloads…") } }
-                else if choices.isEmpty && errorMessage == nil {
-                    ContentUnavailableView("No Downloads Found", systemImage: "arrow.down.doc", description: Text(source == .latestRelease ? "This repository has no release IPAs. Try Actions Builds or another token." : "Choose a workflow and branch with successful builds and unexpired IPA artifacts."))
+                if isLoading || isDetectingSource {
+                    HStack(spacing: Spacing.xs) { ProgressView(); Text(isDetectingSource ? "Checking releases…" : "Finding IPA builds…").foregroundStyle(.secondary) }
+                } else if source == .actionsArtifact && workflowID.isEmpty {
+                    NavigationLink {
+                        GitHubWorkflowPickerView(repositoryURL: repositoryURL.absoluteString, tokenID: tokenID, selection: $workflowID, selectedName: $workflowName)
+                    } label: {
+                        Label("Choose a Workflow", systemImage: "gearshape.2")
+                    }
+                } else if choices.isEmpty && errorMessage == nil {
+                    ContentUnavailableView("No IPA Builds", systemImage: "shippingbox",
+                        description: Text(source == .latestRelease
+                            ? "No release here includes an IPA. Try Actions."
+                            : "No recent successful run of this workflow produced an IPA artifact. Try another workflow or branch."))
+                        .listRowBackground(Color.clear)
                 }
                 if hasMore && !isLoading {
                     SwiftUI.Button("Load More") { Task { await loadMore() } }
                 }
-            } header: { Text(source == .latestRelease ? "Release IPAs" : "Successful Build Artifacts") }
+            } header: { Text(source == .latestRelease ? "Releases with IPAs" : "Builds with IPAs") }
             if let errorMessage {
                 Section {
-                    Label(errorMessage, systemImage: "exclamationmark.triangle").foregroundStyle(.red)
+                    Label(errorMessage, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red)
                     SwiftUI.Button("Try Again") { reloadID = UUID() }
                 }
             }
         }
-        .navigationTitle("GitHub Repository")
+        .navigationTitle("Install from GitHub")
         .navigationBarTitleDisplayMode(.inline)
-        .task(id: requestKey) { await load() }
+        .task { await detectSource() }
+        .task(id: requestKey) { if !isDetectingSource { await load() } }
+        .onChange(of: isDetectingSource) { _, detecting in if !detecting { reloadID = UUID() } }
+    }
+
+    /// Picks Releases when they contain IPAs, otherwise Actions, unless the user already chose.
+    @MainActor private func detectSource() async {
+        defer { isDetectingSource = false }
+        guard !didChooseSource else { return }
+        let token = try? GitHubCredentialStore().load(id: tokenID)
+        let hasIPA = (try? await GitHubUpdateService().releasesContainIPA(repositoryURL.absoluteString, token: token)) ?? true
+        releasesHaveIPA = hasIPA
+        if !didChooseSource { source = hasIPA ? .latestRelease : .actionsArtifact }
     }
 
     @MainActor private func load() async {
@@ -127,55 +156,100 @@ struct GitHubRepositoryImportView: View {
     }
 }
 
-private struct GitHubWorkflowPickerView: View {
+/// Workflow chooser shared by Install from GitHub and Update Source. Workflows whose recent
+/// successful runs produced an IPA artifact are listed first; the rest are tucked away.
+struct GitHubWorkflowPickerView: View {
     let repositoryURL: String
     let tokenID: String?
     @Binding var selection: String
     @Binding var selectedName: String
+    var onArtifactNames: (([String]) -> Void)? = nil
     @Environment(\.dismiss) private var dismiss
-    @State private var workflows: [GitHubUpdateService.Workflow] = []
-    @State private var page = 0
-    @State private var hasMore = true
+    @State private var summaries: [GitHubUpdateService.WorkflowSummary] = []
     @State private var loading = false
+    @State private var loaded = false
     @State private var errorMessage: String?
+    @State private var showsOtherWorkflows = false
+
+    private var ipaWorkflows: [GitHubUpdateService.WorkflowSummary] { summaries.filter(\.buildsIPA) }
+    private var otherWorkflows: [GitHubUpdateService.WorkflowSummary] { summaries.filter { !$0.buildsIPA } }
 
     var body: some View {
         List {
-            ForEach(workflows) { workflow in
-                SwiftUI.Button {
-                    selection = String(workflow.id); selectedName = workflow.name; dismiss()
-                } label: {
-                    HStack {
-                        VStack(alignment: .leading, spacing: 4) {
-                            Text(workflow.name).foregroundStyle(.primary)
-                            Text(workflow.path).font(.subheadline).foregroundStyle(.secondary)
-                        }
-                        Spacer()
-                        if selection == String(workflow.id) { Image(systemName: "checkmark") }
-                    }
-                }.fullWidthListSeparators()
+            if loading {
+                Section {
+                    HStack(spacing: Spacing.xs) { ProgressView(); Text("Checking workflows for IPA builds…").foregroundStyle(.secondary) }
+                }
             }
-            if loading { ProgressView() }
-            else if hasMore { SwiftUI.Button("Load More Workflows") { Task { await load() } } }
-            if let errorMessage { Text(errorMessage).foregroundStyle(.red) }
-            if !loading && workflows.isEmpty && errorMessage == nil { Text("No workflows found in this repository.").foregroundStyle(.secondary) }
+            if let errorMessage {
+                Section {
+                    Label(errorMessage, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.red)
+                    SwiftUI.Button("Try Again") { Task { await load() } }
+                }
+            }
+            if loaded && !ipaWorkflows.isEmpty {
+                Section {
+                    ForEach(ipaWorkflows) { row($0) }
+                } header: {
+                    Text("Builds IPAs")
+                } footer: {
+                    Text("Recent successful runs of these workflows produced an IPA artifact.")
+                }
+            } else if loaded && errorMessage == nil {
+                ContentUnavailableView("No IPA Workflows", systemImage: "shippingbox",
+                    description: Text("No workflow here has a recent successful run with an IPA artifact. Artifacts expire, so older builds may be gone."))
+                    .listRowBackground(Color.clear)
+            }
+            if loaded && !otherWorkflows.isEmpty {
+                Section {
+                    DisclosureGroup("Other Workflows (\(otherWorkflows.count))", isExpanded: $showsOtherWorkflows) {
+                        ForEach(otherWorkflows) { row($0) }
+                    }
+                } footer: {
+                    Text("These haven’t produced an IPA recently. Choose one only if you know it does.")
+                }
+            }
         }
-        .navigationTitle("Choose Workflow")
+        .navigationTitle("Workflow")
         .navigationBarTitleDisplayMode(.inline)
-        .task { if page == 0 { await load() } }
+        .refreshable { await load() }
+        .task { if !loaded { await load() } }
     }
+
+    private func row(_ summary: GitHubUpdateService.WorkflowSummary) -> some View {
+        SwiftUI.Button {
+            selection = String(summary.workflow.id)
+            selectedName = summary.workflow.name
+            onArtifactNames?(summary.ipaArtifactNames)
+            dismiss()
+        } label: {
+            HStack(spacing: Spacing.s) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(summary.workflow.name).font(.body.weight(.semibold)).foregroundStyle(.primary)
+                    Text(summary.buildsIPA ? summary.ipaArtifactNames.joined(separator: ", ") : summary.workflow.path)
+                        .font(.subheadline).foregroundStyle(.secondary).lineLimit(1)
+                }
+                Spacer(minLength: 0)
+                if selection == String(summary.workflow.id) || selection == summary.workflow.path
+                    || selection == (summary.workflow.path as NSString).lastPathComponent {
+                    Image(systemName: "checkmark").foregroundStyle(Color.sideKickAccent).accessibilityLabel("Selected")
+                }
+            }
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+
     @MainActor private func load() async {
         guard !loading else { return }
         loading = true; errorMessage = nil
         defer { loading = false }
         do {
             let token = try GitHubCredentialStore().load(id: tokenID)
-            let result = try await GitHubUpdateService().workflows(repositoryURL, token: token, page: page + 1)
-            try Task.checkCancellation()
-            let ids = Set(workflows.map(\.id))
-            workflows += result.filter { !ids.contains($0.id) }; page += 1; hasMore = result.count == 100
+            summaries = try await GitHubUpdateService().workflowSummaries(repositoryURL, token: token)
+            loaded = true
         } catch is CancellationError { }
-        catch { errorMessage = error.localizedDescription }
+        catch { errorMessage = error.localizedDescription; loaded = true }
     }
 }
 

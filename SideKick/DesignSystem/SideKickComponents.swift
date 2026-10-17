@@ -124,16 +124,6 @@ extension View {
         }
     }
 
-    /// Lets the Liquid Glass tab bar shrink while content scrolls (iOS 26).
-    @ViewBuilder
-    func minimizingTabBarOnScroll() -> some View {
-        if #available(iOS 26, *) {
-            self.tabBarMinimizeBehavior(.onScrollDown)
-        } else {
-            self
-        }
-    }
-
     /// Shows a running multi-app refresh in the Liquid Glass tab bar accessory (iOS 26.2+; 26.1 hides it unreliably),
     /// so progress stays visible after leaving My Apps. Earlier systems keep the in-list status row.
     @ViewBuilder

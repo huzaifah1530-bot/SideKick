@@ -28,7 +28,6 @@ struct ContentView: View {
                             SettingsView()
                         }
                     }
-                    .minimizingTabBarOnScroll()
                     .refreshActivityAccessory(environment.refreshActivity) {
                         unsavedSettings.requestNavigation { selectedTab = 0 }
                     }

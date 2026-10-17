@@ -70,7 +70,44 @@ actor GitHubHistoryClient {
         let updated_at: String?
     }
 
-    func page(configuration: GitHubUpdateConfiguration, token: String?, page: Int, allowMultiple: Bool = false, latestOnly: Bool = false) async throws -> GitHubHistoryPage {
+    /// Artifacts are zip files, so their contents can't be listed without downloading them.
+    /// An artifact counts as an IPA build when its name says so ("App.ipa", "app-unsigned-ipa").
+    static func artifactLooksLikeIPA(_ name: String) -> Bool {
+        name.lowercased().contains("ipa")
+    }
+
+    private func repositoryRoot(_ repositoryURL: String) throws -> String {
+        guard let url = URL(string: repositoryURL.trimmingCharacters(in: .whitespacesAndNewlines)),
+              ["github.com", "www.github.com"].contains(url.host?.lowercased() ?? ""),
+              ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { throw GitHubHistoryError.invalidSource }
+        let repository = GitHubSourceIdentity.repository(repositoryURL)
+        guard let parts = URL(string: repository)?.path.split(separator: "/"), parts.count == 2,
+              parts.allSatisfy({ $0.range(of: "^[A-Za-z0-9_.-]+$", options: .regularExpression) != nil }) else { throw GitHubHistoryError.invalidSource }
+        return "/repos/" + parts.joined(separator: "/")
+    }
+
+    /// Names of IPA artifacts from the most recent successful runs of a workflow. Empty when the
+    /// workflow hasn't produced an unexpired IPA artifact recently.
+    func recentIPAArtifactNames(repositoryURL: String, workflow: String, token: String?, runLimit: Int = 3) async throws -> [String] {
+        let root = try repositoryRoot(repositoryURL)
+        guard let encoded = workflow.addingPercentEncoding(withAllowedCharacters: .alphanumerics.union(CharacterSet(charactersIn: "-._~"))) else {
+            throw GitHubHistoryError.invalidSource
+        }
+        let runs: Runs = try await get(path: root + "/actions/workflows/" + encoded + "/runs",
+            query: ["status": "success", "per_page": String(runLimit)], token: token)
+        for run in runs.workflow_runs where run.conclusion == "success" {
+            try Task.checkCancellation()
+            let result: Artifacts = try await get(path: root + "/actions/runs/\(run.id)/artifacts", query: ["per_page": "100"], token: token)
+            let names = result.artifacts.filter { !$0.expired && Self.artifactLooksLikeIPA($0.name) }.map(\.name)
+            if !names.isEmpty {
+                var seen = Set<String>()
+                return names.filter { seen.insert($0.lowercased()).inserted }
+            }
+        }
+        return []
+    }
+
+    func page(configuration: GitHubUpdateConfiguration, token: String?, page: Int, allowMultiple: Bool = false, latestOnly: Bool = false, requireIPAArtifact: Bool = false) async throws -> GitHubHistoryPage {
         guard page > 0, let url = URL(string: configuration.repositoryURL.trimmingCharacters(in: .whitespacesAndNewlines)),
               ["github.com", "www.github.com"].contains(url.host?.lowercased() ?? ""),
               ["http", "https"].contains(url.scheme?.lowercased() ?? "") else { throw GitHubHistoryError.invalidSource }
@@ -122,6 +159,11 @@ actor GitHubHistoryClient {
                 guard artifactPage <= 20 else { throw GitHubHistoryError.paginationLimit }
             }
             var matches = select(all, name: { $0.name }, filter: configuration.assetName)
+            if requireIPAArtifact {
+                matches = matches.filter { Self.artifactLooksLikeIPA($0.name) }
+                // Runs that produced no IPA artifact are hidden rather than shown as empty builds.
+                if matches.isEmpty { continue }
+            }
             if matches.count > 1 && !allowMultiple {
                     guard Set(matches.map { $0.name.lowercased() }).count == 1 else { throw GitHubHistoryError.ambiguousAsset }
                     matches = Array(matches.sorted(by: { $0.id > $1.id }).prefix(1))

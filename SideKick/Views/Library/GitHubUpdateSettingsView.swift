@@ -50,6 +50,11 @@ struct GitHubUpdateSettingsView: View {
 
     @State private var isConfirmingRemoval = false
     @State private var hasSavedConfiguration = false
+    @State private var workflowName = ""
+    @State private var artifactSuggestions: [String] = []
+    @State private var isDetectingSource = false
+    @State private var detectionMessage: String?
+    @State private var detectedRepository = ""
 
     var body: some View {
         Form {
@@ -68,15 +73,31 @@ struct GitHubUpdateSettingsView: View {
 
             Section {
                 Picker("Builds from", selection: $source) {
-                    ForEach(GitHubUpdateSource.allCases) { option in Text(option.title).tag(option) }
+                    Text("Releases").tag(GitHubUpdateSource.latestRelease)
+                    Text("Actions").tag(GitHubUpdateSource.actionsArtifact)
+                }
+                .pickerStyle(.segmented)
+                .disabled(isDetectingSource)
+                if isDetectingSource {
+                    HStack(spacing: Spacing.xs) { ProgressView(); Text("Checking where this repository publishes IPAs…").foregroundStyle(.secondary) }
                 }
                 if source == .actionsArtifact {
-                    LabeledContent("Workflow") {
-                        TextField("build.yml", text: $workflowFile)
-                            .multilineTextAlignment(.trailing)
-                            .textInputAutocapitalization(.never)
-                            .autocorrectionDisabled()
+                    NavigationLink {
+                        GitHubWorkflowPickerView(
+                            repositoryURL: repositoryURL,
+                            tokenID: tokenID,
+                            selection: $workflowFile,
+                            selectedName: $workflowName,
+                            onArtifactNames: { names in
+                                artifactSuggestions = names
+                                if names.count == 1 { assetName = names[0] }
+                                else if !names.contains(where: { $0.caseInsensitiveCompare(assetName) == .orderedSame }) { assetName = "" }
+                            }
+                        )
+                    } label: {
+                        LabeledContent("Workflow", value: workflowName.isEmpty ? (workflowFile.isEmpty ? "Choose" : workflowFile) : workflowName)
                     }
+                    .disabled(!isValidRepository)
                     LabeledContent("Branch") {
                         TextField("All branches", text: $branch)
                             .multilineTextAlignment(.trailing)
@@ -84,16 +105,29 @@ struct GitHubUpdateSettingsView: View {
                             .autocorrectionDisabled()
                     }
                 }
-                LabeledContent(source == .latestRelease ? "IPA name" : "Artifact") {
-                    TextField("Any", text: $assetName)
-                        .multilineTextAlignment(.trailing)
-                        .textInputAutocapitalization(.never)
-                        .autocorrectionDisabled()
+                if source == .actionsArtifact && artifactSuggestions.count > 1 {
+                    Picker("Artifact", selection: $assetName) {
+                        Text("Any IPA").tag("")
+                        ForEach(artifactSuggestions, id: \.self) { Text($0).tag($0) }
+                    }
+                } else {
+                    LabeledContent(source == .latestRelease ? "IPA name" : "Artifact") {
+                        TextField("Any", text: $assetName)
+                            .multilineTextAlignment(.trailing)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                    }
                 }
             } header: {
                 Text("Builds")
             } footer: {
-                Text("Use * in the name to match changing version numbers.")
+                if let detectionMessage {
+                    Text(detectionMessage)
+                } else if source == .actionsArtifact {
+                    Text("Choose a workflow that builds IPAs. Only runs with an IPA artifact count as updates.")
+                } else {
+                    Text("Use * in the name to match changing version numbers.")
+                }
             }
 
             if !repositoryURL.isEmpty {
@@ -187,6 +221,12 @@ struct GitHubUpdateSettingsView: View {
             Text("SideKick will stop checking GitHub for \(target.name). The installed app isn’t changed.")
         }
         .navigationTitle("Update Source")
+        .task(id: repositoryURL) {
+            // Wait for typing to settle, then pick the source that actually publishes IPAs.
+            try? await Task.sleep(for: .milliseconds(600))
+            guard !Task.isCancelled else { return }
+            await detectSource()
+        }
         .navigationBarTitleDisplayMode(.inline)
         .task { await load() }
         .onChange(of: sourceIdentity) { _, value in
@@ -342,6 +382,53 @@ struct GitHubUpdateSettingsView: View {
                     detail: error.localizedDescription, checkedConfiguration: saved, checkedAt: .now)
                 _ = await environment.publishDetailGitHubCheck(check, target: target)
             }
+        }
+    }
+
+    private var isValidRepository: Bool {
+        guard let url = URL(string: repositoryURL.trimmingCharacters(in: .whitespacesAndNewlines)),
+              ["github.com", "www.github.com"].contains(url.host?.lowercased() ?? "") else { return false }
+        return url.path.split(separator: "/").count >= 2
+    }
+
+    /// For a new source, choose Releases when they contain IPAs and Actions otherwise.
+    /// Saved sources keep their configuration; this only fills in what's still unset.
+    @MainActor private func detectSource() async {
+        // SideKick's own source is preconfigured; never second-guess it.
+        guard didFinishInitialLoad, isValidRepository, !hasSavedConfiguration,
+              target.id != Bundle.main.bundleIdentifier,
+              detectedRepository != repositoryURL else { return }
+        detectedRepository = repositoryURL
+        isDetectingSource = true
+        defer { isDetectingSource = false }
+        let token = try? GitHubCredentialStore().load(id: tokenID)
+        let service = GitHubUpdateService()
+        guard let releasesHaveIPA = try? await service.releasesContainIPA(repositoryURL, token: token) else {
+            detectionMessage = nil
+            return
+        }
+        if releasesHaveIPA {
+            source = .latestRelease
+            detectionMessage = "This repository’s releases include IPAs."
+            return
+        }
+        source = .actionsArtifact
+        detectionMessage = "Releases here don’t include IPAs, so SideKick switched to Actions."
+        guard let summaries = try? await service.workflowSummaries(repositoryURL, token: token) else { return }
+        let ipaWorkflows = summaries.filter(\.buildsIPA)
+        if ipaWorkflows.count == 1, let only = ipaWorkflows.first {
+            workflowFile = String(only.workflow.id)
+            workflowName = only.workflow.name
+            artifactSuggestions = only.ipaArtifactNames
+            if only.ipaArtifactNames.count == 1 { assetName = only.ipaArtifactNames[0] }
+            branch = ""
+            detectionMessage = "Releases here don’t include IPAs. “\(only.workflow.name)” is the only workflow that builds one, so it’s selected."
+        } else if ipaWorkflows.isEmpty {
+            detectionMessage = "Neither releases nor recent Actions runs include an IPA. Check the repository or add a token."
+        } else {
+            workflowFile = ""
+            workflowName = ""
+            detectionMessage = "Releases here don’t include IPAs. Choose one of the \(ipaWorkflows.count) workflows that build them."
         }
     }
 
