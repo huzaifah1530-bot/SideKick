@@ -77,7 +77,10 @@ jobs:
         run: python3 -m unittest discover -s Tests/VendorRegression -v
 
       - name: Apply SideKick backup helper integration
-        run: python3 scripts/integrate-backup-helper.py Vendor/SideStore
+        run: |
+          python3 scripts/integrate-backup-helper.py Vendor/SideStore
+          git -C Vendor/SideStore apply ../../patches/sidestore-signing-repairs.patch
+          git -C Vendor/SideStore/Dependencies/SideSign apply ../../../../patches/sidesign-required-app-groups.patch
 
       - name: Test vendor audit regressions
         run: |

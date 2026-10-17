@@ -31,6 +31,7 @@ class IntegrationPatchTests(unittest.TestCase):
                 "Shared/Extensions/Bundle+AltStore.swift", "SideStore/Core/Operations/PipelineExecutor.swift",
                 "SideStore/Core/Operations/PipelineOperations/FetchProvisioningProfilesOperation.swift",
                 "SideStore/Core/Operations/PipelineOperations/ResignAppOperation.swift",
+                "SideStore/Core/Operations/PipelineOperations/PrepareAppExtensionBundleIDsOperation.swift",
                 "SideStore/Core/Operations/PipelineOperations/RemoveBackupDataOperation.swift",
                 "AltWidget/Info.plist", "SideBackup/Info.plist",
                 "AltStore/Resources/ReleaseEntitlements.plist",
@@ -77,6 +78,9 @@ class IntegrationPatchTests(unittest.TestCase):
                     subprocess.run([compiler, "-frontend", "-parse", str(checkout / relative)], check=True)
             result = subprocess.run([sys.executable, str(ROOT / "scripts/integrate-backup-helper.py"), str(checkout)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
+            patch_path.write_bytes((ROOT / 'patches/sidestore-signing-repairs.patch').read_bytes())
+            result = subprocess.run(['git', '-C', str(checkout), 'apply', str(patch_path)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
             stage = (checkout / "SideStore/Core/Operations/PipelineOperations/StageBackupAppOperation.swift").read_text()
             self.assertIn('updates["SideKickBackupAppGroup"] = backupGroup', stage)
             shared = (checkout / "Shared/Extensions/Bundle+AltStore.swift").read_text()
@@ -86,6 +90,14 @@ class IntegrationPatchTests(unittest.TestCase):
             self.assertIn('Bundle.main.appGroups.contains(groupIdentifier)', provisioning)
             self.assertLess(provisioning.index('return groupIdentifier'), provisioning.index('return groupIdentifier + "." + team.identifier'))
             signing = (checkout / "SideStore/Core/Operations/PipelineOperations/ResignAppOperation.swift").read_text()
+            self.assertIn('appexBundleIds[appBundle.bundleIdentifier]', signing)
+            self.assertIn('try self.validateExtensionIdentifiers(in: preparedApp)', signing)
+            self.assertIn('requiredAppGroups: requiredAppGroups', signing)
+            self.assertIn('requestedEntitlements(for: targetAppBundle, team: team)', provisioning)
+            self.assertIn('groupIdentifier == Bundle.main.altstoreAppGroup', provisioning)
+            self.assertIn('appbundleIdentifier = Bundle.activeBundle.bundleIdentifier', shared)
+            self.assertIn('baseAltStoreAppGroupID = "group.com.sidekick.app"', shared)
+            self.assertIn('self == "com.sidekick.app"', shared)
             self.assertIn('resignedAppBundle.executableName == "SideBackup"', signing)
             self.assertIn(').contains(expected)', signing)
             self.assertIn('if resignedAppBundle.isAltStoreApp {', signing)
@@ -97,17 +109,26 @@ class IntegrationPatchTests(unittest.TestCase):
             self.assertIn('Activity Log', helper)
             self.assertIn('SideKick', helper)
             if compiler := shutil.which("swiftc"):
+                from signing_repair_checks import verify_repairs
+                verify_repairs(checkout, compiler)
                 for relative in ["SideBackup/ContentView.swift", "Shared/Extensions/Bundle+AltStore.swift",
                                  "SideStore/Core/Operations/PipelineExecutor.swift",
                                  "SideStore/Core/Operations/PipelineOperations/StageBackupAppOperation.swift",
                                  "SideStore/Core/Operations/PipelineOperations/FetchProvisioningProfilesOperation.swift",
                                  "SideStore/Core/Operations/PipelineOperations/ResignAppOperation.swift",
+                                 "SideStore/Core/Operations/PipelineOperations/PrepareAppExtensionBundleIDsOperation.swift",
                                  "AltStore/Managing Apps/AppManager.swift"]:
                     subprocess.run([compiler, "-frontend", "-parse", str(checkout / relative)], check=True)
                 # Exercise the actual composed resolver with different host/helper IDs.
                 getter = re.search(r'@objc dynamic var altstoreAppGroup: String\? \{.*?\n    \}', shared, re.S).group(0)
                 fixture = '''import Foundation
-enum Bundle { static let baseAltStoreAppGroupID = "group.com.spotify.client.TEAM" }
+enum Bundle {
+    static let baseAltStoreAppGroupID = "group.com.spotify.client.TEAM"
+    enum Info {
+        static let activeBundleIdentifier = "com.sidekick.app.TEAM"
+        static let appbundleIdentifier = activeBundleIdentifier
+    }
+}
 struct FakeBundle {
     let appGroups: [String]
     let expected: String?
@@ -120,6 +141,13 @@ precondition(FakeBundle(appGroups: [host + ".TEAM"], expected: host).altstoreApp
 precondition(FakeBundle(appGroups: [Bundle.baseAltStoreAppGroupID], expected: host).altstoreAppGroup == nil)
 precondition(FakeBundle(appGroups: [Bundle.baseAltStoreAppGroupID], expected: nil).altstoreAppGroup == Bundle.baseAltStoreAppGroupID)
 '''.replace('GETTER', getter.replace('@objc dynamic ', ''))
+                identity_getter = re.search(r'    var isAltStoreAppID: Bool \{.*?^    \}', shared, re.S | re.M).group(0)
+                fixture += '\nextension String {\n' + identity_getter + '\n}\n'
+                fixture += '''precondition("com.sidekick.app".isAltStoreAppID)
+precondition("com.sidekick.app.TEAM".isAltStoreAppID)
+precondition(!"com.sidekick.app.Widget".isAltStoreAppID)
+precondition(!"other.com.sidekick.app.TEAM".isAltStoreAppID)
+'''
                 source = checkout / "BackupGroupFixture.swift"
                 source.write_text(fixture)
                 binary = checkout / "backup-group-fixture"
@@ -176,6 +204,13 @@ precondition(accepts([], isStore: false)) // unrelated apps need no store group
                 patch_path.write_bytes(content.encode("utf-8"))
                 result = subprocess.run(["git", "-C", str(dependency), "apply", str(patch_path)], capture_output=True, text=True)
                 self.assertEqual(result.returncode, 0, result.stderr)
+                if relative == 'Dependencies/SideSign':
+                    signing_path = 'Sources/CodeSigning/CodeSignerAPI.swift'
+                    target = dependency / signing_path
+                    target.parent.mkdir(parents=True, exist_ok=True)
+                    target.write_bytes(subprocess.check_output(['git', '-C', str(ROOT / 'Vendor/SideStore' / relative), 'show', 'HEAD:' + signing_path]))
+                    result = subprocess.run(['git', '-C', str(dependency), 'apply', str(ROOT / 'patches/sidesign-required-app-groups.patch')], capture_output=True, text=True)
+                    self.assertEqual(result.returncode, 0, result.stderr)
             delegate = (checkout / "AltStore/AppDelegate.swift").read_text(encoding="utf-8")
             begin = delegate.index("private func prepareForBackgroundFetch()")
             end = delegate.index("\n    }", begin)

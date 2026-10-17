@@ -17,6 +17,25 @@ VPN_KEYS = ('com.apple.developer.networking.networkextension', 'com.apple.develo
 
 
 class HostEntitlementTests(unittest.TestCase):
+    def signer_source(self):
+        relative = 'Sources/CodeSigning/CodeSignerAPI.swift'
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            path = root / relative
+            path.parent.mkdir(parents=True)
+            path.write_bytes(subprocess.check_output(['git', '-C', str(ROOT / 'Vendor/SideStore/Dependencies/SideSign'), 'show', 'HEAD:' + relative]))
+            subprocess.run(['git', 'init', '--quiet', str(root)], check=True)
+            subprocess.run(['git', '-C', str(root), 'apply', str(ROOT / 'patches/sidesign-required-app-groups.patch')], check=True)
+            return path.read_text()
+
+    def test_required_groups_are_scoped_to_a_bundle_and_checked_against_its_profile(self):
+        signer = self.signer_source()
+        self.assertIn('requiredAppGroups[app.bundleIdentifier]', signer)
+        self.assertIn('requestedGroups.allSatisfy({ grantedGroups.contains($0) })', signer)
+        self.assertIn('applicationEntitlements[groupKey] = requestedGroups', signer)
+        workflow = (ROOT / '.github/workflows/ios-build.yml').read_text()
+        self.assertIn('patches/sidesign-required-app-groups.patch', workflow)
+
     def module(self):
         spec = importlib.util.spec_from_file_location('host_entitlements', ROOT / 'scripts/host-entitlements.py')
         module = importlib.util.module_from_spec(spec)
@@ -72,17 +91,17 @@ class HostEntitlementTests(unittest.TestCase):
 
     @unittest.skipUnless(shutil.which('swiftc'), 'Behavioral signing fixture requires Swift')
     def test_real_signer_keeps_requested_profile_grants_without_inventing_permissions(self):
-        signer = (ROOT / 'Vendor/SideStore/Dependencies/SideSign/Sources/CodeSigning/CodeSignerAPI.swift').read_text()
+        signer = self.signer_source()
         body = re.search(r'            var filteredEntitlements = matchedProfile.entitlements.*?(?=            let plist =)', signer, re.S).group(0)
         with tempfile.TemporaryDirectory() as directory:
             source = Path(directory) / 'SigningFixture.swift'
             source.write_text('''import Foundation
 struct Profile { let entitlements: [String: Any]; let teamIdentifier: String }
-struct App { let entitlements: [String: Any] }
+struct App { let bundleIdentifier = "com.sidekick.app.TEAM"; let entitlements: [String: Any] }
 enum SignerError: Error { case invalidApp(cause: String) }
 func verboseLog(_ value: String) {}
 func debugLog(_ value: String) {}
-func filter(_ app: App, _ matchedProfile: Profile) throws -> [String: Any] {
+func filter(_ app: App, _ matchedProfile: Profile, requiredAppGroups: [String: [String]] = [:]) throws -> [String: Any] {
     BODY
     return filteredEntitlements
 }
@@ -96,6 +115,15 @@ precondition(result[siri] as? Bool == true)
 precondition(result[vpn] == nil)
 let broken = try filter(App(entitlements: [:]), profile)
 precondition(broken[group] == nil) // reproduces the old empty-packaging failure
+let repaired = try filter(App(entitlements: [siri: true]), profile, requiredAppGroups: ["com.sidekick.app.TEAM": ["group.com.sidekick.app.TEAM"]])
+precondition(repaired[group] as? [String] == ["group.com.sidekick.app.TEAM"])
+precondition(repaired[siri] as? Bool == true)
+let unrelated = try filter(App(entitlements: [:]), profile, requiredAppGroups: ["another.app": ["group.com.sidekick.app.TEAM"]])
+precondition(unrelated[group] == nil)
+do {
+    _ = try filter(App(entitlements: [:]), profile, requiredAppGroups: ["com.sidekick.app.TEAM": ["group.not.authorized"]])
+    preconditionFailure("An unprovisioned group was accepted")
+} catch SignerError.invalidApp { }
 '''.replace('BODY', body))
             binary = Path(directory) / 'signing-fixture'
             subprocess.run([shutil.which('swiftc'), str(source), '-o', str(binary)], check=True)
