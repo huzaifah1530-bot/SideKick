@@ -24,9 +24,9 @@
     "semantic_hash": ""
   },
   "SideKick/App/AppEnvironment.swift": {
-    "mtime": 1792246304.6012938,
-    "seen": 1792246536.6708007,
-    "ast_hash": "94bdcde7d6d8e093be9b3ea1a9fd4ded",
+    "mtime": 1792246874.350916,
+    "seen": 1792248204.4404292,
+    "ast_hash": "6d8b20f96b2cec118dbedfa686d5ffbb",
     "semantic_hash": ""
   },
   "SideKick/App/SideKickApp.swift": {
@@ -270,9 +270,9 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Home/HomeView.swift": {
-    "mtime": 1792246304.6028254,
-    "seen": 1792246536.670916,
-    "ast_hash": "e92ae22d2d380951d925c1caf5e4224b",
+    "mtime": 1792248092.0720165,
+    "seen": 1792248204.4405055,
+    "ast_hash": "35ef7318b19f64448bcf64f23fd386ea",
     "semantic_hash": ""
   },
   "SideKick/Views/Home/IPASharingViews.swift": {
@@ -324,9 +324,9 @@
     "semantic_hash": ""
   },
   "SideKick/Views/LiveContainer/LiveContainerViews.swift": {
-    "mtime": 1792245502.1251242,
-    "seen": 1792246536.670942,
-    "ast_hash": "0ff560c2ae0afc62836cda89cb02899f",
+    "mtime": 1792248144.3784125,
+    "seen": 1792248204.4405248,
+    "ast_hash": "faf519e5199c021d07f280304df14b30",
     "semantic_hash": ""
   },
   "SideKick/Views/Root/ContentView.swift": {

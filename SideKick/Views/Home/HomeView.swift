@@ -40,6 +40,9 @@ struct HomeView: View {
     @State private var expirationClock = Date.now
     @State private var ipaPendingRemoval: ImportedIPA?
     @State private var contextRoute: HomeContextRoute?
+    @State private var selectedGuestID: String?
+    @State private var sourceGuestID: String?
+    @State private var liveContainerError: String?
     @Environment(AppEnvironment.self) private var environment
     @Environment(\.scenePhase) private var scenePhase
 
@@ -234,7 +237,11 @@ struct HomeView: View {
                 }
 
                 if !environment.liveContainerState.connections.isEmpty || !guestApps.isEmpty {
-                    LiveContainerLibrarySection()
+                    LiveContainerLibrarySection(
+                        selectedGuestID: $selectedGuestID,
+                        sourceGuestID: $sourceGuestID,
+                        actionError: $liveContainerError
+                    )
                 }
 
                 if !filteredImportedApps.isEmpty {
@@ -282,6 +289,15 @@ struct HomeView: View {
             .navigationDestination(item: $contextRoute) { route in
                 contextDestination(route)
             }
+            .navigationDestination(item: $selectedGuestID) { id in
+                LiveContainerGuestDetailView(guestID: id)
+            }
+            .navigationDestination(item: $sourceGuestID) { id in
+                if let guest = guestApps.first(where: { $0.id == id }) {
+                    GitHubUpdateSettingsView(target: guest.updateTarget)
+                }
+            }
+            .messageAlert("LiveContainer", message: $liveContainerError)
             .confirmationDialog(
                 "Remove \(ipaPendingRemoval?.name ?? "IPA")?",
                 isPresented: Binding(get: { ipaPendingRemoval != nil }, set: { if !$0 { ipaPendingRemoval = nil } }),

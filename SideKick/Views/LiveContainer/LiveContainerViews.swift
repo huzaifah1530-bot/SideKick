@@ -2,13 +2,14 @@ import SwiftUI
 import UIKit
 import UniformTypeIdentifiers
 
+/// Guest rows for My Apps. Navigation and alerts live on the parent List: attaching them to a
+/// `Section` turns the whole section into a single row, so every guest would lift and push together.
 struct LiveContainerLibrarySection: View {
     @Environment(AppEnvironment.self) private var environment
-    @State private var selectedGuestID: String?
-    @State private var isShowingGuestDetail = false
+    @Binding var selectedGuestID: String?
+    @Binding var sourceGuestID: String?
+    @Binding var actionError: String?
     @State private var workingGuestID: String?
-    @State private var actionError: String?
-    @State private var sourceGuestID: String?
     private var state: LiveContainerState { environment.liveContainerState }
     private var message: String? { environment.liveContainerLoadError }
 
@@ -70,19 +71,6 @@ struct LiveContainerLibrarySection: View {
                 }
             }
         } header: { Text("LiveContainer") }
-        .navigationDestination(isPresented: $isShowingGuestDetail) {
-            if let selectedGuestID {
-                LiveContainerGuestDetailView(guestID: selectedGuestID)
-            }
-        }
-        .navigationDestination(item: $sourceGuestID) { id in
-            if let guest = state.apps.first(where: { $0.id == id }) {
-                GitHubUpdateSettingsView(target: guest.updateTarget)
-            }
-        }
-        .alert("LiveContainer", isPresented: Binding(get: { actionError != nil }, set: { if !$0 { actionError = nil } })) {
-            SwiftUI.Button("OK", role: .cancel) { actionError = nil }
-        } message: { Text(actionError ?? "") }
     }
 
     @ViewBuilder
@@ -99,7 +87,6 @@ struct LiveContainerLibrarySection: View {
             if hasUpdate {
                 SwiftUI.Button {
                     selectedGuestID = app.id
-                    isShowingGuestDetail = true
                 } label: {
                     Label("Review Update", systemImage: "arrow.down.circle")
                 }
@@ -484,72 +471,127 @@ struct LiveContainerGuestDetailView: View {
         List {
             if let guest {
                 Section {
-                    HStack(spacing: 16) {
-                        LiveContainerGuestIcon(data: guest.iconData).frame(width: 76, height: 76)
-                        VStack(alignment: .leading) {
-                            Text(guest.name).font(.title3.bold())
-                            Text("\(guest.version) · Build \(guest.build)").foregroundStyle(.secondary)
+                    DetailHeader(
+                        iconData: guest.iconData,
+                        title: guest.name,
+                        subtitle: guest.build == guest.version ? guest.version : "\(guest.version) (\(guest.build))"
+                    ) {
+                        guestBadge(guest)
+                    }
+                    HStack(spacing: Spacing.s) {
+                        SwiftUI.Button { Task { await launch() } } label: {
+                            ActionLabel("Open", isWorking: working && !isCheckingUpdates)
                         }
-                    }.padding(.vertical, 8)
+                        .primaryActionStyle()
+                        .disabled(working || !canLaunch(guest))
+
+                        if configuration != nil {
+                            SwiftUI.Button { Task { await checkUpdates() } } label: {
+                                ActionLabel("Check", systemImage: "arrow.clockwise", isWorking: isCheckingUpdates)
+                            }
+                            .secondaryActionStyle()
+                            .tint(.sideKickAccent)
+                            .disabled(working || isCheckingUpdates || !canCheckUpdates)
+                        }
+                    }
+                    .padding(.top, Spacing.xs)
                 }
+                .listRowBackground(Color.clear)
+                .listRowInsets(EdgeInsets(top: Spacing.xs, leading: Spacing.m, bottom: Spacing.xs, trailing: Spacing.m))
+                .listRowSeparator(.hidden)
+
+                if let warning = guest.warning ?? connection?.error {
+                    Section {
+                        Label(warning, systemImage: "exclamationmark.triangle.fill")
+                            .foregroundStyle(.orange)
+                        NavigationLink { LiveContainerConnectionsView() } label: {
+                            Text("Reconnect Folder")
+                        }
+                    }
+                }
+
                 if let candidate {
                     updateReviewSection(for: guest, candidate: candidate)
                 }
+
                 Section {
-                    SwiftUI.Button { Task { await launch() } } label: { Label("Open in LiveContainer", systemImage: "play.circle") }
-                        .disabled(working || connection?.isConnected != true || connection?.storageKind == .snapshot || !guest.isAvailable || guest.warning != nil)
-                    if let connection {
-                        SwiftUI.Button { Task { await openContainer(connection) } } label: { Label("Open LiveContainer", systemImage: "square.stack.3d.up") }
-                    }
-                } footer: { Text("SideKick requests a launch. LiveContainer handles authentication, JIT, and errors; accepting a URL does not confirm that the guest started.") }
-                Section("GitHub Updates") {
                     NavigationLink { GitHubUpdateSettingsView(target: guest.updateTarget) } label: {
-                        Label("Update Source & Installed Build", systemImage: "chevron.left.forwardslash.chevron.right")
+                        VStack(alignment: .leading, spacing: 2) {
+                            Label("GitHub Updates", systemImage: "arrow.down.app")
+                            if configuration != nil {
+                                Text(hasChecked ? checkState.message : "Tap Check to look for newer builds.")
+                                    .font(.subheadline)
+                                    .foregroundStyle(.secondary)
+                                    .lineLimit(2)
+                            }
+                        }
                     }
                     .disabled(isBeingForgotten)
-                    SwiftUI.Button { Task { await checkUpdates() } } label: { Label("Check for Updates", systemImage: "arrow.clockwise") }
-                        .disabled(working || isCheckingUpdates || !canCheckUpdates)
-                    if isBeingForgotten {
-                        Label(updateEligibilityMessage, systemImage: "exclamationmark.triangle")
-                            .font(.footnote)
-                            .foregroundStyle(.orange)
-                    }
                     if let configuration {
                         LiveContainerInstalledBuildDisclosure(configuration: configuration)
                             .id(configuration.sourceIdentity + "\n" + (configuration.effectiveBaselineKey ?? ""))
-                        if configuration.source == .actionsArtifact {
-                            Text("Actions builds require a GitHub token with Actions: read access to this repository. For private repositories, include the repository and ensure the organization has approved the token. Choose or add a token in Update Source & Installed Build.")
-                                .font(.footnote).foregroundStyle(.secondary)
-                        }
                     }
-                    if let candidate {
-                        if let url = URL(string: candidate.repositoryURL ?? "https://github.com") {
-                            Link(destination: url) { Label("View on GitHub", systemImage: "arrow.up.right.square") }
-                        }
-                    } else if configuration != nil { Text(hasChecked ? checkState.message : "Check this source for newer builds.").foregroundStyle(.secondary) }
-                    if isCheckingUpdates { ProgressView("Checking for updates…") }
-                    else if working { ProgressView() }
-                }
-                Section("LiveContainer Details") {
-                    LabeledContent("Bundle ID", value: guest.bundleIdentifier).textSelection(.enabled)
-                    LabeledContent("App folder", value: guest.folder).textSelection(.enabled)
-                    LabeledContent("Last seen", value: guest.lastSeen.formatted())
-                    LabeledContent("Connection", value: connection?.name ?? "Missing")
-                    if let connection { LabeledContent("Storage", value: connection.storageKind.title) }
-                    if let warning = guest.warning { Text(warning).foregroundStyle(.orange) }
-                    if let error = connection?.error { Text(error).foregroundStyle(.orange) }
-                    NavigationLink { LiveContainerConnectionsView() } label: { Label("Connection & Rescan", systemImage: "folder") }
-                    if !guest.isAvailable {
-                        SwiftUI.Button("Remove Cached Guest", role: .destructive) {
-                            confirmingGuestRemoval = true
-                        }
-                        .disabled(working || isCheckingUpdates)
+                } footer: {
+                    if isBeingForgotten {
+                        Text(updateEligibilityMessage)
+                    } else if configuration?.source == .actionsArtifact {
+                        Text("Actions builds need a GitHub token with Actions read access.")
+                    } else if configuration == nil {
+                        Text("Track a GitHub repository for new builds of this app.")
                     }
                 }
-            } else { ContentUnavailableView("Guest Not Found", systemImage: "app.dashed") }
+
+                Section {
+                    DisclosureGroup("Details") {
+                        LabeledContent("Bundle ID", value: guest.bundleIdentifier).textSelection(.enabled)
+                        LabeledContent("App folder", value: guest.folder).textSelection(.enabled)
+                        LabeledContent("Folder", value: connection?.name ?? "Missing")
+                        if let connection { LabeledContent("Storage", value: connection.storageKind.title) }
+                        LabeledContent("Last seen", value: guest.lastSeen.formatted(date: .abbreviated, time: .shortened))
+                    }
+                }
+            } else { ContentUnavailableView("App Not Found", systemImage: "app.dashed") }
         }
-        .navigationTitle(guest?.name ?? "LiveContainer Guest")
+        .listStyle(.insetGrouped)
+        .navigationTitle(guest?.name ?? "LiveContainer App")
         .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            if let guest {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Menu {
+                        Section {
+                            if let connection {
+                                SwiftUI.Button { Task { await openContainer(connection) } } label: {
+                                    Label("Open LiveContainer", systemImage: "square.stack.3d.up")
+                                }
+                            }
+                            if let candidate, let url = URL(string: candidate.repositoryURL ?? "") {
+                                Link(destination: url) { Label("View on GitHub", systemImage: "safari") }
+                            }
+                        }
+                        Section {
+                            NavigationLink { LiveContainerConnectionsView() } label: {
+                                Label("Manage Folder", systemImage: "folder")
+                            }
+                            SwiftUI.Button { UIPasteboard.general.string = guest.bundleIdentifier } label: {
+                                Label("Copy Bundle ID", systemImage: "doc.on.doc")
+                            }
+                        }
+                        if !guest.isAvailable {
+                            Section {
+                                SwiftUI.Button(role: .destructive) { confirmingGuestRemoval = true } label: {
+                                    Label("Remove from SideKick…", systemImage: "trash")
+                                }
+                                .disabled(working || isCheckingUpdates)
+                            }
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                    }
+                    .accessibilityLabel("More")
+                }
+            }
+        }
         .task { await reload(); await checkUpdates() }
         .onReceive(NotificationCenter.default.publisher(for: .sideKickLiveContainerDidChange)) { _ in
             Task { await reloadAfterCatalogueChange() }
@@ -582,6 +624,23 @@ struct LiveContainerGuestDetailView: View {
         }
     }
 
+    private func canLaunch(_ guest: LiveContainerGuest) -> Bool {
+        connection?.isConnected == true && connection?.storageKind != .snapshot && guest.isAvailable && guest.warning == nil
+    }
+
+    @ViewBuilder
+    private func guestBadge(_ guest: LiveContainerGuest) -> some View {
+        if !guest.isAvailable {
+            StatusBadge(title: "Unavailable", systemImage: "exclamationmark.triangle.fill", tone: .warning)
+        } else if let candidate, candidate.isKnownNewer {
+            StatusBadge(title: "Update available", systemImage: "arrow.down.circle.fill", tone: .accent)
+        } else if connection?.isConnected != true || connection?.error != nil {
+            StatusBadge(title: "Folder disconnected", systemImage: "folder.badge.questionmark", tone: .warning)
+        } else {
+            StatusBadge(title: "In LiveContainer", systemImage: "square.stack.3d.up.fill", tone: .neutral)
+        }
+    }
+
     private func updateReviewSection(for guest: LiveContainerGuest, candidate: GitHubUpdateCandidate) -> some View {
         Section {
             LabeledContent("Installed", value: "\(guest.version) (\(guest.build))")
@@ -596,27 +655,25 @@ struct LiveContainerGuestDetailView: View {
                 isSkipDisabled: working || isCheckingUpdates
             ) {
                 SwiftUI.Button { Task { await updateInLiveContainer(candidate) } } label: {
-                    Label("Send to LiveContainer", systemImage: "square.and.arrow.up")
-                        .fontWeight(.semibold)
+                    ActionLabel("Send to LiveContainer", systemImage: "square.and.arrow.up")
                 }
-                .buttonStyle(.plain)
+                .primaryActionStyle()
             }
             if canConfirmInstalledBuild {
                 SwiftUI.Button { markingInstalled = true } label: {
-                    Label("I Installed This Build", systemImage: "checkmark.circle")
+                    Label("I’ve Installed This Build", systemImage: "checkmark.circle")
                 }
-                .foregroundStyle(.green)
                 .disabled(working || isCheckingUpdates)
             }
             if !canCheckUpdates {
-                Label(updateEligibilityMessage, systemImage: "exclamationmark.triangle")
+                Label(updateEligibilityMessage, systemImage: "exclamationmark.triangle.fill")
                     .font(.footnote)
                     .foregroundStyle(.orange)
             }
         } header: {
-            Text(candidate.isKnownNewer ? "Update Available" : "Review Build")
+            Text(candidate.isKnownNewer ? "Update" : "Build to Review")
         } footer: {
-            Text("Download the IPA, send it to LiveContainer, then confirm only after installation finishes.")
+            Text("Download, send to LiveContainer, then confirm once it’s installed.")
         }
     }
 
@@ -993,16 +1050,6 @@ private struct LiveContainerInstalledBuildDisclosure: View {
             Text(value).font(.body).fixedSize(horizontal: false, vertical: true)
         }
         .accessibilityElement(children: .combine)
-    }
-}
-
-private struct LiveContainerGuestIcon: View {
-    let data: Data?
-    var body: some View {
-        Group {
-            if let data, let image = UIImage(data: data) { Image(uiImage: image).resizable().scaledToFit() }
-            else { Image(systemName: "app.fill").resizable().scaledToFit().padding(12).foregroundStyle(.white).background(Color.sideKickAccent.gradient) }
-        }.clipShape(.rect(cornerRadius: 12))
     }
 }
 
