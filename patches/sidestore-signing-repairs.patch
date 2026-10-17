@@ -70,12 +70,22 @@
          infoDictionary[kCFBundleIdentifierKey as String] = newBundleID
  
          // Fix-up BGTaskScheduler identifiers so they stay under the new bundle ID.
-@@ -190,7 +204,21 @@
+@@ -190,7 +204,31 @@
      
      private func resignAppBundle(at fileURL: URL, team: ALTTeam, certificate: ALTCertificate, profiles: [ALTProvisioningProfile]) async throws -> URL {
          let signer = ALTSigner(team: team, certificate: certificate)
 -        try await signer.signApp(at: fileURL, provisioningProfiles: profiles, progress: nil)
 +        var requiredAppGroups: [String: [String]] = [:]
++        if let app = ALTApplication(fileURL: fileURL), app.executableName == "SideBackup" {
++            let grants = profiles.first(where: { $0.bundleIdentifier == app.bundleIdentifier })?.entitlements[.appGroups] as? [String] ?? []
++            guard let expected = app.infoPlist["SideKickBackupAppGroup"] as? String,
++                  expected == Bundle.main.altstoreAppGroup, grants.contains(expected) else {
++                throw OperationError.invalidParameters("The restore helper's signing profile must grant SideKick's existing shared backup group. Use the same signing team. The backup and installed app have not been changed.")
++            }
++            // Preparation removes the old signature. Restore its exact authorized request
++            // under the helper's adopted app ID, without granting it to unrelated apps.
++            requiredAppGroups[app.bundleIdentifier] = [expected]
++        }
 +        if let app = ALTApplication(fileURL: fileURL), self.context.targetAppBundle?.isAltStoreApp == true || app.isAltStoreApp {
 +            let grants = profiles.first(where: { $0.bundleIdentifier == app.bundleIdentifier })?.entitlements[.appGroups] as? [String] ?? []
 +            let expected = app.bundleIdentifier == Bundle.Info.activeBundleIdentifier ? Bundle.main.altstoreAppGroup : nil

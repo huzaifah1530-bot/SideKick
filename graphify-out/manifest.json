@@ -3940,5 +3940,11 @@
     "seen": 1792230234.0431995,
     "ast_hash": "9104152835e7f1cb01e11ce5b8ddf2d0",
     "semantic_hash": ""
+  },
+  "Tests/ReleaseManifest/test_restore_helper_signing.py": {
+    "mtime": 1792231442.1736562,
+    "seen": 1792231523.0829191,
+    "ast_hash": "ebabdb4c3583e4177aae396c6c3b34ea",
+    "semantic_hash": ""
   }
 }

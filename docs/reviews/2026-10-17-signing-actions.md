@@ -16,6 +16,12 @@ Source recognition and the backup-group base now also recognize canonical `com.s
 
 ## Verification and limits
 
+### Offloaded-app restore helper follow-up
+
+The restore screenshot fails at the post-sign helper check, before installation. The helper adopts the restored app's ID, so the manager-only explicit group request did not cover it. After preparation removes its old signature, the signer's source-entitlement filter can remove App Groups even though provisioning granted the shared group. The helper now explicitly requests its staged backup group under its adopted bundle ID. The request must equal the running host's group and be granted by that exact bundle's profile. SideSign still validates the grant and the post-sign helper check remains intact. No backup files or app records are removed. The same staged helper is used for offloading and restoring.
+
+A regression fixture reproduces missing source entitlements and tests the production helper request, missing/wrong profiles, mismatched metadata and unrelated executables. Windows runs composition and structural checks; execution of the extracted Swift logic requires macOS CI. An offload/restore round trip with Spotify, including its existing data and shared containers, still requires a physical device.
+
 Regression coverage composes the patches against pinned upstream revisions. macOS fixtures execute the actual extension mapping, final identifier validation, request normalization, signer filtering, and post-sign guard. Cases include unsigned and already signed sources, custom targets, stale mappings, duplicate IDs, retained sources missing App Groups, unauthorized groups, unrelated apps, and preservation of other requests. The existing packaged-IPA checks remain in the build.
 
 Windows checks cannot verify Apple provisioning or iPhone installation. Device confirmation must re-sign LiveContainer with its retained extensions and re-sign SideKick using the existing account, checking that backup access and app data remain intact. A profile without the required App Group, or a different signing team, cannot be bypassed.
