@@ -78,7 +78,7 @@ class IntegrationPatchTests(unittest.TestCase):
                     subprocess.run([compiler, "-frontend", "-parse", str(checkout / relative)], check=True)
             result = subprocess.run([sys.executable, str(ROOT / "scripts/integrate-backup-helper.py"), str(checkout)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
-            patch_path.write_bytes((ROOT / 'patches/sidestore-signing-repairs.patch').read_bytes())
+            patch_path.write_bytes((ROOT / 'patches/sidestore-signing-repairs.patch').read_text(encoding='utf-8').encode('utf-8'))
             result = subprocess.run(['git', '-C', str(checkout), 'apply', str(patch_path)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             stage = (checkout / "SideStore/Core/Operations/PipelineOperations/StageBackupAppOperation.swift").read_text()
@@ -209,7 +209,8 @@ precondition(accepts([], isStore: false)) // unrelated apps need no store group
                     target = dependency / signing_path
                     target.parent.mkdir(parents=True, exist_ok=True)
                     target.write_bytes(subprocess.check_output(['git', '-C', str(ROOT / 'Vendor/SideStore' / relative), 'show', 'HEAD:' + signing_path]))
-                    result = subprocess.run(['git', '-C', str(dependency), 'apply', str(ROOT / 'patches/sidesign-required-app-groups.patch')], capture_output=True, text=True)
+                    patch_path.write_bytes((ROOT / 'patches/sidesign-required-app-groups.patch').read_text(encoding='utf-8').encode('utf-8'))
+                    result = subprocess.run(['git', '-C', str(dependency), 'apply', str(patch_path)], capture_output=True, text=True)
                     self.assertEqual(result.returncode, 0, result.stderr)
             delegate = (checkout / "AltStore/AppDelegate.swift").read_text(encoding="utf-8")
             begin = delegate.index("private func prepareForBackgroundFetch()")

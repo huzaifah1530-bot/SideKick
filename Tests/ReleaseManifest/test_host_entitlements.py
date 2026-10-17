@@ -25,7 +25,9 @@ class HostEntitlementTests(unittest.TestCase):
             path.parent.mkdir(parents=True)
             path.write_bytes(subprocess.check_output(['git', '-C', str(ROOT / 'Vendor/SideStore/Dependencies/SideSign'), 'show', 'HEAD:' + relative]))
             subprocess.run(['git', 'init', '--quiet', str(root)], check=True)
-            subprocess.run(['git', '-C', str(root), 'apply', str(ROOT / 'patches/sidesign-required-app-groups.patch')], check=True)
+            patch_path = root / 'required-groups.patch'
+            patch_path.write_bytes((ROOT / 'patches/sidesign-required-app-groups.patch').read_text(encoding='utf-8').encode('utf-8'))
+            subprocess.run(['git', '-C', str(root), 'apply', str(patch_path)], check=True)
             return path.read_text()
 
     def test_required_groups_are_scoped_to_a_bundle_and_checked_against_its_profile(self):
