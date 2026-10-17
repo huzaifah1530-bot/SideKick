@@ -1,15 +1,19 @@
 --- a/Sources/CodeSigning/CodeSignerAPI.swift
 +++ b/Sources/CodeSigning/CodeSignerAPI.swift
-@@ -60,7 +60,7 @@
+@@ -60,7 +60,11 @@
          self.keyStore = keyStore
      }
  
 -    public func signApp(at appURL: URL, provisioningProfiles profiles: [ProvisioningProfile], progress: Progress? = nil) async throws
-+    public func signApp(at appURL: URL, provisioningProfiles profiles: [ProvisioningProfile], progress: Progress? = nil, requiredAppGroups: [String: [String]] = [:]) async throws
++    public func signApp(at appURL: URL, provisioningProfiles profiles: [ProvisioningProfile], progress: Progress? = nil) async throws {
++        try await signApp(at: appURL, provisioningProfiles: profiles, progress: progress, requiredAppGroups: [:])
++    }
++
++    public func signApp(at appURL: URL, provisioningProfiles profiles: [ProvisioningProfile], progress: Progress? = nil, requiredAppGroups: [String: [String]]) async throws
      {
          debugLog("[SideSign] AppBundleSigner.signApp called")
          verboseLog("[SideSign] URL: \(appURL.path), Profiles: \(profiles.map { "\($0.name) (\($0.bundleIdentifier))" })")
-@@ -95,7 +95,15 @@
+@@ -95,7 +99,15 @@
              var filteredEntitlements = matchedProfile.entitlements
              verboseLog("[SideSign] Original profile entitlements: \(filteredEntitlements)")
  

@@ -33,6 +33,8 @@ class HostEntitlementTests(unittest.TestCase):
         self.assertIn('requiredAppGroups[app.bundleIdentifier]', signer)
         self.assertIn('requestedGroups.allSatisfy({ grantedGroups.contains($0) })', signer)
         self.assertIn('applicationEntitlements[groupKey] = requestedGroups', signer)
+        original_api = 'public func signApp(at appURL: URL, provisioningProfiles profiles: [ProvisioningProfile], progress: Progress? = nil) async throws'
+        self.assertIn(original_api, signer, 'Keep the original CodeSignerAPI protocol entry point')
         workflow = (ROOT / '.github/workflows/ios-build.yml').read_text()
         self.assertIn('patches/sidesign-required-app-groups.patch', workflow)
 
