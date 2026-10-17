@@ -7,8 +7,7 @@ enum DatabaseStartupState: Equatable {
     case failed(String)
 }
 
-@MainActor
-struct RefreshActivity: Equatable {
+struct RefreshActivity: Equatable, Sendable {
     var title: String
     var completed: Int
     var total: Int
@@ -16,6 +15,7 @@ struct RefreshActivity: Equatable {
     var fraction: Double { total > 0 ? Double(completed) / Double(total) : 0 }
 }
 
+@MainActor
 @Observable
 final class AppEnvironment {
     let ipaImportStore: IPAImportStore
