@@ -98,7 +98,9 @@ class IntegrationPatchTests(unittest.TestCase):
             self.assertIn('appbundleIdentifier = Bundle.activeBundle.bundleIdentifier', shared)
             self.assertIn('baseAltStoreAppGroupID = "group.com.sidekick.app"', shared)
             self.assertIn('self == "com.sidekick.app"', shared)
-            self.assertIn('resignedAppBundle.executableName == "SideBackup"', signing)
+            self.assertIn('resignedAppBundle.infoPlist["CFBundleExecutable"] as? String == "SideBackup"', signing)
+            # Bundle(url:) is cached per path; restore re-stages the original app at the helper's App.app.
+            self.assertNotIn('executableName == "SideBackup"', signing)
             self.assertIn(').contains(expected)', signing)
             self.assertIn('if resignedAppBundle.isAltStoreApp {', signing)
             self.assertIn('existingGroup.map({ groups.contains($0) }) ?? true', signing)

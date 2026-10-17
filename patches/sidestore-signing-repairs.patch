@@ -70,13 +70,15 @@
          infoDictionary[kCFBundleIdentifierKey as String] = newBundleID
  
          // Fix-up BGTaskScheduler identifiers so they stay under the new bundle ID.
-@@ -190,7 +204,31 @@
+@@ -190,7 +204,33 @@
      
      private func resignAppBundle(at fileURL: URL, team: ALTTeam, certificate: ALTCertificate, profiles: [ALTProvisioningProfile]) async throws -> URL {
          let signer = ALTSigner(team: team, certificate: certificate)
 -        try await signer.signApp(at: fileURL, provisioningProfiles: profiles, progress: nil)
 +        var requiredAppGroups: [String: [String]] = [:]
-+        if let app = ALTApplication(fileURL: fileURL), app.executableName == "SideBackup" {
++        // Read the executable from the current Info.plist. Foundation caches Bundle per path,
++        // and restore re-stages the original app at the same App.app path the helper used.
++        if let app = ALTApplication(fileURL: fileURL), app.infoPlist["CFBundleExecutable"] as? String == "SideBackup" {
 +            let grants = profiles.first(where: { $0.bundleIdentifier == app.bundleIdentifier })?.entitlements[.appGroups] as? [String] ?? []
 +            guard let expected = app.infoPlist["SideKickBackupAppGroup"] as? String,
 +                  expected == Bundle.main.altstoreAppGroup, grants.contains(expected) else {

@@ -1,3950 +1,3950 @@
 {
   "Package.swift": {
-    "mtime": 1792230161.614787,
-    "seen": 1792230234.042396,
+    "mtime": 1792241119.794292,
+    "seen": 1792242270.2952032,
     "ast_hash": "5929d48cd291ee6d1a377abe1ed1346b",
     "semantic_hash": ""
   },
   "SideKickVPN/CIDRValidator.swift": {
-    "mtime": 1792230161.6624644,
-    "seen": 1792230234.0424023,
+    "mtime": 1792241119.8514602,
+    "seen": 1792242270.29521,
     "ast_hash": "5f2c93c5c39c20881f24c6ea000f11cd",
     "semantic_hash": ""
   },
   "SideKickVPN/PacketTunnelProvider.swift": {
-    "mtime": 1792230161.6642945,
-    "seen": 1792230234.0424054,
+    "mtime": 1792241119.854402,
+    "seen": 1792242270.295213,
     "ast_hash": "5e558d0ba99c57ebb77948faa7ccfbc0",
     "semantic_hash": ""
   },
   "SideKickVPN/TunnelConstants.swift": {
-    "mtime": 1792230161.6653006,
-    "seen": 1792230234.0424073,
+    "mtime": 1792241119.8554082,
+    "seen": 1792242270.295215,
     "ast_hash": "f925b94a5c074478447da919a420073e",
     "semantic_hash": ""
   },
   "SideKick/App/AppEnvironment.swift": {
-    "mtime": 1792230161.617461,
-    "seen": 1792230234.0424092,
+    "mtime": 1792241119.794292,
+    "seen": 1792242270.295217,
     "ast_hash": "017ce06f0416dad27d47fd8b306faf34",
     "semantic_hash": ""
   },
   "SideKick/App/SideKickApp.swift": {
-    "mtime": 1792230161.6181455,
-    "seen": 1792230234.0424106,
+    "mtime": 1792241119.794292,
+    "seen": 1792242270.2952187,
     "ast_hash": "a6937a0e15a09b2da25d1eb81844a9f5",
     "semantic_hash": ""
   },
   "SideKick/Components/FullWidthListSeparators.swift": {
-    "mtime": 1792230161.6202927,
-    "seen": 1792230234.042412,
+    "mtime": 1792241119.799729,
+    "seen": 1792242270.2952201,
     "ast_hash": "06a2f59f78b795051dd53b415d100127",
     "semantic_hash": ""
   },
   "SideKick/Components/ImportedIPARow.swift": {
-    "mtime": 1792230181.2513773,
-    "seen": 1792230234.0424135,
+    "mtime": 1792241119.799729,
+    "seen": 1792242270.2952216,
     "ast_hash": "849d770e390f2069689c655c7013fd4c",
     "semantic_hash": ""
   },
   "SideKick/DesignSystem/SideKickTheme.swift": {
-    "mtime": 1792230181.2523787,
-    "seen": 1792230234.042415,
+    "mtime": 1792241119.799729,
+    "seen": 1792242270.2952228,
     "ast_hash": "ceca61c051e3cb2b3eb7dc1cf74f07c9",
     "semantic_hash": ""
   },
   "SideKick/Models/GitHubBuildTracking.swift": {
-    "mtime": 1792230161.6236198,
-    "seen": 1792230234.0424166,
+    "mtime": 1792241119.799729,
+    "seen": 1792242270.2952247,
     "ast_hash": "e43973b919c2fa7e229d0c56dacfe68f",
     "semantic_hash": ""
   },
   "SideKick/Models/GitHubUpdateConfiguration.swift": {
-    "mtime": 1792230161.6239674,
-    "seen": 1792230234.042418,
+    "mtime": 1792241119.799729,
+    "seen": 1792242270.2952259,
     "ast_hash": "eee766f2a8e200fc2c9ed6701a7258b8",
     "semantic_hash": ""
   },
   "SideKick/Models/ImportedIPA.swift": {
-    "mtime": 1792230161.6239674,
-    "seen": 1792230234.0424192,
+    "mtime": 1792241119.805156,
+    "seen": 1792242270.2952273,
     "ast_hash": "3a02a2c9d97bdc23f11e4765f6255a60",
     "semantic_hash": ""
   },
   "SideKick/Models/LiveContainerModels.swift": {
-    "mtime": 1792230161.6255374,
-    "seen": 1792230234.0424204,
+    "mtime": 1792241119.805156,
+    "seen": 1792242270.2952287,
     "ast_hash": "f7ad6c2f2223efa27cd84a774fcdbe91",
     "semantic_hash": ""
   },
   "SideKick/Services/AnisetteConfiguration.swift": {
-    "mtime": 1792230161.6255374,
-    "seen": 1792230234.0424216,
+    "mtime": 1792241119.805156,
+    "seen": 1792242270.29523,
     "ast_hash": "050e08352fc631bdebd0f37366ce386f",
     "semantic_hash": ""
   },
   "SideKick/Services/AppSharingService.swift": {
-    "mtime": 1792230161.6291318,
-    "seen": 1792230234.0424256,
+    "mtime": 1792241119.805156,
+    "seen": 1792242270.2952332,
     "ast_hash": "a3c2f7a81092c77b1eaeed76e839ea8a",
     "semantic_hash": ""
   },
   "SideKick/Services/DailyRefreshShortcut.swift": {
-    "mtime": 1792230161.6291318,
-    "seen": 1792230234.0424268,
+    "mtime": 1792241119.805156,
+    "seen": 1792242270.295235,
     "ast_hash": "ca8b998ea3d17470e6d54d9077895185",
     "semantic_hash": ""
   },
   "SideKick/Services/ExpirationNotificationScheduler.swift": {
-    "mtime": 1792230161.6311376,
-    "seen": 1792230234.0424306,
+    "mtime": 1792241119.8099637,
+    "seen": 1792242270.2952387,
     "ast_hash": "9ea9f45ba2a3578dd0e68318a56162fc",
     "semantic_hash": ""
   },
   "SideKick/Services/GitHubCredentialStore.swift": {
-    "mtime": 1792230161.6311376,
-    "seen": 1792230234.042432,
+    "mtime": 1792241119.8107958,
+    "seen": 1792242270.2952402,
     "ast_hash": "2a7fd7afb51e9a6705a69fc9ba641044",
     "semantic_hash": ""
   },
   "SideKick/Services/GitHubDiagnosticsStore.swift": {
-    "mtime": 1792230161.6311376,
-    "seen": 1792230234.0424333,
+    "mtime": 1792241119.8107958,
+    "seen": 1792242270.2952414,
     "ast_hash": "1fb17424f147c4ffe6574e458ac5b73f",
     "semantic_hash": ""
   },
   "SideKick/Services/GitHubHistoryClient.swift": {
-    "mtime": 1792230161.6321373,
-    "seen": 1792230234.0424345,
+    "mtime": 1792241119.8107958,
+    "seen": 1792242270.295243,
     "ast_hash": "fe16e19b1b4403b2f9000afcc76fe1b0",
     "semantic_hash": ""
   },
   "SideKick/Services/GitHubHistoryStore.swift": {
-    "mtime": 1792230161.6321373,
-    "seen": 1792230234.042436,
+    "mtime": 1792241119.8107958,
+    "seen": 1792242270.2952445,
     "ast_hash": "0186cd59e1ec87b3a958ebe0e94572c8",
     "semantic_hash": ""
   },
   "SideKick/Services/GitHubUpdateConfigurationStore.swift": {
-    "mtime": 1792230161.6334116,
-    "seen": 1792230234.0424373,
+    "mtime": 1792241119.8107958,
+    "seen": 1792242270.295247,
     "ast_hash": "84dca5d75a64bb7a6d1fdf4adcca5e09",
     "semantic_hash": ""
   },
   "SideKick/Services/GitHubUpdateDiscovery.swift": {
-    "mtime": 1792230161.6334116,
-    "seen": 1792230234.0424385,
+    "mtime": 1792241119.8107958,
+    "seen": 1792242270.2952497,
     "ast_hash": "f30f613678a27a1bf6a09136b8dfa66a",
     "semantic_hash": ""
   },
   "SideKick/Services/GitHubUpdateDownloadStore.swift": {
-    "mtime": 1792230161.6344185,
-    "seen": 1792230234.0424397,
+    "mtime": 1792241119.8107958,
+    "seen": 1792242270.2952542,
     "ast_hash": "043986c3cf4543645d1d25f58e9a0973",
     "semantic_hash": ""
   },
   "SideKick/Services/GitHubUpdateNotificationScheduler.swift": {
-    "mtime": 1792230161.6344185,
-    "seen": 1792230234.042441,
+    "mtime": 1792241119.8107958,
+    "seen": 1792242270.2952585,
     "ast_hash": "d0386984a2bb3a810b183455251c6a3c",
     "semantic_hash": ""
   },
   "SideKick/Services/GitHubUpdateScanner.swift": {
-    "mtime": 1792230161.635417,
-    "seen": 1792230234.0424423,
+    "mtime": 1792241119.8107958,
+    "seen": 1792242270.2952614,
     "ast_hash": "2e857097857bc2a0191fff7a3f487fad",
     "semantic_hash": ""
   },
   "SideKick/Services/GitHubUpdateService.swift": {
-    "mtime": 1792230161.6362221,
-    "seen": 1792230234.0424435,
+    "mtime": 1792241119.8163583,
+    "seen": 1792242270.2952642,
     "ast_hash": "ecc9985555901e0713b30401698f489d",
     "semantic_hash": ""
   },
   "SideKick/Services/IPAImportStore.swift": {
-    "mtime": 1792230161.6369317,
-    "seen": 1792230234.0424447,
+    "mtime": 1792241119.8163583,
+    "seen": 1792242270.295267,
     "ast_hash": "142c6fa5c6621169caf7119724519b74",
     "semantic_hash": ""
   },
   "SideKick/Services/LiveContainerScanner.swift": {
-    "mtime": 1792230161.6369317,
-    "seen": 1792230234.0424461,
+    "mtime": 1792241119.8163583,
+    "seen": 1792242270.2952702,
     "ast_hash": "d14f55a5114fa88bf7f1fc8aef1f2c17",
     "semantic_hash": ""
   },
   "SideKick/Services/LiveContainerStore.swift": {
-    "mtime": 1792230161.6379366,
-    "seen": 1792230234.0424476,
+    "mtime": 1792241119.8163583,
+    "seen": 1792242270.2952733,
     "ast_hash": "2f48c275763f87901c5220630bb2e071",
     "semantic_hash": ""
   },
   "SideKick/Services/LocalVPNService.swift": {
-    "mtime": 1792230161.6379366,
-    "seen": 1792230234.0424488,
+    "mtime": 1792241119.8163583,
+    "seen": 1792242270.2952757,
     "ast_hash": "8dea229414cad47fe97ed6765d30cac4",
     "semantic_hash": ""
   },
   "SideKick/Services/PairingSetupImporter.swift": {
-    "mtime": 1792230161.6389363,
-    "seen": 1792230234.04245,
+    "mtime": 1792241119.8163583,
+    "seen": 1792242270.295277,
     "ast_hash": "d77df88245c050157d5cbc9569cac684",
     "semantic_hash": ""
   },
   "SideKick/Services/ProgressFileDownload.swift": {
-    "mtime": 1792230161.6389363,
-    "seen": 1792230234.042451,
+    "mtime": 1792241119.8163583,
+    "seen": 1792242270.2952785,
     "ast_hash": "15ffcb17a872007f69a977e8f1ae93c5",
     "semantic_hash": ""
   },
   "SideKick/Services/SideKickCertificateExport.swift": {
-    "mtime": 1792230161.6389363,
-    "seen": 1792230234.0424523,
+    "mtime": 1792241119.8163583,
+    "seen": 1792242270.2952802,
     "ast_hash": "ef9ff3973601c3c116a70fc8cbd418f5",
     "semantic_hash": ""
   },
   "SideKick/Services/SideKickDataDirectory.swift": {
-    "mtime": 1792230161.640245,
-    "seen": 1792230234.0424535,
+    "mtime": 1792241119.8163583,
+    "seen": 1792242270.2952814,
     "ast_hash": "ca41ce8223836a7abec58cacd3e3aa00",
     "semantic_hash": ""
   },
   "SideKick/Services/SideKickLogStorage.swift": {
-    "mtime": 1792230161.6414363,
-    "seen": 1792230234.0424564,
+    "mtime": 1792241119.821058,
+    "seen": 1792242270.2952845,
     "ast_hash": "02b50da383b98ab2cb1eac350ec56c15",
     "semantic_hash": ""
   },
   "SideKick/Services/SideKickStorageCleanup.swift": {
-    "mtime": 1792230161.6414363,
-    "seen": 1792230234.0424573,
+    "mtime": 1792241119.8219528,
+    "seen": 1792242270.2952857,
     "ast_hash": "ed967e5b99e35a090d73c490dd3d07fe",
     "semantic_hash": ""
   },
   "SideKick/Services/SideKickStorageUsage.swift": {
-    "mtime": 1792230161.642436,
-    "seen": 1792230234.0424585,
+    "mtime": 1792241119.8219528,
+    "seen": 1792242270.2952876,
     "ast_hash": "c6a780d8e21e8bd6ce7d8b46f1992058",
     "semantic_hash": ""
   },
   "SideKick/Services/SideStoreOperationService.swift": {
-    "mtime": 1792230161.6434367,
-    "seen": 1792230234.04246,
+    "mtime": 1792241119.8219528,
+    "seen": 1792242270.2952888,
     "ast_hash": "a3cdb17988be6669a0df7db695a218c8",
     "semantic_hash": ""
   },
   "SideKick/Services/SigningAccountStore.swift": {
-    "mtime": 1792230161.6444366,
-    "seen": 1792230234.042461,
+    "mtime": 1792241119.8219528,
+    "seen": 1792242270.2952905,
     "ast_hash": "8bb5c5dd7e2b8d0897e2ee248c701e09",
     "semantic_hash": ""
   },
   "SideKick/Services/SigningExpiry.swift": {
-    "mtime": 1792230161.6444366,
-    "seen": 1792230234.042462,
+    "mtime": 1792241119.8219528,
+    "seen": 1792242270.295292,
     "ast_hash": "ed30159d0343054e62b67850709b6274",
     "semantic_hash": ""
   },
   "SideKick/ViewModels/HomeViewModel.swift": {
-    "mtime": 1792230161.6457908,
-    "seen": 1792230234.0424652,
+    "mtime": 1792241119.8277917,
+    "seen": 1792242270.2952948,
     "ast_hash": "39841ca7a93e1909e5f2aaea61c453db",
     "semantic_hash": ""
   },
   "SideKick/Views/Accounts/AccountsView.swift": {
-    "mtime": 1792230181.253378,
-    "seen": 1792230234.0424666,
+    "mtime": 1792241119.8287897,
+    "seen": 1792242270.2952962,
     "ast_hash": "832c9ff81bd35f6a5462953be1a885f8",
     "semantic_hash": ""
   },
   "SideKick/Views/Accounts/AppleIDSignInSheet.swift": {
-    "mtime": 1792230161.6469703,
-    "seen": 1792230234.0424678,
+    "mtime": 1792241119.8287897,
+    "seen": 1792242270.2952979,
     "ast_hash": "e161fda6ea351d1ceb647d05fddec49e",
     "semantic_hash": ""
   },
   "SideKick/Views/Components/SideKickLibraryAppRow.swift": {
-    "mtime": 1792230181.2543783,
-    "seen": 1792230234.042469,
+    "mtime": 1792241119.8287897,
+    "seen": 1792242270.2952995,
     "ast_hash": "a209484d07bb9d7b011785de6521c8ce",
     "semantic_hash": ""
   },
   "SideKick/Views/Home/HomeView.swift": {
-    "mtime": 1792230181.2543783,
-    "seen": 1792230234.042471,
+    "mtime": 1792241119.8322222,
+    "seen": 1792242270.295301,
     "ast_hash": "09dcced2e06f7c3c3cdd138b57efca12",
     "semantic_hash": ""
   },
   "SideKick/Views/Home/IPASharingViews.swift": {
-    "mtime": 1792230161.64897,
-    "seen": 1792230234.0424721,
+    "mtime": 1792241119.83323,
+    "seen": 1792242270.2953029,
     "ast_hash": "10328ee6aab6eb11f562c662d8e00d64",
     "semantic_hash": ""
   },
   "SideKick/Views/Library/AppManagementView.swift": {
-    "mtime": 1792230181.255378,
-    "seen": 1792230234.0424736,
+    "mtime": 1792241119.834129,
+    "seen": 1792242270.2953043,
     "ast_hash": "4bcaf3e50f139b4a178239bec8a2884f",
     "semantic_hash": ""
   },
   "SideKick/Views/Library/GitHubRepositoryImportView.swift": {
-    "mtime": 1792230161.6513593,
-    "seen": 1792230234.0424762,
+    "mtime": 1792241119.834129,
+    "seen": 1792242270.2953076,
     "ast_hash": "45512f553f59a9754a224097b05c80f0",
     "semantic_hash": ""
   },
   "SideKick/Views/Library/GitHubTokenPickerView.swift": {
-    "mtime": 1792230161.6513593,
-    "seen": 1792230234.0424776,
+    "mtime": 1792241119.834129,
+    "seen": 1792242270.2953088,
     "ast_hash": "06b69e4f18081d366afbf1de9b58a30a",
     "semantic_hash": ""
   },
   "SideKick/Views/Library/GitHubUpdateDetailView.swift": {
-    "mtime": 1792230181.256378,
-    "seen": 1792230234.042479,
+    "mtime": 1792241119.8377717,
+    "seen": 1792242270.2953105,
     "ast_hash": "58159a33377748fb8b283f172116264f",
     "semantic_hash": ""
   },
   "SideKick/Views/Library/GitHubUpdateSettingsView.swift": {
-    "mtime": 1792230161.652537,
-    "seen": 1792230234.0424805,
+    "mtime": 1792241119.8387802,
+    "seen": 1792242270.2953122,
     "ast_hash": "bc57d246d9a3220a83dd3951310a78bf",
     "semantic_hash": ""
   },
   "SideKick/Views/Library/GitHubUpdatesView.swift": {
-    "mtime": 1792230181.2573783,
-    "seen": 1792230234.042482,
+    "mtime": 1792241119.8397791,
+    "seen": 1792242270.2953136,
     "ast_hash": "23086cedd3abd6f57c56775f589538dd",
     "semantic_hash": ""
   },
   "SideKick/Views/Library/OtherTeamInstallationView.swift": {
-    "mtime": 1792230161.6535366,
-    "seen": 1792230234.042483,
+    "mtime": 1792241119.8397791,
+    "seen": 1792242270.295315,
     "ast_hash": "9366fc48f91f7b653c20b0b9583c819b",
     "semantic_hash": ""
   },
   "SideKick/Views/LiveContainer/LiveContainerViews.swift": {
-    "mtime": 1792230181.2583816,
-    "seen": 1792230234.0424857,
+    "mtime": 1792241119.8397791,
+    "seen": 1792242270.2953184,
     "ast_hash": "c5e74cdcfee1abc2d8d0cd79abdc2d20",
     "semantic_hash": ""
   },
   "SideKick/Views/Root/ContentView.swift": {
-    "mtime": 1792230181.2583816,
-    "seen": 1792230234.0424871,
+    "mtime": 1792241119.8433263,
+    "seen": 1792242270.2953198,
     "ast_hash": "ea1c337e5b09ae12209bd36f01404053",
     "semantic_hash": ""
   },
   "SideKick/Views/Root/RequiredSetupView.swift": {
-    "mtime": 1792230181.2593815,
-    "seen": 1792230234.0424883,
+    "mtime": 1792241119.8443325,
+    "seen": 1792242270.295321,
     "ast_hash": "969863662c25eb2c6e8a0fc409d15831",
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/GitHubAccountSettingsView.swift": {
-    "mtime": 1792230161.6581106,
-    "seen": 1792230234.042491,
+    "mtime": 1792241119.8449347,
+    "seen": 1792242270.2953238,
     "ast_hash": "775dc0a28b0a5cb4670a29e82d4ae3b8",
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/GitHubDefaultTokenSettingsView.swift": {
-    "mtime": 1792230161.659121,
-    "seen": 1792230234.0424922,
+    "mtime": 1792241119.8449347,
+    "seen": 1792242270.2953258,
     "ast_hash": "532847f5d12d70e7b0978ebe04eecdf8",
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/GitHubDiagnosticsView.swift": {
-    "mtime": 1792230161.659121,
-    "seen": 1792230234.0424936,
+    "mtime": 1792241119.8449347,
+    "seen": 1792242270.2953286,
     "ast_hash": "c98ae7b42dda7568ef7819b3d63ae418",
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/LocalConnectionSettingsView.swift": {
-    "mtime": 1792230161.6601257,
-    "seen": 1792230234.042495,
+    "mtime": 1792241119.8449347,
+    "seen": 1792242270.295331,
     "ast_hash": "867e7bc50519689460e6bfa019c93614",
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/SettingsView.swift": {
-    "mtime": 1792230181.2603817,
-    "seen": 1792230234.0424962,
+    "mtime": 1792241119.8449347,
+    "seen": 1792242270.2953336,
     "ast_hash": "bec39e12b5c8afeccd635d7ad61f9f95",
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/SideStoreSettingsPages.swift": {
-    "mtime": 1792230181.2603817,
-    "seen": 1792230234.0424976,
+    "mtime": 1792241119.8489492,
+    "seen": 1792242270.295338,
     "ast_hash": "96a998d527385e6e912c6828df937f0b",
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/SkippedGitHubUpdatesView.swift": {
-    "mtime": 1792230161.661125,
-    "seen": 1792230234.0424988,
+    "mtime": 1792241119.8499587,
+    "seen": 1792242270.2953415,
     "ast_hash": "29dce0cf33eb938b510808775a3f964e",
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/StorageFilesView.swift": {
-    "mtime": 1792230161.6621244,
-    "seen": 1792230234.0424998,
+    "mtime": 1792241119.8499587,
+    "seen": 1792242270.295344,
     "ast_hash": "4639b28c50d83610f3cceb5da49a25e4",
     "semantic_hash": ""
   },
   "Tests/PrefetchRegistry/PrefetchTaskRegistryRegression.swift": {
-    "mtime": 1792230161.667299,
-    "seen": 1792230234.0425029,
+    "mtime": 1792241119.8559022,
+    "seen": 1792242270.2953503,
     "ast_hash": "ad1bc081649b22da235a7109cb03c6e6",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_integration_patches.py": {
-    "mtime": 1792230265.8988104,
-    "seen": 1792230301.7055035,
-    "ast_hash": "9bd534ba90ed8b614fc6cde494fae13e",
+    "mtime": 1792242152.2511113,
+    "seen": 1792242270.2953727,
+    "ast_hash": "35069e2b1e97c342ee488120680e3d5a",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_release_manifest.py": {
-    "mtime": 1792230161.6684313,
-    "seen": 1792230234.0425196,
+    "mtime": 1792241119.8614025,
+    "seen": 1792242270.295378,
     "ast_hash": "35dc935c243b7596d69792c7020b6f67",
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/AnisetteConfigurationTests.swift": {
-    "mtime": 1792230161.6684313,
-    "seen": 1792230234.0425222,
+    "mtime": 1792241119.8614025,
+    "seen": 1792242270.2953825,
     "ast_hash": "fd08e50f1396750f01c57ed9878397a3",
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/GitHubBaselineTests.swift": {
-    "mtime": 1792230161.674589,
-    "seen": 1792230234.042526,
+    "mtime": 1792241119.866912,
+    "seen": 1792242270.2953868,
     "ast_hash": "1f2bbe9f1c63954a3c2cccfe73f089a8",
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/GitHubDiagnosticsTests.swift": {
-    "mtime": 1792230161.674589,
-    "seen": 1792230234.0425272,
+    "mtime": 1792241119.866912,
+    "seen": 1792242270.2953887,
     "ast_hash": "deffb6c25335493c45be58309ab404d0",
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/GitHubHistoryClientTests.swift": {
-    "mtime": 1792230161.674589,
-    "seen": 1792230234.0425286,
+    "mtime": 1792241119.866912,
+    "seen": 1792242270.29539,
     "ast_hash": "2fe14328bf5f51e14c365bbf22158e97",
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/GitHubHistoryStoreTests.swift": {
-    "mtime": 1792230161.675588,
-    "seen": 1792230234.0425298,
+    "mtime": 1792241119.866912,
+    "seen": 1792242270.2953913,
     "ast_hash": "971436f4a7b72ac507d135c32c7a73d2",
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/GitHubTrackingTests.swift": {
-    "mtime": 1792230161.675588,
-    "seen": 1792230234.042531,
+    "mtime": 1792241119.866912,
+    "seen": 1792242270.2953925,
     "ast_hash": "91c1dd1ba3288a83b4b30d37d811d1f5",
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/LiveContainerTests.swift": {
-    "mtime": 1792230161.677586,
-    "seen": 1792230234.0425334,
+    "mtime": 1792241119.866912,
+    "seen": 1792242270.2953963,
     "ast_hash": "cd91b2a49f4e5409dd3fcb2b5ee8a083",
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/StorageCleanupTests.swift": {
-    "mtime": 1792230161.677586,
-    "seen": 1792230234.0425358,
+    "mtime": 1792241119.866912,
+    "seen": 1792242270.295399,
     "ast_hash": "6b14099280bd99d1ff715efe88c15688",
     "semantic_hash": ""
   },
   "Tests/VendorRegression/AuthCompatibilityRegression.swift": {
-    "mtime": 1792230161.6795871,
-    "seen": 1792230234.0425382,
+    "mtime": 1792241119.8724327,
+    "seen": 1792242270.2954018,
     "ast_hash": "846bd02fe3567f371a2e04d64461e940",
     "semantic_hash": ""
   },
   "Tests/VendorRegression/test_auth_compatibility_patch.py": {
-    "mtime": 1792230161.6805863,
-    "seen": 1792230234.042541,
+    "mtime": 1792241119.8724327,
+    "seen": 1792242270.2954054,
     "ast_hash": "7371a18a9054f9b859219988a9dae33e",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/App Detail/AppContentViewController.swift": {
-    "mtime": 1792230193.454563,
-    "seen": 1792230234.0425448,
+    "mtime": 1792241140.4985607,
+    "seen": 1792242270.2954094,
     "ast_hash": "50ec3be4ae4a3dce01ac3fc573751057",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/App Detail/AppContentViewControllerCells.swift": {
-    "mtime": 1792230193.454563,
-    "seen": 1792230234.0425463,
+    "mtime": 1792241140.4985607,
+    "seen": 1792242270.295411,
     "ast_hash": "524d350e22473a01849687a7215cb1d4",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/App Detail/AppDetailCollectionViewController.swift": {
-    "mtime": 1792230193.4571545,
-    "seen": 1792230234.0425477,
+    "mtime": 1792241140.4985607,
+    "seen": 1792242270.2954125,
     "ast_hash": "0bc1d672e3d9e14afe6f695c631a745a",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/App Detail/AppPermissionsCard.swift": {
-    "mtime": 1792230193.4571545,
-    "seen": 1792230234.042549,
+    "mtime": 1792241140.4985607,
+    "seen": 1792242270.2954135,
     "ast_hash": "260a185b942c1d38638529fd8b29ca4f",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/App Detail/AppViewController.swift": {
-    "mtime": 1792230193.4581566,
-    "seen": 1792230234.04255,
+    "mtime": 1792241140.4985607,
+    "seen": 1792242270.2954147,
     "ast_hash": "2e79a938d97b8b1507cf362e03228442",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/App Detail/Screenshots/AppScreenshotCollectionViewCell.swift": {
-    "mtime": 1792230193.4581566,
-    "seen": 1792230234.0425515,
+    "mtime": 1792241140.4985607,
+    "seen": 1792242270.2954164,
     "ast_hash": "77fc32fb7899efb0d342f80032730ff3",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/App Detail/Screenshots/AppScreenshotsViewController.swift": {
-    "mtime": 1792230193.4591527,
-    "seen": 1792230234.042553,
+    "mtime": 1792241140.4985607,
+    "seen": 1792242270.2954175,
     "ast_hash": "f0b83bba1ac636ddd38b63df1692f5c8",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/App Detail/Screenshots/PreviewAppScreenshotsViewController.swift": {
-    "mtime": 1792230193.4614778,
-    "seen": 1792230234.0425541,
+    "mtime": 1792241140.5041468,
+    "seen": 1792242270.295419,
     "ast_hash": "5ea950b4e8da19782efc38533d4af796",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/App IDs/AppIDsViewController.swift": {
-    "mtime": 1792230193.4614778,
-    "seen": 1792230234.042555,
+    "mtime": 1792241140.5041468,
+    "seen": 1792242270.2954204,
     "ast_hash": "402f1aaa18a69d7f08b1a53a6e83b7d1",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/AppDelegate.swift": {
-    "mtime": 1792230193.4625366,
-    "seen": 1792230234.0425568,
+    "mtime": 1792242234.4905722,
+    "seen": 1792242270.2954216,
     "ast_hash": "205841bda9bd9ce185f1ebc3710c1d0f",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Authentication/AuthenticationViewController.swift": {
-    "mtime": 1792230193.464545,
-    "seen": 1792230234.0425577,
+    "mtime": 1792241140.5041468,
+    "seen": 1792242270.2954228,
     "ast_hash": "2810744be304978edc0bed30eb8ae008",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Authentication/InstructionsViewController.swift": {
-    "mtime": 1792230193.4655454,
-    "seen": 1792230234.042559,
+    "mtime": 1792241140.5041468,
+    "seen": 1792242270.295424,
     "ast_hash": "9d33ac74767ec29b0150b23336a64829",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Authentication/ResignAltStoreViewController.swift": {
-    "mtime": 1792230193.4655454,
-    "seen": 1792230234.0425603,
+    "mtime": 1792241140.5041468,
+    "seen": 1792242270.2954252,
     "ast_hash": "a10fbf6e0f3f4d509d1fd898215316c6",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Authentication/SelectTeamViewController.swift": {
-    "mtime": 1792230193.4665456,
-    "seen": 1792230234.0425613,
+    "mtime": 1792241140.5041468,
+    "seen": 1792242270.295427,
     "ast_hash": "a84dd117c4bb9d697e92a1b2dd616db7",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Browse/BrowseViewController.swift": {
-    "mtime": 1792230193.4685428,
-    "seen": 1792230234.0425627,
+    "mtime": 1792241140.509756,
+    "seen": 1792242270.2954283,
     "ast_hash": "0df7e4572f8f70bb84f6fb7d191803f5",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Browse/FeaturedComponents.swift": {
-    "mtime": 1792230193.4685428,
-    "seen": 1792230234.0425646,
+    "mtime": 1792241140.509756,
+    "seen": 1792242270.29543,
     "ast_hash": "99445a3c0c77e6ef1babfe00602b6e69",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Browse/FeaturedViewController.swift": {
-    "mtime": 1792230193.4705453,
-    "seen": 1792230234.0425658,
+    "mtime": 1792241140.509756,
+    "seen": 1792242270.2954314,
     "ast_hash": "d65903cc86ac83b29a5a196c424172fb",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Browse/ScreenshotCollectionViewCell.swift": {
-    "mtime": 1792230193.4715428,
-    "seen": 1792230234.042567,
+    "mtime": 1792241140.509756,
+    "seen": 1792242270.2954323,
     "ast_hash": "e3014a81fda79522c7730390a067a424",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Components/AppBannerCollectionViewCell.swift": {
-    "mtime": 1792230193.4715428,
-    "seen": 1792230234.0425682,
+    "mtime": 1792241140.509756,
+    "seen": 1792242270.295434,
     "ast_hash": "0d3557e4321d6d31c7ea331f44a3318b",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Components/AppBannerView.swift": {
-    "mtime": 1792230193.4725423,
-    "seen": 1792230234.0425694,
+    "mtime": 1792241140.509756,
+    "seen": 1792242270.295435,
     "ast_hash": "8811c1a0d0243468894911a84682b69e",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Components/AppCardCollectionViewCell.swift": {
-    "mtime": 1792230193.4755416,
-    "seen": 1792230234.0425708,
+    "mtime": 1792241140.5152502,
+    "seen": 1792242270.2954364,
     "ast_hash": "f32600f12fab40b823681eaea44502b6",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Components/AppIconImageView.swift": {
-    "mtime": 1792230193.4755416,
-    "seen": 1792230234.0425723,
+    "mtime": 1792241140.5152502,
+    "seen": 1792242270.2954376,
     "ast_hash": "b43ea0ffb65c1d16a874c91dfb1af522",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Components/BackgroundTaskManager.swift": {
-    "mtime": 1792230193.4755416,
-    "seen": 1792230234.0425732,
+    "mtime": 1792241140.5152502,
+    "seen": 1792242270.295439,
     "ast_hash": "29aabe1e3cf142d5525b10bc8a39c942",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Components/Button.swift": {
-    "mtime": 1792230193.476545,
-    "seen": 1792230234.0425746,
+    "mtime": 1792241140.5152502,
+    "seen": 1792242270.2954402,
     "ast_hash": "0d52ce2e8d532caab2a90b03886b9637",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Components/CollapsingTextView.swift": {
-    "mtime": 1792230193.476545,
-    "seen": 1792230234.0425758,
+    "mtime": 1792241140.5152502,
+    "seen": 1792242270.2954414,
     "ast_hash": "2d75cb586b7f81c3a3e1d4d1b2fa0f21",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Components/ForwardingNavigationController.swift": {
-    "mtime": 1792230193.4775429,
-    "seen": 1792230234.0425792,
+    "mtime": 1792241140.5152502,
+    "seen": 1792242270.2954426,
     "ast_hash": "a9a19fa208832881ce769b767d1ad9fd",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Components/HeaderContentViewController.swift": {
-    "mtime": 1792230193.4785445,
-    "seen": 1792230234.0425801,
+    "mtime": 1792241140.5152502,
+    "seen": 1792242270.295444,
     "ast_hash": "982479172f96cbb5e2901743163abfea",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Components/NavigationBar.swift": {
-    "mtime": 1792230193.4785445,
-    "seen": 1792230234.0425816,
+    "mtime": 1792241140.5152502,
+    "seen": 1792242270.2954452,
     "ast_hash": "62ee182597e8636fdaffc4750360e3dc",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Components/NibView.swift": {
-    "mtime": 1792230193.4785445,
-    "seen": 1792230234.0425828,
+    "mtime": 1792241140.5152502,
+    "seen": 1792242270.2954466,
     "ast_hash": "30f5936e8ecae5b1a2d82cd0c48ffe17",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Components/PillButton.swift": {
-    "mtime": 1792230193.4797244,
-    "seen": 1792230234.0425844,
+    "mtime": 1792242234.4915724,
+    "seen": 1792242270.2954478,
     "ast_hash": "20240cf05443b1af3d09ea77d5bb2ed7",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Components/PlaceholderView.swift": {
-    "mtime": 1792230193.4797244,
-    "seen": 1792230234.0425856,
+    "mtime": 1792241140.5152502,
+    "seen": 1792242270.2954488,
     "ast_hash": "bc801271f8839b69c985f116469202a9",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Components/TextCollectionReusableView.swift": {
-    "mtime": 1792230193.4807248,
-    "seen": 1792230234.0425866,
+    "mtime": 1792241140.5208263,
+    "seen": 1792242270.2954507,
     "ast_hash": "42023601568f81a9befc4689589f6e55",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Components/ToastView.swift": {
-    "mtime": 1792230193.4807248,
-    "seen": 1792230234.042588,
+    "mtime": 1792241140.5208263,
+    "seen": 1792242270.2954519,
     "ast_hash": "7893d6f35f7bf33af19242a65bd6c3ff",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Components/VibrantButton.swift": {
-    "mtime": 1792230193.4817274,
-    "seen": 1792230234.0425892,
+    "mtime": 1792241140.5208263,
+    "seen": 1792242270.295453,
     "ast_hash": "129a4d9e6d4cd9027634dadaaf053abe",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Components/Keychain.swift": {
-    "mtime": 1792230193.4837258,
-    "seen": 1792230234.0425901,
+    "mtime": 1792242234.492571,
+    "seen": 1792242270.2954543,
     "ast_hash": "6aded089fcdcac0eeabf28dc560ae62a",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/DataSources/ArrayDataSource.swift": {
-    "mtime": 1792230193.4847248,
-    "seen": 1792230234.0425916,
+    "mtime": 1792242234.4935708,
+    "seen": 1792242270.2954555,
     "ast_hash": "8b7c4a353593f6a64c33b18189fa8940",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/DataSources/CellContentCell.swift": {
-    "mtime": 1792230193.4857235,
-    "seen": 1792230234.0425928,
+    "mtime": 1792241140.5259597,
+    "seen": 1792242270.295457,
     "ast_hash": "34d4f142558c841845fbcea913661952",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/DataSources/CellContentChange.swift": {
-    "mtime": 1792230193.4857235,
-    "seen": 1792230234.0425937,
+    "mtime": 1792241140.5264072,
+    "seen": 1792242270.2954583,
     "ast_hash": "043b5025fcb846019bda3cc08f005964",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/DataSources/CellContentDataSource.swift": {
-    "mtime": 1792230193.4867258,
-    "seen": 1792230234.0425956,
+    "mtime": 1792242234.494693,
+    "seen": 1792242270.2954595,
     "ast_hash": "1769b4b0a0d0fe5b916c8d058660bf34",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/DataSources/CellContentPrefetchingDataSource.swift": {
-    "mtime": 1792230193.4867258,
-    "seen": 1792230234.0425968,
+    "mtime": 1792241140.5264072,
+    "seen": 1792242270.295461,
     "ast_hash": "967757ff40610b2288c4da9833bf147b",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/DataSources/CellContentUpdateableView.swift": {
-    "mtime": 1792230193.4877236,
-    "seen": 1792230234.0425978,
+    "mtime": 1792241140.5264072,
+    "seen": 1792242270.2954621,
     "ast_hash": "66653f5ebd8b433eadbaa8b089a13d88",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/DataSources/CompositeDataSource.swift": {
-    "mtime": 1792230193.4877236,
-    "seen": 1792230234.0425994,
+    "mtime": 1792242234.494693,
+    "seen": 1792242270.2954633,
     "ast_hash": "2e54ded8b3ca7ab81296fa92b2d8570b",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/DataSources/DynamicDataSource.swift": {
-    "mtime": 1792230193.4887242,
-    "seen": 1792230234.0426004,
+    "mtime": 1792241140.529665,
+    "seen": 1792242270.2954648,
     "ast_hash": "c06d8e047cf5b7322a3ed2569ff3bb03",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/DataSources/FetchedResultsDataSource.swift": {
-    "mtime": 1792230193.4897232,
-    "seen": 1792230234.0426018,
+    "mtime": 1792242234.495694,
+    "seen": 1792242270.2954662,
     "ast_hash": "4082e2312226491872837d01127952d3",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/DataSources/UICollectionView+CellContent.swift": {
-    "mtime": 1792230193.4897232,
-    "seen": 1792230234.0426035,
+    "mtime": 1792241140.5316575,
+    "seen": 1792242270.2954676,
     "ast_hash": "9bc87ea118175a8cf204e859ac8ae78b",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/DataSources/UITableView+CellContent.swift": {
-    "mtime": 1792230193.4907248,
-    "seen": 1792230234.0426044,
+    "mtime": 1792241140.5316575,
+    "seen": 1792242270.2954686,
     "ast_hash": "9cb1db72f892d4c1fa907f0ede834258",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Extensions/AltStore+Async.swift": {
-    "mtime": 1792230193.4907248,
-    "seen": 1792230234.0426059,
+    "mtime": 1792241140.5325408,
+    "seen": 1792242270.2954698,
     "ast_hash": "b97b0fa1e81e7c8eb522e50c5f2b42b6",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Extensions/Date+RelativeDate.swift": {
-    "mtime": 1792230193.4917276,
-    "seen": 1792230234.0426068,
+    "mtime": 1792241140.5325408,
+    "seen": 1792242270.2954712,
     "ast_hash": "bb8776a7bc8f3dc5c379b972b8210e43",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Extensions/FileManager+Backups.swift": {
-    "mtime": 1792230193.4927256,
-    "seen": 1792230234.042608,
+    "mtime": 1792241140.5325408,
+    "seen": 1792242270.2954721,
     "ast_hash": "5779f66a6c9f4a7aa9a8bc69008b83ae",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Extensions/JSONDecoder+Properties.swift": {
-    "mtime": 1792230193.4927256,
-    "seen": 1792230234.0426095,
+    "mtime": 1792241140.5325408,
+    "seen": 1792242270.2954733,
     "ast_hash": "56e3b54fb6130b2c91ff5b034dd6f771",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Extensions/Logger+AltStore.swift": {
-    "mtime": 1792230193.4937224,
-    "seen": 1792230234.0426104,
+    "mtime": 1792241140.5325408,
+    "seen": 1792242270.2954748,
     "ast_hash": "4ac3b2cfc96833bbbb66f428793907cc",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Extensions/ProcessInfo+AltStore.swift": {
-    "mtime": 1792230193.4937224,
-    "seen": 1792230234.0426116,
+    "mtime": 1792241140.5325408,
+    "seen": 1792242270.2954757,
     "ast_hash": "6707fd8437704a3dde3bf39e738cb1ed",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Extensions/ProcessInfo+Previews.swift": {
-    "mtime": 1792230193.4937224,
-    "seen": 1792230234.042613,
+    "mtime": 1792241140.5325408,
+    "seen": 1792242270.295477,
     "ast_hash": "d4692de221ddd435c464cbd44fd58af5",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Extensions/Regex+Permissions.swift": {
-    "mtime": 1792230193.4947255,
-    "seen": 1792230234.042614,
+    "mtime": 1792241140.5325408,
+    "seen": 1792242270.295478,
     "ast_hash": "46312053826af8a9d3f12f6f059c547b",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Extensions/URL+Normalized.swift": {
-    "mtime": 1792230193.4947255,
-    "seen": 1792230234.0426154,
+    "mtime": 1792241140.5325408,
+    "seen": 1792242270.2954793,
     "ast_hash": "ffec68094412952a968d5bdd0239c5aa",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Extensions/UserDefaults+AltStore.swift": {
-    "mtime": 1792230193.495939,
-    "seen": 1792230234.0426166,
+    "mtime": 1792241140.537085,
+    "seen": 1792242270.2954803,
     "ast_hash": "b6d5ea2bed6bafa8573fc7d25d7ea2ff",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Intents/ViewAppIntentHandler.swift": {
-    "mtime": 1792230193.4969387,
-    "seen": 1792230234.0426178,
+    "mtime": 1792241140.537579,
+    "seen": 1792242270.2954817,
     "ast_hash": "3440e8d7bba4946d2cb754e5dbfd0993",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/Account.swift": {
-    "mtime": 1792230193.4979384,
-    "seen": 1792230234.0426192,
+    "mtime": 1792241140.537579,
+    "seen": 1792242270.2954829,
     "ast_hash": "8b10a6d0ac6186f050f67b747255975b",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/AppID.swift": {
-    "mtime": 1792230193.5136683,
-    "seen": 1792230234.0426204,
+    "mtime": 1792241140.5485737,
+    "seen": 1792242270.2954838,
     "ast_hash": "865654b8ceb912f1b2b4198619a80905",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/AppPermission.swift": {
-    "mtime": 1792230193.5146663,
-    "seen": 1792230234.0426214,
+    "mtime": 1792241140.5485737,
+    "seen": 1792242270.2954853,
     "ast_hash": "ec06dab0a60e1d7791c4dabdcf457f07",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/AppScreenshot.swift": {
-    "mtime": 1792230193.5146663,
-    "seen": 1792230234.0426228,
+    "mtime": 1792242234.4966934,
+    "seen": 1792242270.2954867,
     "ast_hash": "0664e753983b5a41f2837416418049e2",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/AppVersion.swift": {
-    "mtime": 1792230193.5156662,
-    "seen": 1792230234.042624,
+    "mtime": 1792241140.5543435,
+    "seen": 1792242270.2954876,
     "ast_hash": "07efdd79e71adf4d30c0ad87255d590d",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/BaseEntity.swift": {
-    "mtime": 1792230193.5156662,
-    "seen": 1792230234.0426252,
+    "mtime": 1792241140.5543435,
+    "seen": 1792242270.2954895,
     "ast_hash": "207b9e93f0bcf0209c8236f7f721f441",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/DatabaseManager/DatabaseManager.swift": {
-    "mtime": 1792230193.516999,
-    "seen": 1792230234.0426266,
+    "mtime": 1792241140.5543435,
+    "seen": 1792242270.2954907,
     "ast_hash": "4d6b9f519639c427dfa033587e7bfb36",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/DatabaseManager/PersistentContainer.swift": {
-    "mtime": 1792230193.516999,
-    "seen": 1792230234.0426276,
+    "mtime": 1792241140.5543435,
+    "seen": 1792242270.2954922,
     "ast_hash": "4e87a08ff1abecee598e5ede0cf7a61c",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/InstalledApp.swift": {
-    "mtime": 1792230193.5181932,
-    "seen": 1792230234.042629,
+    "mtime": 1792242234.4976935,
+    "seen": 1792242270.2954934,
     "ast_hash": "ed81d588ad4736272e1d1fce090a169a",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/InstalledExtension.swift": {
-    "mtime": 1792230193.5181932,
-    "seen": 1792230234.0426302,
+    "mtime": 1792241140.5543435,
+    "seen": 1792242270.2954943,
     "ast_hash": "7dc3c2326f7acf7eb5c648ec7b9382cb",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/LoggedError.swift": {
-    "mtime": 1792230193.5181932,
-    "seen": 1792230234.0426314,
+    "mtime": 1792241140.5543435,
+    "seen": 1792242270.2954957,
     "ast_hash": "a154fbbc8f9682de28a3fdd16ec51f65",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/MergePolicies/MergePolicy.swift": {
-    "mtime": 1792230193.5191936,
-    "seen": 1792230234.0426323,
+    "mtime": 1792241140.559772,
+    "seen": 1792242270.2954972,
     "ast_hash": "b690a9e76afedb77379d252d842dc7a4",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/MergePolicies/RelationshipPreservingMergePolicy.swift": {
-    "mtime": 1792230193.5201938,
-    "seen": 1792230234.0426338,
+    "mtime": 1792241140.559772,
+    "seen": 1792242270.2954986,
     "ast_hash": "d1f5ec8405c6ba3b6d269f16d2be41f3",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/Migrations/Policies/InstalledAppPolicy.swift": {
-    "mtime": 1792230193.5823379,
-    "seen": 1792230234.0426347,
+    "mtime": 1792241140.6209714,
+    "seen": 1792242270.2954996,
     "ast_hash": "a4ff1745ad8c172cdd14d49a7b14fab8",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/Migrations/Policies/StoreApp10ToStoreApp11Policy.swift": {
-    "mtime": 1792230193.583845,
-    "seen": 1792230234.042636,
+    "mtime": 1792241140.6209714,
+    "seen": 1792242270.2955008,
     "ast_hash": "25d8a5ef3c1dc9bab3d53860c1d392da",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/Migrations/Policies/StoreAppPolicy.swift": {
-    "mtime": 1792230193.5851314,
-    "seen": 1792230234.0426373,
+    "mtime": 1792241140.6209714,
+    "seen": 1792242270.2955022,
     "ast_hash": "2ff455df7a53bb12020ed0ea8aef499d",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/Migrations/Policies/v11-to-v17/Source11To17MigrationPolicy.swift": {
-    "mtime": 1792230193.5851314,
-    "seen": 1792230234.0426385,
+    "mtime": 1792241140.6209714,
+    "seen": 1792242270.2955034,
     "ast_hash": "76fd177996fed995cbafe40c0ee24f2d",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/Migrations/Policies/v11-to-v17/StoreApp11To17MigrationPolicy.swift": {
-    "mtime": 1792230193.5861304,
-    "seen": 1792230234.04264,
+    "mtime": 1792241140.6209714,
+    "seen": 1792242270.295505,
     "ast_hash": "f22f1c41a947df6758bc0c72c4bb288a",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/Migrations/Policies/v11-to-v17_1/AppPermission11To17_1MigrationPolicy.swift": {
-    "mtime": 1792230193.587131,
-    "seen": 1792230234.042641,
+    "mtime": 1792241140.6209714,
+    "seen": 1792242270.2955065,
     "ast_hash": "e47743b0e571bb50db4098083681d2f3",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/Migrations/Policies/v11-to-v17_1/ReleaseTrack11To17_1MigrationPolicy.swift": {
-    "mtime": 1792230193.5881312,
-    "seen": 1792230234.0426424,
+    "mtime": 1792241140.6209714,
+    "seen": 1792242270.2955077,
     "ast_hash": "fbfa50ed8a0bdb6ea46f8f8c8a63be63",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/Migrations/Policies/v11-to-v17_1/Source11To17_1MigrationPolicy.swift": {
-    "mtime": 1792230193.5881312,
-    "seen": 1792230234.0426438,
+    "mtime": 1792241140.6209714,
+    "seen": 1792242270.295509,
     "ast_hash": "d4d7aa0893a08b4356a48569705c2c4e",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/Migrations/Policies/v11-to-v17_1/StoreApp11To17_1MigrationPolicy.swift": {
-    "mtime": 1792230193.5881312,
-    "seen": 1792230234.0426447,
+    "mtime": 1792241140.6259518,
+    "seen": 1792242270.29551,
     "ast_hash": "050baf5410f2b8b3c70f29e5e0c27d64",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/Migrations/Policies/v17-to-v17_1/AppPermission17To17_1MigrationPolicy.swift": {
-    "mtime": 1792230193.5891285,
-    "seen": 1792230234.042646,
+    "mtime": 1792241140.626433,
+    "seen": 1792242270.2955112,
     "ast_hash": "2628589b931bc5b76e8fd1ae2903212b",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/Migrations/Policies/v17-to-v17_1/ReleaseTrack17To17_1MigrationPolicy.swift": {
-    "mtime": 1792230193.5901313,
-    "seen": 1792230234.0426474,
+    "mtime": 1792241140.626433,
+    "seen": 1792242270.295513,
     "ast_hash": "e05e45bc19ddcbe90d9474986c2f3576",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/Migrations/Policies/v17-to-v17_1/Source17To17_1MigrationPolicy.swift": {
-    "mtime": 1792230193.5911286,
-    "seen": 1792230234.0426486,
+    "mtime": 1792241140.626433,
+    "seen": 1792242270.295514,
     "ast_hash": "bd6702a552636a3a363bf06a369d9151",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/Migrations/Policies/v17-to-v17_1/StoreApp17To17_1MigrationPolicy.swift": {
-    "mtime": 1792230193.5911286,
-    "seen": 1792230234.0426505,
+    "mtime": 1792241140.626433,
+    "seen": 1792242270.2955153,
     "ast_hash": "1ca19f8a16af6dfe1629672ae0a247b5",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/NewsItem.swift": {
-    "mtime": 1792230193.5921278,
-    "seen": 1792230234.0426514,
+    "mtime": 1792241140.626433,
+    "seen": 1792242270.2955165,
     "ast_hash": "15a3a8a0a27369203f98bd783a2337ea",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/RefreshAttempt.swift": {
-    "mtime": 1792230193.5921278,
-    "seen": 1792230234.0426526,
+    "mtime": 1792241140.626433,
+    "seen": 1792242270.2955177,
     "ast_hash": "975732854f60005dd775d60cf1ab4d50",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/ReleaseTrack.swift": {
-    "mtime": 1792230193.5931313,
-    "seen": 1792230234.0426538,
+    "mtime": 1792241140.626433,
+    "seen": 1792242270.2955189,
     "ast_hash": "b8eb4c9a672672fb35c8661b8fea72d0",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/Source.swift": {
-    "mtime": 1792230193.5931313,
-    "seen": 1792230234.042655,
+    "mtime": 1792241140.626433,
+    "seen": 1792242270.2955208,
     "ast_hash": "b87d0d714662d24d5025a314446c0321",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/StoreApp.swift": {
-    "mtime": 1792230193.5941308,
-    "seen": 1792230234.0426562,
+    "mtime": 1792241140.631502,
+    "seen": 1792242270.2955217,
     "ast_hash": "d565d82880bef6d7948509500bb60c90",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/Team.swift": {
-    "mtime": 1792230193.5951307,
-    "seen": 1792230234.0426579,
+    "mtime": 1792241140.6319818,
+    "seen": 1792242270.2955232,
     "ast_hash": "2bc63e0d2a19fd8d60d45d61acf8c147",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/Transformers/SecureValueTransformer.swift": {
-    "mtime": 1792230193.5951307,
-    "seen": 1792230234.0426593,
+    "mtime": 1792241140.6319818,
+    "seen": 1792242270.2955241,
     "ast_hash": "bcccbb23fced1c801cd00650d25c04a9",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Model/WidgetDataManager+CoreData.swift": {
-    "mtime": 1792230193.596131,
-    "seen": 1792230234.0426607,
+    "mtime": 1792241140.6319818,
+    "seen": 1792242270.2955253,
     "ast_hash": "29ec0f24f78af56261651c3f5c43201f",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Protocols/ALTAppPermission.swift": {
-    "mtime": 1792230193.596131,
-    "seen": 1792230234.0426617,
+    "mtime": 1792241140.6319818,
+    "seen": 1792242270.2955267,
     "ast_hash": "f88bef3bede7c95f1771a64c4888a927",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Protocols/AppProtocol.swift": {
-    "mtime": 1792230193.597139,
-    "seen": 1792230234.0426629,
+    "mtime": 1792241140.6319818,
+    "seen": 1792242270.2955284,
     "ast_hash": "0edab0ae773158039b7c9735042ea23e",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Protocols/Fetchable.swift": {
-    "mtime": 1792230193.5981357,
-    "seen": 1792230234.0426643,
+    "mtime": 1792241140.6319818,
+    "seen": 1792242270.2955298,
     "ast_hash": "6a8ea043e30850aac1071243dfb76343",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Protocols/OptionalProtocol.swift": {
-    "mtime": 1792230193.5981357,
-    "seen": 1792230234.0426657,
+    "mtime": 1792241140.6319818,
+    "seen": 1792242270.295531,
     "ast_hash": "9e6c93aeb7d9389aa406ed663f0a18bb",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Types/ALTAppPermissions.swift": {
-    "mtime": 1792230193.6058922,
-    "seen": 1792230234.042667,
+    "mtime": 1792241140.637503,
+    "seen": 1792242270.2955322,
     "ast_hash": "c00adf0ad6e9539b0f2ca600a89afb75",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Types/ALTPatreonBenefitID.swift": {
-    "mtime": 1792230193.6058922,
-    "seen": 1792230234.0426683,
+    "mtime": 1792241140.637503,
+    "seen": 1792242270.2955337,
     "ast_hash": "896fd601902d7efef0a5868babc39d35",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Types/ALTSourceUserInfoKey.swift": {
-    "mtime": 1792230193.607092,
-    "seen": 1792230234.0426695,
+    "mtime": 1792241140.6426198,
+    "seen": 1792242270.2955346,
     "ast_hash": "1e783499848c65e87a6ec22b299b987a",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Types/AppSorting.swift": {
-    "mtime": 1792230193.6080923,
-    "seen": 1792230234.0426705,
+    "mtime": 1792241140.6431334,
+    "seen": 1792242270.2955363,
     "ast_hash": "d187d9e18afbbf3980355a0b03d474bb",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Types/AsyncManaged.swift": {
-    "mtime": 1792230193.6080923,
-    "seen": 1792230234.042672,
+    "mtime": 1792241140.6431334,
+    "seen": 1792242270.2955377,
     "ast_hash": "3b6e57529dc90cbd72ee59e3addba253",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Types/KnownSource.swift": {
-    "mtime": 1792230193.609089,
-    "seen": 1792230234.0426729,
+    "mtime": 1792241140.6431334,
+    "seen": 1792242270.2955387,
     "ast_hash": "81c99b0139759f4b9e11205c4928ad81",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Types/Managed.swift": {
-    "mtime": 1792230193.609089,
-    "seen": 1792230234.042674,
+    "mtime": 1792241140.6431334,
+    "seen": 1792242270.2955403,
     "ast_hash": "cb63e2ebcc72abf70fff894bcf2efadd",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/Types/StoreCategory.swift": {
-    "mtime": 1792230193.609089,
-    "seen": 1792230234.0426755,
+    "mtime": 1792241140.6431334,
+    "seen": 1792242270.2955413,
     "ast_hash": "8860c1ea2610b9e4b0d06bec7d78f2a9",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Extensions/Bundle+AppExtension.swift": {
-    "mtime": 1792230193.610092,
-    "seen": 1792230234.0426764,
+    "mtime": 1792241140.6431334,
+    "seen": 1792242270.2955425,
     "ast_hash": "72a1aa23dcdc94e5f8c365d558d96930",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Extensions/FileManager+DirectorySize.swift": {
-    "mtime": 1792230193.610092,
-    "seen": 1792230234.042678,
+    "mtime": 1792241140.6431334,
+    "seen": 1792242270.2955441,
     "ast_hash": "06809e3424d41eefcfd62aeecec91500",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Extensions/FileManager+URLs.swift": {
-    "mtime": 1792230193.6114478,
-    "seen": 1792230234.0426793,
+    "mtime": 1792241140.6431334,
+    "seen": 1792242270.2955453,
     "ast_hash": "1dc8ab8ccae979ec31449be0fbbb3bf6",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Extensions/INInteraction+AltStore.swift": {
-    "mtime": 1792230193.6127086,
-    "seen": 1792230234.0426803,
+    "mtime": 1792241140.6431334,
+    "seen": 1792242270.2955465,
     "ast_hash": "6caa6386eb8ea3c4ce58d5b7033a7442",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Extensions/NSPredicate+Search.swift": {
-    "mtime": 1792230193.6127086,
-    "seen": 1792230234.042682,
+    "mtime": 1792241140.6431334,
+    "seen": 1792242270.295548,
     "ast_hash": "f605d8648089c4caa2adf45f6b681091",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Extensions/OSLog+SideStore.swift": {
-    "mtime": 1792230193.6127086,
-    "seen": 1792230234.042683,
+    "mtime": 1792241140.6431334,
+    "seen": 1792242270.295549,
     "ast_hash": "6c36f293c5588042846c3a98f913b8cb",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Extensions/String+Localization.swift": {
-    "mtime": 1792230193.613711,
-    "seen": 1792230234.042684,
+    "mtime": 1792241140.6481786,
+    "seen": 1792242270.29555,
     "ast_hash": "eb2d389e68694b3f927d97fdee40ff8f",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Extensions/UIAlertAction+Actions.swift": {
-    "mtime": 1792230193.613711,
-    "seen": 1792230234.0426853,
+    "mtime": 1792241140.6486406,
+    "seen": 1792242270.295552,
     "ast_hash": "c7309b528f29546b19f507b44690589d",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Extensions/UIDevice+Vibration.swift": {
-    "mtime": 1792230193.6147087,
-    "seen": 1792230234.0426865,
+    "mtime": 1792241140.6486406,
+    "seen": 1792242270.2955532,
     "ast_hash": "c5dc33c8ca78fa4321a03796c00d8037",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Extensions/UIFontDescriptor+Bold.swift": {
-    "mtime": 1792230193.6147087,
-    "seen": 1792230234.0426893,
+    "mtime": 1792241140.6486406,
+    "seen": 1792242270.2955546,
     "ast_hash": "449443c95377a7f8c3f3dde7e0a75ffc",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Extensions/UIKit+ActivityIndicating.swift": {
-    "mtime": 1792230193.61571,
-    "seen": 1792230234.0426905,
+    "mtime": 1792241140.6486406,
+    "seen": 1792242270.2955556,
     "ast_hash": "754281d61a215274737d8f24df8c87b3",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Extensions/UINavigationBarAppearance+TintColor.swift": {
-    "mtime": 1792230193.61571,
-    "seen": 1792230234.042692,
+    "mtime": 1792241140.6486406,
+    "seen": 1792242270.295557,
     "ast_hash": "6134a7a4eece939e0dd34fb989c88c64",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Extensions/UIScreen+CompactHeight.swift": {
-    "mtime": 1792230193.61571,
-    "seen": 1792230234.0426931,
+    "mtime": 1792241140.6486406,
+    "seen": 1792242270.2955582,
     "ast_hash": "2342514172292c7c3e45146cb329fd3a",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Extensions/UISpringTimingParameters+Conveniences.swift": {
-    "mtime": 1792230193.6170106,
-    "seen": 1792230234.0426943,
+    "mtime": 1792241140.6486406,
+    "seen": 1792242270.2955596,
     "ast_hash": "bdec40d70f17885261bc0db1ed296678",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Extensions/UIView+AnimatedHide.swift": {
-    "mtime": 1792230193.6170106,
-    "seen": 1792230234.0426955,
+    "mtime": 1792241140.6486406,
+    "seen": 1792242270.295561,
     "ast_hash": "8b4285fbd9dcd564cf8a53903d619ca5",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Extensions/UIView+Pinning.swift": {
-    "mtime": 1792230193.6182342,
-    "seen": 1792230234.042697,
+    "mtime": 1792241140.6486406,
+    "seen": 1792242270.2955623,
     "ast_hash": "cc87cdc2051bead452e46d3d1132b2e8",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Extensions/UIViewController+WebURL.swift": {
-    "mtime": 1792230193.6182342,
-    "seen": 1792230234.0426981,
+    "mtime": 1792241140.6486406,
+    "seen": 1792242270.2955635,
     "ast_hash": "ae814cfca60d64dda0271f13d6279143",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Extensions/UTType+AltStore.swift": {
-    "mtime": 1792230193.619234,
-    "seen": 1792230234.0426996,
+    "mtime": 1792241140.6486406,
+    "seen": 1792242270.2955647,
     "ast_hash": "7c1ef79d2ffe01a21a62b60f4afcb819",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Intents/App Intents/AppShortcuts.swift": {
-    "mtime": 1792230193.6202328,
-    "seen": 1792230234.0427008,
+    "mtime": 1792242234.4986925,
+    "seen": 1792242270.2955658,
     "ast_hash": "6046003f807f9505078bd97f4eef5115",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Intents/App Intents/RefreshAllAppsIntent.swift": {
-    "mtime": 1792230193.621232,
-    "seen": 1792230234.0427022,
+    "mtime": 1792241140.6543329,
+    "seen": 1792242270.2955668,
     "ast_hash": "2689c2292de669ab4fb7d637979bdc8a",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Intents/App Intents/RefreshAllAppsWidgetIntent.swift": {
-    "mtime": 1792230193.6222317,
-    "seen": 1792230234.0427032,
+    "mtime": 1792241140.6543329,
+    "seen": 1792242270.2955682,
     "ast_hash": "62ff3dc374190d252eef974edc3a7efe",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Intents/Legacy/IntentHandler.swift": {
-    "mtime": 1792230193.6225655,
-    "seen": 1792230234.0427046,
+    "mtime": 1792241140.6543329,
+    "seen": 1792242270.2955694,
     "ast_hash": "1f8bd9adda08b2da2e8d55ec023f1a7c",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/LaunchViewController.swift": {
-    "mtime": 1792230193.6237924,
-    "seen": 1792230234.042706,
+    "mtime": 1792241140.6543329,
+    "seen": 1792242270.2955704,
     "ast_hash": "b47045a2f0be2feec251c5ade08bc7e2",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Managing Apps/AppExtensionView.swift": {
-    "mtime": 1792230193.6247916,
-    "seen": 1792230234.0427072,
+    "mtime": 1792241140.6543329,
+    "seen": 1792242270.2955718,
     "ast_hash": "b7775e6689e73d11795ca0b2844af744",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Managing Apps/AppManager.swift": {
-    "mtime": 1792230193.6257935,
-    "seen": 1792230234.0427084,
+    "mtime": 1792242234.4996934,
+    "seen": 1792242270.295573,
     "ast_hash": "6dd21d9120c86cf9db8986318c217c1f",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Managing Apps/AppManagerErrors.swift": {
-    "mtime": 1792230193.6267924,
-    "seen": 1792230234.0427098,
+    "mtime": 1792241140.6592736,
+    "seen": 1792242270.2955742,
     "ast_hash": "bce3ced703b5f999340b64014c4b94cb",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/My Apps/InstalledAppsCollectionHeaderView.swift": {
-    "mtime": 1792230193.6277957,
-    "seen": 1792230234.042711,
+    "mtime": 1792241140.965379,
+    "seen": 1792242270.2955754,
     "ast_hash": "c6942bf365b12bc2e2b52fe3b365b00b",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/My Apps/MyAppsComponents.swift": {
-    "mtime": 1792230193.6293776,
-    "seen": 1792230234.0427127,
+    "mtime": 1792241140.965379,
+    "seen": 1792242270.2955766,
     "ast_hash": "cfc10a33ae89afd8ac9e8ac7859c900d",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/My Apps/MyAppsViewController.swift": {
-    "mtime": 1792230193.630377,
-    "seen": 1792230234.0427139,
+    "mtime": 1792242234.5006933,
+    "seen": 1792242270.2955778,
     "ast_hash": "712951df766316948a15cdfcec61757a",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/My Apps/UpdateCollectionViewCell.swift": {
-    "mtime": 1792230193.630377,
-    "seen": 1792230234.042715,
+    "mtime": 1792241140.965379,
+    "seen": 1792242270.295579,
     "ast_hash": "0272f3b65633778b4c4035e6e68e5539",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/News/NewsCollectionViewCell.swift": {
-    "mtime": 1792230193.6333773,
-    "seen": 1792230234.0427165,
+    "mtime": 1792241140.9710257,
+    "seen": 1792242270.2955801,
     "ast_hash": "52a389ec336dd7e9d303de27de070466",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/News/NewsViewController.swift": {
-    "mtime": 1792230193.6349387,
-    "seen": 1792230234.0427175,
+    "mtime": 1792241140.9710257,
+    "seen": 1792242270.2955813,
     "ast_hash": "0a9623b58b3733a8ab8c1b1d473bf0b3",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Permissions/AppPermissionProtocol.swift": {
-    "mtime": 1792230193.635939,
-    "seen": 1792230234.0427186,
+    "mtime": 1792241140.975961,
+    "seen": 1792242270.295583,
     "ast_hash": "4f3ace7a357ea826661943f5fd0333fd",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Permissions/ReviewPermissionsViewController.swift": {
-    "mtime": 1792230193.6369388,
-    "seen": 1792230234.0427203,
+    "mtime": 1792241140.975961,
+    "seen": 1792242270.2955842,
     "ast_hash": "e16ce8c7142a56ceb843d2d75266ae66",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/SceneDelegate.swift": {
-    "mtime": 1792230193.778155,
-    "seen": 1792230234.0427215,
+    "mtime": 1792242234.501695,
+    "seen": 1792242270.2955854,
     "ast_hash": "f5f4922cdf070c0b6324c4c2012b8e3d",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Settings/AltAppIconsViewController.swift": {
-    "mtime": 1792230193.7813263,
-    "seen": 1792230234.0427227,
+    "mtime": 1792241141.1154177,
+    "seen": 1792242270.29559,
     "ast_hash": "f5302c55261c3c59dcf5d16daa8876f5",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Settings/AnisetteManager.swift": {
-    "mtime": 1792230193.7836623,
-    "seen": 1792230234.042724,
+    "mtime": 1792241141.1154177,
+    "seen": 1792242270.295591,
     "ast_hash": "a07bfe6381af0ef6606840352cb6b0f1",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Settings/AnisetteServerList.swift": {
-    "mtime": 1792230193.7836623,
-    "seen": 1792230234.042725,
+    "mtime": 1792241141.1154177,
+    "seen": 1792242270.2955925,
     "ast_hash": "213e1386333a968431484337667d7c54",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Settings/Error Log/ErrorDetailsViewController.swift": {
-    "mtime": 1792230193.7849164,
-    "seen": 1792230234.0427265,
+    "mtime": 1792241141.1154177,
+    "seen": 1792242270.2955935,
     "ast_hash": "32bf52885b77bd281ad4c92402971d16",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Settings/Error Log/ErrorLogTableViewCell.swift": {
-    "mtime": 1792230193.7849164,
-    "seen": 1792230234.0427282,
+    "mtime": 1792241141.1154177,
+    "seen": 1792242270.295595,
     "ast_hash": "1e70aa5fdd1fa64b0ca40feea69c997c",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Settings/Error Log/ErrorLogViewController.swift": {
-    "mtime": 1792230193.7859137,
-    "seen": 1792230234.0427294,
+    "mtime": 1792242234.5026941,
+    "seen": 1792242270.2955964,
     "ast_hash": "7016ba124ceae62b1873ef9d907c4090",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Settings/InsetGroupTableViewCell.swift": {
-    "mtime": 1792230193.7869134,
-    "seen": 1792230234.0427308,
+    "mtime": 1792241141.1209326,
+    "seen": 1792242270.2955978,
     "ast_hash": "3ad922955fc7b2dc93a988fdd7ed1cd6",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Settings/LicensesViewController.swift": {
-    "mtime": 1792230193.7869134,
-    "seen": 1792230234.042732,
+    "mtime": 1792241141.1209326,
+    "seen": 1792242270.2955992,
     "ast_hash": "b078db57b7a3c7b7ef5e1c91ee8307d2",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Settings/PatreonViewController.swift": {
-    "mtime": 1792230193.7879128,
-    "seen": 1792230234.0427334,
+    "mtime": 1792241141.1209326,
+    "seen": 1792242270.2956004,
     "ast_hash": "03296a92a18728fdeda2243378bbe8cf",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Settings/RefreshAttemptsViewController.swift": {
-    "mtime": 1792230193.7879128,
-    "seen": 1792230234.0427346,
+    "mtime": 1792241141.1209326,
+    "seen": 1792242270.2956014,
     "ast_hash": "92239cfe77865c90deae034aa1387ac0",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Settings/SettingsHeaderFooterView.swift": {
-    "mtime": 1792230193.7892332,
-    "seen": 1792230234.0427358,
+    "mtime": 1792241141.1209326,
+    "seen": 1792242270.2956028,
     "ast_hash": "5f7abe3292a3cfb7bf9d5422cb599710",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Settings/SettingsViewController.swift": {
-    "mtime": 1792230193.7912686,
-    "seen": 1792230234.0427372,
+    "mtime": 1792242234.5036929,
+    "seen": 1792242270.2956038,
     "ast_hash": "7d9f87af2a8ef52948b601665ee7497e",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Sources/AddSourceViewController.swift": {
-    "mtime": 1792230193.7942681,
-    "seen": 1792230234.0427384,
+    "mtime": 1792242234.5046928,
+    "seen": 1792242270.295605,
     "ast_hash": "efc8ed3ec67e31995e968df4a60ba4e9",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Sources/Components/AddSourceTextFieldCell.swift": {
-    "mtime": 1792230193.7952683,
-    "seen": 1792230234.0427396,
+    "mtime": 1792241141.126701,
+    "seen": 1792242270.2956064,
     "ast_hash": "60fe341875e1ee247ae5db43bbd62ff6",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Sources/Components/SourceComponents.swift": {
-    "mtime": 1792230193.7952683,
-    "seen": 1792230234.042741,
+    "mtime": 1792242234.5046928,
+    "seen": 1792242270.2956078,
     "ast_hash": "fd4cfb2b81eb9fa8e84a1cf61f45d695",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Sources/Components/SourceHeaderView.swift": {
-    "mtime": 1792230193.7962694,
-    "seen": 1792230234.0427423,
+    "mtime": 1792241141.126701,
+    "seen": 1792242270.2956088,
     "ast_hash": "4c86e4d2ffe2f21a1f8119b553fc0124",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Sources/SourceDetailContentViewController.swift": {
-    "mtime": 1792230193.7988174,
-    "seen": 1792230234.042744,
+    "mtime": 1792241141.1320796,
+    "seen": 1792242270.2956102,
     "ast_hash": "f592b0f075938324af2d0e5118662931",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Sources/SourceDetailViewController.swift": {
-    "mtime": 1792230193.7988174,
-    "seen": 1792230234.042745,
+    "mtime": 1792241141.1320796,
+    "seen": 1792242270.2956114,
     "ast_hash": "5f553b4b6619ed5884049ea0b29af988",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Sources/SourcesViewController.swift": {
-    "mtime": 1792230193.8002715,
-    "seen": 1792230234.0427463,
+    "mtime": 1792242234.5066938,
+    "seen": 1792242270.2956126,
     "ast_hash": "5ba3e821c6c5bac0576d5269e8816b85",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/TabBarController.swift": {
-    "mtime": 1792230193.8023727,
-    "seen": 1792230234.0427475,
+    "mtime": 1792241141.1320796,
+    "seen": 1792242270.2956142,
     "ast_hash": "989235106355b97c8758a359f7b46c12",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Types/ImportedAccount.swift": {
-    "mtime": 1792230193.8023727,
-    "seen": 1792230234.042749,
+    "mtime": 1792241141.1320796,
+    "seen": 1792242270.2956166,
     "ast_hash": "c6163c7b31d38e376b23c10157634226",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Types/LoadingState.swift": {
-    "mtime": 1792230193.8033779,
-    "seen": 1792230234.04275,
+    "mtime": 1792241141.137064,
+    "seen": 1792242270.2956188,
     "ast_hash": "58846b4a075cc220f6f7f59afea549a2",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltWidget/AltWidgetBundle.swift": {
-    "mtime": 1792230193.8063774,
-    "seen": 1792230234.0427516,
+    "mtime": 1792241141.1376183,
+    "seen": 1792242270.2956212,
     "ast_hash": "a906c4e1aba763098b47c04482f9f066",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltWidget/AltWidgetLogging.swift": {
-    "mtime": 1792230193.8077407,
-    "seen": 1792230234.0427527,
+    "mtime": 1792241141.1376183,
+    "seen": 1792242270.2956235,
     "ast_hash": "ec13cfbae496088540bb181b3ae99e2b",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltWidget/Components/Countdown.swift": {
-    "mtime": 1792230193.8152573,
-    "seen": 1792230234.0427537,
+    "mtime": 1792241141.1486957,
+    "seen": 1792242270.2956254,
     "ast_hash": "25087d73eaf9d46737607237b4fb59f6",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltWidget/Components/UnsupportedWidgetView.swift": {
-    "mtime": 1792230193.8152573,
-    "seen": 1792230234.0427551,
+    "mtime": 1792241141.1486957,
+    "seen": 1792242270.2956266,
     "ast_hash": "2e0d847d0c688175386327ff9b3fd8bd",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltWidget/Extensions/Date+Widget.swift": {
-    "mtime": 1792230193.816258,
-    "seen": 1792230234.0427563,
+    "mtime": 1792241141.1486957,
+    "seen": 1792242270.295628,
     "ast_hash": "179825e654896755f9b7c72fe9ec4d16",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltWidget/Extensions/View+AltWidget.swift": {
-    "mtime": 1792230193.816258,
-    "seen": 1792230234.0427577,
+    "mtime": 1792242234.5066938,
+    "seen": 1792242270.2956297,
     "ast_hash": "54f06b140e39f55d002a13960b27543e",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltWidget/Intents/PaginationIntent.swift": {
-    "mtime": 1792230193.818258,
-    "seen": 1792230234.0427594,
+    "mtime": 1792242234.5076966,
+    "seen": 1792242270.2956312,
     "ast_hash": "88391cbc6be820743230c7bdda26c46d",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltWidget/Intents/SelectAppIntent.swift": {
-    "mtime": 1792230193.818258,
-    "seen": 1792230234.0427606,
+    "mtime": 1792241141.1486957,
+    "seen": 1792242270.2956324,
     "ast_hash": "b6b258281cb77ac3576a8b662d5f83a8",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltWidget/Intents/WidgetUpdateIntent.swift": {
-    "mtime": 1792230193.819261,
-    "seen": 1792230234.0427618,
+    "mtime": 1792241141.1486957,
+    "seen": 1792242270.295634,
     "ast_hash": "791845da6a7bdb53acd9f884366330bd",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltWidget/Manager/PageInfoManager.swift": {
-    "mtime": 1792230193.819261,
-    "seen": 1792230234.042763,
+    "mtime": 1792242234.5086968,
+    "seen": 1792242270.295635,
     "ast_hash": "52d19ddecb1f45c55edd25db89b3c8b1",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltWidget/Model/AppSnapshot.swift": {
-    "mtime": 1792230193.8202612,
-    "seen": 1792230234.0427642,
+    "mtime": 1792241141.1542902,
+    "seen": 1792242270.2956362,
     "ast_hash": "b1ca12a5d711c70759a3f53a8e49d88d",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltWidget/Providers/ActiveAppsTimelineProvider+Simulator.swift": {
-    "mtime": 1792230193.8212583,
-    "seen": 1792230234.0427656,
+    "mtime": 1792241141.1542902,
+    "seen": 1792242270.2956378,
     "ast_hash": "5f73a75d2fcad3873828154a0182b10a",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltWidget/Providers/ActiveAppsTimelineProvider.swift": {
-    "mtime": 1792230193.8212583,
-    "seen": 1792230234.042767,
+    "mtime": 1792242234.5086968,
+    "seen": 1792242270.295639,
     "ast_hash": "28b227c000c6e7fe994b3cc61155897d",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltWidget/Providers/AppsTimelineProvider.swift": {
-    "mtime": 1792230193.8232577,
-    "seen": 1792230234.0427682,
+    "mtime": 1792241141.1542902,
+    "seen": 1792242270.2956402,
     "ast_hash": "29e41f918b0af3669210c8793714d794",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltWidget/Widgets/ActiveAppsWidget.swift": {
-    "mtime": 1792230193.8242579,
-    "seen": 1792230234.0427694,
+    "mtime": 1792242234.5096962,
+    "seen": 1792242270.2956417,
     "ast_hash": "39b0919598b60e9b0c75a0792f4dc1cc",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltWidget/Widgets/AppDetailWidget.swift": {
-    "mtime": 1792230193.8242579,
-    "seen": 1792230234.0427706,
+    "mtime": 1792242234.5096962,
+    "seen": 1792242270.2956429,
     "ast_hash": "4486248ca43260d2a0ca47507a261047",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltWidget/Widgets/LockScreenWidget.swift": {
-    "mtime": 1792230193.826258,
-    "seen": 1792230234.042772,
+    "mtime": 1792241141.1542902,
+    "seen": 1792242270.295644,
     "ast_hash": "c842dbf700117e835118e10168a443a0",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/CLI/CommandContext.swift": {
-    "mtime": 1792230195.9704056,
-    "seen": 1792230234.0427732,
+    "mtime": 1792241150.1650803,
+    "seen": 1792242270.2956455,
     "ast_hash": "9411e461743870a00d6382adb1e23056",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/CLI/CommandHandler.swift": {
-    "mtime": 1792230195.9714055,
-    "seen": 1792230234.0427747,
+    "mtime": 1792242234.7684155,
+    "seen": 1792242270.2956467,
     "ast_hash": "5dbf9f04096b2c952b0ce02015dd2ef8",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/CLI/DeviceDataManager.swift": {
-    "mtime": 1792230195.972406,
-    "seen": 1792230234.042776,
+    "mtime": 1792241150.170584,
+    "seen": 1792242270.2956479,
     "ast_hash": "989c6341c51b59dabd40978776b963a2",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/CLI/PortalCommandsParser.swift": {
-    "mtime": 1792230195.972406,
-    "seen": 1792230234.0427773,
+    "mtime": 1792242234.7684155,
+    "seen": 1792242270.295649,
     "ast_hash": "31823b848dd1aeee9dd891aaaac779b4",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/CLI/SecureInput.swift": {
-    "mtime": 1792230195.9736094,
-    "seen": 1792230234.0427787,
+    "mtime": 1792241150.170584,
+    "seen": 1792242270.2956502,
     "ast_hash": "ed7c241621634d4d4264a896f3edf21e",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/CLI/SessionManager.swift": {
-    "mtime": 1792230195.9736094,
-    "seen": 1792230234.04278,
+    "mtime": 1792241150.170584,
+    "seen": 1792242270.2956517,
     "ast_hash": "7067c0829aeb852964222b5104f68139",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/CLI/main.swift": {
-    "mtime": 1792230195.974609,
-    "seen": 1792230234.0427809,
+    "mtime": 1792242234.7694185,
+    "seen": 1792242270.2956529,
     "ast_hash": "a3a766c090606ca01ccc837c5c8e06e2",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Package.swift": {
-    "mtime": 1792230195.974609,
-    "seen": 1792230234.0427828,
+    "mtime": 1792241150.170584,
+    "seen": 1792242270.295654,
     "ast_hash": "ed2b535c4c732413b076e7e80f2c5dd5",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Anisette/AnisetteDataManager.swift": {
-    "mtime": 1792230195.9766092,
-    "seen": 1792230234.042784,
+    "mtime": 1792242234.7704175,
+    "seen": 1792242270.2956555,
     "ast_hash": "a018fcc338030a3b1fc544e9178d1c29",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Anisette/RemoteAnisetteDataProvider.swift": {
-    "mtime": 1792230195.9766092,
-    "seen": 1792230234.042785,
+    "mtime": 1792242234.7704175,
+    "seen": 1792242270.2956567,
     "ast_hash": "2ca70d4d56c2a1ccffcd862e0c22e960",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Archiver/Archive.swift": {
-    "mtime": 1792230195.9776108,
-    "seen": 1792230234.0427864,
+    "mtime": 1792242234.771422,
+    "seen": 1792242270.2956579,
     "ast_hash": "561af68aec448a116420701ce8a9ddbc",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Archiver/FileManagerZip.swift": {
-    "mtime": 1792230195.9786131,
-    "seen": 1792230234.0427876,
+    "mtime": 1792242234.7724228,
+    "seen": 1792242270.2956593,
     "ast_hash": "7234befc24a179ed3fd4c93f5cde03b8",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Certificates/CertificateParser.swift": {
-    "mtime": 1792230195.9786131,
-    "seen": 1792230234.042789,
+    "mtime": 1792242234.7724228,
+    "seen": 1792242270.2956681,
     "ast_hash": "3e9d45e2dcd9c692fa70c38f8f89c810",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Certificates/PKCS12Parser.swift": {
-    "mtime": 1792230195.979609,
-    "seen": 1792230234.0427904,
+    "mtime": 1792242234.7734237,
+    "seen": 1792242270.2956698,
     "ast_hash": "68ab1fb18f92fb3a89227104e43682e1",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/CodeSigning/CodeSignerAPI.swift": {
-    "mtime": 1792230195.9806087,
-    "seen": 1792230234.0427916,
+    "mtime": 1792242234.7734237,
+    "seen": 1792242270.295671,
     "ast_hash": "60f6deeecfc0b79e21c33055677ada14",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Compatibility.swift": {
-    "mtime": 1792230195.9806087,
-    "seen": 1792230234.0427928,
+    "mtime": 1792242234.7744217,
+    "seen": 1792242270.2956724,
     "ast_hash": "440c665a0231afdf581e6f7da9640dc7",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Constants.swift": {
-    "mtime": 1792230195.9816089,
-    "seen": 1792230234.042794,
+    "mtime": 1792242234.7744217,
+    "seen": 1792242270.2956736,
     "ast_hash": "16c9a5cb9e4461705c3daf457548eda1",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/DeveloperPortal/AppGroups.swift": {
-    "mtime": 1792230195.9826093,
-    "seen": 1792230234.0427952,
+    "mtime": 1792241150.1761098,
+    "seen": 1792242270.2956748,
     "ast_hash": "779e0678e5ad504f526fd18ac53c2da5",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/DeveloperPortal/AppIDs.swift": {
-    "mtime": 1792230195.9826093,
-    "seen": 1792230234.0427964,
+    "mtime": 1792242234.7754219,
+    "seen": 1792242270.2956767,
     "ast_hash": "1ae7aca99692d38b9ee6e7bc877cf3ce",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/DeveloperPortal/AuthDevices.swift": {
-    "mtime": 1792230195.9836094,
-    "seen": 1792230234.0427976,
+    "mtime": 1792241150.181186,
+    "seen": 1792242270.2956777,
     "ast_hash": "6bce0fc05a9ec33c0fe2eeecb6ca7cf5",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/DeveloperPortal/AuthModels.swift": {
-    "mtime": 1792230195.9846096,
-    "seen": 1792230234.0427988,
+    "mtime": 1792242234.7764223,
+    "seen": 1792242270.295679,
     "ast_hash": "d2d2096ebd9f03a84faf8a64e4abbe10",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/DeveloperPortal/Authentication.swift": {
-    "mtime": 1792230195.9846096,
-    "seen": 1792230234.0428,
+    "mtime": 1792242234.7764223,
+    "seen": 1792242270.2956803,
     "ast_hash": "176322c4b745e600ed9f620a12bacf17",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/DeveloperPortal/Certificates.swift": {
-    "mtime": 1792230195.9856095,
-    "seen": 1792230234.0428011,
+    "mtime": 1792241150.181647,
+    "seen": 1792242270.2956812,
     "ast_hash": "a007c19c76c712146c21b71bb45eadef",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/DeveloperPortal/DeveloperPortalAPI.swift": {
-    "mtime": 1792230195.9856095,
-    "seen": 1792230234.0428023,
+    "mtime": 1792242234.7774224,
+    "seen": 1792242270.295683,
     "ast_hash": "6d92350963eb2f641a15b3fb55f84e47",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/DeveloperPortal/Devices.swift": {
-    "mtime": 1792230195.9866095,
-    "seen": 1792230234.0428038,
+    "mtime": 1792241150.181647,
+    "seen": 1792242270.2956843,
     "ast_hash": "a89fa0176beb8cfab5cf2fedd3b4cbe5",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/DeveloperPortal/Profiles.swift": {
-    "mtime": 1792230195.9866095,
-    "seen": 1792230234.042805,
+    "mtime": 1792241150.181647,
+    "seen": 1792242270.2956855,
     "ast_hash": "210bd264a933dc73e7c05ebdebf0a860",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/DeveloperPortal/Teams.swift": {
-    "mtime": 1792230195.987609,
-    "seen": 1792230234.042806,
+    "mtime": 1792241150.181647,
+    "seen": 1792242270.295687,
     "ast_hash": "23609c08ea0056761ef4e6f743d368cc",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Logging.swift": {
-    "mtime": 1792230195.987609,
-    "seen": 1792230234.0428073,
+    "mtime": 1792242234.7774224,
+    "seen": 1792242270.2956882,
     "ast_hash": "af797adbbb863a6adff988ec08997a85",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Models/Account.swift": {
-    "mtime": 1792230195.988609,
-    "seen": 1792230234.0428085,
+    "mtime": 1792241150.181647,
+    "seen": 1792242270.2956896,
     "ast_hash": "20a1dd38c56d9f2b1ba570a8179cc1de",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Models/AnisetteData.swift": {
-    "mtime": 1792230195.988609,
-    "seen": 1792230234.04281,
+    "mtime": 1792241150.181647,
+    "seen": 1792242270.295691,
     "ast_hash": "0b64a07c037a1f1d6da18956e007c408",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Models/AppBundle.swift": {
-    "mtime": 1792230195.9896097,
-    "seen": 1792230234.0428112,
+    "mtime": 1792241150.181647,
+    "seen": 1792242270.2956924,
     "ast_hash": "a301afcb10ba0e573bcd4b8156ec8626",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Models/AppGroup.swift": {
-    "mtime": 1792230195.9896097,
-    "seen": 1792230234.0428123,
+    "mtime": 1792241150.1871657,
+    "seen": 1792242270.2956939,
     "ast_hash": "fe2cc9b8a675b9c980416bcb52a9c2f2",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Models/AppID.swift": {
-    "mtime": 1792230195.9906087,
-    "seen": 1792230234.0428138,
+    "mtime": 1792242234.778422,
+    "seen": 1792242270.295695,
     "ast_hash": "d1f1e35f436340c3738fef7f9f0a61b5",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Models/AuthDevice.swift": {
-    "mtime": 1792230195.9906087,
-    "seen": 1792230234.042815,
+    "mtime": 1792241150.1871657,
+    "seen": 1792242270.295696,
     "ast_hash": "057bf6d0d16d799d48557cfd4bdb798e",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Models/AuthSession.swift": {
-    "mtime": 1792230195.9916096,
-    "seen": 1792230234.0428162,
+    "mtime": 1792241150.1871657,
+    "seen": 1792242270.2956975,
     "ast_hash": "4254697022a9ba6a9644342c843df828",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Models/CertificateRequest.swift": {
-    "mtime": 1792230195.9916096,
-    "seen": 1792230234.0428176,
+    "mtime": 1792241150.1871657,
+    "seen": 1792242270.2956986,
     "ast_hash": "a44d401ea90b60970ada1251cd4c9e9b",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Models/CertificateType.swift": {
-    "mtime": 1792230195.9926088,
-    "seen": 1792230234.0428188,
+    "mtime": 1792241150.1871657,
+    "seen": 1792242270.2957,
     "ast_hash": "f1226eb07706786b926239587d02ca95",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Models/DeveloperPortalResponses.swift": {
-    "mtime": 1792230195.9926088,
-    "seen": 1792230234.04282,
+    "mtime": 1792241150.1871657,
+    "seen": 1792242270.2957013,
     "ast_hash": "f0a484dd856d1850ef998e7a19ecca49",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Models/Device.swift": {
-    "mtime": 1792230195.9926088,
-    "seen": 1792230234.0428216,
+    "mtime": 1792241150.1871657,
+    "seen": 1792242270.2957025,
     "ast_hash": "430a17d88673cc1b520e755abf8a8e85",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Models/DeviceData.swift": {
-    "mtime": 1792230195.9936092,
-    "seen": 1792230234.0428226,
+    "mtime": 1792241150.1871657,
+    "seen": 1792242270.295704,
     "ast_hash": "4b17266f9bd6611dcc7d2b0abf9e8c30",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Models/Entitlement.swift": {
-    "mtime": 1792230195.9936092,
-    "seen": 1792230234.042824,
+    "mtime": 1792241150.1871657,
+    "seen": 1792242270.2957048,
     "ast_hash": "51fe0192766c97f2414418c7bc5caf23",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Models/Errors.swift": {
-    "mtime": 1792230195.9946096,
-    "seen": 1792230234.0428252,
+    "mtime": 1792242234.779423,
+    "seen": 1792242270.295706,
     "ast_hash": "6be1be07f5f5c108e7c911015eba92d6",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Models/Feature.swift": {
-    "mtime": 1792230195.9946096,
-    "seen": 1792230234.0428264,
+    "mtime": 1792241150.1871657,
+    "seen": 1792242270.295708,
     "ast_hash": "9d683e2e0ca50e0243cf53f11923c6ae",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Models/InfoPlistParser.swift": {
-    "mtime": 1792230195.995609,
-    "seen": 1792230234.0428278,
+    "mtime": 1792241150.1871657,
+    "seen": 1792242270.295709,
     "ast_hash": "9e70f69fcff7876d2ead7cb75caa2615",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Models/KeyStore.swift": {
-    "mtime": 1792230195.995609,
-    "seen": 1792230234.0428295,
+    "mtime": 1792242234.779423,
+    "seen": 1792242270.2957103,
     "ast_hash": "e0058338b87a46db561794e3445a7059",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Models/ProfileType.swift": {
-    "mtime": 1792230195.9971006,
-    "seen": 1792230234.042831,
+    "mtime": 1792241150.192805,
+    "seen": 1792242270.2957115,
     "ast_hash": "b46700ddd8a0523d08bf64dbbdbb50d5",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Models/ProvisioningProfile.swift": {
-    "mtime": 1792230195.9971006,
-    "seen": 1792230234.042832,
+    "mtime": 1792241150.192805,
+    "seen": 1792242270.2957127,
     "ast_hash": "69f1d064fc94b9396db08e3dcb615d4e",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Models/Session.swift": {
-    "mtime": 1792230195.9981062,
-    "seen": 1792230234.042833,
+    "mtime": 1792241150.192805,
+    "seen": 1792242270.2957144,
     "ast_hash": "9701dae6a3b506089ddafd7d5ba96e70",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Models/Team.swift": {
-    "mtime": 1792230195.9981062,
-    "seen": 1792230234.0428345,
+    "mtime": 1792241150.192805,
+    "seen": 1792242270.2957156,
     "ast_hash": "a681dfb19500a53b2f9c8a69a91bd2ea",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/Models/X509Certificate.swift": {
-    "mtime": 1792230195.9981062,
-    "seen": 1792230234.0428357,
+    "mtime": 1792241150.192805,
+    "seen": 1792242270.2957165,
     "ast_hash": "740d5e243c6e4334ff54f03ddc23e447",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/SideSign.swift": {
-    "mtime": 1792230195.999106,
-    "seen": 1792230234.0428371,
+    "mtime": 1792241150.192805,
+    "seen": 1792242270.295718,
     "ast_hash": "535ba9e245dcc10d828fbd89fd45f7ae",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Sources/SideSignHeaders.swift": {
-    "mtime": 1792230195.999106,
-    "seen": 1792230234.0428386,
+    "mtime": 1792241150.192805,
+    "seen": 1792242270.2957191,
     "ast_hash": "daec7f7d6af1ea022a020f8f98347071",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/Tests/SideSignTests/SideSignTests.swift": {
-    "mtime": 1792230196.000106,
-    "seen": 1792230234.0428398,
+    "mtime": 1792241150.198366,
+    "seen": 1792242270.29572,
     "ast_hash": "b527de5ac76e017307694ab0caac0142",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/Common/ConcurrencyUtils.swift": {
-    "mtime": 1792230197.7505188,
-    "seen": 1792230234.0428412,
+    "mtime": 1792241150.3595507,
+    "seen": 1792242270.2957215,
     "ast_hash": "9975b0e0538f5b1f5e2b078f43590118",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/Common/FFIDispatcher.swift": {
-    "mtime": 1792230197.7505188,
-    "seen": 1792230234.0428421,
+    "mtime": 1792242234.9704638,
+    "seen": 1792242270.2957227,
     "ast_hash": "64f822aeb951d9b069bdf1ce80395443",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/Common/MinimuxerCommonLogging.swift": {
-    "mtime": 1792230197.7572184,
-    "seen": 1792230234.0428433,
+    "mtime": 1792241150.3595507,
+    "seen": 1792242270.2957237,
     "ast_hash": "8ba9c603a7be90c701571bc8ab7e0cd7",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/Common/MinimuxerConstants.swift": {
-    "mtime": 1792230197.7572184,
-    "seen": 1792230234.0428452,
+    "mtime": 1792241150.3645506,
+    "seen": 1792242270.295725,
     "ast_hash": "4898b05bf1c67ad740d834957faa9ae5",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/Common/NetworkUtils.swift": {
-    "mtime": 1792230197.7582283,
-    "seen": 1792230234.0428462,
+    "mtime": 1792241150.3652024,
+    "seen": 1792242270.2957263,
     "ast_hash": "a4fa45b4b09d345d54f0d790b0f8aba1",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/Common/Package.swift": {
-    "mtime": 1792230197.7582283,
-    "seen": 1792230234.0428472,
+    "mtime": 1792241150.3652024,
+    "seen": 1792242270.2957277,
     "ast_hash": "90dc8ac1ec1a382804be179cbd549ec3",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/Common/PairingFile.swift": {
-    "mtime": 1792230197.7592247,
-    "seen": 1792230234.0428486,
+    "mtime": 1792241150.3652024,
+    "seen": 1792242270.2957287,
     "ast_hash": "ee0036249f63eb07d16affbccdfc40df",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/Common/PairingProtocol.swift": {
-    "mtime": 1792230197.7592247,
-    "seen": 1792230234.0428498,
+    "mtime": 1792241150.3652024,
+    "seen": 1792242270.2957299,
     "ast_hash": "d242c769b844e9d6996186208c849199",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/Common/TCPAcceptor.swift": {
-    "mtime": 1792230197.7592247,
-    "seen": 1792230234.042851,
+    "mtime": 1792242234.9704638,
+    "seen": 1792242270.2957315,
     "ast_hash": "3c41625fc1880d3ea2f65cd5e17f188f",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/DeviceGateway/BaseDeviceGateway.swift": {
-    "mtime": 1792230197.7608461,
-    "seen": 1792230234.0428529,
+    "mtime": 1792242234.9714723,
+    "seen": 1792242270.295733,
     "ast_hash": "d15e1bdfc7d70b1f3fcc22bcdce47bef",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/DeviceGateway/DeviceGatewayAPI.swift": {
-    "mtime": 1792230197.7618544,
-    "seen": 1792230234.0428538,
+    "mtime": 1792242234.9714723,
+    "seen": 1792242270.2957342,
     "ast_hash": "54c7189c509d6e2261e1e6e799e5b434",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/DeviceGateway/DeviceGatewayError.swift": {
-    "mtime": 1792230197.7618544,
-    "seen": 1792230234.0428553,
+    "mtime": 1792241150.3652024,
+    "seen": 1792242270.2957356,
     "ast_hash": "6e603623bc314c4f213aff5f77f73cc1",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/DeviceGateway/DeviceGatewayLogging.swift": {
-    "mtime": 1792230197.7628546,
-    "seen": 1792230234.0428565,
+    "mtime": 1792241150.3701034,
+    "seen": 1792242270.2957366,
     "ast_hash": "4d83ce39307949dbec6df9551e5c5c4e",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/DeviceGateway/Package.swift": {
-    "mtime": 1792230197.7628546,
-    "seen": 1792230234.0428576,
+    "mtime": 1792241150.3707154,
+    "seen": 1792242270.2957385,
     "ast_hash": "e8a672e5408b46cdeb32c4663986846f",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/DeviceGateway/idevice/IdeviceGateway.swift": {
-    "mtime": 1792230197.7638547,
-    "seen": 1792230234.042859,
+    "mtime": 1792242234.9724717,
+    "seen": 1792242270.2957397,
     "ast_hash": "2cb184296b287f9551ee9f835cf98fba",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/DeviceGateway/libimobiledevice/LibimobiledeviceGateway.swift": {
-    "mtime": 1792230197.764854,
-    "seen": 1792230234.0428607,
+    "mtime": 1792242234.9734714,
+    "seen": 1792242270.2957408,
     "ast_hash": "fe9f9c09fa22719882639e977ba066bf",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/Package.swift": {
-    "mtime": 1792230197.7668507,
-    "seen": 1792230234.042862,
+    "mtime": 1792241150.3707154,
+    "seen": 1792242270.2957423,
     "ast_hash": "7f784a64f4b58a1e1c232aea98b273a2",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/Sources/DeviceProvider.swift": {
-    "mtime": 1792230197.7681005,
-    "seen": 1792230234.0428631,
+    "mtime": 1792241150.3707154,
+    "seen": 1792242270.2957432,
     "ast_hash": "c9a9db91adac6bdaea54fdd853683d28",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/Sources/EMProxyImpl.swift": {
-    "mtime": 1792230197.7681005,
-    "seen": 1792230234.0428643,
+    "mtime": 1792241150.375685,
+    "seen": 1792242270.2957444,
     "ast_hash": "368ac3c408fa6f163c0eafebaddbbf90",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/Sources/MinimuxerApi.swift": {
-    "mtime": 1792230197.7691002,
-    "seen": 1792230234.0428658,
+    "mtime": 1792241150.3763373,
+    "seen": 1792242270.2957458,
     "ast_hash": "ea53770e948b5add1918eb8800409f17",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/Sources/MinimuxerError.swift": {
-    "mtime": 1792230197.7701,
-    "seen": 1792230234.042867,
+    "mtime": 1792241150.3763373,
+    "seen": 1792242270.2957468,
     "ast_hash": "8cdd981f0dd0fe3fb80512b624167c48",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/Sources/MinimuxerImpl.swift": {
-    "mtime": 1792230197.7701,
-    "seen": 1792230234.0428684,
+    "mtime": 1792242234.974472,
+    "seen": 1792242270.295748,
     "ast_hash": "79284090ff27b16834db3880acc27318",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/Sources/MinimuxerInternalError.swift": {
-    "mtime": 1792230197.771101,
-    "seen": 1792230234.0428696,
+    "mtime": 1792241150.3763373,
+    "seen": 1792242270.2957492,
     "ast_hash": "1f9e2be4c7d3892908a0b494a4c33cd4",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/Sources/MinimuxerLogging.swift": {
-    "mtime": 1792230197.771101,
-    "seen": 1792230234.0428708,
+    "mtime": 1792241150.3763373,
+    "seen": 1792242270.2957504,
     "ast_hash": "bc9d1e2509b327ecc9c3b908e2b9242b",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/Sources/Services/DeviceConnectionManager.swift": {
-    "mtime": 1792230197.7721002,
-    "seen": 1792230234.042872,
+    "mtime": 1792242234.9754722,
+    "seen": 1792242270.2957516,
     "ast_hash": "c488da91dc8871570ef6a5195f6a21f5",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/Sources/Services/DeviceEndpoint.swift": {
-    "mtime": 1792230197.7724202,
-    "seen": 1792230234.0428734,
+    "mtime": 1792241150.3763373,
+    "seen": 1792242270.295753,
     "ast_hash": "5c287a52d4b6cf3cddf2d3e6aaaad2a7",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/Sources/Services/HeartbeatService.swift": {
-    "mtime": 1792230197.7736154,
-    "seen": 1792230234.0428746,
+    "mtime": 1792242234.9754722,
+    "seen": 1792242270.2957544,
     "ast_hash": "32d25fbc79de7dae006c1d3efaac9775",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/Sources/Services/Mounter.swift": {
-    "mtime": 1792230197.7736154,
-    "seen": 1792230234.0428762,
+    "mtime": 1792241150.3763373,
+    "seen": 1792242270.2957559,
     "ast_hash": "773ba545c61e7820102aebfa38919bdd",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/Sources/Services/NetworkIfaceScanner.swift": {
-    "mtime": 1792230197.7746189,
-    "seen": 1792230234.0428774,
+    "mtime": 1792242234.976472,
+    "seen": 1792242270.295757,
     "ast_hash": "3519884ee6d231adf73e1d39971e5f96",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/Sources/Services/NetworkObserverService.swift": {
-    "mtime": 1792230197.7746189,
-    "seen": 1792230234.0428786,
+    "mtime": 1792242234.976472,
+    "seen": 1792242270.295758,
     "ast_hash": "8b2235fbd8a10840b9a2ca04c9d1fe33",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/Sources/Services/UsbmuxdProxyServer.swift": {
-    "mtime": 1792230197.775619,
-    "seen": 1792230234.04288,
+    "mtime": 1792242234.9774697,
+    "seen": 1792242270.2957597,
     "ast_hash": "7904b5915569d234a6fbc7bf77d44b63",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/Sources/Services/WirelessPairService.swift": {
-    "mtime": 1792230197.775619,
-    "seen": 1792230234.0428813,
+    "mtime": 1792242234.9784715,
+    "seen": 1792242270.2957609,
     "ast_hash": "98723e2b39367836e23a1c9ceb496303",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/Sources/Types/RawPacket.swift": {
-    "mtime": 1792230197.7766192,
-    "seen": 1792230234.0428824,
+    "mtime": 1792241150.3832917,
+    "seen": 1792242270.2957625,
     "ast_hash": "be17f151edc3aba3f1ca16f926fb2306",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/Tests/EMProxyTests.swift": {
-    "mtime": 1792230197.777619,
-    "seen": 1792230234.0428839,
+    "mtime": 1792241150.3832917,
+    "seen": 1792242270.2957637,
     "ast_hash": "d5f47df6e4b73d8fe695ad9b981e66bc",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Shared/Categories/CFNotificationName+AltStore.swift": {
-    "mtime": 1792230193.832258,
-    "seen": 1792230234.042885,
+    "mtime": 1792241141.1657574,
+    "seen": 1792242270.2957647,
     "ast_hash": "79b93ff3b7dd66a501bf123add56db68",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Shared/Errors/ALTLocalizedError.swift": {
-    "mtime": 1792230193.832258,
-    "seen": 1792230234.0428865,
+    "mtime": 1792241141.1657574,
+    "seen": 1792242270.2957664,
     "ast_hash": "3007090ecbe5d6c19107fcfc3a25f758",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Shared/Errors/ALTWrappedError.swift": {
-    "mtime": 1792230193.8332577,
-    "seen": 1792230234.0428877,
+    "mtime": 1792241141.1657574,
+    "seen": 1792242270.2957675,
     "ast_hash": "79f90a3e5a230ede5f5323bd0690af0f",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Shared/Errors/ProcessError.swift": {
-    "mtime": 1792230193.8342583,
-    "seen": 1792230234.0428889,
+    "mtime": 1792241141.1657574,
+    "seen": 1792242270.2957685,
     "ast_hash": "3633ae8cf75af6298e48fd7c7c2a3289",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Shared/Errors/UserInfoValue.swift": {
-    "mtime": 1792230193.8342583,
-    "seen": 1792230234.0428903,
+    "mtime": 1792241141.1657574,
+    "seen": 1792242270.2957702,
     "ast_hash": "b3d6a6f239a3e8a48e91327408eef65f",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Shared/Extensions/ALTApplication+AltStoreApp.swift": {
-    "mtime": 1792230193.8352573,
-    "seen": 1792230234.0428917,
+    "mtime": 1792241141.1657574,
+    "seen": 1792242270.2957714,
     "ast_hash": "b6d3282a1fc0a29babb3d16ed854f4a2",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Shared/Extensions/Bundle+AltStore.swift": {
-    "mtime": 1792230193.8352573,
-    "seen": 1792230234.0428934,
+    "mtime": 1792242234.5126958,
+    "seen": 1792242270.2957723,
     "ast_hash": "8d4b95deefd7f64cb462fd3abc20f149",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Shared/Extensions/FileManager+SharedDirectories.swift": {
-    "mtime": 1792230193.8372593,
-    "seen": 1792230234.0428946,
+    "mtime": 1792242234.5136962,
+    "seen": 1792242270.2957737,
     "ast_hash": "ca6404f52294c40a8cb6b1f59a8d35e0",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Shared/Extensions/NSError+AltStore.swift": {
-    "mtime": 1792230193.8372593,
-    "seen": 1792230234.0428958,
+    "mtime": 1792241141.1704063,
+    "seen": 1792242270.295775,
     "ast_hash": "a9e4821191ae2f1b760b6c5e60b85b16",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Shared/Extensions/OperatingSystemVersion+Comparable.swift": {
-    "mtime": 1792230193.8382573,
-    "seen": 1792230234.042897,
+    "mtime": 1792241141.170997,
+    "seen": 1792242270.2957764,
     "ast_hash": "b5475f3d0ee77629d9c92c7f0dff1900",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Shared/Extensions/ProcessInfo+Platform.swift": {
-    "mtime": 1792230193.8382573,
-    "seen": 1792230234.0428982,
+    "mtime": 1792241141.170997,
+    "seen": 1792242270.2957778,
     "ast_hash": "1739c7c7a9cd80772408a9284b08f026",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Shared/Extensions/Result+Conveniences.swift": {
-    "mtime": 1792230193.8392591,
-    "seen": 1792230234.0428996,
+    "mtime": 1792241141.170997,
+    "seen": 1792242270.295779,
     "ast_hash": "36750cd0c2ca27756b0c5cba65d7d90c",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Shared/Extensions/UIApplication+AppExtension.swift": {
-    "mtime": 1792230193.8392591,
-    "seen": 1792230234.0429008,
+    "mtime": 1792242234.5136962,
+    "seen": 1792242270.2957802,
     "ast_hash": "beb2d19d62ad4d0d77d1e4b289e31c39",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Shared/Extensions/UIColor+AltStore.swift": {
-    "mtime": 1792230193.8392591,
-    "seen": 1792230234.042902,
+    "mtime": 1792241141.170997,
+    "seen": 1792242270.2957814,
     "ast_hash": "d2747210dc25a229caefc19ea7782fbf",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Shared/Extensions/UIColor+Hex.swift": {
-    "mtime": 1792230193.8402576,
-    "seen": 1792230234.0429032,
+    "mtime": 1792241141.170997,
+    "seen": 1792242270.2957826,
     "ast_hash": "080918da9b5345b83d378f400d17a403",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Shared/Extensions/UIImage+Manipulation.swift": {
-    "mtime": 1792230193.8402576,
-    "seen": 1792230234.0429046,
+    "mtime": 1792241141.170997,
+    "seen": 1792242270.295784,
     "ast_hash": "48c51930f412f06c760efe7ff4847e12",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideBackup/BackupEngine.swift": {
-    "mtime": 1792230193.8452594,
-    "seen": 1792230234.0429058,
+    "mtime": 1792242234.5146966,
+    "seen": 1792242270.2957857,
     "ast_hash": "a4f236070c8b5248408faa5bcffa77f7",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideBackup/ConsoleLog.swift": {
-    "mtime": 1792230193.8462586,
-    "seen": 1792230234.0429068,
+    "mtime": 1792242234.5146966,
+    "seen": 1792242270.2957873,
     "ast_hash": "ea3bf7accceaed02d509d3b66d972991",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideBackup/ContentView.swift": {
-    "mtime": 1792230193.8462586,
-    "seen": 1792230234.0429082,
+    "mtime": 1792242234.515697,
+    "seen": 1792242270.2957885,
     "ast_hash": "39d6ad904a93a06e246093afe925ff95",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideBackup/SideBackup-Bridging-Header.h": {
-    "mtime": 1792230193.847258,
-    "seen": 1792230234.0429094,
+    "mtime": 1792241141.176857,
+    "seen": 1792242270.2957902,
     "ast_hash": "850940e044176095a95ed51a7e5947d0",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideBackup/SideBackupApp.swift": {
-    "mtime": 1792230193.848258,
-    "seen": 1792230234.0429108,
+    "mtime": 1792242234.5166965,
+    "seen": 1792242270.2957914,
     "ast_hash": "bb330f8d9f9c01afcf9627ef1bc582a0",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideBackup/SideBackupAppLauncher.h": {
-    "mtime": 1792230193.848258,
-    "seen": 1792230234.042912,
+    "mtime": 1792241141.176857,
+    "seen": 1792242270.2957926,
     "ast_hash": "2ab74681b150b01a508d4bb8d761d1cf",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideBackup/SideBackupAppLauncher.m": {
-    "mtime": 1792230193.849258,
-    "seen": 1792230234.0429132,
+    "mtime": 1792241141.176857,
+    "seen": 1792242270.295794,
     "ast_hash": "bf3d89c2b1ddf35921c38fcd53da4ce6",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/AppBootManager.swift": {
-    "mtime": 1792230193.8513412,
-    "seen": 1792230234.0429144,
+    "mtime": 1792241141.1820273,
+    "seen": 1792242270.2957952,
     "ast_hash": "6eee153744d040e89181d238fcf2c508",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/AppConstants.swift": {
-    "mtime": 1792230193.8513412,
-    "seen": 1792230234.0429156,
+    "mtime": 1792242234.5166965,
+    "seen": 1792242270.2957964,
     "ast_hash": "b86357e8ae99e8dfabec93e54c5bd71c",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Anisette/AnisetteConfigManager.swift": {
-    "mtime": 1792230193.8535123,
-    "seen": 1792230234.0429165,
+    "mtime": 1792241141.1820273,
+    "seen": 1792242270.2957978,
     "ast_hash": "e395fc2436c937cbef6cf3fe3b4f0019",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Anisette/AnisetteProvider.swift": {
-    "mtime": 1792230193.8535123,
-    "seen": 1792230234.042918,
+    "mtime": 1792242234.5176954,
+    "seen": 1792242270.295799,
     "ast_hash": "a2ed5cf9774b919eaf24c6518db9a9c2",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Anisette/AnisetteServersManager.swift": {
-    "mtime": 1792230193.8555112,
-    "seen": 1792230234.0429194,
+    "mtime": 1792241141.1820273,
+    "seen": 1792242270.295801,
     "ast_hash": "efebb88be78b20ec67beebdd8e75bfb1",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Anisette/OnDeviceAnisetteManager.swift": {
-    "mtime": 1792230193.855882,
-    "seen": 1792230234.0429206,
+    "mtime": 1792242234.5186942,
+    "seen": 1792242270.295802,
     "ast_hash": "a1741f7f9d842c4f28c35fffed349ac3",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Auth/AuthManager.swift": {
-    "mtime": 1792230193.855882,
-    "seen": 1792230234.0429218,
+    "mtime": 1792242234.5186942,
+    "seen": 1792242270.295803,
     "ast_hash": "bb9911732713234fd78b681d71c85d3e",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Auth/DeveloperPortalProxy.swift": {
-    "mtime": 1792230193.857068,
-    "seen": 1792230234.042923,
+    "mtime": 1792242234.519693,
+    "seen": 1792242270.2958045,
     "ast_hash": "05328449293d331930db5161521b92f6",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Auth/Flows/CertificateProvisioningFlow.swift": {
-    "mtime": 1792230193.8580685,
-    "seen": 1792230234.0429244,
+    "mtime": 1792241141.1876037,
+    "seen": 1792242270.2958057,
     "ast_hash": "d0237366220cd003857ede049360b642",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Auth/Flows/CodeSignValidationFlow.swift": {
-    "mtime": 1792230193.8580685,
-    "seen": 1792230234.0429258,
+    "mtime": 1792241141.1876037,
+    "seen": 1792242270.2958066,
     "ast_hash": "4f351b1791195cc8841cfd0edfc4410f",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Auth/Flows/DeviceRegistrationFlow.swift": {
-    "mtime": 1792230193.859069,
-    "seen": 1792230234.042927,
+    "mtime": 1792241141.1876037,
+    "seen": 1792242270.295808,
     "ast_hash": "27afc2e4b676a55d53dfd31ab4d47b17",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Auth/SideSignConfigManager.swift": {
-    "mtime": 1792230193.860069,
-    "seen": 1792230234.0429282,
+    "mtime": 1792241141.1876037,
+    "seen": 1792242270.2958093,
     "ast_hash": "ba0e0f8d39ea4a14a1f0c7185fe9d095",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/BackgroundServices/BackgroundAudioService.swift": {
-    "mtime": 1792230193.860069,
-    "seen": 1792230234.0429294,
+    "mtime": 1792241141.1876037,
+    "seen": 1792242270.2958105,
     "ast_hash": "7570401ff1b3a5efd47d139a6cc09e05",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/BackgroundServices/BackgroundLocationService.swift": {
-    "mtime": 1792230193.8614416,
-    "seen": 1792230234.0429306,
+    "mtime": 1792241141.1876037,
+    "seen": 1792242270.295812,
     "ast_hash": "ecd6b445931f31c1062da326dcb7d52b",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/BackgroundServices/BackgroundService.swift": {
-    "mtime": 1792230193.8614416,
-    "seen": 1792230234.042932,
+    "mtime": 1792241141.1876037,
+    "seen": 1792242270.295813,
     "ast_hash": "0176c4c088a377019cec929326aec4d8",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Bonjour/BonjourDiscoveryManager.swift": {
-    "mtime": 1792230193.8626416,
-    "seen": 1792230234.0429332,
+    "mtime": 1792242234.520693,
+    "seen": 1792242270.2958145,
     "ast_hash": "019daf0b773372db049f058ace479eff",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Bonjour/BonjourDiscoveryTypes.swift": {
-    "mtime": 1792230193.8636415,
-    "seen": 1792230234.0429342,
+    "mtime": 1792241141.1926236,
+    "seen": 1792242270.2958157,
     "ast_hash": "6d908852cf663a267a1fe1e30a8e50ba",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Bonjour/LocalNetworkPermissionChecker.swift": {
-    "mtime": 1792230193.8636415,
-    "seen": 1792230234.0429358,
+    "mtime": 1792241141.1931918,
+    "seen": 1792242270.295817,
     "ast_hash": "77f078b5741f3cfc87f9f5154123db74",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Certificates/CertificateASN1Parser.swift": {
-    "mtime": 1792230193.8653169,
-    "seen": 1792230234.042937,
+    "mtime": 1792241141.1931918,
+    "seen": 1792242270.2958183,
     "ast_hash": "d9edc3c41c0f7497737f77e8cbcd8271",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Certificates/CertificateManager.swift": {
-    "mtime": 1792230193.8653169,
-    "seen": 1792230234.0429387,
+    "mtime": 1792242234.520693,
+    "seen": 1792242270.2958195,
     "ast_hash": "e336c9806daa33fa99b6e1d28da4c5c1",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Certificates/CertificateStore.swift": {
-    "mtime": 1792230193.8669884,
-    "seen": 1792230234.04294,
+    "mtime": 1792241141.1931918,
+    "seen": 1792242270.2958207,
     "ast_hash": "5950814214438f48f4a1a7484d1b4f19",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Certificates/CodeSignValidator.swift": {
-    "mtime": 1792230193.8669884,
-    "seen": 1792230234.0429409,
+    "mtime": 1792241141.1931918,
+    "seen": 1792242270.295822,
     "ast_hash": "1c48e24f6831942010c5b40cdedcb000",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Certificates/OCSPValidator.swift": {
-    "mtime": 1792230193.8681772,
-    "seen": 1792230234.0429423,
+    "mtime": 1792242234.5216932,
+    "seen": 1792242270.295823,
     "ast_hash": "803408afe6c11063115329898c9ce115",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/DeviceApi/EMProxyWrapper.swift": {
-    "mtime": 1792230193.8681772,
-    "seen": 1792230234.0429435,
+    "mtime": 1792241141.1931918,
+    "seen": 1792242270.2958243,
     "ast_hash": "6d6fafb4cefa1c644bf44c6f49641147",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/DeviceApi/MinimuxerWrapper.swift": {
-    "mtime": 1792230193.8691766,
-    "seen": 1792230234.042945,
+    "mtime": 1792241141.19817,
+    "seen": 1792242270.2958255,
     "ast_hash": "f5208f67124246b12f17ee22a8f3caa3",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/JIT/SideJITManager.swift": {
-    "mtime": 1792230193.8691766,
-    "seen": 1792230234.0429466,
+    "mtime": 1792242234.5226927,
+    "seen": 1792242270.2958267,
     "ast_hash": "93afda93021dd025b6d65afad5b87c2f",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Logging/OperationLogging.swift": {
-    "mtime": 1792230193.8701775,
-    "seen": 1792230234.0429475,
+    "mtime": 1792241141.1987119,
+    "seen": 1792242270.2958279,
     "ast_hash": "7ecac5d8cce2fb3234f81c3d3f20a586",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Logging/SideStoreLogging.swift": {
-    "mtime": 1792230193.871179,
-    "seen": 1792230234.042949,
+    "mtime": 1792241141.1987119,
+    "seen": 1792242270.2958293,
     "ast_hash": "e9d2247258e4380884e9b44d7ffc961c",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/AppOperation.swift": {
-    "mtime": 1792230193.871179,
-    "seen": 1792230234.04295,
+    "mtime": 1792241141.1987119,
+    "seen": 1792242270.2958305,
     "ast_hash": "65e2992bcd0a4a3fd717487aa0f08914",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/AsyncOperation.swift": {
-    "mtime": 1792230193.8721776,
-    "seen": 1792230234.042951,
+    "mtime": 1792241141.1987119,
+    "seen": 1792242270.295832,
     "ast_hash": "00d1914f0fc42234b95f215e4e7efa06",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/Errors/OperationError.swift": {
-    "mtime": 1792230193.8731656,
-    "seen": 1792230234.0429523,
+    "mtime": 1792241141.1987119,
+    "seen": 1792242270.295833,
     "ast_hash": "54cdea4d6f5b3d80d125ae3d8353c1e0",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/Errors/SourceError.swift": {
-    "mtime": 1792230193.8741705,
-    "seen": 1792230234.042954,
+    "mtime": 1792241141.1987119,
+    "seen": 1792242270.2958343,
     "ast_hash": "d2949c9361b053f40119201a70b5e8f1",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/Errors/VerificationError.swift": {
-    "mtime": 1792230193.8741705,
-    "seen": 1792230234.0429556,
+    "mtime": 1792241141.2037344,
+    "seen": 1792242270.2958357,
     "ast_hash": "b6c74dff218515b8388833678194fdcf",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/OperationContexts.swift": {
-    "mtime": 1792230193.8751707,
-    "seen": 1792230234.0429566,
+    "mtime": 1792242234.5226927,
+    "seen": 1792242270.295837,
     "ast_hash": "bf37f829b72213f50861d7471c52fcb0",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/OperationEntitlements.swift": {
-    "mtime": 1792230193.8751707,
-    "seen": 1792230234.042958,
+    "mtime": 1792241141.2043576,
+    "seen": 1792242270.295838,
     "ast_hash": "058be1fe8f7246a12ef60ddf998a168d",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/OperationStep.swift": {
-    "mtime": 1792230193.876171,
-    "seen": 1792230234.0429592,
+    "mtime": 1792241141.2043576,
+    "seen": 1792242270.2958395,
     "ast_hash": "883eb788aa95fb10fe927775d3db1b9d",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/OperationStepDefinition.swift": {
-    "mtime": 1792230193.876171,
-    "seen": 1792230234.0429604,
+    "mtime": 1792241141.2043576,
+    "seen": 1792242270.2958405,
     "ast_hash": "0d85c49afa0bb1490ca9df7afa251db0",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineExecutionHandler.swift": {
-    "mtime": 1792230193.877171,
-    "seen": 1792230234.0429618,
+    "mtime": 1792241141.2043576,
+    "seen": 1792242270.2958417,
     "ast_hash": "c114d62f53f01ee6be1918a02489bf02",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineExecutor.swift": {
-    "mtime": 1792230193.877171,
-    "seen": 1792230234.0429633,
+    "mtime": 1792242234.5236945,
+    "seen": 1792242270.295843,
     "ast_hash": "e8d480f15ca9253301ca0386a3eb4053",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/CacheAppOperation.swift": {
-    "mtime": 1792230193.8780954,
-    "seen": 1792230234.0429645,
+    "mtime": 1792241141.2043576,
+    "seen": 1792242270.295844,
     "ast_hash": "ed2493552f52989c0881526569187200",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/CacheResignedMetadataOperation.swift": {
-    "mtime": 1792230193.8780954,
-    "seen": 1792230234.0429657,
+    "mtime": 1792242234.5246933,
+    "seen": 1792242270.2958453,
     "ast_hash": "e5e258ff94dd7c53122a5d92e3c4bb27",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/CacheSigningCertOperation.swift": {
-    "mtime": 1792230193.8793032,
-    "seen": 1792230234.0429668,
+    "mtime": 1792241141.2043576,
+    "seen": 1792242270.295847,
     "ast_hash": "6dcdcda6f1940f0860a839a5ddcb9be2",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/ChangeAppIconOperation.swift": {
-    "mtime": 1792230193.8803034,
-    "seen": 1792230234.0429683,
+    "mtime": 1792241141.2043576,
+    "seen": 1792242270.295848,
     "ast_hash": "b11d5916cb0cb0cb71964be4e47c6e36",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/CleanStagedAppOperation.swift": {
-    "mtime": 1792230193.8803034,
-    "seen": 1792230234.0429697,
+    "mtime": 1792241141.20928,
+    "seen": 1792242270.2958493,
     "ast_hash": "40bcbf6413d6be7540b77d94eef6fe71",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/CreateIpaOperation.swift": {
-    "mtime": 1792230193.8813038,
-    "seen": 1792230234.0429707,
+    "mtime": 1792241141.2098775,
+    "seen": 1792242270.2958505,
     "ast_hash": "963167af7f42404d760b2f57c0800d04",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/EmbedSigningCertOperation.swift": {
-    "mtime": 1792230193.8813038,
-    "seen": 1792230234.0429718,
+    "mtime": 1792242234.5246933,
+    "seen": 1792242270.2958517,
     "ast_hash": "d7b8a4e9101ab183434d6872ad2a3a0c",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/ExportResignedIpaOperation.swift": {
-    "mtime": 1792230193.8823035,
-    "seen": 1792230234.042973,
+    "mtime": 1792241141.2098775,
+    "seen": 1792242270.2958531,
     "ast_hash": "37ad599d620194e896986d8cba138082",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/FetchProvisioningProfilesOperation.swift": {
-    "mtime": 1792230193.8823035,
-    "seen": 1792230234.0429742,
+    "mtime": 1792242234.5257885,
+    "seen": 1792242270.2958543,
     "ast_hash": "99f2ed51dd730b718a69777f1705feba",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/InstallAppOperation.swift": {
-    "mtime": 1792230193.883684,
-    "seen": 1792230234.0429754,
+    "mtime": 1792242234.5267897,
+    "seen": 1792242270.2958558,
     "ast_hash": "832874d28fdb44c8a6ea752fcb845ef2",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/MarkAppInactiveOperation.swift": {
-    "mtime": 1792230193.883684,
-    "seen": 1792230234.0429769,
+    "mtime": 1792241141.2098775,
+    "seen": 1792242270.2958572,
     "ast_hash": "5bd4aff6f1d64e6b3097d0f24641a8cc",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/PatchInfoPlistOperation.swift": {
-    "mtime": 1792230193.884815,
-    "seen": 1792230234.042978,
+    "mtime": 1792242234.5267897,
+    "seen": 1792242270.2958584,
     "ast_hash": "fc4929bd5634f68f76f0983246ca6df4",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/PerformBackupRestoreOperation.swift": {
-    "mtime": 1792230193.884815,
-    "seen": 1792230234.0429792,
+    "mtime": 1792241141.2098775,
+    "seen": 1792242270.2958598,
     "ast_hash": "c66e4d600c1eac5a0a7e5ef4f79c0b94",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/PreflightChecksOperation.swift": {
-    "mtime": 1792230193.884815,
-    "seen": 1792230234.0429807,
+    "mtime": 1792241141.2098775,
+    "seen": 1792242270.295861,
     "ast_hash": "f226ed5b8dc11c4d7a501af9ec900d7b",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/PrepareAppExtensionBundleIDsOperation.swift": {
-    "mtime": 1792230193.885815,
-    "seen": 1792230234.0429819,
+    "mtime": 1792242234.5277884,
+    "seen": 1792242270.2958622,
     "ast_hash": "3c0a7b7f7da13048175f2c6e72a7e964",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/RefreshAppOperation.swift": {
-    "mtime": 1792230193.8869262,
-    "seen": 1792230234.042983,
+    "mtime": 1792242234.5277884,
+    "seen": 1792242270.2958634,
     "ast_hash": "fd3ef321807471d62eb5eb4323ff0e9d",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/RemoveAppExtensionsOperation.swift": {
-    "mtime": 1792230193.8869262,
-    "seen": 1792230234.0429847,
+    "mtime": 1792242234.5287907,
+    "seen": 1792242270.2958646,
     "ast_hash": "8b8cf48c712e8d8f3d2e4ea862050c4d",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/RemoveAppOperation.swift": {
-    "mtime": 1792230193.8879323,
-    "seen": 1792230234.042986,
+    "mtime": 1792241141.216155,
+    "seen": 1792242270.2958655,
     "ast_hash": "48bbf8d14fc0f172fe9dec8bc094685c",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/RemoveBackupDataOperation.swift": {
-    "mtime": 1792230193.8879323,
-    "seen": 1792230234.0429873,
+    "mtime": 1792241141.216155,
+    "seen": 1792242270.295867,
     "ast_hash": "e8c29daebe2fbeab56b6da351a95bc94",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/ResignAppOperation.swift": {
-    "mtime": 1792230193.8889322,
-    "seen": 1792230234.0429885,
+    "mtime": 1792242234.529791,
+    "seen": 1792242270.2958684,
     "ast_hash": "f64c29cc54c5ab65ec5cfecf9dd264e3",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/SendAppOperation.swift": {
-    "mtime": 1792230193.8892615,
-    "seen": 1792230234.0429897,
+    "mtime": 1792241141.216155,
+    "seen": 1792242270.2958696,
     "ast_hash": "7da2e13cdcaccf86f54516fd4f8b455a",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/StageAppOperation.swift": {
-    "mtime": 1792230193.8892615,
-    "seen": 1792230234.0429912,
+    "mtime": 1792241141.216155,
+    "seen": 1792242270.2958715,
     "ast_hash": "fd1dd21ea4a8851921d7f8a37fd0b28e",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/StageBackupAppOperation.swift": {
-    "mtime": 1792230193.8904364,
-    "seen": 1792230234.0429924,
+    "mtime": 1792242234.529791,
+    "seen": 1792242270.2958727,
     "ast_hash": "2434a155203fe2ca7bd5a0d743d59750",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/UninstallAppOperation.swift": {
-    "mtime": 1792230193.8918319,
-    "seen": 1792230234.0429935,
+    "mtime": 1792241141.216155,
+    "seen": 1792242270.2958739,
     "ast_hash": "85bbfd1c49391ac4122770952497cf7f",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/UpdateAppCertificateOperation.swift": {
-    "mtime": 1792230193.8918319,
-    "seen": 1792230234.042995,
+    "mtime": 1792242234.5307896,
+    "seen": 1792242270.295875,
     "ast_hash": "c4f55fa8b0bb7ad5cdf76724de9632a7",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/UserCustomizationOperation.swift": {
-    "mtime": 1792230193.8928392,
-    "seen": 1792230234.0429962,
+    "mtime": 1792242234.5307896,
+    "seen": 1792242270.2958763,
     "ast_hash": "d8494499942f41a6d3f369c6dc32c206",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/VerifyAppOperation.swift": {
-    "mtime": 1792230193.8928392,
-    "seen": 1792230234.0429976,
+    "mtime": 1792241141.2204168,
+    "seen": 1792242270.2958775,
     "ast_hash": "60adcad2d00ab41d8d8ca4a4e9904a53",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineOperations/VerifyCertificateOperation.swift": {
-    "mtime": 1792230193.8938377,
-    "seen": 1792230234.0429988,
+    "mtime": 1792242234.5317876,
+    "seen": 1792242270.2958786,
     "ast_hash": "fce958c94a892e2d8f7171fbe913de68",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/PipelineRunner.swift": {
-    "mtime": 1792230193.8938377,
-    "seen": 1792230234.0430002,
+    "mtime": 1792242234.5317876,
+    "seen": 1792242270.2958798,
     "ast_hash": "de2a75d6235779a53b42ed519576f835",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/RefreshGroup.swift": {
-    "mtime": 1792230193.894837,
-    "seen": 1792230234.0430017,
+    "mtime": 1792241141.2210963,
+    "seen": 1792242270.2958813,
     "ast_hash": "553022245a79f16c9dd53f9ce149bbc4",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/StandaloneExecutionHandler.swift": {
-    "mtime": 1792230193.894837,
-    "seen": 1792230234.0430028,
+    "mtime": 1792241141.2210963,
+    "seen": 1792242270.2958822,
     "ast_hash": "68c019e808167d24900e8e18c3395458",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/StandaloneOperations/BackgroundRefreshAppsOperation.swift": {
-    "mtime": 1792230193.8958364,
-    "seen": 1792230234.0430045,
+    "mtime": 1792241141.2210963,
+    "seen": 1792242270.2958834,
     "ast_hash": "f2e8cfb11ceca67f41f34b89c691a8bf",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/StandaloneOperations/ClearAppCacheOperation.swift": {
-    "mtime": 1792230193.8968415,
-    "seen": 1792230234.0430055,
+    "mtime": 1792241141.2210963,
+    "seen": 1792242270.2958848,
     "ast_hash": "dde5df5cc78687a3745e4f694f055558",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/StandaloneOperations/DeactivateAppOperation.swift": {
-    "mtime": 1792230193.8978398,
-    "seen": 1792230234.0430067,
+    "mtime": 1792241141.2210963,
+    "seen": 1792242270.2958858,
     "ast_hash": "c611811ec929698ffa502d376bfba09f",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/StandaloneOperations/DownloadAppOperation.swift": {
-    "mtime": 1792230193.8978398,
-    "seen": 1792230234.043008,
+    "mtime": 1792242234.53279,
+    "seen": 1792242270.295887,
     "ast_hash": "800bae82999294e488bd3eece9e7b830",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/StandaloneOperations/EnableJITOperation.swift": {
-    "mtime": 1792230193.8988419,
-    "seen": 1792230234.0430093,
+    "mtime": 1792241141.2210963,
+    "seen": 1792242270.2958884,
     "ast_hash": "cc9b79d3002a0b119aa3be0c63beecf7",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/StandaloneOperations/FetchSourceOperation.swift": {
-    "mtime": 1792230193.8988419,
-    "seen": 1792230234.0430105,
+    "mtime": 1792241141.2259862,
+    "seen": 1792242270.2958899,
     "ast_hash": "a7ede51919d0729220dd8993c85d31d7",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/StandaloneOperations/InjectBatchProfilesOperation.swift": {
-    "mtime": 1792230193.8998442,
-    "seen": 1792230234.0430121,
+    "mtime": 1792242234.53279,
+    "seen": 1792242270.2958913,
     "ast_hash": "ab99109ebaebe5622268418c30dfd7e8",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/StandaloneOperations/ScheduleExpirationWarningNotificationOperation.swift": {
-    "mtime": 1792230193.9003227,
-    "seen": 1792230234.043013,
+    "mtime": 1792241141.2266467,
+    "seen": 1792242270.2958925,
     "ast_hash": "5a9e74a206e9ca91aed92b1a4910114c",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/StandaloneOperations/SignInOperation.swift": {
-    "mtime": 1792230193.9015672,
-    "seen": 1792230234.0430143,
+    "mtime": 1792242234.5337882,
+    "seen": 1792242270.2958934,
     "ast_hash": "a5d79f44b3bd5fda3110b53c5a23d4d8",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/StandaloneOperations/SyncAppIDsOperation.swift": {
-    "mtime": 1792230193.9015672,
-    "seen": 1792230234.0430157,
+    "mtime": 1792241141.2266467,
+    "seen": 1792242270.2958949,
     "ast_hash": "f5be64e657b65c6d12ea9432ce6c063f",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Operations/StandaloneOperations/UpdateKnownSourcesOperation.swift": {
-    "mtime": 1792230193.9025693,
-    "seen": 1792230234.043017,
+    "mtime": 1792241141.2266467,
+    "seen": 1792242270.295896,
     "ast_hash": "8455af2b9537d246790ae7ad9152c09c",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Pairing/PairingFileManager.swift": {
-    "mtime": 1792230193.9025693,
-    "seen": 1792230234.0430183,
+    "mtime": 1792242234.5349288,
+    "seen": 1792242270.2958972,
     "ast_hash": "7bd94c41940034d47adf9a61c14b0610",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Profiles/ProfileManager.swift": {
-    "mtime": 1792230193.903567,
-    "seen": 1792230234.0430195,
+    "mtime": 1792241141.2266467,
+    "seen": 1792242270.2958987,
     "ast_hash": "c487e9f2258a59efbb83ea50d4fd9856",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Shortcuts/CellularRefreshManager.swift": {
-    "mtime": 1792230193.9045658,
-    "seen": 1792230234.0430207,
+    "mtime": 1792241141.2266467,
+    "seen": 1792242270.2958999,
     "ast_hash": "aabd0b8d0e00f7ef69325f15c908e601",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Storage/CacheManager.swift": {
-    "mtime": 1792230193.9045658,
-    "seen": 1792230234.0430222,
+    "mtime": 1792241141.2266467,
+    "seen": 1792242270.2959008,
     "ast_hash": "5dc57108b0a5d7b8acd7a58809050c6c",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/Theme/ThemeManager.swift": {
-    "mtime": 1792230193.9059029,
-    "seen": 1792230234.0430238,
+    "mtime": 1792241141.2320807,
+    "seen": 1792242270.2959027,
     "ast_hash": "8a0b2315da938f87140be3a7ef19302e",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/tvOS/PairingWebUploadServer.swift": {
-    "mtime": 1792230193.907061,
-    "seen": 1792230234.0430248,
+    "mtime": 1792241141.2320807,
+    "seen": 1792242270.2959037,
     "ast_hash": "40d0df9a0f812d29baf8f3c525d360cf",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/tvOS/SideStoreTopShelfProvider.swift": {
-    "mtime": 1792230193.907061,
-    "seen": 1792230234.0430262,
+    "mtime": 1792241141.2320807,
+    "seen": 1792242270.295905,
     "ast_hash": "a767999006b4edca3a3f47a66f4b21ff",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/tvOS/TVWebFileTransferManager.swift": {
-    "mtime": 1792230193.9080603,
-    "seen": 1792230234.0430274,
+    "mtime": 1792242234.5359278,
+    "seen": 1792242270.2959063,
     "ast_hash": "f6ed48fc2a03732f67912ebee59eb4b5",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Core/tvOS/UISwitch+tvOS.swift": {
-    "mtime": 1792230193.9080603,
-    "seen": 1792230234.0430288,
+    "mtime": 1792241141.2320807,
+    "seen": 1792242270.2959075,
     "ast_hash": "8d6dbd0e08f6ed31c4daad808e341274",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/DeepLinks/ExportCertificateDialog.swift": {
-    "mtime": 1792230193.9090621,
-    "seen": 1792230234.04303,
+    "mtime": 1792241141.2320807,
+    "seen": 1792242270.2959087,
     "ast_hash": "cad666242e863f8ea31a884cf4ca045c",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/DeepLinks/ExportPairingFileHandler.swift": {
-    "mtime": 1792230193.9100618,
-    "seen": 1792230234.0430312,
+    "mtime": 1792242234.5359278,
+    "seen": 1792242270.2959104,
     "ast_hash": "7df7b040c2edea93398f781d2a33dea5",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/DeepLinks/FileImportHandler.swift": {
-    "mtime": 1792230193.9100618,
-    "seen": 1792230234.0430326,
+    "mtime": 1792241141.2320807,
+    "seen": 1792242270.2959118,
     "ast_hash": "451a64cd554222bcabc26eb2a67dfa26",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/DeepLinks/InstallAppDialog.swift": {
-    "mtime": 1792230193.9114316,
-    "seen": 1792230234.0430338,
+    "mtime": 1792241141.2320807,
+    "seen": 1792242270.2959127,
     "ast_hash": "ecd6cc2d69ef005e3f769922fb3b387a",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/DeepLinks/URLHandler.swift": {
-    "mtime": 1792230193.9114316,
-    "seen": 1792230234.043035,
+    "mtime": 1792242234.5369284,
+    "seen": 1792242270.295914,
     "ast_hash": "a93daf857e41d78d5ec2be96e47e4770",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Extensions/NSAttributedString+Markdown.swift": {
-    "mtime": 1792230193.912502,
-    "seen": 1792230234.0430365,
+    "mtime": 1792242234.5369284,
+    "seen": 1792242270.2959151,
     "ast_hash": "c67d7db6921ad4bf6d9da5bce6bfa5f5",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Handlers/PipelineHandler.swift": {
-    "mtime": 1792230193.9135027,
-    "seen": 1792230234.0430377,
+    "mtime": 1792242234.5379276,
+    "seen": 1792242270.2959163,
     "ast_hash": "0776ffcc8be2ee4a10e0a8b130f81782",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Handlers/PresenterProvider.swift": {
-    "mtime": 1792230193.9135027,
-    "seen": 1792230234.043039,
+    "mtime": 1792241141.238283,
+    "seen": 1792242270.2959175,
     "ast_hash": "c3b0354a67fe9da3263d320f88751de6",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Handlers/SignInFlowHandler.swift": {
-    "mtime": 1792230193.914503,
-    "seen": 1792230234.0430403,
+    "mtime": 1792241141.238283,
+    "seen": 1792242270.295919,
     "ast_hash": "10e2c64f93a0f1aaa69dfcdc0dec3b14",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/MaintenanceManager.swift": {
-    "mtime": 1792230193.915502,
-    "seen": 1792230234.0430415,
+    "mtime": 1792242234.5389276,
+    "seen": 1792242270.2959201,
     "ast_hash": "fabc771d259c757853797183c71fe966",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Tests/UITests/UITests.swift": {
-    "mtime": 1792230193.9165025,
-    "seen": 1792230234.043043,
+    "mtime": 1792241141.238283,
+    "seen": 1792242270.2959213,
     "ast_hash": "6875cb48dc6460f8e4ab72d7f84409d9",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Tests/UITests/UITestsLaunchTests.swift": {
-    "mtime": 1792230193.9165025,
-    "seen": 1792230234.043044,
+    "mtime": 1792241141.238283,
+    "seen": 1792242270.2959228,
     "ast_hash": "008282f0135019a5803a0290e09d0120",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Tests/UnitTests/datastructures/DataStructuresTests.swift": {
-    "mtime": 1792230193.9175017,
-    "seen": 1792230234.0430453,
+    "mtime": 1792241141.2426262,
+    "seen": 1792242270.2959237,
     "ast_hash": "f0aaab81a99aa2e652ee466059026c9a",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Tests/UnitTests/datastructures/LinkedHashMapTests.swift": {
-    "mtime": 1792230193.9185026,
-    "seen": 1792230234.0430467,
+    "mtime": 1792241141.243109,
+    "seen": 1792242270.295925,
     "ast_hash": "9fcec0a1f18f86a83bd7359de12b3b01",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Tests/UnitTests/datastructures/TreeMapTests.swift": {
-    "mtime": 1792230193.9195013,
-    "seen": 1792230234.0430477,
+    "mtime": 1792241141.243109,
+    "seen": 1792242270.2959263,
     "ast_hash": "aad67c3d0544729855d2240fdf5ddf07",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Utils/common/AppBundleFingerprint.swift": {
-    "mtime": 1792230193.9195013,
-    "seen": 1792230234.043049,
+    "mtime": 1792242234.5389276,
+    "seen": 1792242270.2959275,
     "ast_hash": "2ba5b21ef4a639ab739d78ea412033bf",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Utils/common/ArchiveFingerprint.swift": {
-    "mtime": 1792230193.9205012,
-    "seen": 1792230234.0430503,
+    "mtime": 1792241141.243109,
+    "seen": 1792242270.2959287,
     "ast_hash": "c1d46f96fd40008c3ab7a43a70cf2a9c",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Utils/common/BuildInfo.swift": {
-    "mtime": 1792230193.9215033,
-    "seen": 1792230234.0430515,
+    "mtime": 1792241141.243109,
+    "seen": 1792242270.29593,
     "ast_hash": "fa1db0821ebec357b8dcefe9baa88d7e",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Utils/common/DateTimeUtil.swift": {
-    "mtime": 1792230193.9215033,
-    "seen": 1792230234.043053,
+    "mtime": 1792241141.243109,
+    "seen": 1792242270.295931,
     "ast_hash": "54e2f7c3a79a0038887905a68b823449",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Utils/common/FileOutputStream.swift": {
-    "mtime": 1792230193.9225013,
-    "seen": 1792230234.043054,
+    "mtime": 1792242234.5399282,
+    "seen": 1792242270.2959325,
     "ast_hash": "46b21a06c0289fb5b44075b3a73978e7",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Utils/common/OutputStream.swift": {
-    "mtime": 1792230193.9225013,
-    "seen": 1792230234.0430553,
+    "mtime": 1792241141.243109,
+    "seen": 1792242270.2959337,
     "ast_hash": "6a613ae278916e1839a5a312f2d36eeb",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Utils/concurrency/TaskChainCoalescer.swift": {
-    "mtime": 1792230193.9235032,
-    "seen": 1792230234.0430567,
+    "mtime": 1792241141.243109,
+    "seen": 1792242270.295935,
     "ast_hash": "f06bcf03d8d530d730acfdde7aab4be7",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Utils/concurrency/TaskChainSerializer.swift": {
-    "mtime": 1792230193.9235032,
-    "seen": 1792230234.043058,
+    "mtime": 1792241141.248674,
+    "seen": 1792242270.2959363,
     "ast_hash": "6df9bd498e28e60b0ec07c62766f91c6",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Utils/concurrency/TaskMutexSerializer.swift": {
-    "mtime": 1792230193.924501,
-    "seen": 1792230234.043059,
+    "mtime": 1792241141.248674,
+    "seen": 1792242270.2959375,
     "ast_hash": "ade471303e776c704c18c9de2d59d7a1",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Utils/datastructures/LinkedHashMap.swift": {
-    "mtime": 1792230193.925505,
-    "seen": 1792230234.0430605,
+    "mtime": 1792241141.248674,
+    "seen": 1792242270.2959387,
     "ast_hash": "92ac9996416ba39cfc43ee0d13a47f32",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Utils/datastructures/SingletonGenericMap.swift": {
-    "mtime": 1792230193.925505,
-    "seen": 1792230234.0430615,
+    "mtime": 1792241141.248674,
+    "seen": 1792242270.2959402,
     "ast_hash": "24bd94ec38492e362bf6a056c173293c",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Utils/datastructures/TreeMap.swift": {
-    "mtime": 1792230193.926505,
-    "seen": 1792230234.0430627,
+    "mtime": 1792241141.248674,
+    "seen": 1792242270.295941,
     "ast_hash": "aa23e8bdc87d0091a6b161dfee584141",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Utils/dignostics/database/CoreDataHelper.swift": {
-    "mtime": 1792230193.9280958,
-    "seen": 1792230234.043064,
+    "mtime": 1792241141.248674,
+    "seen": 1792242270.2959423,
     "ast_hash": "cbe6cc772466854b90fd4f13db90b6ca",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Utils/dignostics/errors/ErrorProcessing.swift": {
-    "mtime": 1792230193.9292848,
-    "seen": 1792230234.043065,
+    "mtime": 1792241141.248674,
+    "seen": 1792242270.2959437,
     "ast_hash": "91f14290d30feec1a9be2227050c0aef",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Utils/dignostics/operations/OperationsLoggingControl.swift": {
-    "mtime": 1792230193.9292848,
-    "seen": 1792230234.0430663,
+    "mtime": 1792241141.253752,
+    "seen": 1792242270.2959452,
     "ast_hash": "9b760ae8d7611a74fafe144f09ca9b29",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Utils/importexport/ImportExport.swift": {
-    "mtime": 1792230193.9302876,
-    "seen": 1792230234.0430675,
+    "mtime": 1792242234.5409284,
+    "seen": 1792242270.2959466,
     "ast_hash": "52e830b3aea7517fe2de8528f42d0a4f",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Utils/iostreams/AbstractClassError.swift": {
-    "mtime": 1792230193.9312875,
-    "seen": 1792230234.043069,
+    "mtime": 1792241141.2546668,
+    "seen": 1792242270.2959476,
     "ast_hash": "d03e57483d937f259b0ac87d9768f1f2",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Utils/iostreams/ConsoleLog.swift": {
-    "mtime": 1792230193.9312875,
-    "seen": 1792230234.0430698,
+    "mtime": 1792242234.5409284,
+    "seen": 1792242270.2959487,
     "ast_hash": "7c528f682dc6fa0f30e87ef45765dc41",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Utils/iostreams/ConsoleLogger.swift": {
-    "mtime": 1792230193.9322855,
-    "seen": 1792230234.0430713,
+    "mtime": 1792241141.2546668,
+    "seen": 1792242270.29595,
     "ast_hash": "85e8dc4cf66883a8d06deb6a5556e486",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Utils/misc/xcmapping-diff-reporter/xcmapping-diff.py": {
-    "mtime": 1792230193.933762,
-    "seen": 1792230234.0430725,
+    "mtime": 1792241141.2546668,
+    "seen": 1792242270.2959511,
     "ast_hash": "e1568b065f7b37e78218aacb96e2172b",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Utils/pagination/PaginationDataHolder.swift": {
-    "mtime": 1792230193.934809,
-    "seen": 1792230234.043074,
+    "mtime": 1792241141.2546668,
+    "seen": 1792242270.2959523,
     "ast_hash": "712dd7c70581fd3c57be1e654affc994",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Components/ActivityViewController.swift": {
-    "mtime": 1792230193.934809,
-    "seen": 1792230234.043075,
+    "mtime": 1792241141.2592986,
+    "seen": 1792242270.2959538,
     "ast_hash": "24ac7ddcc802bfffebaeb0dc151aed22",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Components/AppInfoView.swift": {
-    "mtime": 1792230193.9358115,
-    "seen": 1792230234.0430763,
+    "mtime": 1792241141.2603064,
+    "seen": 1792242270.2959552,
     "ast_hash": "15b5cab5057375eb6fa227728487cd97",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Components/BundleResourceBrowserView.swift": {
-    "mtime": 1792230193.9368117,
-    "seen": 1792230234.043078,
+    "mtime": 1792241141.2603064,
+    "seen": 1792242270.2959569,
     "ast_hash": "0fe2746fd8e9f88e5ef7da1a28a0c283",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Components/CodeResourcesViewer.swift": {
-    "mtime": 1792230193.9378111,
-    "seen": 1792230234.043079,
+    "mtime": 1792241141.2603064,
+    "seen": 1792242270.295958,
     "ast_hash": "83acc6b0061c58f4399e2519e2be09ab",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Components/CustomAppIDAlertViewController.swift": {
-    "mtime": 1792230193.9378111,
-    "seen": 1792230234.04308,
+    "mtime": 1792241141.2603064,
+    "seen": 1792242270.2959595,
     "ast_hash": "ebd5a34f9b7bf63accd2127c4f0bfc52",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Components/EntitlementsCustomizationCoreView.swift": {
-    "mtime": 1792230193.9388115,
-    "seen": 1792230234.0430815,
+    "mtime": 1792242234.541928,
+    "seen": 1792242270.2959607,
     "ast_hash": "c74dc4df10072941b45936a094ea2c91",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Components/EntitlementsCustomizationSheetView.swift": {
-    "mtime": 1792230193.9392092,
-    "seen": 1792230234.0430825,
+    "mtime": 1792241141.2603064,
+    "seen": 1792242270.2959619,
     "ast_hash": "1a31f793c709e4ef23662a4da5129bac",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Components/EntitlementsCustomizationView.swift": {
-    "mtime": 1792230193.9392092,
-    "seen": 1792230234.0430837,
+    "mtime": 1792241141.2603064,
+    "seen": 1792242270.295963,
     "ast_hash": "87ed8bd848ba553e258318b4b47f6c72",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Components/EntitlementsCustomizationViewModel.swift": {
-    "mtime": 1792230193.9404013,
-    "seen": 1792230234.043085,
+    "mtime": 1792242234.5429277,
+    "seen": 1792242270.2959645,
     "ast_hash": "1782586e75c1ce015a33423678cb6dcb",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Components/InfoPlistContainerView.swift": {
-    "mtime": 1792230193.9404013,
-    "seen": 1792230234.0430865,
+    "mtime": 1792241141.2603064,
+    "seen": 1792242270.2959657,
     "ast_hash": "ad7d8db0942ca6588c59a5218c426676",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Components/InfoPlistCustomizationCoreView.swift": {
-    "mtime": 1792230193.941401,
-    "seen": 1792230234.043088,
+    "mtime": 1792242234.5429277,
+    "seen": 1792242270.2959669,
     "ast_hash": "3e49107514d4c858941a4375b0ac708c",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Components/InfoPlistCustomizationSheetView.swift": {
-    "mtime": 1792230193.941401,
-    "seen": 1792230234.0430892,
+    "mtime": 1792241141.2654374,
+    "seen": 1792242270.2959683,
     "ast_hash": "816c0fa27152150b3d4149cd3b74d250",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Components/InfoPlistCustomizationView.swift": {
-    "mtime": 1792230193.942405,
-    "seen": 1792230234.04309,
+    "mtime": 1792241141.2654374,
+    "seen": 1792242270.2959695,
     "ast_hash": "6250b0b659eca7767a09ca5890a81b2e",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Components/MachOResourceViewer.swift": {
-    "mtime": 1792230193.942405,
-    "seen": 1792230234.0430918,
+    "mtime": 1792241141.2654374,
+    "seen": 1792242270.295971,
     "ast_hash": "46abb089c0620af779985420024c9723",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Components/SuffixEnforcedTextField.swift": {
-    "mtime": 1792230193.9434009,
-    "seen": 1792230234.043093,
+    "mtime": 1792241141.2654374,
+    "seen": 1792242270.2959726,
     "ast_hash": "1f6666398a6d48e01fa683e701507075",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Components/UIKit/CollapsingMarkdownView.swift": {
-    "mtime": 1792230193.9444008,
-    "seen": 1792230234.0430946,
+    "mtime": 1792241141.2654374,
+    "seen": 1792242270.2959738,
     "ast_hash": "2bd58f8098c67e54737c15bfdf2512aa",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/MyApps/DeleteAppAlertViewController.swift": {
-    "mtime": 1792230193.9447796,
-    "seen": 1792230234.0430956,
+    "mtime": 1792241141.2654374,
+    "seen": 1792242270.2959754,
     "ast_hash": "d9fe28d8ca7e1ee14984c432db53499f",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Onboarding/OnboardingView.swift": {
-    "mtime": 1792230193.9459724,
-    "seen": 1792230234.0430968,
+    "mtime": 1792241141.2654374,
+    "seen": 1792242270.2959766,
     "ast_hash": "b0078b6b42d3f426e20c5348d0ac30ad",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/Anisette/AnisetteDataView.swift": {
-    "mtime": 1792230193.946972,
-    "seen": 1792230234.0430982,
+    "mtime": 1792241141.2703881,
+    "seen": 1792242270.2959778,
     "ast_hash": "54920228cd3c8f6f208b98acd035caa7",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/BackupRestore/BackupAndRestoreView.swift": {
-    "mtime": 1792230193.947975,
-    "seen": 1792230234.0430994,
+    "mtime": 1792241141.2710395,
+    "seen": 1792242270.295979,
     "ast_hash": "539c37147355e6d655c842dde93f757d",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/CacheMgmt/CacheManagementView.swift": {
-    "mtime": 1792230193.948974,
-    "seen": 1792230234.0431006,
+    "mtime": 1792241141.2710395,
+    "seen": 1792242270.2959807,
     "ast_hash": "2a8cfc9855c84010676af9942cbf21f7",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/CacheMgmt/CacheViewModel.swift": {
-    "mtime": 1792230193.948974,
-    "seen": 1792230234.0431023,
+    "mtime": 1792241141.2710395,
+    "seen": 1792242270.295982,
     "ast_hash": "687e60fc498ea6ca66af268b8e138d50",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/Certificates/ActiveCertSectionView.swift": {
-    "mtime": 1792230193.9503396,
-    "seen": 1792230234.0431035,
+    "mtime": 1792241141.2710395,
+    "seen": 1792242270.295983,
     "ast_hash": "5b611b9beaf0e5cb26a378c1dc579fdc",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/Certificates/CertificateDetailView.swift": {
-    "mtime": 1792230193.9503396,
-    "seen": 1792230234.043105,
+    "mtime": 1792241141.2710395,
+    "seen": 1792242270.2959843,
     "ast_hash": "a7afd4d577646c840926429a08ff3b04",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/Certificates/CertificateExporter.swift": {
-    "mtime": 1792230193.9515624,
-    "seen": 1792230234.043106,
+    "mtime": 1792241141.2710395,
+    "seen": 1792242270.2959857,
     "ast_hash": "928beb81d3bc191a9a72290b068790a6",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/Certificates/CertificateRowView.swift": {
-    "mtime": 1792230193.9525614,
-    "seen": 1792230234.0431073,
+    "mtime": 1792241141.2710395,
+    "seen": 1792242270.2959867,
     "ast_hash": "07f29393615c4f8a874a6954b78f9b94",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/Certificates/CertificateTypes.swift": {
-    "mtime": 1792230193.9525614,
-    "seen": 1792230234.0431087,
+    "mtime": 1792241141.2759476,
+    "seen": 1792242270.2959886,
     "ast_hash": "3e8d3563ceb44a17d82ad58c02f11ad0",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/Certificates/CertificatesListView.swift": {
-    "mtime": 1792230193.9535613,
-    "seen": 1792230234.04311,
+    "mtime": 1792241141.2764597,
+    "seen": 1792242270.2959898,
     "ast_hash": "ea713a184d0d354f4bbd22b48010dbd1",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/Certificates/CertificatesView.swift": {
-    "mtime": 1792230193.9535613,
-    "seen": 1792230234.043111,
+    "mtime": 1792241141.2764597,
+    "seen": 1792242270.2959907,
     "ast_hash": "742ca444137b289a4b0efdbac67195c5",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/Certificates/CertificatesViewModel.swift": {
-    "mtime": 1792230193.9545617,
-    "seen": 1792230234.0431125,
+    "mtime": 1792242234.5439277,
+    "seen": 1792242270.2959924,
     "ast_hash": "50df61b6d96a38b6ff74efca1736f32c",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/Certificates/PrivateKeyTextEditor.swift": {
-    "mtime": 1792230193.9545617,
-    "seen": 1792230234.043114,
+    "mtime": 1792241141.2764597,
+    "seen": 1792242270.2959936,
     "ast_hash": "5366cb1e233d0c9c6e24e30a95416b89",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/Certificates/PrivateKeyTextInputView.swift": {
-    "mtime": 1792230193.9558837,
-    "seen": 1792230234.0431154,
+    "mtime": 1792241141.2764597,
+    "seen": 1792242270.295995,
     "ast_hash": "96a4837aa9f17768a0221eafe1b7c856",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/Certificates/RevokeAlertViewController.swift": {
-    "mtime": 1792230193.9558837,
-    "seen": 1792230234.0431166,
+    "mtime": 1792241141.2764597,
+    "seen": 1792242270.2959962,
     "ast_hash": "4c3711387532259d45b3093acf07ed0a",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/Certificates/SetCertificateAlertViewController.swift": {
-    "mtime": 1792230193.9558837,
-    "seen": 1792230234.043118,
+    "mtime": 1792241141.2764597,
+    "seen": 1792242270.2959974,
     "ast_hash": "2efb1103448d346a7ad262a1302238d6",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/Certificates/SignableCertificatesListViewController.swift": {
-    "mtime": 1792230193.9570863,
-    "seen": 1792230234.0431197,
+    "mtime": 1792241141.2764597,
+    "seen": 1792242270.2959988,
     "ast_hash": "7f340bb20ce996e3328441a42855a598",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/Connection/ConnectionConfig.swift": {
-    "mtime": 1792230193.9570863,
-    "seen": 1792230234.0431209,
+    "mtime": 1792241141.2764597,
+    "seen": 1792242270.296,
     "ast_hash": "477f6c2737cd1bd7eaf7df113618ef7d",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/Connection/ConnectionConfigView.swift": {
-    "mtime": 1792230193.958087,
-    "seen": 1792230234.0431218,
+    "mtime": 1792241141.2764597,
+    "seen": 1792242270.296001,
     "ast_hash": "92954bb51b8b94d996951fd290e72d2c",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/DeveloperServices/AppGroups/AppGroupsListView.swift": {
-    "mtime": 1792230193.959089,
-    "seen": 1792230234.0431232,
+    "mtime": 1792241141.2820454,
+    "seen": 1792242270.2960024,
     "ast_hash": "77a6f614909cd83fdeb0bebf0f8689c9",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/DeveloperServices/AppIDs/AppIDDetailView.swift": {
-    "mtime": 1792230193.9600885,
-    "seen": 1792230234.0431242,
+    "mtime": 1792242234.5450206,
+    "seen": 1792242270.2960038,
     "ast_hash": "3238dadf2f8e2ad3a855a337d392b107",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/DeveloperServices/AppIDs/AppIDsListView.swift": {
-    "mtime": 1792230193.9600885,
-    "seen": 1792230234.0431259,
+    "mtime": 1792241141.2820454,
+    "seen": 1792242270.296005,
     "ast_hash": "74b4da412e591845b2b632927c8224b0",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/DeveloperServices/Certificates/CertificatePortalDetailView.swift": {
-    "mtime": 1792230193.9614358,
-    "seen": 1792230234.043127,
+    "mtime": 1792241141.2820454,
+    "seen": 1792242270.2960064,
     "ast_hash": "0a262dad1d1ed19c43a889d70b1454c9",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/DeveloperServices/Certificates/CertificatesPortalListView.swift": {
-    "mtime": 1792230193.9614358,
-    "seen": 1792230234.0431283,
+    "mtime": 1792241141.2820454,
+    "seen": 1792242270.2960076,
     "ast_hash": "87946b3e3d32cbff196316d2ae0c4dcc",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/DeveloperServices/DeveloperServicesView.swift": {
-    "mtime": 1792230193.9626665,
-    "seen": 1792230234.0431297,
+    "mtime": 1792241141.2820454,
+    "seen": 1792242270.296009,
     "ast_hash": "a42f3f863453c78b5eb4b27738ec0cab",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/DeveloperServices/DeveloperServicesViewModel.swift": {
-    "mtime": 1792230193.963667,
-    "seen": 1792230234.0431309,
+    "mtime": 1792242234.5460186,
+    "seen": 1792242270.29601,
     "ast_hash": "a4e136acc5d8cbaa47dc57dec63492b1",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/DeveloperServices/Devices/DevicesListView.swift": {
-    "mtime": 1792230193.9646704,
-    "seen": 1792230234.043132,
+    "mtime": 1792241141.2820454,
+    "seen": 1792242270.2960117,
     "ast_hash": "e5d5d24cc608ddffd2199442b54a9aac",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/DeveloperServices/Profiles/CreateManualProfileView.swift": {
-    "mtime": 1792230193.9646704,
-    "seen": 1792230234.0431335,
+    "mtime": 1792241141.2820454,
+    "seen": 1792242270.296013,
     "ast_hash": "2c75b790167bab55af38fa7082d6d54c",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/DeveloperServices/Profiles/ProfilePortalDetailView.swift": {
-    "mtime": 1792230193.9656663,
-    "seen": 1792230234.0431347,
+    "mtime": 1792242234.5470176,
+    "seen": 1792242270.296014,
     "ast_hash": "ba5220c72f51c8725329f09a3e3abd15",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/DeveloperServices/Profiles/ProfilesListView.swift": {
-    "mtime": 1792230193.9666684,
-    "seen": 1792230234.043136,
+    "mtime": 1792241141.2877162,
+    "seen": 1792242270.2960155,
     "ast_hash": "f1050bee2265fda595ade419a5509eed",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/JIT/SideJITServerConfigView.swift": {
-    "mtime": 1792230193.9669907,
-    "seen": 1792230234.0431373,
+    "mtime": 1792241141.2877162,
+    "seen": 1792242270.296017,
     "ast_hash": "4e9a2bbc45e242e7ff5038014cee381f",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/NetworkDiscovery/BonjourDiscoveryView.swift": {
-    "mtime": 1792230193.9680288,
-    "seen": 1792230234.0431385,
+    "mtime": 1792241141.2877162,
+    "seen": 1792242270.296018,
     "ast_hash": "b02cb57eb60339bbb12942881af21932",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/NetworkDiscovery/BonjourDiscoveryViewModel.swift": {
-    "mtime": 1792230193.9690309,
-    "seen": 1792230234.04314,
+    "mtime": 1792242234.5480168,
+    "seen": 1792242270.2960198,
     "ast_hash": "12c7482af49622f630452b071eeff93d",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/PairingFile/PairingFileDetailView.swift": {
-    "mtime": 1792230193.9690309,
-    "seen": 1792230234.0431411,
+    "mtime": 1792241141.2877162,
+    "seen": 1792242270.296021,
     "ast_hash": "1fe54728adc67f6c952b3505e17031c8",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/PairingFile/PairingFileEditAlertViewController.swift": {
-    "mtime": 1792230193.9700315,
-    "seen": 1792230234.0431423,
+    "mtime": 1792241141.2877162,
+    "seen": 1792242270.2960222,
     "ast_hash": "723af7374d2bdd15cd34705d2feb5f40",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/PairingFile/PairingFileManagementView.swift": {
-    "mtime": 1792230193.971028,
-    "seen": 1792230234.0431437,
+    "mtime": 1792241141.2877162,
+    "seen": 1792242270.2960234,
     "ast_hash": "0dc648500e4eb4fd4d3bbb34d3ffeaa4",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/PairingFile/PairingFileManagementViewModel.swift": {
-    "mtime": 1792230193.9720273,
-    "seen": 1792230234.043145,
+    "mtime": 1792241141.2926202,
+    "seen": 1792242270.2960246,
     "ast_hash": "235c8799137e223ce78e975aefa010dc",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/PairingFile/PairingViewController.swift": {
-    "mtime": 1792230193.9725387,
-    "seen": 1792230234.0431461,
+    "mtime": 1792241141.2933047,
+    "seen": 1792242270.2960258,
     "ast_hash": "c6609544fcec061ecdd9c2be05b3556a",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/PairingFile/WirelessPair/WirelessPairTargetDialog.swift": {
-    "mtime": 1792230193.9725387,
-    "seen": 1792230234.0431476,
+    "mtime": 1792242234.5490184,
+    "seen": 1792242270.2960274,
     "ast_hash": "fdb40135fe3e34ec88993f0d11e83076",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/PairingFile/WirelessPair/WirelessPairView.swift": {
-    "mtime": 1792230193.9737005,
-    "seen": 1792230234.043149,
+    "mtime": 1792241141.2933047,
+    "seen": 1792242270.2960286,
     "ast_hash": "c618c49c3a2d480881ae32e530c8a45c",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/PairingFile/WirelessPair/WirelessPairViewModel.swift": {
-    "mtime": 1792230193.9746988,
-    "seen": 1792230234.0431502,
+    "mtime": 1792242234.5500169,
+    "seen": 1792242270.29603,
     "ast_hash": "c2328c81c32f7d57fe6dee7410e91c91",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/Profiles/ProfileManagementView.swift": {
-    "mtime": 1792230193.9756985,
-    "seen": 1792230234.0431514,
+    "mtime": 1792242234.551019,
+    "seen": 1792242270.296031,
     "ast_hash": "72838f71af76296639ffb9165f196af4",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/Profiles/ProfileManagementViewModel.swift": {
-    "mtime": 1792230193.9766974,
-    "seen": 1792230234.0431526,
+    "mtime": 1792242234.5520203,
+    "seen": 1792242270.2960322,
     "ast_hash": "8031ed5dcbffeb18b3e037f0465e7933",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/Profiles/SelectProfileViewController.swift": {
-    "mtime": 1792230193.9776986,
-    "seen": 1792230234.043154,
+    "mtime": 1792241141.2933047,
+    "seen": 1792242270.2960336,
     "ast_hash": "a066c2d8084921c55e51ab49319f9ceb",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/Profiles/SetProfileAlertViewController.swift": {
-    "mtime": 1792230193.9780939,
-    "seen": 1792230234.0431554,
+    "mtime": 1792241141.2933047,
+    "seen": 1792242270.2960353,
     "ast_hash": "d6ecbabf10c5005ceb0bb3c437a3b5ad",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/UserCustomizations/SideSign/SideSignConfigurationView.swift": {
-    "mtime": 1792230193.9792893,
-    "seen": 1792230234.0431564,
+    "mtime": 1792242234.5530164,
+    "seen": 1792242270.2960362,
     "ast_hash": "92a28d4cf9b4e81678eddd09c4b7cdef",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/UserCustomizations/ThemePickerView.swift": {
-    "mtime": 1792230193.9792893,
-    "seen": 1792230234.043158,
+    "mtime": 1792241141.2986915,
+    "seen": 1792242270.2960377,
     "ast_hash": "cbbd0976ed3501c740e8e775e8893792",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Advanced/UserCustomizations/UserCustomizationsView.swift": {
-    "mtime": 1792230193.981294,
-    "seen": 1792230234.0431592,
+    "mtime": 1792242234.5540168,
+    "seen": 1792242270.2960389,
     "ast_hash": "9e491ea43b4b81a106d19cf69c0541ab",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Auth/AccountVerificationRow.swift": {
-    "mtime": 1792230193.981294,
-    "seen": 1792230234.0431604,
+    "mtime": 1792242234.5540168,
+    "seen": 1792242270.2960403,
     "ast_hash": "102b7ce25abdb845f5d1c72a568bfeef",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Auth/ExportAccountAlertViewController.swift": {
-    "mtime": 1792230193.9822898,
-    "seen": 1792230234.0431616,
+    "mtime": 1792241141.2986915,
+    "seen": 1792242270.2960415,
     "ast_hash": "e9aa25cbb0e0465bdc171a9ccb0f1725",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Auth/ImportAccountAlertController.swift": {
-    "mtime": 1792230193.9836547,
-    "seen": 1792230234.0431628,
+    "mtime": 1792241141.2986915,
+    "seen": 1792242270.296043,
     "ast_hash": "baf641c4ca3a519d3f9407877527bb7e",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Auth/ResetAdiAlertViewController.swift": {
-    "mtime": 1792230193.9836547,
-    "seen": 1792230234.0431643,
+    "mtime": 1792241141.2986915,
+    "seen": 1792242270.2960443,
     "ast_hash": "7c733162b2e6e8b5477b541f4da5b2ca",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Auth/RevokeCertificatesAlertViewController.swift": {
-    "mtime": 1792230193.9836547,
-    "seen": 1792230234.0431652,
+    "mtime": 1792241141.2986915,
+    "seen": 1792242270.2960455,
     "ast_hash": "755ab397dd3e5db4c39394e5fb6e3dc1",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Auth/SignOutAlertViewController.swift": {
-    "mtime": 1792230193.9849212,
-    "seen": 1792230234.0431664,
+    "mtime": 1792241141.3037329,
+    "seen": 1792242270.2960467,
     "ast_hash": "2bb0f55cb2fb92d52eb73391424c02ec",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Diagnostics/DeveloperOptionsView.swift": {
-    "mtime": 1792230193.9859233,
-    "seen": 1792230234.0431678,
+    "mtime": 1792242234.5550165,
+    "seen": 1792242270.2960482,
     "ast_hash": "be0816f7e1af2fbbb2350cbcdc4043ed",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Diagnostics/ExperimentalFeaturesView.swift": {
-    "mtime": 1792230193.9859233,
-    "seen": 1792230234.043169,
+    "mtime": 1792241141.3044734,
+    "seen": 1792242270.296049,
     "ast_hash": "ff34766c2e808d973c68afbf8a2f5250",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/Diagnostics/OperationsLoggingControlView.swift": {
-    "mtime": 1792230193.9869254,
-    "seen": 1792230234.0431702,
+    "mtime": 1792241141.3044734,
+    "seen": 1792242270.2960508,
     "ast_hash": "418865daf5544721c510f97f8f5d0bd3",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/TechyThings/ErrorLog/ConsoleLogView.swift": {
-    "mtime": 1792230193.987923,
-    "seen": 1792230234.0431716,
+    "mtime": 1792241141.3044734,
+    "seen": 1792242270.2960522,
     "ast_hash": "ef81737a0c89e07cc1cc1852f8806069",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/TechyThings/HealthCheck/HealthCheckView.swift": {
-    "mtime": 1792230193.9892385,
-    "seen": 1792230234.0431726,
+    "mtime": 1792242234.5560167,
+    "seen": 1792242270.2960532,
     "ast_hash": "0b09bdc1034b40edfc3dff0322997f95",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/TechyThings/HealthCheck/HealthCheckViewModel.swift": {
-    "mtime": 1792230193.9892385,
-    "seen": 1792230234.0431738,
+    "mtime": 1792242234.5570214,
+    "seen": 1792242270.2960544,
     "ast_hash": "740298af475fce6a8b99be97c35e4465",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/TechyThings/StorageExplorer/DirectoryExplorerView.swift": {
-    "mtime": 1792230193.99039,
-    "seen": 1792230234.0431752,
+    "mtime": 1792242234.5570214,
+    "seen": 1792242270.2960558,
     "ast_hash": "6a50d317cb50e73ccfe1e168dc8f593b",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/TechyThings/StorageExplorer/StorageExplorerView.swift": {
-    "mtime": 1792230193.9913864,
-    "seen": 1792230234.0431762,
+    "mtime": 1792241141.3099308,
+    "seen": 1792242270.2960567,
     "ast_hash": "28095bcdd7b5d6e1ae915805812b04b6",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/Settings/TechyThings/StorageExplorer/StorageExplorerViewModel.swift": {
-    "mtime": 1792230193.9923856,
-    "seen": 1792230234.0431774,
+    "mtime": 1792242234.558017,
+    "seen": 1792242270.2960582,
     "ast_hash": "826bb958425f6baf2af5b2d3ed6fe658",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Views/SplashView.swift": {
-    "mtime": 1792230193.9938655,
-    "seen": 1792230234.0431788,
+    "mtime": 1792241141.3099308,
+    "seen": 1792242270.2960594,
     "ast_hash": "e2b53be576f0066da64d71d9295ad59e",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Widget/WidgetData/WidgetDataManager.swift": {
-    "mtime": 1792230193.9947598,
-    "seen": 1792230234.04318,
+    "mtime": 1792242234.5590167,
+    "seen": 1792242270.2960606,
     "ast_hash": "8493ede418895a3f579949086171dbfb",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Widget/WidgetData/WidgetLogManager.swift": {
-    "mtime": 1792230193.9947598,
-    "seen": 1792230234.0431814,
+    "mtime": 1792241141.3099308,
+    "seen": 1792242270.2960618,
     "ast_hash": "ebc1814cefb50c3a18b4a3bcce5affe9",
     "semantic_hash": ""
   },
   "Vendor/SideStore/SideStore/Widget/WidgetData/WidgetModels.swift": {
-    "mtime": 1792230193.9959435,
-    "seen": 1792230234.0431826,
+    "mtime": 1792241141.3099308,
+    "seen": 1792242270.2960632,
     "ast_hash": "60643a5a111b22ec5a0a2fd91236da17",
     "semantic_hash": ""
   },
   "Vendor/SideStore/scripts/ci/generate_release_notes.py": {
-    "mtime": 1792230193.996948,
-    "seen": 1792230234.0431838,
+    "mtime": 1792241141.314844,
+    "seen": 1792242270.2960646,
     "ast_hash": "e3c33316d012f96cb5bb353bd372dec9",
     "semantic_hash": ""
   },
   "Vendor/SideStore/scripts/ci/generate_source_metadata.py": {
-    "mtime": 1792230193.996948,
-    "seen": 1792230234.0431852,
+    "mtime": 1792241141.3153496,
+    "seen": 1792242270.2960663,
     "ast_hash": "3b28cd78c9996fcc4d178a3a7884fa56",
     "semantic_hash": ""
   },
   "Vendor/SideStore/scripts/ci/update_source_metadata.py": {
-    "mtime": 1792230193.9979484,
-    "seen": 1792230234.0431862,
+    "mtime": 1792241141.3153496,
+    "seen": 1792242270.2960675,
     "ast_hash": "700bd5e1b38fb077c9467fae817655ae",
     "semantic_hash": ""
   },
   "Vendor/SideStore/scripts/ci/workflow.py": {
-    "mtime": 1792230193.998948,
-    "seen": 1792230234.0431879,
+    "mtime": 1792242234.5590167,
+    "seen": 1792242270.296069,
     "ast_hash": "60aaec95a364827c286b864e2493bac1",
     "semantic_hash": ""
   },
   "Vendor/SideStore/scripts/sideconf/decrypt_sideconf.py": {
-    "mtime": 1792230193.9999473,
-    "seen": 1792230234.0431893,
+    "mtime": 1792241141.3153496,
+    "seen": 1792242270.29607,
     "ast_hash": "2f58e9422170a6b4df39a0c76d9b9c1f",
     "semantic_hash": ""
   },
   "Vendor/SideStore/trustedapps.json": {
-    "mtime": 1792230194.0004303,
-    "seen": 1792230234.0431905,
+    "mtime": 1792241141.3153496,
+    "seen": 1792242270.2960715,
     "ast_hash": "da84d868b8db43a39e6b1fa9f8292e64",
     "semantic_hash": ""
   },
   "scripts/create-release-manifest.py": {
-    "mtime": 1792230161.9890022,
-    "seen": 1792230234.043192,
+    "mtime": 1792241120.1391582,
+    "seen": 1792242270.2960725,
     "ast_hash": "8eb1814ce71df39b864ec360f5e92fd9",
     "semantic_hash": ""
   },
   "scripts/embed-local-vpn.py": {
-    "mtime": 1792230161.9890022,
-    "seen": 1792230234.043193,
+    "mtime": 1792241120.1391582,
+    "seen": 1792242270.2960737,
     "ast_hash": "2905e4aa7f45a7ea9548fac616af2750",
     "semantic_hash": ""
   },
   "scripts/verify-dependency-regressions.py": {
-    "mtime": 1792230161.9944842,
-    "seen": 1792230234.0432007,
+    "mtime": 1792241120.1442034,
+    "seen": 1792242270.2960823,
     "ast_hash": "6dffd1e280f698f94092e0925c57445a",
     "semantic_hash": ""
   },
   "scripts/verify-sidestore-regressions.py": {
-    "mtime": 1792230161.9954822,
-    "seen": 1792230234.0432022,
+    "mtime": 1792241120.1442034,
+    "seen": 1792242270.2960837,
     "ast_hash": "b61ef5fffb7ce6d2b42c3edfb596bb5a",
     "semantic_hash": ""
   },
   ".github/workflows/ios-build.yml": {
-    "mtime": 1792230181.4658751,
-    "seen": 1792230234.043203,
+    "mtime": 1792241119.7885525,
+    "seen": 1792242270.2960846,
     "ast_hash": "a98aaaae664c44f44ad5915a9c848ef3",
     "semantic_hash": ""
   },
   "AGENTS.md": {
-    "mtime": 1792230161.6137855,
-    "seen": 1792230234.0432045,
+    "mtime": 1792241119.7932823,
+    "seen": 1792242270.296086,
     "ast_hash": "1b97412ef16b20b0f08a2352bce1d0f3",
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1792230161.6157868,
-    "seen": 1792230234.0432072,
+    "mtime": 1792241119.794292,
+    "seen": 1792242270.2960885,
     "ast_hash": "d97b8d3145fdd4a687c58dac78677092",
     "semantic_hash": ""
   },
   "SideKickVPN/UPSTREAM.md": {
-    "mtime": 1792230161.6653006,
-    "seen": 1792230234.0432084,
+    "mtime": 1792241119.8554082,
+    "seen": 1792242270.2960901,
     "ast_hash": "a725fb70004cd1e5ce6dac8c4585b120",
     "semantic_hash": ""
   },
   "THIRD_PARTY_NOTICES.md": {
-    "mtime": 1792230161.6663003,
-    "seen": 1792230234.04321,
+    "mtime": 1792241119.8559022,
+    "seen": 1792242270.2960913,
     "ast_hash": "42d73febc908ea7c68a6a7e54c2a3ca0",
     "semantic_hash": ""
   },
   "Vendor/SideStore/.github/ISSUE_TEMPLATE/bug_report.yml": {
-    "mtime": 1792230193.4314723,
-    "seen": 1792230234.0432112,
+    "mtime": 1792241140.4759605,
+    "seen": 1792242270.2960927,
     "ast_hash": "3b00e231f59346290c0506779ae5b35d",
     "semantic_hash": ""
   },
   "Vendor/SideStore/.github/ISSUE_TEMPLATE/config.yml": {
-    "mtime": 1792230193.4314723,
-    "seen": 1792230234.0432122,
+    "mtime": 1792241140.4764717,
+    "seen": 1792242270.296094,
     "ast_hash": "b78130894b95960feb46fbf4e8f96586",
     "semantic_hash": ""
   },
   "Vendor/SideStore/.github/ISSUE_TEMPLATE/feature_request.yml": {
-    "mtime": 1792230193.4334688,
-    "seen": 1792230234.0432136,
+    "mtime": 1792241140.4764717,
+    "seen": 1792242270.2960951,
     "ast_hash": "4f38eae6598640b1617bf32a2a8eb779",
     "semantic_hash": ""
   },
   "Vendor/SideStore/.github/labeler.yml": {
-    "mtime": 1792230193.4347,
-    "seen": 1792230234.043215,
+    "mtime": 1792241140.4764717,
+    "seen": 1792242270.296097,
     "ast_hash": "a3dec8b4c9705f74f504651bc3357fb1",
     "semantic_hash": ""
   },
   "Vendor/SideStore/.github/workflows/alpha.yml": {
-    "mtime": 1792230193.4369166,
-    "seen": 1792230234.0432165,
+    "mtime": 1792241140.4819653,
+    "seen": 1792242270.2960982,
     "ast_hash": "ac76cbd1ed392696139f5320c46d5405",
     "semantic_hash": ""
   },
   "Vendor/SideStore/.github/workflows/attach_build_products.yml": {
-    "mtime": 1792230193.4379127,
-    "seen": 1792230234.043218,
+    "mtime": 1792241140.4819653,
+    "seen": 1792242270.2960997,
     "ast_hash": "b41fa2e0886c5e3766c9abf1a052443d",
     "semantic_hash": ""
   },
   "Vendor/SideStore/.github/workflows/nightly.yml": {
-    "mtime": 1792230193.4379127,
-    "seen": 1792230234.043219,
+    "mtime": 1792241140.4819653,
+    "seen": 1792242270.2961006,
     "ast_hash": "eced64c36529f5c6e08dc4b2a20a53a5",
     "semantic_hash": ""
   },
   "Vendor/SideStore/.github/workflows/pr.yml": {
-    "mtime": 1792230193.438913,
-    "seen": 1792230234.0432205,
+    "mtime": 1792241140.4819653,
+    "seen": 1792242270.2961018,
     "ast_hash": "23874596788313522384d5fe876e57a4",
     "semantic_hash": ""
   },
   "Vendor/SideStore/.github/workflows/stable.yml": {
-    "mtime": 1792230193.4404933,
-    "seen": 1792230234.0432217,
+    "mtime": 1792241140.4870837,
+    "seen": 1792242270.2961035,
     "ast_hash": "712e84f1104c0b18cb8b1cd54bb665e3",
     "semantic_hash": ""
   },
   "Vendor/SideStore/.github/workflows/triage.yml": {
-    "mtime": 1792230193.4414973,
-    "seen": 1792230234.0432227,
+    "mtime": 1792241140.4875703,
+    "seen": 1792242270.2961047,
     "ast_hash": "630a83f374a550b4e6b1ae4c457c0243",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AGENTS.md": {
-    "mtime": 1792230193.442497,
-    "seen": 1792230234.0432243,
+    "mtime": 1792241140.4875703,
+    "seen": 1792242270.296106,
     "ast_hash": "8dba365cb8c75b7259b8f19986ac261a",
     "semantic_hash": ""
   },
   "Vendor/SideStore/CERTIFICATE-OF-ORIGIN.md": {
-    "mtime": 1792230193.826258,
-    "seen": 1792230234.0432253,
+    "mtime": 1792241141.1598597,
+    "seen": 1792242270.2961073,
     "ast_hash": "3e75ad0677e8c5735b51ff2b768033c7",
     "semantic_hash": ""
   },
   "Vendor/SideStore/CLAUDE.md": {
-    "mtime": 1792230193.8272579,
-    "seen": 1792230234.0432267,
+    "mtime": 1792241141.1598597,
+    "seen": 1792242270.2961085,
     "ast_hash": "771faa62feb60b7de901a397aebb29b0",
     "semantic_hash": ""
   },
   "Vendor/SideStore/CONTRIBUTING.md": {
-    "mtime": 1792230193.8282578,
-    "seen": 1792230234.043228,
+    "mtime": 1792242234.5106962,
+    "seen": 1792242270.2961102,
     "ast_hash": "b5c96ad6eed9d85adb500458c26cc4eb",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/.github/workflows/build-all.yml": {
-    "mtime": 1792230195.9674065,
-    "seen": 1792230234.043229,
+    "mtime": 1792241150.1650803,
+    "seen": 1792242270.296111,
     "ast_hash": "5b199bb2415e8dbabebcdc6f2a080f33",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/.github/workflows/ci.yml": {
-    "mtime": 1792230195.9674065,
-    "seen": 1792230234.0432305,
+    "mtime": 1792241150.1650803,
+    "seen": 1792242270.2961123,
     "ast_hash": "634d86e28946ea06b2f878072ec5a786",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/.github/workflows/release-cli.yml": {
-    "mtime": 1792230195.9684055,
-    "seen": 1792230234.0432317,
+    "mtime": 1792241150.1650803,
+    "seen": 1792242270.2961137,
     "ast_hash": "dbe2954b213747a63609682b69bf1996",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/SideSign/README.md": {
-    "mtime": 1792230195.9756088,
-    "seen": 1792230234.043233,
+    "mtime": 1792241150.170584,
+    "seen": 1792242270.2961147,
     "ast_hash": "b7476aca72b9c52bdd101498bdf962e8",
     "semantic_hash": ""
   },
   "Vendor/SideStore/Dependencies/minimuxer/README.md": {
-    "mtime": 1792230197.7668507,
-    "seen": 1792230234.0432348,
+    "mtime": 1792241150.3707154,
+    "seen": 1792242270.296116,
     "ast_hash": "22382981bbc7f06aa11c0a825a01a722",
     "semantic_hash": ""
   },
   "Vendor/SideStore/GEMINI.md": {
-    "mtime": 1792230193.8292577,
-    "seen": 1792230234.0432358,
+    "mtime": 1792241141.1598597,
+    "seen": 1792242270.2961173,
     "ast_hash": "771faa62feb60b7de901a397aebb29b0",
     "semantic_hash": ""
   },
   "Vendor/SideStore/README.md": {
-    "mtime": 1792230193.8312576,
-    "seen": 1792230234.0432444,
+    "mtime": 1792241141.1648507,
+    "seen": 1792242270.2961185,
     "ast_hash": "8e5565e849338d3f13ff52d40e1451b9",
     "semantic_hash": ""
   },
   "docs/livecontainer-integration.md": {
-    "mtime": 1792230161.9039154,
-    "seen": 1792230234.0432475,
+    "mtime": 1792241120.0443606,
+    "seen": 1792242270.2961211,
     "ast_hash": "5ba8e77d1e7c27a5a8919a647a805540",
     "semantic_hash": ""
   },
   "docs/livecontainer-investigation.md": {
-    "mtime": 1792230161.9039154,
-    "seen": 1792230234.043249,
+    "mtime": 1792241120.0488527,
+    "seen": 1792242270.2961223,
     "ast_hash": "72222577b98854e6485a22c5cd81936d",
     "semantic_hash": ""
   },
   "docs/livecontainer-offload-research-plan.md": {
-    "mtime": 1792230161.9049168,
-    "seen": 1792230234.043251,
+    "mtime": 1792241120.049679,
+    "seen": 1792242270.2961237,
     "ast_hash": "36f1ac0d9ab3b4d9e0216ad527e231b2",
     "semantic_hash": ""
   },
   "docs/loading-and-ios18.md": {
-    "mtime": 1792230161.9059153,
-    "seen": 1792230234.0432522,
+    "mtime": 1792241120.049679,
+    "seen": 1792242270.296125,
     "ast_hash": "b8f33d238b5e04af385d53e819feb87c",
     "semantic_hash": ""
   },
   "docs/settings-functionality.md": {
-    "mtime": 1792230161.9388914,
-    "seen": 1792230234.0432534,
+    "mtime": 1792241120.0831022,
+    "seen": 1792242270.2961261,
     "ast_hash": "5af1fba6b58433bad09df23cdb24c2df",
     "semantic_hash": ""
   },
   "docs/stock-livecontainer-transfer.md": {
-    "mtime": 1792230161.9398935,
-    "seen": 1792230234.043255,
+    "mtime": 1792241120.0877357,
+    "seen": 1792242270.2961276,
     "ast_hash": "f6bd991239cbcd5217c0c83898557041",
     "semantic_hash": ""
   },
   "docs/superpowers/plans/2026-10-10-livecontainer.md": {
-    "mtime": 1792230161.9402375,
-    "seen": 1792230234.0432563,
+    "mtime": 1792241120.0884855,
+    "seen": 1792242270.296129,
     "ast_hash": "cbca5cad10a0230e75ce01846dc18362",
     "semantic_hash": ""
   },
   "docs/superpowers/plans/2026-10-10-update-tracking.md": {
-    "mtime": 1792230161.941453,
-    "seen": 1792230234.0432577,
+    "mtime": 1792241120.0884855,
+    "seen": 1792242270.29613,
     "ast_hash": "18c045ebbdac07ac329c382209c80f56",
     "semantic_hash": ""
   },
   "docs/superpowers/plans/2026-10-11-review-bug-fixes.md": {
-    "mtime": 1792230161.9424515,
-    "seen": 1792230234.0432587,
+    "mtime": 1792241120.0884855,
+    "seen": 1792242270.2961314,
     "ast_hash": "dca87a574d9ceea266d28ac51b1e34fa",
     "semantic_hash": ""
   },
   "docs/superpowers/plans/2026-10-13-github-updates.md": {
-    "mtime": 1792230161.9424515,
-    "seen": 1792230234.0432599,
+    "mtime": 1792241120.0884855,
+    "seen": 1792242270.2961326,
     "ast_hash": "76c8430d5ee50234ad5b7028a528578e",
     "semantic_hash": ""
   },
   "docs/update-tracking-design.md": {
-    "mtime": 1792230161.9434521,
-    "seen": 1792230234.0432613,
+    "mtime": 1792241120.0884855,
+    "seen": 1792242270.296134,
     "ast_hash": "bc6f103f1c0572ce1e482c6a2e8d3e5b",
     "semantic_hash": ""
   },
   "project.yml": {
-    "mtime": 1792230161.9880042,
-    "seen": 1792230234.0432625,
+    "mtime": 1792241120.1391582,
+    "seen": 1792242270.296135,
     "ast_hash": "4276aaea9c63bf81f5daf81dce0aa756",
     "semantic_hash": ""
   },
   "scripts/graphify.ps1": {
-    "mtime": 1792230161.9890022,
-    "seen": 1792230234.0431943,
+    "mtime": 1792241120.1391582,
+    "seen": 1792242270.2960753,
     "ast_hash": "6bad7df27fe63c3eba8c328dbca3beae",
     "semantic_hash": ""
   },
   "PROJECT_CONTEXT.md": {
-    "mtime": 1792230161.614787,
-    "seen": 1792230234.043206,
+    "mtime": 1792241119.794292,
+    "seen": 1792242270.2960873,
     "ast_hash": "1e407631c01ed1751d4f99afb8e941a0",
     "semantic_hash": ""
   },
   "docs/graphify.md": {
-    "mtime": 1792230161.9029133,
-    "seen": 1792230234.043246,
+    "mtime": 1792241120.0443606,
+    "seen": 1792242270.2961197,
     "ast_hash": "e97cef11df1292caaa4a086e6efe4958",
     "semantic_hash": ""
   },
   "SideKick/Services/DiagnosticsStore.swift": {
-    "mtime": 1792230161.6301372,
-    "seen": 1792230234.0424292,
+    "mtime": 1792241119.805156,
+    "seen": 1792242270.295237,
     "ast_hash": "c91d99ff066c53f699b19a42bd4adc32",
     "semantic_hash": ""
   },
   "SideKick/Services/SideKickDiagnostics.swift": {
-    "mtime": 1792230161.640245,
-    "seen": 1792230234.0424547,
+    "mtime": 1792241119.821058,
+    "seen": 1792242270.2952828,
     "ast_hash": "d2e565c82ed4f74e03d4175b68d0bcab",
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/DiagnosticsView.swift": {
-    "mtime": 1792230161.6568887,
-    "seen": 1792230234.0424895,
+    "mtime": 1792241119.8449347,
+    "seen": 1792242270.2953224,
     "ast_hash": "c5ec43082763215a002a1e1700e4b724",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_hosted_lifecycle.py": {
-    "mtime": 1792230161.6684313,
-    "seen": 1792230234.0425127,
+    "mtime": 1792241119.8609886,
+    "seen": 1792242270.295369,
     "ast_hash": "8ddf786cef9a375e36d84a7cd1d44d31",
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/DiagnosticsTests.swift": {
-    "mtime": 1792230161.673581,
-    "seen": 1792230234.0425246,
+    "mtime": 1792241119.8665564,
+    "seen": 1792242270.2953854,
     "ast_hash": "114356705d6daf98d04a3b92f0bb2c0e",
     "semantic_hash": ""
   },
   "SideKick/Services/UnsavedSettingsCoordinator.swift": {
-    "mtime": 1792230161.6444366,
-    "seen": 1792230234.042464,
+    "mtime": 1792241119.8219528,
+    "seen": 1792242270.295293,
     "ast_hash": "d8578223ec66b84cc5d085f540e1fd6e",
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/UnsavedSettingsGuard.swift": {
-    "mtime": 1792230161.6624644,
-    "seen": 1792230234.0425014,
+    "mtime": 1792241119.8509567,
+    "seen": 1792242270.2953472,
     "ast_hash": "fd998e8fe9eb6b1d1c2d804716916964",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_unsaved_settings.py": {
-    "mtime": 1792230161.6684313,
-    "seen": 1792230234.0425208,
+    "mtime": 1792241119.8614025,
+    "seen": 1792242270.2953815,
     "ast_hash": "831c2379845ef899ce7f8241e1188d7f",
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/UnsavedSettingsTests.swift": {
-    "mtime": 1792230161.6785877,
-    "seen": 1792230234.0425372,
+    "mtime": 1792241119.8710604,
+    "seen": 1792242270.2954004,
     "ast_hash": "77c673c81baf46b7eac7319494782e6f",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_local_connection.py": {
-    "mtime": 1792230161.6684313,
-    "seen": 1792230234.0425186,
+    "mtime": 1792241119.8614025,
+    "seen": 1792242270.2953763,
     "ast_hash": "7e54f804e3056d3e040964ba2667c603",
     "semantic_hash": ""
   },
   "Tests/VendorRegression/NetworkIPv4Regression.swift": {
-    "mtime": 1792230161.6805863,
-    "seen": 1792230234.0425396,
+    "mtime": 1792241119.8724327,
+    "seen": 1792242270.2954037,
     "ast_hash": "290766f9594142f620ac5f9ac5c2a44a",
     "semantic_hash": ""
   },
   "Tests/VendorRegression/test_network_ipv4_patch.py": {
-    "mtime": 1792230161.681587,
-    "seen": 1792230234.0425434,
+    "mtime": 1792241119.8724327,
+    "seen": 1792242270.2954078,
     "ast_hash": "3093f0b3d643c6757f3feac8bae0b724",
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/SelfUpdateReleaseTests.swift": {
-    "mtime": 1792230161.677586,
-    "seen": 1792230234.0425346,
+    "mtime": 1792241119.866912,
+    "seen": 1792242270.295398,
     "ast_hash": "00e923d38883b818e8022bb8f53ffc10",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_install_start.py": {
-    "mtime": 1792230161.6684313,
-    "seen": 1792230234.042514,
+    "mtime": 1792241119.8614025,
+    "seen": 1792242270.2953706,
     "ast_hash": "3bc5adaad55ad586f96a5a5d1a2acce9",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_completed_update_queue.py": {
-    "mtime": 1792230161.6684313,
-    "seen": 1792230234.0425074,
+    "mtime": 1792241119.8559022,
+    "seen": 1792242270.29536,
     "ast_hash": "d9869304505047174d9a504b0e35b1d1",
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/CompletedUpdateQueueTests.swift": {
-    "mtime": 1792230161.6684313,
-    "seen": 1792230234.0425234,
+    "mtime": 1792241119.86555,
+    "seen": 1792242270.2953837,
     "ast_hash": "95c7da72434030c98b1106532b6ed47c",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_helper_packaging.py": {
-    "mtime": 1792230161.6684313,
-    "seen": 1792230234.0425088,
+    "mtime": 1792241119.8559022,
+    "seen": 1792242270.2953632,
     "ast_hash": "17042da38c849ee6c8dff4b712420d74",
     "semantic_hash": ""
   },
   "SideKick/Views/LiveContainer/LiveContainerImportView.swift": {
-    "mtime": 1792230161.6551676,
-    "seen": 1792230234.0424845,
+    "mtime": 1792241119.8397791,
+    "seen": 1792242270.2953165,
     "ast_hash": "94075c00990f8d98636356b8d7e26975",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_livecontainer_import.py": {
-    "mtime": 1792230161.6684313,
-    "seen": 1792230234.042517,
+    "mtime": 1792241119.8614025,
+    "seen": 1792242270.2953746,
     "ast_hash": "06b2da93d4ca7c8f92568a23004332ae",
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/LiveContainerImportTests.swift": {
-    "mtime": 1792230161.6765883,
-    "seen": 1792230234.0425322,
+    "mtime": 1792241119.866912,
+    "seen": 1792242270.2953944,
     "ast_hash": "5226aa0e6f7d3d91090baf229c2c9c6b",
     "semantic_hash": ""
   },
   "SideKick/Services/AppOffloadService.swift": {
-    "mtime": 1792230161.6255374,
-    "seen": 1792230234.042424,
+    "mtime": 1792241119.805156,
+    "seen": 1792242270.295232,
     "ast_hash": "7c513a1a96d7cf170ec7f414cc6b19f5",
     "semantic_hash": ""
   },
   "SideKick/Views/Library/AppOffloadView.swift": {
-    "mtime": 1792230161.65097,
-    "seen": 1792230234.0424747,
+    "mtime": 1792241119.834129,
+    "seen": 1792242270.295306,
     "ast_hash": "9b9a9ba517b7f47c817f6460f72a7983",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_app_offload.py": {
-    "mtime": 1792230181.2613816,
-    "seen": 1792230234.042506,
+    "mtime": 1792241119.8559022,
+    "seen": 1792242270.295357,
     "ast_hash": "a64f43fea24b77f9bc6e669fe925ffb3",
     "semantic_hash": ""
   },
   "scripts/package-backup-helper.py": {
-    "mtime": 1792230161.9934819,
-    "seen": 1792230234.043198,
+    "mtime": 1792241120.1442034,
+    "seen": 1792242270.2960794,
     "ast_hash": "6cf9725aa8e15c08b5c711b5e8be18f6",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/signing_repair_checks.py": {
-    "mtime": 1792230181.4668736,
-    "seen": 1792230234.0425043,
+    "mtime": 1792241119.8559022,
+    "seen": 1792242270.295354,
     "ast_hash": "c11a9b43d4c6d172f0722ab7e3256fdf",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_host_entitlements.py": {
-    "mtime": 1792230240.056617,
-    "seen": 1792230301.705497,
-    "ast_hash": "5b4a58f0d20817b36e8bc2b0ed8e1aa0",
+    "mtime": 1792241119.8599832,
+    "seen": 1792242270.2953658,
+    "ast_hash": "bd94f6fdbb17a9e2a42b614fb37cc94f",
     "semantic_hash": ""
   },
   "Tests/VendorRegression/test_explicit_peer_patch.py": {
-    "mtime": 1792230181.4688733,
-    "seen": 1792230234.042542,
+    "mtime": 1792241119.8724327,
+    "seen": 1792242270.2954066,
     "ast_hash": "058993f3043ff8f94a607845c4a7de8f",
     "semantic_hash": ""
   },
   "scripts/host-entitlements.py": {
-    "mtime": 1792230181.4728744,
-    "seen": 1792230234.0431955,
+    "mtime": 1792241120.1391582,
+    "seen": 1792242270.2960765,
     "ast_hash": "0720be1622c7a241da749836424c0f86",
     "semantic_hash": ""
   },
   "scripts/integrate-backup-helper.py": {
-    "mtime": 1792230181.4728744,
-    "seen": 1792230234.043197,
-    "ast_hash": "40ce5790f2b81b79c180f0a9ce1f1d3c",
+    "mtime": 1792242140.2857225,
+    "seen": 1792242270.2960777,
+    "ast_hash": "1fe28c08fd5749501e283cd40b3cfe58",
     "semantic_hash": ""
   },
   "scripts/templates/SideKickBackupView.swift": {
-    "mtime": 1792230161.9944842,
-    "seen": 1792230234.0431995,
+    "mtime": 1792241120.1442034,
+    "seen": 1792242270.2960806,
     "ast_hash": "9104152835e7f1cb01e11ce5b8ddf2d0",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_restore_helper_signing.py": {
-    "mtime": 1792231442.1736562,
-    "seen": 1792231523.0829191,
-    "ast_hash": "ebabdb4c3583e4177aae396c6c3b34ea",
+    "mtime": 1792242172.1234217,
+    "seen": 1792242270.2953799,
+    "ast_hash": "739a61dadbf888d61458b6c9e9ad25c2",
     "semantic_hash": ""
   }
 }
