@@ -44,6 +44,7 @@ enum IPAImportError: LocalizedError {
     case sourceBookmarkUnavailable
     case bundleIdentifierMismatch(String, String)
     case sourceChanged
+    case zipWithoutSingleIPA
 
     var errorDescription: String? {
         switch self {
@@ -57,6 +58,7 @@ enum IPAImportError: LocalizedError {
         case .sourceBookmarkUnavailable: "SideKick couldn’t save access to the original file. Choose it again from Files."
         case .bundleIdentifierMismatch(let expected, let actual): "This IPA is for \(actual), not \(expected). It wasn’t queued as an update."
         case .sourceChanged: "The IPA has changed since it was reviewed. Review the updated file before installing or sharing it."
+        case .zipWithoutSingleIPA: "This zip doesn’t contain exactly one IPA. SideKick only imports a zip that holds a single .ipa and nothing else."
         }
     }
 }

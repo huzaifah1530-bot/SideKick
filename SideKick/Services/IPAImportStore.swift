@@ -76,6 +76,33 @@ actor IPAImportStore {
         return app
     }
 
+    /// Fallback for a .zip picked in Files: accepted only when it contains exactly one .ipa and
+    /// nothing else (Finder's __MACOSX and .DS_Store entries are ignored). The IPA is kept as a
+    /// managed copy because a file inside a zip can't be bookmarked.
+    func prepareZippedIPA(from zipURL: URL) throws -> ImportedIPA {
+        let securityScoped = zipURL.startAccessingSecurityScopedResource()
+        defer { if securityScoped { zipURL.stopAccessingSecurityScopedResource() } }
+        guard fileManager.isReadableFile(atPath: zipURL.path) else { throw IPAImportError.inaccessibleFile }
+        let archive: Archive
+        do { archive = try Archive(url: zipURL, accessMode: .read) }
+        catch { throw IPAImportError.zipWithoutSingleIPA }
+        let files = archive.filter { entry in
+            guard entry.type == .file else { return false }
+            let path = entry.path
+            let name = (path as NSString).lastPathComponent
+            return !path.hasPrefix("__MACOSX/") && !path.contains("/__MACOSX/") && name != ".DS_Store" && !name.hasPrefix("._")
+        }
+        guard files.count == 1, let entry = files.first, entry.path.lowercased().hasSuffix(".ipa") else {
+            throw IPAImportError.zipWithoutSingleIPA
+        }
+        let extracted = fileManager.temporaryDirectory.appendingPathComponent("sidekick-zip-\(UUID().uuidString).ipa")
+        defer { try? fileManager.removeItem(at: extracted) }
+        _ = try archive.extract(entry, to: extracted)
+        try Task.checkCancellation()
+        // Treat it like a downloaded IPA so SideKick keeps its own copy.
+        return try prepareIPA(from: extracted, remoteSourceURL: zipURL)
+    }
+
     func prepareIPA(bookmarkData: Data) throws -> ImportedIPA {
         var isStale = false
         let sourceURL: URL

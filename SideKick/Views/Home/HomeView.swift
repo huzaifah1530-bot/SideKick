@@ -40,6 +40,10 @@ struct HomeView: View {
     @State private var expirationClock = Date.now
     @State private var ipaPendingRemoval: ImportedIPA?
     @State private var contextRoute: HomeContextRoute?
+    /// Files picked together import one at a time, pausing whenever one needs an update choice.
+    @State private var pendingFileImports: [URL] = []
+    @State private var importFailures: [String] = []
+    private static let importTypes: [UTType] = [UTType(filenameExtension: "ipa") ?? .data, .zip]
     @State private var selectedGuestID: String?
     @State private var sourceGuestID: String?
     @State private var liveContainerError: String?
@@ -371,11 +375,12 @@ struct HomeView: View {
                     EmptyView()
                 }
             }
-            .fileImporter(isPresented: $showingImporter, allowedContentTypes: [.data], allowsMultipleSelection: false) { result in
+            .fileImporter(isPresented: $showingImporter, allowedContentTypes: Self.importTypes, allowsMultipleSelection: true) { result in
                 switch result {
                 case .success(let urls):
-                    guard let url = urls.first else { return }
-                    Task { await prepareImport(from: url) }
+                    pendingFileImports += urls
+                    importFailures = []
+                    Task { await importNextFile() }
                 case .failure(let error):
                     viewModel.errorMessage = error.localizedDescription
                 }
@@ -404,7 +409,12 @@ struct HomeView: View {
                 Task { await importPendingIPA() }
             }
             .onChange(of: isImportReviewActive) { _, active in
-                if !active { Task { await importPendingIPA() } }
+                if !active {
+                    Task {
+                        await importNextFile()
+                        await importPendingIPA()
+                    }
+                }
             }
             .onReceive(NotificationCenter.default.publisher(for: GitHubUpdateNotificationRouteStore.tappedNotification)) { _ in
                 Task { await openPendingUpdateNotification() }
@@ -757,15 +767,26 @@ struct HomeView: View {
         await load()
     }
 
-    private func prepareImport(from url: URL) async {
-        guard !isImportReviewActive else { return }
-        viewModel.isImporting = true
-        defer { viewModel.isImporting = false }
-        do {
-            let app = try await environment.ipaImportStore.prepareIPA(from: url)
-            await handlePreparedIPA(app)
-        } catch {
-            viewModel.errorMessage = error.localizedDescription
+    /// Imports queued files in order. Stops when one needs an update choice; the choice
+    /// dialog closing resumes the queue. Failures are collected and reported once at the end.
+    private func importNextFile() async {
+        while !pendingFileImports.isEmpty, !isImportReviewActive {
+            let url = pendingFileImports.removeFirst()
+            viewModel.isImporting = true
+            do {
+                let app = url.pathExtension.lowercased() == "zip"
+                    ? try await environment.ipaImportStore.prepareZippedIPA(from: url)
+                    : try await environment.ipaImportStore.prepareIPA(from: url)
+                viewModel.isImporting = false
+                await handlePreparedIPA(app)
+            } catch {
+                viewModel.isImporting = false
+                importFailures.append("\(url.lastPathComponent): \(error.localizedDescription)")
+            }
+        }
+        if pendingFileImports.isEmpty, !isImportReviewActive, !importFailures.isEmpty {
+            viewModel.errorMessage = importFailures.joined(separator: "\n\n")
+            importFailures = []
         }
     }
 

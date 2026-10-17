@@ -156,17 +156,30 @@ struct GitHubUpdateSettingsView: View {
 
             if !repositoryURL.isEmpty {
                 Section {
-                    if history.isEmpty && selectedBaselineKey == nil {
+                    if history.isEmpty && isLoadingHistory {
+                        // The list behind this row is empty until GitHub answers; opening it now
+                        // would show a blank page that never fills in.
+                        HStack {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text("Installed Build")
+                                Text("Loading builds…").font(.subheadline).foregroundStyle(.secondary)
+                            }
+                            Spacer()
+                            ProgressView()
+                        }
+                        .accessibilityElement(children: .combine)
+                    } else if history.isEmpty {
                         SwiftUI.Button {
                             Task { await loadHistory() }
                         } label: {
-                            HStack {
-                                Text("Find Installed Build")
-                                Spacer()
-                                if isLoadingHistory { ProgressView() }
+                            VStack(alignment: .leading, spacing: 2) {
+                                Text(selectedBaselineKey == nil ? "Find Installed Build" : "Load Builds")
+                                if selectedBaselineKey != nil {
+                                    Text("Saved build · load builds to change it")
+                                        .font(.subheadline).foregroundStyle(.secondary)
+                                }
                             }
                         }
-                        .disabled(isLoadingHistory)
                     } else {
                         NavigationLink {
                             GitHubBaselineSelectionView(
@@ -190,7 +203,10 @@ struct GitHubUpdateSettingsView: View {
                         }
                     }
                     if isLoadingHistory && !history.isEmpty {
-                        ProgressView().frame(maxWidth: .infinity)
+                        HStack(spacing: Spacing.xs) {
+                            ProgressView()
+                            Text("Loading more builds…").font(.subheadline).foregroundStyle(.secondary)
+                        }
                     }
                 } header: {
                     HStack {
@@ -291,6 +307,9 @@ struct GitHubUpdateSettingsView: View {
             builds = []
             historyPage = 1
             isLoadingHistory = false
+            // The discarded request was the only one in flight; start again with the new token
+            // so the list doesn't stay empty.
+            if isValidRepository { Task { await loadHistory() } }
         }
         .onReceive(NotificationCenter.default.publisher(for: .sideKickGitHubSettingsDidChange)) { _ in
             Task {
