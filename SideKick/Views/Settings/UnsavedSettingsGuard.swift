@@ -31,6 +31,8 @@ import SwiftUI
 
     private func register() {
         coordinator.register(owner: owner, isDirty: isDirty, save: save, discard: discard)
+        // Make sure re-tapping the current tab asks first while this page has edits.
+        if isDirty { TabReselectGuard.installInAllWindows() }
     }
 }
 

@@ -12,6 +12,11 @@ final class TabReselectGuard: NSObject, UITabBarControllerDelegate {
         self.original = original
     }
 
+    /// Re-checks every window. Cheap, and covers SwiftUI replacing the delegate later.
+    static func installInAllWindows() {
+        install(in: UIApplication.shared.connectedScenes.compactMap { $0 as? UIWindowScene }.flatMap(\.windows))
+    }
+
     /// Safe to call repeatedly; installs once per tab bar controller.
     static func install(in windows: [UIWindow]) {
         for window in windows {
@@ -21,6 +26,18 @@ final class TabReselectGuard: NSObject, UITabBarControllerDelegate {
             installed[ObjectIdentifier(tabs)] = guardDelegate
             tabs.delegate = guardDelegate
         }
+    }
+
+    /// SwiftUI's `Tab {}` API drives UIKit's iOS 18 UITab delegate method, not the older one.
+    func tabBarController(_ tabBarController: UITabBarController, shouldSelectTab tab: UITab) -> Bool {
+        if tab === tabBarController.selectedTab, UnsavedSettingsCoordinator.shared.hasUnsavedChanges {
+            let root = tab.viewController
+            UnsavedSettingsCoordinator.shared.requestNavigation { [weak root] in
+                Self.findNavigationController(root)?.popToRootViewController(animated: true)
+            }
+            return false
+        }
+        return original?.tabBarController?(tabBarController, shouldSelectTab: tab) ?? true
     }
 
     func tabBarController(_ tabBarController: UITabBarController, shouldSelect viewController: UIViewController) -> Bool {
