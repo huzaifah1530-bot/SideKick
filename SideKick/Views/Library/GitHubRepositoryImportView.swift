@@ -258,67 +258,32 @@ private struct GitHubRepositoryDownloadView: View {
     @State var tokenID: String?
     let onImported: (ImportedIPA) async throws -> Void
     @Environment(AppEnvironment.self) private var environment
-    @State private var progress: GitHubDownloadProgress?
-    @State private var task: Task<Void, Never>?
-    @State private var importedApp: ImportedIPA?
-    @State private var errorMessage: String?
+    @State private var jobID: UUID?
 
     var body: some View {
         List {
             Section {
                 LabeledContent("Version", value: choice.candidate.newVersion)
-                LabeledContent("Download", value: choice.candidate.assetName)
-                GitHubTokenSelectionLink(selection: $tokenID).disabled(task != nil)
+                LabeledContent("File", value: choice.candidate.assetName)
+                GitHubTokenSelectionLink(selection: $tokenID).disabled(jobID != nil)
             } header: { Text(choice.candidate.title) } footer: {
-                Text("Update tracking is configured when you install this IPA. Future downloads come from the same repository, workflow, branch, and asset name.")
+                Text("After you install it, SideKick checks this same source for updates.")
             }
             Section {
-                if let importedApp {
-                    Label("Ready to install", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
-                    NavigationLink { AppManagementView(importedApp: importedApp) } label: { Label("Review App", systemImage: "app") }
-                    SwiftUI.Button(role: .destructive) {
-                        Task {
-                            do { try await environment.ipaImportStore.delete(importedApp); self.importedApp = nil }
-                            catch { errorMessage = error.localizedDescription }
-                        }
-                    } label: { Label("Delete IPA", systemImage: "trash") }
-                } else if task != nil {
-                    ProgressView(value: progress?.fractionCompleted)
-                    Text(progress.map { ByteCountFormatter.string(fromByteCount: $0.bytesWritten, countStyle: .file) + " downloaded" } ?? "Starting download…")
-                        .font(.subheadline).foregroundStyle(.secondary)
-                    SwiftUI.Button("Cancel Download", role: .cancel) { task?.cancel() }
+                if let jobID, environment.importDownloads.jobs[jobID] != nil {
+                    ImportDownloadPanel(jobID: jobID)
                 } else {
                     SwiftUI.Button {
-                        task = Task { await download() }
-                    } label: { Label("Download IPA", systemImage: "arrow.down.circle.fill") }
+                        jobID = environment.importDownloads.start(.repository(choice, tokenID: tokenID))
+                    } label: {
+                        Label("Download IPA", systemImage: "arrow.down.circle.fill")
+                            .font(.body.weight(.semibold))
+                    }
                 }
             }
-            if let errorMessage { Section { Label(errorMessage, systemImage: "exclamationmark.triangle").foregroundStyle(.red) } }
         }
         .navigationTitle("Download from GitHub")
         .navigationBarTitleDisplayMode(.inline)
-        .onDisappear { task?.cancel() }
-    }
-    @MainActor private func download() async {
-        defer { task = nil }
-        errorMessage = nil; progress = nil
-        var prepared: ImportedIPA?
-        do {
-            let token = try GitHubCredentialStore().load(id: tokenID)
-            let url = try await GitHubUpdateService().downloadIPA(for: choice.candidate, token: token) { value in
-                Task { @MainActor in progress = value }
-            }
-            defer { try? FileManager.default.removeItem(at: url) }
-            try Task.checkCancellation()
-            let app = try await environment.ipaImportStore.importRepositoryIPA(from: url, choice: choice, tokenID: tokenID)
-            prepared = app
-            try Task.checkCancellation()
-            try await onImported(app)
-            importedApp = app
-            prepared = nil
-        } catch {
-            if let prepared { try? await environment.ipaImportStore.delete(prepared) }
-            if !Task.isCancelled { errorMessage = error.localizedDescription }
-        }
+        .trackVisibleImportDownload(jobID)
     }
 }

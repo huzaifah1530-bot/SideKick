@@ -38,6 +38,7 @@ struct ContentView: View {
                             .padding(.trailing, Spacing.m)
                             .padding(.bottom, 72)
                             .animation(.smooth, value: environment.githubUpdateDownloads.activeJobIDs)
+                            .animation(.smooth, value: environment.importDownloads.activeJobIDs)
                     }
                     .sheet(item: $openedDownload) { item in
                         NavigationStack {
@@ -135,7 +136,9 @@ struct ContentView: View {
 
     @ViewBuilder
     private func downloadPage(_ id: String) -> some View {
-        if let candidate = environment.githubUpdateDownloads.candidates[id] {
+        if id.hasPrefix("import:"), let uuid = UUID(uuidString: String(id.dropFirst(7))) {
+            ImportDownloadPage(jobID: uuid)
+        } else if let candidate = environment.githubUpdateDownloads.candidates[id] {
             if candidate.targetKind == .liveContainer {
                 LiveContainerGuestDetailView(guestID: candidate.bundleIdentifier)
             } else if let app = environment.installedApps.first(where: { $0.id == candidate.bundleIdentifier }) {

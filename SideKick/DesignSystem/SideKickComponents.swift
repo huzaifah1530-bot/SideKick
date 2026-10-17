@@ -315,7 +315,21 @@ struct ActiveDownloadsButton: View {
     let open: (String) -> Void
 
     private var store: GitHubUpdateDownloadStore { environment.githubUpdateDownloads }
-    private var ids: [String] { store.activeJobIDs }
+    private var imports: IPAImportDownloadStore { environment.importDownloads }
+    /// Update downloads keep their candidate ID; import jobs are prefixed with "import:".
+    private var ids: [String] { store.activeJobIDs + imports.activeJobIDs.map { "import:" + $0.uuidString } }
+
+    private func importJob(_ id: String) -> IPAImportDownloadStore.Job? {
+        guard id.hasPrefix("import:"), let uuid = UUID(uuidString: String(id.dropFirst(7))) else { return nil }
+        return imports.jobs[uuid]
+    }
+
+    /// (isDownloading, progress) for either kind of job.
+    private func progressInfo(_ id: String) -> (Bool, Double?) {
+        if let job = importJob(id) { return (job.state == .downloading, job.progress?.fractionCompleted) }
+        if let job = store.jobs[id] { return (job.isDownloading, job.progress) }
+        return (false, nil)
+    }
 
     var body: some View {
         if !ids.isEmpty {
@@ -341,8 +355,8 @@ struct ActiveDownloadsButton: View {
     }
 
     private var ring: some View {
-        let downloading = ids.compactMap { store.jobs[$0] }.filter(\.isDownloading)
-        let progress = downloading.isEmpty ? 1 : downloading.map { $0.progress ?? 0 }.reduce(0, +) / Double(downloading.count)
+        let downloading = ids.map(progressInfo).filter(\.0)
+        let progress = downloading.isEmpty ? 1 : downloading.map { $0.1 ?? 0 }.reduce(0, +) / Double(downloading.count)
         return ZStack {
             Circle().stroke(Color.primary.opacity(0.12), lineWidth: 3)
             Circle()
@@ -371,6 +385,7 @@ struct ActiveDownloadsButton: View {
     }
 
     private func name(_ id: String) -> String {
+        if let job = importJob(id) { return job.title }
         guard let candidate = store.candidates[id] else { return "Download" }
         return environment.installedApps.first { $0.id == candidate.bundleIdentifier }?.name
             ?? environment.liveContainerState.apps.first { $0.id == candidate.bundleIdentifier }?.name
@@ -378,6 +393,16 @@ struct ActiveDownloadsButton: View {
     }
 
     private func status(_ id: String) -> String {
+        if let job = importJob(id) {
+            switch job.state {
+            case .downloading:
+                guard let fraction = job.progress?.fractionCompleted else { return "Starting…" }
+                return "Downloading · \(Int(fraction * 100))%"
+            case .needsTarget: return "Choose which app to update"
+            case .ready: return "Ready to install"
+            case .failed: return "Failed"
+            }
+        }
         guard let job = store.jobs[id] else { return "" }
         if job.isDownloading {
             guard let progress = job.progress else { return "Starting…" }

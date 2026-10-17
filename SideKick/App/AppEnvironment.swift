@@ -19,6 +19,7 @@ struct RefreshActivity: Equatable, Sendable {
 @Observable
 final class AppEnvironment {
     let ipaImportStore: IPAImportStore
+    let importDownloads: IPAImportDownloadStore
     let githubUpdateDownloads = GitHubUpdateDownloadStore()
     let liveContainerStore = LiveContainerStore.shared
     private(set) var databaseState: DatabaseStartupState = .starting
@@ -57,6 +58,7 @@ final class AppEnvironment {
 
     init(ipaImportStore: IPAImportStore = IPAImportStore.shared) {
         self.ipaImportStore = ipaImportStore
+        self.importDownloads = IPAImportDownloadStore(ipaStore: ipaImportStore)
         // Clear request flags left by the retired transfer wizard. Offloading
         // always uses SideStore's own backup flow.
         if !AppOffloadService.isRunning {

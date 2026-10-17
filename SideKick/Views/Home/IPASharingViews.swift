@@ -110,6 +110,7 @@ struct URLImportView: View {
     @State private var githubRepositoryURL: URL?
     @State private var showingGitHubRepository = false
     @State private var didStartIncomingImport = false
+    @State private var importJobID: UUID?
 
     var body: some View {
         List {
@@ -127,6 +128,12 @@ struct URLImportView: View {
                 Text("IPA Link")
             }
 
+            if let importJobID, environment.importDownloads.jobs[importJobID] != nil {
+                Section {
+                    ImportDownloadPanel(jobID: importJobID)
+                    SwiftUI.Button("Download Another") { self.importJobID = nil; linkText = "" }
+                }
+            } else {
             Section {
                 if isDownloading {
                     VStack(alignment: .leading, spacing: 10) {
@@ -193,6 +200,7 @@ struct URLImportView: View {
                 }
             }
 
+            }
             Section {
                 Text("Only download apps you trust. IPA links are saved in SideKick after import. Files imports use the bookmarked file, so SideKick needs continued access to it.")
                     .font(.footnote)
@@ -215,6 +223,7 @@ struct URLImportView: View {
                 }
             }
         }
+        .trackVisibleImportDownload(importJobID)
         .navigationTitle("Import from URL")
         .navigationBarTitleDisplayMode(.inline)
         .confirmationDialog(
@@ -331,6 +340,9 @@ struct URLImportView: View {
                 showingGitHubRepository = true
                 return
             }
+            // Direct links download in the background store so they survive leaving this page.
+            importJobID = environment.importDownloads.start(.url(sourceURL))
+            return
             let (downloadedURL, response) = try await BuzzheavierClient().download(from: sourceURL) { progress in
                 Task { @MainActor in
                     guard directDownloadID == generation else { return }
