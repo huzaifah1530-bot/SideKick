@@ -270,7 +270,7 @@ struct GitHubUpdatesView: View {
 private struct GitHubAppUpdateStatusView: View {
     let configuration: GitHubUpdateConfiguration
     @Environment(AppEnvironment.self) private var environment
-    @State private var reviewCandidate: GitHubUpdateCandidate?
+    @State private var reviewCandidateID: String?
 
     private var currentConfiguration: GitHubUpdateConfiguration? {
         environment.githubConfigurations.first { $0.id == configuration.id }
@@ -359,7 +359,9 @@ private struct GitHubAppUpdateStatusView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .navigationDestination(item: $reviewCandidate) { reviewDestination($0) }
+        .navigationDestination(item: $reviewCandidateID) { _ in
+            if let candidate = check?.candidate { reviewDestination(candidate) }
+        }
         .navigationTitle(target?.name ?? "App Update")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -377,7 +379,7 @@ private struct GitHubAppUpdateStatusView: View {
     /// A Button, not a NavigationLink: links inside a List render as dim rows with a chevron.
     @ViewBuilder private func installLink(_ candidate: GitHubUpdateCandidate) -> some View {
         if candidate.targetKind == .liveContainer || environment.installedApps.contains(where: { $0.id == candidate.bundleIdentifier }) {
-            SwiftUI.Button { reviewCandidate = candidate } label: {
+            SwiftUI.Button { reviewCandidateID = candidate.id } label: {
                 ActionLabel(candidate.isKnownNewer ? "Review Update" : "Review Build")
             }
             .primaryActionStyle()
