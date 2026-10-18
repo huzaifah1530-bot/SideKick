@@ -437,6 +437,8 @@ struct LiveContainerGuestDetailView: View {
     @State private var awaitingHandoff: String?
     @State private var sharedIPA: LiveContainerSharedIPA?
     @State private var handoffURL: URL?
+    @State private var confirmingIPADelete = false
+    @State private var confirmingSkip = false
 
     private var downloadJob: GitHubUpdateDownloadJob? {
         candidate.flatMap { environment.githubUpdateDownloads.jobs[$0.id] }
@@ -562,10 +564,41 @@ struct LiveContainerGuestDetailView: View {
         }
         .navigationTitle(guest?.name ?? "LiveContainer App")
         .navigationBarTitleDisplayMode(.inline)
+        .safeAreaInset(edge: .bottom) {
+            if let candidate, guest != nil {
+                BottomActionBar { updateActions(for: candidate) }
+            }
+        }
+        .confirmationDialog("Delete downloaded IPA?", isPresented: $confirmingIPADelete, titleVisibility: .visible) {
+            SwiftUI.Button("Delete IPA", role: .destructive) {
+                guard let candidate else { return }
+                Task {
+                    do { try await environment.githubUpdateDownloads.discardDownload(for: candidate, ipaImportStore: environment.ipaImportStore) }
+                    catch { message = error.localizedDescription }
+                }
+            }
+        } message: { Text("You can download it again later. The app in LiveContainer isn’t changed.") }
+        .confirmationDialog("Skip this build?", isPresented: $confirmingSkip, titleVisibility: .visible) {
+            SwiftUI.Button("Skip Build", role: .destructive) { Task { await resolve(markInstalled: false) } }
+        } message: { Text("This build will be hidden. Future updates still appear.") }
         .toolbar {
             if let guest {
                 ToolbarItem(placement: .topBarTrailing) {
                     Menu {
+                        if candidate != nil {
+                            Section {
+                                if canConfirmInstalledBuild {
+                                    SwiftUI.Button { markingInstalled = true } label: {
+                                        Label("I’ve Installed This Build", systemImage: "checkmark.circle")
+                                    }
+                                }
+                                if downloadJob?.isDownloading != true {
+                                    SwiftUI.Button(role: .destructive) { confirmingSkip = true } label: {
+                                        Label("Skip This Build", systemImage: "forward.end")
+                                    }
+                                }
+                            }
+                        }
                         Section {
                             if let connection {
                                 SwiftUI.Button { Task { await openContainer(connection) } } label: {
@@ -650,34 +683,12 @@ struct LiveContainerGuestDetailView: View {
 
     private func updateReviewSection(for guest: LiveContainerGuest, candidate: GitHubUpdateCandidate) -> some View {
         Section {
-            LabeledContent("Installed", value: "\(guest.version) (\(guest.build))")
+            LabeledContent("Installed", value: guest.build == guest.version ? guest.version : "\(guest.version) (\(guest.build))")
             LabeledContent("Available", value: candidate.newVersion)
-            Text(candidate.title).font(.subheadline).foregroundStyle(.secondary)
-            GitHubUpdateDownloadControls(
-                job: downloadJob,
-                onDownload: { Task { await updateInLiveContainer(candidate, handoffIfQueued: false) } },
-                onCancel: { environment.githubUpdateDownloads.cancelDownload(for: candidate) },
-                onSkip: { Task { await resolve(markInstalled: false) } },
-                onDelete: {
-                    Task {
-                        do { try await environment.githubUpdateDownloads.discardDownload(for: candidate, ipaImportStore: environment.ipaImportStore) }
-                        catch { message = error.localizedDescription }
-                    }
-                },
-                isDisabled: working || isCheckingUpdates || !canCheckUpdates,
-                isSkipDisabled: working || isCheckingUpdates
-            ) {
-                SwiftUI.Button { Task { await updateInLiveContainer(candidate) } } label: {
-                    ActionLabel("Send to LiveContainer", systemImage: "square.and.arrow.up")
-                }
-                .primaryActionStyle()
-            }
-            if canConfirmInstalledBuild {
-                SwiftUI.Button { markingInstalled = true } label: {
-                    Label("I’ve Installed This Build", systemImage: "checkmark.circle")
-                }
-                .disabled(working || isCheckingUpdates)
-            }
+            Text(candidate.title)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+                .lineLimit(3)
             if !canCheckUpdates {
                 Label(updateEligibilityMessage, systemImage: "exclamationmark.triangle.fill")
                     .font(.footnote)
@@ -686,7 +697,58 @@ struct LiveContainerGuestDetailView: View {
         } header: {
             Text(candidate.isKnownNewer ? "Update" : "Build to Review")
         } footer: {
-            Text("Download, send to LiveContainer, then confirm once it’s installed.")
+            Text("Download, send it to LiveContainer, then come back to confirm it installed.")
+        }
+    }
+
+    /// Same layout as the regular update screen: one primary action, a secondary beside it,
+    /// Delete IPA underneath, and Skip / I've Installed in the ••• menu.
+    @ViewBuilder
+    private func updateActions(for candidate: GitHubUpdateCandidate) -> some View {
+        if let job = downloadJob, job.isDownloading {
+            VStack(alignment: .leading, spacing: Spacing.xs) {
+                HStack {
+                    Text("Downloading").font(.subheadline.weight(.semibold))
+                    Spacer()
+                    Text(job.progress.map { "\(Int($0 * 100))%" } ?? "Starting…")
+                        .font(.subheadline.monospacedDigit()).foregroundStyle(.secondary)
+                }
+                ProgressView(value: job.progress ?? 0).tint(.sideKickAccent)
+            }
+            .accessibilityElement(children: .combine)
+            SwiftUI.Button { environment.githubUpdateDownloads.cancelDownload(for: candidate) } label: {
+                ActionLabel("Cancel Download")
+            }
+            .secondaryActionStyle()
+            .tint(.red)
+        } else if downloadJob?.queuedIPA != nil {
+            HStack(spacing: Spacing.s) {
+                SwiftUI.Button { Task { await updateInLiveContainer(candidate) } } label: {
+                    ActionLabel("Send to LC", systemImage: "square.and.arrow.up", isWorking: working)
+                }
+                .primaryActionStyle()
+                .disabled(working || isCheckingUpdates || !canCheckUpdates)
+                SwiftUI.Button { Task { await updateInLiveContainer(candidate, handoffIfQueued: false) } } label: {
+                    ActionLabel("Re-download", systemImage: "arrow.clockwise")
+                }
+                .secondaryActionStyle()
+                .tint(.sideKickAccent)
+                .disabled(working || isCheckingUpdates || !canCheckUpdates)
+            }
+            SwiftUI.Button("Delete IPA", role: .destructive) { confirmingIPADelete = true }
+                .font(.body.weight(.semibold))
+                .frame(minHeight: 44)
+        } else {
+            if let error = downloadJob?.errorMessage {
+                Label(error, systemImage: "exclamationmark.triangle.fill")
+                    .font(.footnote).foregroundStyle(.red)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            SwiftUI.Button { Task { await updateInLiveContainer(candidate, handoffIfQueued: false) } } label: {
+                ActionLabel(downloadJob?.errorMessage == nil ? "Download Update" : "Try Again", systemImage: "arrow.down.circle")
+            }
+            .primaryActionStyle()
+            .disabled(working || isCheckingUpdates || !canCheckUpdates)
         }
     }
 
@@ -967,6 +1029,9 @@ struct LiveContainerGuestDetailView: View {
             guard await revalidateUpdateHandoff(candidate, identity: identity, expectedConfiguration: expectedConfiguration) else { return }
             handoffURL = url
             sharedIPA = LiveContainerSharedIPA(url: url)
+            if let guest, let source = candidate.sourceIdentity {
+                LiveContainerHandoffRecord(guest: guest, candidate: candidate, source: source).save()
+            }
         } catch { message = error.localizedDescription }
     }
 

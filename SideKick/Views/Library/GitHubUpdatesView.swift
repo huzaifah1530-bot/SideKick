@@ -270,6 +270,7 @@ struct GitHubUpdatesView: View {
 private struct GitHubAppUpdateStatusView: View {
     let configuration: GitHubUpdateConfiguration
     @Environment(AppEnvironment.self) private var environment
+    @State private var reviewCandidate: GitHubUpdateCandidate?
 
     private var currentConfiguration: GitHubUpdateConfiguration? {
         environment.githubConfigurations.first { $0.id == configuration.id }
@@ -358,6 +359,7 @@ private struct GitHubAppUpdateStatusView: View {
             }
         }
         .listStyle(.insetGrouped)
+        .navigationDestination(item: $reviewCandidate) { reviewDestination($0) }
         .navigationTitle(target?.name ?? "App Update")
         .navigationBarTitleDisplayMode(.inline)
     }
@@ -372,17 +374,21 @@ private struct GitHubAppUpdateStatusView: View {
         }
     }
 
+    /// A Button, not a NavigationLink: links inside a List render as dim rows with a chevron.
     @ViewBuilder private func installLink(_ candidate: GitHubUpdateCandidate) -> some View {
-        if candidate.targetKind == .liveContainer {
-            NavigationLink { LiveContainerGuestDetailView(guestID: candidate.bundleIdentifier) } label: {
-                ActionLabel("Review in LiveContainer")
-            }
-            .primaryActionStyle()
-        } else if let app = environment.installedApps.first(where: { $0.id == candidate.bundleIdentifier }) {
-            NavigationLink { GitHubUpdateDetailView(candidate: candidate, app: app) } label: {
+        if candidate.targetKind == .liveContainer || environment.installedApps.contains(where: { $0.id == candidate.bundleIdentifier }) {
+            SwiftUI.Button { reviewCandidate = candidate } label: {
                 ActionLabel(candidate.isKnownNewer ? "Review Update" : "Review Build")
             }
             .primaryActionStyle()
+        }
+    }
+
+    @ViewBuilder private func reviewDestination(_ candidate: GitHubUpdateCandidate) -> some View {
+        if candidate.targetKind == .liveContainer {
+            LiveContainerGuestDetailView(guestID: candidate.bundleIdentifier)
+        } else if let app = environment.installedApps.first(where: { $0.id == candidate.bundleIdentifier }) {
+            GitHubUpdateDetailView(candidate: candidate, app: app)
         }
     }
 }

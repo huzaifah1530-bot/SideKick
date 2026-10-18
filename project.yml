@@ -3,7 +3,7 @@
 # version is not authoritative. Use .github/workflows/ios-build.yml: CI applies
 # the SideStore integration patch, embeds SideKickVPN, then builds the SideStore
 # scheme from Vendor/SideStore/AltStore.xcodeproj. The integration script stamps
-# marketing version 0.9.0; CI sets CURRENT_PROJECT_VERSION from the run number.
+# marketing version 0.9.1; CI sets CURRENT_PROJECT_VERSION from the run number.
 # Product startup belongs to the patched SideStore SceneDelegate/AppDelegate.
 name: SideKick
 options:

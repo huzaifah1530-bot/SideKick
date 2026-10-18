@@ -598,62 +598,116 @@ private struct GitHubHistoricalVersionView: View {
         preparedCandidate.flatMap { environment.githubUpdateDownloads.jobs[$0.id] }
     }
 
+    @State private var isShowingInstall = false
+
+    private var installedApp: InstalledAppSummary? { environment.installedApps.first { $0.id == target.id } }
+
     var body: some View {
         List {
-            Section("Version") {
-                Text(item.title).font(.headline)
-                if let date = item.date { LabeledContent("Published", value: date.formatted()) }
+            Section {
+                VStack(alignment: .leading, spacing: Spacing.xxs) {
+                    Text(item.title).font(.headline).lineLimit(4)
+                    if let date = item.date {
+                        Text(date.formatted(date: .abbreviated, time: .shortened))
+                            .font(.subheadline).foregroundStyle(.secondary)
+                    }
+                }
+                .padding(.vertical, Spacing.xxs)
                 if let build {
                     LabeledContent("Version", value: build.version)
-                    LabeledContent("File", value: build.assetName)
+                    LabeledContent("File", value: build.assetName).lineLimit(1)
                 }
-                Text("Installing an older build replaces the app’s version. Older versions may not support data created by newer versions.")
-                    .font(.footnote).foregroundStyle(.secondary)
+            } footer: {
+                Text("Installing an older build replaces the app’s version. Older versions may not open data from newer ones.")
             }
-            Section {
-                if let candidate = preparedCandidate {
-                    if target.kind == .installed {
-                        if let app = environment.installedApps.first(where: { $0.id == target.id }) {
-                            NavigationLink("Download & Install This Version") {
-                                GitHubUpdateDetailView(candidate: candidate, app: app, isVersionSelection: true)
-                            }
-                        } else {
-                            Text("The installed app is unavailable. Refresh My Apps and reopen this version.")
-                        }
-                    } else {
-                        GitHubUpdateDownloadControls(job: downloadJob,
-                            onDownload: { Task { await downloadGuest(candidate) } },
-                            onCancel: { environment.githubUpdateDownloads.cancelDownload(for: candidate) },
-                            onSkip: {}, allowsSkip: false, isDisabled: working) {
-                            SwiftUI.Button("Install in LiveContainer") { Task { await shareGuest(candidate) } }
-                        }
-                        Text("Choose LiveContainer in the share sheet and replace the existing guest. Verify the installation before marking this build installed.")
-                            .font(.footnote).foregroundStyle(.secondary)
-                    }
-                } else {
-                    SwiftUI.Button("Use This Source & Review Installation") { Task { await prepare() } }
-                        .disabled(build == nil || working)
-                    Text("This saves the GitHub source shown in setup. Your installed build remains unchanged until installation succeeds or you confirm it manually.")
-                        .font(.footnote).foregroundStyle(.secondary)
+            if let message {
+                Section {
+                    Label(message, systemImage: "exclamationmark.triangle.fill")
+                        .font(.footnote).foregroundStyle(.red).textSelection(.enabled)
                 }
-                if working { ProgressView() }
-                if let message { Text(message).foregroundStyle(.red).textSelection(.enabled) }
-            }
-            Section {
-                SwiftUI.Button("This Version Is Already Installed") { confirmingBaseline = true }
             }
         }
-        .navigationTitle("Version Details")
+        .listStyle(.insetGrouped)
+        .safeAreaInset(edge: .bottom) {
+            BottomActionBar { versionActions }
+        }
+        .navigationDestination(isPresented: $isShowingInstall) {
+            if let candidate = preparedCandidate, let installedApp {
+                GitHubUpdateDetailView(candidate: candidate, app: installedApp, isVersionSelection: true)
+            }
+        }
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    SwiftUI.Button { confirmingBaseline = true } label: {
+                        Label("I’ve Installed This Version", systemImage: "checkmark.circle")
+                    }
+                } label: { Image(systemName: "ellipsis") }
+                .accessibilityLabel("More")
+            }
+        }
+        .navigationTitle("Version")
         .navigationBarTitleDisplayMode(.inline)
-        .alert("Already installed this exact build?", isPresented: $confirmingBaseline) {
-            SwiftUI.Button("Select Installed Build") { selectedKey = item.key; dismiss() }
+        .alert("Installed this exact build?", isPresented: $confirmingBaseline) {
+            SwiftUI.Button("Select as Installed") { selectedKey = item.key; dismiss() }
             SwiftUI.Button("Cancel", role: .cancel) { }
-        } message: { Text("This selects the installed build for setup; it does not install anything. Save GitHub settings to apply it.") }
+        } message: { Text("This only marks the build in Update Source; it doesn’t install anything. Save to apply.") }
         .sheet(isPresented: $showingShare, onDismiss: {
             if let shareURL { try? FileManager.default.removeItem(at: shareURL) }
             shareURL = nil
         }) {
             if let shareURL { LiveContainerIPAActivity(url: shareURL) }
+        }
+    }
+
+    @ViewBuilder
+    private var versionActions: some View {
+        if let candidate = preparedCandidate {
+            if target.kind == .installed {
+                SwiftUI.Button { isShowingInstall = true } label: { ActionLabel("Install This Version") }
+                    .primaryActionStyle()
+                    .disabled(installedApp == nil)
+            } else if let job = downloadJob, job.isDownloading {
+                ProgressView(value: job.progress ?? 0).tint(.sideKickAccent)
+                SwiftUI.Button { environment.githubUpdateDownloads.cancelDownload(for: candidate) } label: {
+                    ActionLabel("Cancel Download")
+                }
+                .secondaryActionStyle()
+                .tint(.red)
+            } else if downloadJob?.queuedIPA != nil {
+                HStack(spacing: Spacing.s) {
+                    SwiftUI.Button { Task { await shareGuest(candidate) } } label: {
+                        ActionLabel("Send to LC", systemImage: "square.and.arrow.up", isWorking: working)
+                    }
+                    .primaryActionStyle()
+                    .disabled(working)
+                    SwiftUI.Button { Task { await downloadGuest(candidate) } } label: {
+                        ActionLabel("Re-download", systemImage: "arrow.clockwise")
+                    }
+                    .secondaryActionStyle()
+                    .tint(.sideKickAccent)
+                    .disabled(working)
+                }
+                SwiftUI.Button("Delete IPA", role: .destructive) {
+                    Task { try? await environment.githubUpdateDownloads.discardDownload(for: candidate, ipaImportStore: environment.ipaImportStore) }
+                }
+                .font(.body.weight(.semibold))
+                .frame(minHeight: 44)
+            } else {
+                SwiftUI.Button { Task { await downloadGuest(candidate) } } label: {
+                    ActionLabel("Download IPA", systemImage: "arrow.down.circle", isWorking: working)
+                }
+                .primaryActionStyle()
+                .disabled(working)
+            }
+        } else {
+            SwiftUI.Button { Task { await prepare() } } label: {
+                ActionLabel("Use This Version", isWorking: working)
+            }
+            .primaryActionStyle()
+            .disabled(build == nil || working)
+            Text("Saves this source. Nothing installs until you choose to.")
+                .font(.footnote).foregroundStyle(.secondary)
         }
     }
 
@@ -718,6 +772,9 @@ private struct GitHubHistoricalVersionView: View {
                   ipa.githubSourceIdentity == candidate.sourceIdentity else { throw CocoaError(.fileReadCorruptFile) }
             shareURL = try await environment.ipaImportStore.fileURL(for: ipa)
             showingShare = true
+            if let source = candidate.sourceIdentity {
+                LiveContainerHandoffRecord(guest: guest, candidate: candidate, source: source).save()
+            }
             message = nil
         } catch { message = error.localizedDescription }
     }

@@ -10,6 +10,7 @@ struct ContentView: View {
     @State private var openedDownload: OpenedDownload?
     @State private var completedUpdate: UpdateSuccessRecord?
     @State private var refreshFailure: RefreshFailureReport?
+    @State private var handoff: LiveContainerHandoffRecord?
     private var appearance: AppearanceSettings { AppearanceSettings.shared }
     @State private var setupStatus = SetupStatus()
     @StateObject private var unsavedSettings = UnsavedSettingsCoordinator.shared
@@ -50,11 +51,15 @@ struct ContentView: View {
                     .sheet(item: $refreshFailure) { report in
                         RefreshFailureSheet(report: report)
                     }
+                    .sheet(item: $handoff) { record in
+                        LiveContainerHandoffSheet(record: record)
+                    }
                     .onChange(of: environment.installedApps.map { "\($0.id)|\($0.version)|\($0.buildVersion)" }) { _, _ in
                         checkCompletedUpdate()
                     }
                     .onAppear {
                         checkCompletedUpdate()
+                        checkLiveContainerHandoff()
                         if let report = RefreshFailureReport.consumePendingTap() { refreshFailure = report }
                     }
                     .onReceive(NotificationCenter.default.publisher(for: RefreshFailureReport.tappedNotification)) { _ in
@@ -104,6 +109,7 @@ struct ContentView: View {
         }
         .onReceive(NotificationCenter.default.publisher(for: UIApplication.didBecomeActiveNotification)) { _ in
             isForeground = true
+            checkLiveContainerHandoff()
             Task { await GitHubAccountSession.refreshIfNeeded() }
             environment.resumeGitHubChecks()
             guard case .ready = environment.databaseState else { return }
@@ -154,6 +160,14 @@ struct ContentView: View {
             .debounce(for: .milliseconds(150), scheduler: RunLoop.main)) { _ in
                 Task { await environment.reloadLocalCatalogues() }
             }
+    }
+
+    /// Ask once per return, and only when nothing else is being presented.
+    private func checkLiveContainerHandoff() {
+        guard handoff == nil, completedUpdate == nil, refreshFailure == nil, openedDownload == nil,
+              let record = LiveContainerHandoffRecord.pending(),
+              record.sharedAt < .now.addingTimeInterval(-3) else { return }
+        handoff = record
     }
 
     private func checkCompletedUpdate() {

@@ -306,15 +306,15 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Library/GitHubUpdateSettingsView.swift": {
-    "mtime": 1792258341.632003,
-    "seen": 1792258375.6908474,
-    "ast_hash": "de22213143c5c5902b0ab6d10097b0db",
+    "mtime": 1792325049.9816136,
+    "seen": 1792325086.9606345,
+    "ast_hash": "c0acad390158843294fb111a6ea8a239",
     "semantic_hash": ""
   },
   "SideKick/Views/Library/GitHubUpdatesView.swift": {
-    "mtime": 1792245291.6532319,
-    "seen": 1792246536.6709342,
-    "ast_hash": "1fea9da638e8e30510fee1ecbb670570",
+    "mtime": 1792325050.0038314,
+    "seen": 1792325086.9606361,
+    "ast_hash": "e53d77468d20e5ab6b7095a45fafdea0",
     "semantic_hash": ""
   },
   "SideKick/Views/Library/OtherTeamInstallationView.swift": {
@@ -324,15 +324,15 @@
     "semantic_hash": ""
   },
   "SideKick/Views/LiveContainer/LiveContainerViews.swift": {
-    "mtime": 1792249176.4842145,
-    "seen": 1792249267.8732224,
-    "ast_hash": "c41691e5586f0014789209ee4e8ad909",
+    "mtime": 1792325049.9816136,
+    "seen": 1792325086.9606435,
+    "ast_hash": "5c19d5588b8a3378dae98d6126e5347f",
     "semantic_hash": ""
   },
   "SideKick/Views/Root/ContentView.swift": {
-    "mtime": 1792258777.2453966,
-    "seen": 1792260114.9145052,
-    "ast_hash": "47c502a50e9974e3175784a853c7aa0a",
+    "mtime": 1792325050.014954,
+    "seen": 1792325086.9606452,
+    "ast_hash": "1322d2589d3a935f02943a333d7c859c",
     "semantic_hash": ""
   },
   "SideKick/Views/Root/RequiredSetupView.swift": {
@@ -396,9 +396,9 @@
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_integration_patches.py": {
-    "mtime": 1792246494.877773,
-    "seen": 1792246536.6709926,
-    "ast_hash": "81370961c4c5ee903f005961a8e45d88",
+    "mtime": 1792325050.0427108,
+    "seen": 1792325086.9606802,
+    "ast_hash": "bd9e0ed7af73cff1b9f63cdf16367c0b",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_release_manifest.py": {
@@ -3498,9 +3498,9 @@
     "semantic_hash": ""
   },
   "scripts/embed-local-vpn.py": {
-    "mtime": 1792245085.496922,
-    "seen": 1792246536.6742456,
-    "ast_hash": "5b899f93d813a42defe3ce0b16cc8615",
+    "mtime": 1792325050.0264273,
+    "seen": 1792325086.9614356,
+    "ast_hash": "be8edd71785030ce06e537de4c816548",
     "semantic_hash": ""
   },
   "scripts/verify-dependency-regressions.py": {
@@ -3738,9 +3738,9 @@
     "semantic_hash": ""
   },
   "project.yml": {
-    "mtime": 1792243772.7355757,
-    "seen": 1792246536.6743727,
-    "ast_hash": "54fbafe36c6c7e5d70992b450804437d",
+    "mtime": 1792325050.0319786,
+    "seen": 1792325086.961505,
+    "ast_hash": "4d037a454a7aacbca0f4e6d578001121",
     "semantic_hash": ""
   },
   "scripts/graphify.ps1": {
@@ -4017,6 +4017,12 @@
     "mtime": 1792260055.6346939,
     "seen": 1792260114.914519,
     "ast_hash": "61b404ba35f251c6b2208dd0eb91ae96",
+    "semantic_hash": ""
+  },
+  "SideKick/Views/LiveContainer/LiveContainerHandoff.swift": {
+    "mtime": 1792324994.6046195,
+    "seen": 1792325086.96064,
+    "ast_hash": "0948672b26029d5599dc8c48959143b6",
     "semantic_hash": ""
   }
 }
