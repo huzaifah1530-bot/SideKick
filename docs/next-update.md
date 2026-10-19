@@ -1,7 +1,7 @@
 # Next Update
 
 **Started:** 19 October 2026  
-**Status:** Implemented, awaiting device testing
+**Status:** Released as v0.9.2
 
 This is the rolling bug and fix list for the next SideKick update. Add each newly reported issue under **Reported bugs**, keeping the user's wording where possible. Move items to **Completed** once fixed and verified.
 

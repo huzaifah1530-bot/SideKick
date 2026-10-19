@@ -129,7 +129,7 @@ removal_file.write_text(source.replace(original, replacement, 1), encoding="utf-
 
 build_config = root / "Build.xcconfig"
 source = build_config.read_text(encoding="utf-8")
-source, count = re.subn(r"^MARKETING_VERSION = .*$", "MARKETING_VERSION = 0.9.1", source, count=1, flags=re.M)
+source, count = re.subn(r"^MARKETING_VERSION = .*$", "MARKETING_VERSION = 0.9.2", source, count=1, flags=re.M)
 if count != 1:
     raise RuntimeError("Missing app marketing version")
 build_config.write_text(source, encoding="utf-8")
