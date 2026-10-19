@@ -164,7 +164,8 @@ struct LiveContainerLibrarySection: View {
         workingGuestID = app.id
         defer { workingGuestID = nil }
         do {
-            let url = try await environment.liveContainerStore.launchURL(for: app.id)
+            let url = try await environment.liveContainerStore.launchURL(for: app.id,
+                sharedScheme: LiveContainerSharedAccess.launchScheme(for: app))
             guard await UIApplication.shared.open(url) else {
                 actionError = "LiveContainer did not accept the launch request. Check its installation and URL scheme."
                 return
@@ -203,10 +204,13 @@ struct LiveContainerConnectionsView: View {
     @State private var error: String?
     @State private var forgetting: LiveContainerConnection?
     @State private var replacingConnection: LiveContainerConnection?
+    @State private var sharedStatus: LiveContainerSharedAccess.Status?
 
     var body: some View {
         List {
             if isWorking { Section { ProgressView("Reading folder…") } }
+
+            sharedAppsSection
 
             if state.connections.isEmpty {
                 ContentUnavailableView {
@@ -279,7 +283,7 @@ struct LiveContainerConnectionsView: View {
             } header: {
                 Text("Next Folder")
             } footer: {
-                Text("Choose \(kind.location). Add each LiveContainer installation’s folder, plus the shared folder if you use shared apps. Every app appears in the one LiveContainer section on Home. Snapshots can’t launch apps or confirm versions. Guest files are never changed.")
+                Text("Choose \(kind.location). LiveContainer installs and manages apps; LiveContainer 2 and 3 only run shared apps, so their own folders are usually empty. Every app appears in the one LiveContainer section on Home. Snapshots can’t launch apps or confirm versions. Guest files are never changed.")
             }
         }
         .toolbar {
@@ -349,6 +353,48 @@ struct LiveContainerConnectionsView: View {
 
     @MainActor private func reload() async {
         do { state = try await environment.liveContainerStore.snapshot() } catch { self.error = error.localizedDescription }
+        sharedStatus = LiveContainerSharedAccess.status
+    }
+
+    /// Shared apps come from LiveContainer's App Group, not a folder the user picks.
+    @ViewBuilder
+    private var sharedAppsSection: some View {
+        Section {
+            switch sharedStatus {
+            case .available(let directory):
+                if state.connections.contains(where: { $0.storageKind == .sharedDirectory && $0.isConnected }) {
+                    Label("Found automatically", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(Color.sideKickAccent)
+                } else {
+                    SwiftUI.Button {
+                        Task { await run { if let error = await LiveContainerSharedAccess.link(directory, using: environment.liveContainerStore) { throw error } } }
+                    } label: {
+                        Label("Add Shared Apps", systemImage: "plus.circle")
+                    }
+                    .disabled(isWorking)
+                }
+            case .noSharedFolder:
+                Label("No shared apps yet", systemImage: "folder.badge.questionmark")
+            case .notGranted:
+                Label("Shared apps unavailable", systemImage: "lock")
+                    .foregroundStyle(.orange)
+            case nil:
+                ProgressView()
+            }
+        } header: {
+            Text("Shared Apps")
+        } footer: {
+            switch sharedStatus {
+            case .available:
+                Text("Every LiveContainer installation can open these. SideKick opens each one in an installation that’s free, and sends updates to LiveContainer, the one that installs apps.")
+            case .noSharedFolder:
+                Text("In LiveContainer, convert an app to a shared app, then pull to refresh here.")
+            case .notGranted:
+                Text("SideKick and LiveContainer must be signed with the same Apple ID. If they are, refresh SideKick once so it gets access to LiveContainer’s shared apps.")
+            case nil:
+                EmptyView()
+            }
+        }
     }
 
     private func addConnection() {
@@ -987,7 +1033,8 @@ struct LiveContainerGuestDetailView: View {
         working = true
         defer { working = false }
         do {
-            let url = try await environment.liveContainerStore.launchURL(for: guestID)
+            let url = try await environment.liveContainerStore.launchURL(for: guestID,
+                sharedScheme: guest.map { LiveContainerSharedAccess.launchScheme(for: $0) })
             if !(await UIApplication.shared.open(url)) { message = "This LiveContainer URL scheme is unavailable. Check the connection scheme or open LiveContainer manually." }
         } catch { message = error.localizedDescription }
         await reload()
@@ -1057,11 +1104,19 @@ struct LiveContainerGuestDetailView: View {
         do {
             let url = try await environment.ipaImportStore.fileURL(for: ipa)
             guard await revalidateUpdateHandoff(candidate, identity: identity, expectedConfiguration: expectedConfiguration) else { return }
-            handoffURL = url
-            sharedIPA = LiveContainerSharedIPA(url: url)
             if let guest, let source = candidate.sourceIdentity {
                 LiveContainerHandoffRecord(guest: guest, candidate: candidate, source: source).save()
             }
+            // With LiveContainer's group, install straight into LiveContainer 1, the only
+            // installation that can replace apps. Otherwise use the share sheet.
+            if let install = try? LiveContainerSharedAccess.installURL(copying: url) {
+                try? FileManager.default.removeItem(at: url)
+                if await UIApplication.shared.open(install) { return }
+                message = "LiveContainer didn’t open. Open it and try again, or share the IPA instead."
+                return
+            }
+            handoffURL = url
+            sharedIPA = LiveContainerSharedIPA(url: url)
         } catch { message = error.localizedDescription }
     }
 

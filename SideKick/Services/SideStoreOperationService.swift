@@ -68,7 +68,11 @@ final class SideStoreOperationService {
         var summaries: [InstalledAppSummary] = []
         for record in records {
             let iconData: Data?
-            if loadIcons { iconData = try? await record.0.loadIcon()?.pngData() }
+            if loadIcons, record.1 == StoreApp.altstoreAppID {
+                // SideKick's own row: app icon sets can't be loaded by name, so use the
+                // bundled preview of whichever icon is active (vendor loadIcon returns nil).
+                iconData = AppIconController.currentIconData()
+            } else if loadIcons { iconData = try? await record.0.loadIcon()?.pngData() }
             else { iconData = nil }
             summaries.append(InstalledAppSummary(
                 bundleIdentifier: record.1,

@@ -1,5 +1,9 @@
 import UIKit
 
+extension Notification.Name {
+    static let sideKickAppIconDidChange = Notification.Name("SideKick.AppIconDidChange")
+}
+
 /// Keeps SideKick's app icon in the same hue as the accent colour.
 ///
 /// Installed normally, SideKick switches between the precompiled alternate icons.
@@ -24,8 +28,7 @@ enum AppIconController {
 
     /// Preview image for the icon an accent selects.
     static func previewImage(for accent: RGBColor?) -> UIImage? {
-        let name = iconName(for: accent).map { $0.replacingOccurrences(of: "AppIcon", with: "AppIconPreview") }
-        return UIImage(named: name ?? "AppIconPreview")
+        UIImage(named: AppIconVariant.previewName(for: iconName(for: accent)))
     }
 
     /// Bundle of this guest when LiveContainer runs SideKick. LiveContainer
@@ -48,6 +51,7 @@ enum AppIconController {
     static func apply(_ name: String?) async {
         if let bundle = liveContainerBundle {
             updateLiveContainerCache(in: bundle, iconName: name)
+            NotificationCenter.default.post(name: .sideKickAppIconDidChange, object: nil)
             return
         }
         let application = UIApplication.shared
@@ -55,17 +59,23 @@ enum AppIconController {
               application.alternateIconName != name else { return }
         do {
             try await application.setAlternateIconName(name)
+            NotificationCenter.default.post(name: .sideKickAppIconDidChange, object: nil)
         } catch {
             debugLog("[SideKick] Could not change the app icon: \(error.localizedDescription)")
         }
+    }
+
+    /// PNG of the icon SideKick currently shows, for its own row in the app list.
+    static func currentIconData() -> Data? {
+        let name = liveContainerBundle != nil ? iconName(for: AppearanceSettings.shared.customAccent) : UIApplication.shared.alternateIconName
+        return (UIImage(named: AppIconVariant.previewName(for: name)) ?? UIImage(named: "AppIconPreview"))?.pngData()
     }
 
     /// Replaces LiveContainer's cached icon files for this guest. These are cache
     /// files LiveContainer writes itself after signing, not signed resources.
     /// Needs proper testing on device with each LiveContainer release.
     private static func updateLiveContainerCache(in bundle: URL, iconName: String?) {
-        let previewName = iconName.map { $0.replacingOccurrences(of: "AppIcon", with: "AppIconPreview") } ?? "AppIconPreview"
-        guard let source = UIImage(named: previewName), let data = masked(source).pngData() else { return }
+        guard let source = UIImage(named: AppIconVariant.previewName(for: iconName)), let data = masked(source).pngData() else { return }
         for file in ["LCAppIconLight.png", "LCAppIconDark.png"] {
             do { try data.write(to: bundle.appendingPathComponent(file), options: .atomic) }
             catch { debugLog("[SideKick] Could not update the LiveContainer icon: \(error.localizedDescription)") }

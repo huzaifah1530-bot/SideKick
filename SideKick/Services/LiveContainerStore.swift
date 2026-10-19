@@ -347,7 +347,7 @@ actor LiveContainerStore {
         try save(state)
     }
 
-    func launchURL(for guestID: String) async throws -> URL {
+    func launchURL(for guestID: String, sharedScheme: String? = nil) async throws -> URL {
         let before = try snapshot()
         guard let guest = before.apps.first(where: { $0.id == guestID }) else { throw LiveContainerError.guestMissing }
         guard let connection = before.connections.first(where: { $0.id == guest.connectionID }),
@@ -375,7 +375,9 @@ actor LiveContainerStore {
         guard current.id == guestID, current.isAvailable, current.warning == nil else {
             throw LiveContainerError.guestMissing
         }
-        return try LiveContainerLaunch.url(scheme: connection.scheme, folder: current.folder)
+        // Shared apps can run in any installation; the caller picks one the way LiveContainer does.
+        let scheme = connection.storageKind == .sharedDirectory ? (sharedScheme ?? connection.scheme) : connection.scheme
+        return try LiveContainerLaunch.url(scheme: scheme, folder: current.folder)
     }
 
     private func merge(_ scan: LiveContainerScan, into state: inout LiveContainerState, connectionID: UUID) {

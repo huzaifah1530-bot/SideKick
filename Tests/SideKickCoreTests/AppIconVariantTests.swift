@@ -2,13 +2,10 @@ import XCTest
 @testable import SideKickCore
 
 final class AppIconVariantTests: XCTestCase {
-    private func rgb(_ hex: Int) -> (Double, Double, Double) {
-        (Double((hex >> 16) & 0xFF) / 255, Double((hex >> 8) & 0xFF) / 255, Double(hex & 0xFF) / 255)
-    }
-
     private func name(_ hex: Int) -> String? {
-        let (r, g, b) = rgb(hex)
-        return AppIconVariant.iconName(red: r, green: g, blue: b)
+        AppIconVariant.iconName(red: Double((hex >> 16) & 0xFF) / 255,
+                                green: Double((hex >> 8) & 0xFF) / 255,
+                                blue: Double(hex & 0xFF) / 255)
     }
 
     func testDefaultTealAccentsUsePrimaryIcon() {
@@ -17,13 +14,15 @@ final class AppIconVariantTests: XCTestCase {
         XCTAssertNil(name(0x2EE0C4))
     }
 
-    func testAccentsMapToNearestHueBucket() {
-        // Pure blue (240°) is ~70° from the reference hue.
-        XCTAssertEqual(name(0x0000FF), "AppIcon-Hue060")
-        // Pure red (0°) is ~190° away.
-        XCTAssertEqual(name(0xFF0000), "AppIcon-Hue180")
-        // Pure green (120°) is ~310° away.
-        XCTAssertEqual(name(0x00FF00), "AppIcon-Hue300")
+    func testAccentsUseTheirOwnHue() {
+        // Variants are centred on the accent's hue, so red is red, not orange.
+        XCTAssertEqual(name(0xFF0000), "AppIcon-Hue000")
+        XCTAssertEqual(name(0xFF3B30), "AppIcon-Hue000") // system red
+        XCTAssertEqual(name(0xFF9500), "AppIcon-Hue030") // system orange
+        XCTAssertEqual(name(0x00FF00), "AppIcon-Hue120")
+        XCTAssertEqual(name(0x0000FF), "AppIcon-Hue240")
+        XCTAssertEqual(name(0xFF00FF), "AppIcon-Hue300")
+        XCTAssertEqual(name(0xFF0010), "AppIcon-Hue000") // 356° wraps to 0°
     }
 
     func testUnsaturatedAccentsUseMonoIcon() {
@@ -32,11 +31,17 @@ final class AppIconVariantTests: XCTestCase {
         XCTAssertEqual(name(0xFFFFFF), AppIconVariant.monoName)
     }
 
-    func testEveryResultIsAShippedIcon() {
+    func testEveryResultIsAShippedIcon() throws {
         let names = Set(AppIconVariant.allNames)
-        XCTAssertEqual(names.count, 12)
-        for hue in stride(from: 0.0, to: 1.0, by: 0.01) {
-            let degrees = hue * 360
+        XCTAssertEqual(names.count, 22)
+        let catalog = URL(fileURLWithPath: #filePath).deletingLastPathComponent().deletingLastPathComponent()
+            .deletingLastPathComponent().appendingPathComponent("SideKick/Assets.xcassets")
+        for name in names {
+            XCTAssertTrue(FileManager.default.fileExists(atPath: catalog.appendingPathComponent(name + ".appiconset").path), name)
+            let preview = AppIconVariant.previewName(for: name)
+            XCTAssertTrue(FileManager.default.fileExists(atPath: catalog.appendingPathComponent(preview + ".imageset").path), preview)
+        }
+        for degrees in stride(from: 0.0, to: 360.0, by: 1.0) {
             let x = 1 - abs((degrees / 60).truncatingRemainder(dividingBy: 2) - 1)
             let (r, g, b): (Double, Double, Double) = switch Int(degrees / 60) {
             case 0: (1, x, 0)
@@ -52,9 +57,10 @@ final class AppIconVariantTests: XCTestCase {
         }
     }
 
-    func testRotationRoundTrips() {
-        XCTAssertEqual(AppIconVariant.rotation(for: nil), 0)
-        XCTAssertEqual(AppIconVariant.rotation(for: "AppIcon-Hue090"), 90)
-        XCTAssertNil(AppIconVariant.rotation(for: AppIconVariant.monoName))
+    func testPreviewNames() {
+        XCTAssertEqual(AppIconVariant.previewName(for: nil), "AppIconPreview")
+        XCTAssertEqual(AppIconVariant.previewName(for: "AppIcon-Hue090"), "AppIconPreview-Hue090")
+        XCTAssertEqual(AppIconVariant.previewName(for: AppIconVariant.monoName), "AppIconPreview-Mono")
+        XCTAssertEqual(AppIconVariant.previewName(for: "SomethingElse"), "AppIconPreview")
     }
 }

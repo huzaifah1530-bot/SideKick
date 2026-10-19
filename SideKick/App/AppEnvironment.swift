@@ -65,6 +65,19 @@ final class AppEnvironment {
             UserDefaults.standard.removeObject(forKey: "SideKickFileTransferRequest")
             UserDefaults.standard.removeObject(forKey: "SideKickCredentialTransferRequest")
         }
+        // SideKick's own row shows its current icon, which follows the accent colour.
+        NotificationCenter.default.addObserver(forName: .sideKickAppIconDidChange, object: nil, queue: .main) { [weak self] _ in
+            MainActor.assumeIsolated { self?.refreshOwnIcon() }
+        }
+    }
+
+    private func refreshOwnIcon() {
+        guard let data = AppIconController.currentIconData() else { return }
+        installedApps = installedApps.map { app in
+            var app = app
+            if app.bundleIdentifier == StoreApp.altstoreAppID { app.iconData = data }
+            return app
+        }
     }
 
     func startDatabase() async {
@@ -182,6 +195,9 @@ final class AppEnvironment {
         guard DatabaseManager.shared.isStarted, liveContainerScanTask == nil else { return }
         liveContainerScanTask = Task { @MainActor in
             defer { liveContainerScanTask = nil }
+            // Shared apps are found automatically when SideKick can read LiveContainer's group.
+            await LiveContainerSharedAccess.linkIfNeeded(using: liveContainerStore)
+            LiveContainerSharedAccess.removeHandoffs()
             await reloadLiveContainerCatalogue()
             for connection in liveContainerState.connections where connection.isConnected && connection.storageKind != .snapshot {
                 do { try await liveContainerStore.rescan(connection.id) }

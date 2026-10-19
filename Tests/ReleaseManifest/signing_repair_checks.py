@@ -33,6 +33,7 @@ extension ALTApplication {
 enum Bundle {
     enum Info { static let activeBundleURL = URL(fileURLWithPath: "/SideKick.app") }
     static let baseAltStoreAppGroupID = "group.com.sidekick.app"
+    static let liveContainerAppGroupID = "group.com.SideStore.SideStore"
     static var main = Host()
     struct Host { var altstoreAppGroup: String? = "group.com.sidekick.app.TEAM" }
 }
@@ -88,18 +89,22 @@ for ids in [[profile.bundleIdentifier], ["another.app.Share"], [profile.bundleId
 let manager = ALTApplication(bundleIdentifier: "com.sidekick.app", entitlements: ["siri": true], isAltStoreApp: true)
 let team = ALTTeam(identifier: "TEAM")
 let requests = engine.requestedEntitlements(for: manager, team: team)
-precondition(requests["groups"] as? [String] == ["group.com.sidekick.app.TEAM"])
+let lc = "group.com.SideStore.SideStore"
+precondition(requests["groups"] as? [String] == ["group.com.sidekick.app.TEAM", lc])
 precondition(requests["siri"] as? Bool == true)
+// An installed app's already-suffixed group is requested by its base name, so the team is added once.
+let suffixed = ALTApplication(bundleIdentifier: "com.sidekick.app", entitlements: ["groups": [lc + ".TEAM"]], isAltStoreApp: true)
+precondition(engine.requestedEntitlements(for: suffixed, team: team)["groups"] as? [String] == ["group.com.sidekick.app.TEAM", lc])
 precondition(engine.normalize(manager, ["group.com.sidekick.app"]) == ["group.com.sidekick.app.TEAM"])
 Bundle.main = Bundle.Host(altstoreAppGroup: "group.com.sidekick.app.TEAM.existing")
 precondition(engine.normalize(manager, ["group.com.sidekick.app.TEAM.existing"]) == ["group.com.sidekick.app.TEAM.existing"])
 Bundle.main = Bundle.Host()
 context.customEntitlementsByBundleID[manager.bundleIdentifier] = ["groups": ["group.another"], "custom": true]
 let custom = engine.requestedEntitlements(for: manager, team: team)
-precondition(custom["groups"] as? [String] == ["group.another", "group.com.sidekick.app.TEAM"])
+precondition(custom["groups"] as? [String] == ["group.another", "group.com.sidekick.app.TEAM", lc])
 precondition(custom["custom"] as? Bool == true)
 Bundle.main = Bundle.Host(altstoreAppGroup: nil)
-precondition(engine.requestedEntitlements(for: manager, team: team)["groups"] as? [String] == ["group.another", "group.com.sidekick.app"])
+precondition(engine.requestedEntitlements(for: manager, team: team)["groups"] as? [String] == ["group.another", "group.com.sidekick.app", lc])
 precondition(engine.requestedEntitlements(for: ALTApplication(bundleIdentifier: "spotify"), team: team)["groups"] == nil)
 Bundle.main = Bundle.Host()
 precondition(engine.backupGroup(for: ALTTeam(identifier: "OTHERTEAM")) == "group.com.sidekick.app")

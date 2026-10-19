@@ -49,7 +49,7 @@ class HostEntitlementTests(unittest.TestCase):
     def test_both_variants_keep_groups_and_only_external_vpn_permissions_are_removed(self):
         module = self.module()
         configured = plistlib.loads((ROOT / 'SideKickVPN/Host.entitlements').read_bytes())
-        self.assertEqual(configured[GROUP], ['group.com.sidekick.app'])
+        self.assertEqual(configured[GROUP], ['group.com.sidekick.app', 'group.com.SideStore.SideStore'])
         # Additional permission requests must survive without another allowlist.
         configured['keychain-access-groups'] = ['TEAM.com.sidekick.app']
         configured['com.apple.developer.siri'] = True
@@ -71,7 +71,7 @@ class HostEntitlementTests(unittest.TestCase):
 
     def test_packaged_ipa_inspection_rejects_missing_or_changed_permissions(self):
         module = self.module()
-        expected = {GROUP: ['group.com.sidekick.app'], 'com.apple.developer.siri': True}
+        expected = {GROUP: ['group.com.sidekick.app', 'group.com.SideStore.SideStore'], 'com.apple.developer.siri': True}
         with tempfile.TemporaryDirectory() as directory:
             ipa = Path(directory) / 'SideKick.ipa'
             with zipfile.ZipFile(ipa, 'w') as archive:

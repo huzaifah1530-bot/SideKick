@@ -13,9 +13,9 @@ enum LiveContainerStorageKind: String, Codable, CaseIterable, Identifiable, Send
     /// Where this folder lives inside LiveContainer, shown when linking it.
     var location: String {
         switch self {
-        case .privateDocuments: "One installation’s Documents/Applications folder"
-        case .sharedDirectory: "The LiveContainer/Applications folder every installation shares"
-        case .snapshot: "A copied Applications folder, read only"
+        case .privateDocuments: "On My iPhone › LiveContainer › Applications"
+        case .sharedDirectory: "the LiveContainer/Applications folder every installation shares"
+        case .snapshot: "a copied Applications folder, read only"
         }
     }
 }
@@ -65,6 +65,9 @@ struct LiveContainerGuest: Codable, Identifiable, Sendable, Equatable {
     var observation: String? = nil
     var warning: String?
     var executableIdentity: String? = nil
+    /// LiveContainer's data folder for this guest (`LCDataUUID`), used to find the
+    /// installation already running it.
+    var dataFolder: String? = nil
     var id: String { Self.identifier(connectionID: connectionID, folder: folder) }
 
     static func identifier(connectionID: UUID, folder: String) -> String {

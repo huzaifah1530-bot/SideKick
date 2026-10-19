@@ -16,6 +16,7 @@ let package = Package(
             "Services/SideStoreOperationService.swift", "Services/SigningAccountStore.swift", "Services/SigningExpiry.swift",
             "Services/AppOffloadService.swift", "Services/SideKickDiagnostics.swift",
             "Services/IPAImportDownloadStore.swift", "Services/RefreshFailureReport.swift", "Services/UpdateSuccessRecord.swift",
+            "Services/LiveContainerSharedAccess.swift",
             "Services/GitHubAccountSession.swift"
         ], sources: [
             "Models/GitHubBuildTracking.swift",
@@ -34,6 +35,7 @@ let package = Package(
             "Services/AnisetteErrorHint.swift",
             "Services/LiveContainerScanner.swift",
             "Services/LiveContainerStore.swift",
+            "Services/LiveContainerSharedStorage.swift",
             "Services/GitHubUpdateConfigurationStore.swift",
             "Services/SideKickStorageCleanup.swift"
         ]),

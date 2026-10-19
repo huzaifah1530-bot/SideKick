@@ -149,7 +149,7 @@ jobs:
           test -d "$APP_PATH"
 
           # Accent-matched icons must be registered for setAlternateIconName.
-          for icon in AppIcon-Hue030 AppIcon-Hue180 AppIcon-Hue330 AppIcon-Mono; do
+          for icon in AppIcon-Hue000 AppIcon-Hue120 AppIcon-Hue240 AppIcon-Mono; do
             /usr/libexec/PlistBuddy -c "Print :CFBundleIcons:CFBundleAlternateIcons:$icon" "$APP_PATH/Info.plist" > /dev/null
           done
 

@@ -70,7 +70,7 @@
          infoDictionary[kCFBundleIdentifierKey as String] = newBundleID
  
          // Fix-up BGTaskScheduler identifiers so they stay under the new bundle ID.
-@@ -190,7 +204,33 @@
+@@ -190,7 +204,35 @@
      
      private func resignAppBundle(at fileURL: URL, team: ALTTeam, certificate: ALTCertificate, profiles: [ALTProvisioningProfile]) async throws -> URL {
          let signer = ALTSigner(team: team, certificate: certificate)
@@ -91,12 +91,14 @@
 +        if let app = ALTApplication(fileURL: fileURL), self.context.targetAppBundle?.isAltStoreApp == true || app.isAltStoreApp {
 +            let grants = profiles.first(where: { $0.bundleIdentifier == app.bundleIdentifier })?.entitlements[.appGroups] as? [String] ?? []
 +            let expected = app.bundleIdentifier == Bundle.Info.activeBundleIdentifier ? Bundle.main.altstoreAppGroup : nil
-+            let required = expected.map { [$0] } ?? grants.filter {
++            let backup = expected.map { [$0] } ?? grants.filter {
 +                $0 == Bundle.baseAltStoreAppGroupID || $0.hasPrefix(Bundle.baseAltStoreAppGroupID + ".")
 +            }
-+            guard !required.isEmpty, required.allSatisfy({ grants.contains($0) }) else {
++            guard !backup.isEmpty, backup.allSatisfy({ grants.contains($0) }) else {
 +                throw OperationError.invalidParameters("The signing profile does not grant SideKick's shared backup group. Use the same signing team and a profile with App Groups enabled. The installed app has not been replaced.")
 +            }
++            // Optional: lets SideKick list LiveContainer's shared apps. Never required.
++            let required = backup + grants.filter { $0.hasPrefix(Bundle.liveContainerAppGroupID + ".") && !backup.contains($0) }
 +            // Older retained sources can lack the request even when the live app has it.
 +            // Pass only the exact manager bundle's profile-authorized backup groups.
 +            requiredAppGroups[app.bundleIdentifier] = required
@@ -107,7 +109,7 @@
      
 --- a/SideStore/Core/Operations/PipelineOperations/FetchProvisioningProfilesOperation.swift
 +++ b/SideStore/Core/Operations/PipelineOperations/FetchProvisioningProfilesOperation.swift
-@@ -230,13 +230,27 @@
+@@ -230,13 +230,32 @@
          }
      }
      
@@ -125,6 +127,11 @@
 +            var groups = entitlements[ALTEntitlement.appGroups.rawValue] as? [String] ?? []
 +            let backupGroup = self.backupGroup(for: team)
 +            if !groups.contains(backupGroup) { groups.append(backupGroup) }
++            // Request LiveContainer's group by its base name so the team suffix is added once,
++            // even when the installed app's entitlements already carry it.
++            let liveContainerGroup = Bundle.liveContainerAppGroupID
++            groups.removeAll { $0 == liveContainerGroup || $0.hasPrefix(liveContainerGroup + ".") }
++            groups.append(liveContainerGroup)
 +            entitlements[ALTEntitlement.appGroups.rawValue] = groups
 +        }
 +        return entitlements
@@ -141,7 +148,7 @@
          
          guard let allowedFeatures = team.type.allowedFeatures else {
              throw OperationError.invalidParameters("Cannot update features for unknown team type.")
-@@ -300,12 +314,7 @@
+@@ -300,12 +319,7 @@
      }
      
      func updateAppGroups(for appID: ALTAppID, targetAppBundle: ALTApplication, team: ALTTeam) async throws -> ALTAppID {
@@ -155,7 +162,7 @@
                  
          guard var applicationGroups = entitlements[ALTEntitlement.appGroups.rawValue] as? [String], !applicationGroups.isEmpty else {
              verboseLog("[FetchProvisioningProfiles] App ID \(appID.bundleIdentifier) has no app groups, skipping assignment.")
-@@ -333,7 +342,7 @@
+@@ -333,7 +347,7 @@
              }
              
              // Make sure we add .AltWidget for the widget
@@ -164,7 +171,7 @@
              for (_, group) in applicationGroups.enumerated() {
                  if group.contains("AltWidget") {
                      altStoreAppGroupID += ".AltWidget"
-@@ -420,6 +429,12 @@
+@@ -420,6 +434,12 @@
          }
          #endif
  
@@ -179,16 +186,18 @@
          let contextTargetBundleID = self.context.targetBundleIdentifier
 --- a/Shared/Extensions/Bundle+AltStore.swift
 +++ b/Shared/Extensions/Bundle+AltStore.swift
-@@ -69,7 +69,7 @@
+@@ -69,7 +69,9 @@
  public extension Bundle
  {
      // @livecontainer
 -    @objc dynamic static let baseAltStoreAppGroupID = "group." + Bundle.Info.appbundleIdentifier
 +    @objc dynamic static let baseAltStoreAppGroupID = "group.com.sidekick.app"
++    // LiveContainer keeps shared apps in the store's group; SideKick only reads it.
++    static let liveContainerAppGroupID = "group.com.SideStore.SideStore"
  
      var appGroups: [String] {
          guard let execURL = self.executableURL else { return [] }
-@@ -112,6 +112,6 @@
+@@ -112,6 +114,6 @@
          let matchesActiveBundle   = !activeID.isEmpty && self == activeID
          let matchesAltStoreBundle = !altstoreID.isEmpty && self == altstoreID
          

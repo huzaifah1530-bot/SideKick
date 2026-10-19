@@ -23,12 +23,14 @@ enum LiveContainerScanner {
             throw LiveContainerError.invalidMetadata("Signing is incomplete; retry after LiveContainer finishes.")
         }
         var identifier = string(info["CFBundleIdentifier"])
+        var dataFolder: String?
         let supplemental = bundle.appendingPathComponent("LCAppInfo.plist")
         if FileManager.default.fileExists(atPath: supplemental.path) {
             let lcInfo = try plist(supplemental, root: directory)
             if lcInfo["doUseLCBundleId"] as? Bool == true {
                 identifier = string(lcInfo["LCOrignalBundleIdentifier"])
             }
+            dataFolder = string(lcInfo["LCDataUUID"])
         }
         guard let identifier, !identifier.isEmpty else {
             throw LiveContainerError.invalidMetadata("Info.plist has no usable bundle identifier.")
@@ -55,6 +57,7 @@ enum LiveContainerScanner {
             }
         }
         var validated = guest
+        validated.dataFolder = dataFolder
         validated.observation = stamp.joined(separator: "|")
         validated.executableIdentity = executableIdentity(info: info, bundle: bundle, root: directory)
         return validated
@@ -80,12 +83,14 @@ enum LiveContainerScanner {
                 // A temporary signing state must never be repaired by discovery.
                 guard info["LCBundleIdentifier"] == nil else { throw LiveContainerError.invalidMetadata("Signing is incomplete; retry after LiveContainer finishes.") }
                 var identifier = string(info["CFBundleIdentifier"])
+                var dataFolder: String?
                 let supplemental = child.appendingPathComponent("LCAppInfo.plist")
                 if manager.fileExists(atPath: supplemental.path) {
                     let lcInfo = try plist(supplemental, root: directory)
                     if lcInfo["doUseLCBundleId"] as? Bool == true {
                         identifier = string(lcInfo["LCOrignalBundleIdentifier"])
                     }
+                    dataFolder = string(lcInfo["LCDataUUID"])
                 }
                 guard let identifier, !identifier.isEmpty else { throw LiveContainerError.invalidMetadata("Info.plist has no usable bundle identifier.") }
                 let name = string(info["CFBundleDisplayName"]) ?? string(info["CFBundleName"]) ?? child.deletingPathExtension().lastPathComponent
@@ -104,6 +109,7 @@ enum LiveContainerScanner {
                     }
                 }
                 guest.observation = stamp.joined(separator: "|")
+                guest.dataFolder = dataFolder
                 guest.executableIdentity = executableIdentity(info: info, bundle: child, root: directory)
                 result.apps.append(guest)
             } catch is CancellationError { throw CancellationError() }

@@ -7,12 +7,14 @@ import tempfile
 
 GROUP_KEY = 'com.apple.security.application-groups'
 VPN_KEYS = ('com.apple.developer.networking.networkextension', 'com.apple.developer.networking.vpn.api')
+# SideKick's own group first, then LiveContainer's shared-apps group (read only).
+GROUPS = ['group.com.sidekick.app', 'group.com.SideStore.SideStore']
 
 
 def requests(configured: dict, *, external_vpn: bool = False) -> dict:
     result = dict(configured)
-    if result.get(GROUP_KEY) != ['group.com.sidekick.app']:
-        raise ValueError('SideKick must request its App Group before packaging')
+    if result.get(GROUP_KEY) != GROUPS:
+        raise ValueError('SideKick must request its App Groups before packaging')
     if external_vpn:
         for key in VPN_KEYS:
             result.pop(key, None)

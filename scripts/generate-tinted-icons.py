@@ -1,18 +1,19 @@
 """Generate SideKick's accent-matched alternate app icons.
 
-Each variant rotates the hue of the primary icon so its top-left gradient colour
-matches an accent colour bucket. The white bolt keeps its colour because white
-has no saturation. Run from the repository root after changing the primary icon:
+Each variant recolours the primary icon so its average hue is the variant's hue.
+The gradient's hue spread is narrowed, so a red variant reads as red rather than
+running from red into orange. The white bolt keeps its colour because white has
+no saturation. Run from the repository root after changing the primary icon:
 
     python scripts/generate-tinted-icons.py
 
 Requires Pillow and NumPy. The output is committed, so CI does not run this.
-Keep STEP and the naming in sync with SideKick/Services/AppIconVariant.swift.
+Keep the constants in sync with SideKick/Services/AppIconVariant.swift.
 """
 from __future__ import annotations
 
-import colorsys
 import json
+import shutil
 from pathlib import Path
 
 import numpy as np
@@ -21,62 +22,65 @@ from PIL import Image
 ROOT = Path(__file__).resolve().parent.parent
 CATALOG = ROOT / "SideKick" / "Assets.xcassets"
 SOURCE = CATALOG / "AppIcon.appiconset" / "SideKickIcon-1024.png"
-STEP = 30  # degrees between buckets; 360 / STEP icons including the primary
+STEP = 15                     # degrees between variant hues
+PRIMARY_RANGE = (160, 200)    # accent hues the original teal icon already matches
+SPREAD = 0.5                  # keep half of the original gradient's hue range
+PREVIEW_SIZE = 300            # sharp enough for SideKick's hero icon at 3x
 
 
-def contents(filename: str) -> str:
-    return json.dumps({
-        "images": [{"filename": filename, "idiom": "universal", "platform": "ios", "size": "1024x1024"}],
-        "info": {"author": "xcode", "version": 1},
-    }, indent=2) + "\n"
+def variant_hues() -> list[int]:
+    low, high = PRIMARY_RANGE
+    return [h for h in range(0, 360, STEP) if not (low <= h <= high)]
 
 
-PREVIEW_SIZE = 180  # LiveContainer caches 60 pt icons at 3x
-
-
-def preview_contents(filename: str) -> str:
-    return json.dumps({
-        "images": [{"filename": filename, "idiom": "universal"}],
-        "info": {"author": "xcode", "version": 1},
-    }, indent=2) + "\n"
+def contents(images: list[dict]) -> str:
+    return json.dumps({"images": images, "info": {"author": "xcode", "version": 1}}, indent=2) + "\n"
 
 
 def write(name: str, image: Image.Image) -> None:
-    folder = CATALOG / f"{name}.appiconset"
-    folder.mkdir(exist_ok=True)
-    filename = f"{name}-1024.png"
-    image.save(folder / filename, optimize=True)
-    (folder / "Contents.json").write_text(contents(filename), encoding="utf-8")
-    # Image sets can be loaded at runtime; app icon sets cannot.
+    icon = CATALOG / f"{name}.appiconset"
+    icon.mkdir()
+    image.save(icon / f"{name}-1024.png", optimize=True)
+    (icon / "Contents.json").write_text(contents([{
+        "filename": f"{name}-1024.png", "idiom": "universal", "platform": "ios", "size": "1024x1024"}]), encoding="utf-8")
+    # Image sets can be loaded at runtime with UIImage(named:); app icon sets cannot.
     preview_name = name.replace("AppIcon", "AppIconPreview", 1)
     preview = CATALOG / f"{preview_name}.imageset"
-    preview.mkdir(exist_ok=True)
-    preview_file = f"{preview_name}.png"
-    image.resize((PREVIEW_SIZE, PREVIEW_SIZE), Image.LANCZOS).save(preview / preview_file, optimize=True)
-    (preview / "Contents.json").write_text(preview_contents(preview_file), encoding="utf-8")
+    preview.mkdir()
+    image.resize((PREVIEW_SIZE, PREVIEW_SIZE), Image.LANCZOS).save(preview / f"{preview_name}.png", optimize=True)
+    (preview / "Contents.json").write_text(contents([{"filename": f"{preview_name}.png", "idiom": "universal"}]), encoding="utf-8")
+
+
+def mean_hue(hsv: np.ndarray) -> float:
+    """Saturation- and brightness-weighted circular mean, in degrees."""
+    angle = hsv[..., 0] / 256 * 2 * np.pi
+    weight = (hsv[..., 1] / 255) * (hsv[..., 2] / 255)
+    return float(np.degrees(np.arctan2((weight * np.sin(angle)).sum(), (weight * np.cos(angle)).sum())) % 360)
 
 
 def main() -> None:
+    for old in list(CATALOG.glob("AppIcon-*.appiconset")) + list(CATALOG.glob("AppIconPreview*.imageset")):
+        shutil.rmtree(old)
     source = Image.open(SOURCE).convert("RGB")
-    # Report the reference hue so AppIconVariant.referenceHue stays accurate.
-    r, g, b = (c / 255 for c in source.getpixel((8, 8)))
-    print(f"Top-left reference hue: {colorsys.rgb_to_hsv(r, g, b)[0] * 360:.1f} degrees")
+    hsv = np.array(source.convert("HSV"), dtype=np.float64)
+    reference = mean_hue(hsv)
+    print(f"Reference (average) hue: {reference:.1f} degrees")
 
-    # Preview of the primary icon only; its app icon set is maintained by hand.
-    folder = CATALOG / "AppIconPreview.imageset"
-    folder.mkdir(exist_ok=True)
-    source.resize((PREVIEW_SIZE, PREVIEW_SIZE), Image.LANCZOS).save(folder / "AppIconPreview.png", optimize=True)
-    (folder / "Contents.json").write_text(preview_contents("AppIconPreview.png"), encoding="utf-8")
-
-    hsv = np.array(source.convert("HSV"), dtype=np.int16)
-    for degrees in range(STEP, 360, STEP):
-        rotated = hsv.copy()
-        rotated[..., 0] = (rotated[..., 0] + round(degrees * 256 / 360)) % 256
-        write(f"AppIcon-Hue{degrees:03d}", Image.fromarray(rotated.astype(np.uint8), "HSV").convert("RGB"))
+    # Offset of each pixel from the average, wrapped to -180...180.
+    offset = ((hsv[..., 0] / 256 * 360 - reference + 180) % 360) - 180
+    for hue in variant_hues():
+        recoloured = hsv.copy()
+        recoloured[..., 0] = ((hue + offset * SPREAD) % 360) / 360 * 256 % 256
+        write(f"AppIcon-Hue{hue:03d}", Image.fromarray(recoloured.round().astype(np.uint8), "HSV").convert("RGB"))
 
     # Greys, black and white accents have no hue to match.
     write("AppIcon-Mono", source.convert("L").convert("RGB"))
-    print("Wrote", len(range(STEP, 360, STEP)) + 1, "alternate icons")
+
+    preview = CATALOG / "AppIconPreview.imageset"
+    preview.mkdir()
+    source.resize((PREVIEW_SIZE, PREVIEW_SIZE), Image.LANCZOS).save(preview / "AppIconPreview.png", optimize=True)
+    (preview / "Contents.json").write_text(contents([{"filename": "AppIconPreview.png", "idiom": "universal"}]), encoding="utf-8")
+    print("Wrote", len(variant_hues()) + 1, "alternate icons:", ", ".join(f"{h:03d}" for h in variant_hues()))
 
 
 if __name__ == "__main__":
