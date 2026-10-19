@@ -2,7 +2,8 @@
 
 ## User flows
 
-- My Apps has a separate LiveContainer section. Link the actual `Applications` directory exposed in Files, then choose the installation's scheme (`livecontainer`, `livecontainer2`, or a known custom scheme).
+- My Apps has a separate LiveContainer section. Link the actual `Applications` directory exposed in Files, then choose the installation's scheme (`livecontainer`, `livecontainer2`, `livecontainer3`, or a known custom scheme).
+- Several installations are supported: link each installation's private `Documents/Applications` folder and, for shared apps, LiveContainer's shared `LiveContainer/Applications` folder (folder type **Shared apps**). Every guest from every folder appears in the single LiveContainer section on Home; shared guests are captioned "Shared app" and launch through the scheme chosen for that folder. Linking a folder that is already linked is rejected so its apps are never listed twice.
 - Connections support rescan, reconnect, another directory, disconnect, and forget. Disconnect keeps metadata and GitHub sources. Forget records a retryable cleanup before removing sources, cancels active guest downloads, and deletes queued guest IPA records saved by SideKick; if any step fails, Retry Forget resumes from the remaining guest IDs. Neither action changes LiveContainer files.
 - Guest details show real Info.plist version/build, bundle identity, location, last-seen time, connection issues, GitHub settings, and launch actions. Malformed/inaccessible bundles retain prior metadata with a warning.
 - Guest update sources use the existing named GitHub tokens and release/workflow history. Pick an exact installed baseline; matching names or unchanged version labels do not prove which build was installed.
@@ -56,7 +57,7 @@ Physical iPhone testing remains required for: picker exposure of private/shared 
 | `Views/Library/AppManagementView.swift`, `Views/Library/GitHubUpdateDetailView.swift`, `Views/Library/OtherTeamInstallationView.swift` | Update layout/options and all-account capability routing |
 | `Services/SideKickStorageCleanup.swift`, `Services/SideKickStorageUsage.swift`, `Views/Settings/StorageFilesView.swift`, `Views/Settings/SideStoreSettingsPages.swift` | Classified storage, path protection, removal/cleanup controls and reporting |
 | `Services/SideStoreOperationService.swift`, `Services/GitHubUpdateDownloadStore.swift` | Shared configuration actor, signing/removal interlocks, guest queue exclusion |
-| `Info.plist`, `patches/sidestore-sidekick.patch` | LiveContainer query declarations in both build paths |
+| `Info.plist`, `patches/sidestore-sidekick.patch` | LiveContainer query declarations (`livecontainer`, `livecontainer2`, `livecontainer3`) in both build paths |
 | `Views/Root/RequiredSetupView.swift` | Updated shortcut setup link |
 | Root `Package.swift`, `Tests/SideKickCoreTests/*`, `.github/workflows/ios-build.yml`, `.gitignore` | Automated core tests, macOS CI, ignored test build outputs |
 | `README.md`, `docs/settings-functionality.md`, investigation/plan/integration documents | User behavior, constraints, implementation and validation record |

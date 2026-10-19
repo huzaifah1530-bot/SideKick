@@ -148,6 +148,11 @@ jobs:
           APP_PATH="build/Build/Products/Release-iphoneos/SideStore.app"
           test -d "$APP_PATH"
 
+          # Accent-matched icons must be registered for setAlternateIconName.
+          for icon in AppIcon-Hue030 AppIcon-Hue180 AppIcon-Hue330 AppIcon-Mono; do
+            /usr/libexec/PlistBuddy -c "Print :CFBundleIcons:CFBundleAlternateIcons:$icon" "$APP_PATH/Info.plist" > /dev/null
+          done
+
           # Preserve the local VPN provider; remove only the unsupported widget.
           if [ -d "$APP_PATH/PlugIns/AltWidgetExtension.appex" ]; then
             rm -rf "$APP_PATH/PlugIns/AltWidgetExtension.appex"

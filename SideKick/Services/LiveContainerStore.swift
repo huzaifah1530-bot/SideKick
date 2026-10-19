@@ -8,9 +8,13 @@ protocol LiveContainerDirectoryAccess: Sendable {
     func bookmark(for directory: URL) throws -> Data
     func scan(bookmark: Data, connectionID: UUID) throws -> (LiveContainerScan, Data?)
     func guest(bookmark: Data, connectionID: UUID, folder: String) throws -> LiveContainerGuest
+    /// Canonical path a bookmark points to, used to avoid linking one folder twice.
+    func resolvedPath(for bookmark: Data) -> String?
 }
 
 extension LiveContainerDirectoryAccess {
+    func resolvedPath(for bookmark: Data) -> String? { nil }
+
     func guest(bookmark: Data, connectionID: UUID, folder: String) throws -> LiveContainerGuest {
         let (scan, _) = try scan(bookmark: bookmark, connectionID: connectionID)
         guard let guest = scan.apps.first(where: { $0.folder == folder }) else {
@@ -125,6 +129,17 @@ struct SystemLiveContainerDirectoryAccess: LiveContainerDirectoryAccess {
         #endif
     }
 
+    func resolvedPath(for bookmark: Data) -> String? {
+        #if os(Linux)
+        guard let path = String(data: bookmark, encoding: .utf8) else { return nil }
+        let url = URL(fileURLWithPath: path)
+        #else
+        var stale = false
+        guard let url = try? URL(resolvingBookmarkData: bookmark, options: [], relativeTo: nil, bookmarkDataIsStale: &stale) else { return nil }
+        #endif
+        return url.standardizedFileURL.resolvingSymlinksInPath().path
+    }
+
     func scan(bookmark: Data, connectionID: UUID) throws -> (LiveContainerScan, Data?) {
         #if os(Linux)
         guard let path = String(data: bookmark, encoding: .utf8) else { throw LiveContainerError.accessRevoked }
@@ -209,6 +224,13 @@ actor LiveContainerStore {
         links[connectionID] = generation
         defer { if links[connectionID] == generation { links[connectionID] = nil } }
         let bookmark = try access.bookmark(for: directory)
+        // Two installations can expose the same shared folder; list its apps once.
+        if let path = access.resolvedPath(for: bookmark),
+           let existing = try snapshot().connections.first(where: { other in
+               other.id != connectionID && other.bookmark.flatMap { access.resolvedPath(for: $0) } == path
+           }) {
+            throw LiveContainerError.alreadyLinked(existing.name)
+        }
         // Validate before accepting access or replacing a working connection.
         let (scan, renewed) = try await LiveContainerReadContext.scan(access: access, bookmark: bookmark, id: connectionID)
         try Task.checkCancellation()

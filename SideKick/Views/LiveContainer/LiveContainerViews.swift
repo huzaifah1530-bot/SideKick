@@ -27,8 +27,9 @@ struct LiveContainerLibrarySection: View {
                         iconData: app.iconData,
                         metadata: {
                             if let connection = state.connections.first(where: { $0.id == app.connectionID }) {
-                                if connection.storageKind == .snapshot || state.connections.count > 1 {
-                                    Text(connection.storageKind == .snapshot ? "Snapshot · \(connection.name)" : connection.name)
+                                // One section for every installation; the caption tells same-named apps apart.
+                                if connection.storageKind != .privateDocuments || state.connections.count > 1 {
+                                    Text(Self.caption(for: connection))
                                         .font(.caption).foregroundStyle(.secondary)
                                 }
                                 if !connection.isConnected || connection.error != nil {
@@ -58,7 +59,7 @@ struct LiveContainerLibrarySection: View {
                     Spacer()
                 }
             } else if state.apps.isEmpty {
-                Text("No apps in this folder.")
+                Text(state.connections.count > 1 ? "No apps in these folders." : "No apps in this folder.")
                     .foregroundStyle(.secondary)
                 SwiftUI.Button {
                     Task { await rescanFolders() }
@@ -122,6 +123,14 @@ struct LiveContainerLibrarySection: View {
 
     private func connection(for app: LiveContainerGuest) -> LiveContainerConnection? {
         state.connections.first(where: { $0.id == app.connectionID })
+    }
+
+    private static func caption(for connection: LiveContainerConnection) -> String {
+        switch connection.storageKind {
+        case .snapshot: "Snapshot · \(connection.name)"
+        case .sharedDirectory: "Shared app"
+        case .privateDocuments: connection.name
+        }
     }
 
     @MainActor private func rescanFolders() async {
@@ -252,15 +261,25 @@ struct LiveContainerConnectionsView: View {
             }
 
             Section {
-                DisclosureGroup("New Folder Options") {
-                    TextField("Connection name", text: $name)
-                    Picker("Storage type", selection: $kind) {
-                        ForEach(LiveContainerStorageKind.allCases) { Text($0.title).tag($0) }
+                Picker("Folder type", selection: $kind) {
+                    ForEach(LiveContainerStorageKind.allCases) { Text($0.title).tag($0) }
+                }
+                Picker(kind == .sharedDirectory ? "Open with" : "Installation", selection: $scheme) {
+                    ForEach(LiveContainerInstallation.knownSchemes, id: \.self) {
+                        Text(LiveContainerInstallation.displayName(for: $0)).tag($0)
                     }
+                    if !LiveContainerInstallation.knownSchemes.contains(scheme) {
+                        Text(scheme).tag(scheme)
+                    }
+                }
+                DisclosureGroup("More Options") {
+                    TextField("Connection name", text: $name)
                     TextField("Launch scheme", text: $scheme).textInputAutocapitalization(.never).autocorrectionDisabled()
                 }
+            } header: {
+                Text("Next Folder")
             } footer: {
-                Text("Change these only if your LiveContainer setup needs it. Snapshots can’t launch apps or confirm versions. Guest files are never changed.")
+                Text("Choose \(kind.location). Add each LiveContainer installation’s folder, plus the shared folder if you use shared apps. Every app appears in the one LiveContainer section on Home. Snapshots can’t launch apps or confirm versions. Guest files are never changed.")
             }
         }
         .toolbar {
@@ -334,7 +353,13 @@ struct LiveContainerConnectionsView: View {
 
     private func addConnection() {
         reconnectID = nil
-        if !state.connections.isEmpty { name = "LiveContainer \(state.connections.count + 1)" }
+        // Keep a custom name; otherwise describe the installation and folder type.
+        let defaults = LiveContainerInstallation.knownSchemes.flatMap { scheme in
+            LiveContainerStorageKind.allCases.map { LiveContainerInstallation.connectionName(scheme: scheme, storageKind: $0) }
+        } + ["LiveContainer", ""]
+        if defaults.contains(name) || name.range(of: "^LiveContainer \\d+$", options: .regularExpression) != nil {
+            name = LiveContainerInstallation.connectionName(scheme: scheme, storageKind: kind)
+        }
         picker = true
     }
 
@@ -350,7 +375,7 @@ struct LiveContainerConnectionsView: View {
         let healthy = connection.isConnected && connection.error == nil
         let guests = state.apps.filter { $0.connectionID == connection.id }.count
         return HStack(spacing: Spacing.s) {
-            Image(systemName: connection.storageKind == .snapshot ? "archivebox" : "folder.fill")
+            Image(systemName: connection.storageKind == .snapshot ? "archivebox" : connection.storageKind == .sharedDirectory ? "folder.fill.badge.person.crop" : "folder.fill")
                 .font(.title3)
                 .foregroundStyle(healthy ? Color.sideKickAccent : Color.orange)
                 .frame(width: 32)
@@ -375,10 +400,13 @@ struct LiveContainerConnectionsView: View {
         guard connection.isConnected else { return "Disconnected · reconnect to scan" }
         if connection.error != nil { return "Needs attention" }
         let apps = guests == 1 ? "1 app" : "\(guests) apps"
+        let kind = connection.storageKind == .privateDocuments
+            ? "\(LiveContainerInstallation.displayName(for: connection.scheme)) · \(connection.storageKind.title)"
+            : connection.storageKind.title
         if let date = connection.lastSuccessfulScan {
-            return "\(apps) · scanned \(date.formatted(.relative(presentation: .named)))"
+            return "\(kind) · \(apps) · scanned \(date.formatted(.relative(presentation: .named)))"
         }
-        return apps
+        return "\(kind) · \(apps)"
     }
 
     @ViewBuilder
@@ -480,22 +508,11 @@ struct LiveContainerGuestDetailView: View {
                     ) {
                         guestBadge(guest)
                     }
-                    HStack(spacing: Spacing.s) {
-                        SwiftUI.Button { Task { await launch() } } label: {
-                            ActionLabel("Open", isWorking: working && !isCheckingUpdates)
-                        }
-                        .primaryActionStyle()
-                        .disabled(working || !canLaunch(guest))
-
-                        if configuration != nil {
-                            SwiftUI.Button { Task { await checkUpdates() } } label: {
-                                ActionLabel("Check", systemImage: "arrow.clockwise", isWorking: isCheckingUpdates)
-                            }
-                            .secondaryActionStyle()
-                            .tint(.sideKickAccent)
-                            .disabled(working || isCheckingUpdates || !canCheckUpdates)
-                        }
+                    SwiftUI.Button { Task { await launch() } } label: {
+                        ActionLabel("Open", isWorking: working && !isCheckingUpdates)
                     }
+                    .primaryActionStyle()
+                    .disabled(working || !canLaunch(guest))
                     .padding(.top, Spacing.xs)
                 }
                 .listRowBackground(Color.clear)
@@ -514,32 +531,29 @@ struct LiveContainerGuestDetailView: View {
 
                 if let candidate {
                     updateReviewSection(for: guest, candidate: candidate)
+                    // Inline, like the regular app page, so the controls never cover content.
+                    Section { updateActions(for: candidate) }
+                        .listRowBackground(Color.clear)
+                        .listRowInsets(EdgeInsets(top: Spacing.xs, leading: Spacing.m, bottom: Spacing.xs, trailing: Spacing.m))
+                        .listRowSeparator(.hidden)
                 }
 
                 Section {
                     NavigationLink { GitHubUpdateSettingsView(target: guest.updateTarget) } label: {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Label("GitHub Updates", systemImage: "arrow.down.app")
-                            if configuration != nil {
-                                Text(hasChecked ? checkState.message : "Tap Check to look for newer builds.")
-                                    .font(.subheadline)
-                                    .foregroundStyle(.secondary)
-                                    .lineLimit(2)
-                            }
-                        }
+                        Label("GitHub Updates", systemImage: "arrow.down.app")
                     }
                     .disabled(isBeingForgotten)
-                    if let configuration {
-                        LiveContainerInstalledBuildDisclosure(configuration: configuration)
-                            .id(configuration.sourceIdentity + "\n" + (configuration.effectiveBaselineKey ?? ""))
-                    }
                 } footer: {
                     if isBeingForgotten {
                         Text(updateEligibilityMessage)
-                    } else if configuration?.source == .actionsArtifact {
-                        Text("Actions builds need a GitHub token with Actions read access.")
                     } else if configuration == nil {
                         Text("Track a GitHub repository for new builds of this app.")
+                    } else if isCheckingUpdates {
+                        Text("Checking for updates…")
+                    } else if configuration?.source == .actionsArtifact, checkFailed {
+                        Text("Actions builds need a GitHub token with Actions read access.")
+                    } else if hasChecked {
+                        Text(checkState.message)
                     }
                 }
 
@@ -564,11 +578,6 @@ struct LiveContainerGuestDetailView: View {
         }
         .navigationTitle(guest?.name ?? "LiveContainer App")
         .navigationBarTitleDisplayMode(.inline)
-        .safeAreaInset(edge: .bottom) {
-            if let candidate, guest != nil {
-                BottomActionBar { updateActions(for: candidate) }
-            }
-        }
         .confirmationDialog("Delete downloaded IPA?", isPresented: $confirmingIPADelete, titleVisibility: .visible) {
             SwiftUI.Button("Delete IPA", role: .destructive) {
                 guard let candidate else { return }
@@ -596,6 +605,27 @@ struct LiveContainerGuestDetailView: View {
                                     SwiftUI.Button(role: .destructive) { confirmingSkip = true } label: {
                                         Label("Skip This Build", systemImage: "forward.end")
                                     }
+                                }
+                            }
+                        }
+                        if let configuration {
+                            Section {
+                                SwiftUI.Button { Task { await checkUpdates(force: true) } } label: {
+                                    Label("Check for Updates", systemImage: "arrow.clockwise")
+                                }
+                                .disabled(working || isCheckingUpdates || !canCheckUpdates)
+                                NavigationLink {
+                                    List {
+                                        Section {
+                                            LiveContainerInstalledBuildDisclosure(configuration: configuration)
+                                                .id(configuration.sourceIdentity + "\n" + (configuration.effectiveBaselineKey ?? ""))
+                                        }
+                                    }
+                                    .listStyle(.insetGrouped)
+                                    .navigationTitle("Installed Build")
+                                    .navigationBarTitleDisplayMode(.inline)
+                                } label: {
+                                    Label("Installed Build", systemImage: "checkmark.seal")
                                 }
                             }
                         }

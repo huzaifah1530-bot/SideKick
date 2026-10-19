@@ -117,7 +117,8 @@ struct LiveContainerHandoffSheet: View {
             }
             .navigationBarTitleDisplayMode(.inline)
         }
-        .presentationDetents([.medium, .large])
+        // Fully expanded: at half height the answer buttons covered the explanation.
+        .presentationDetents([.large])
         .presentationDragIndicator(.visible)
     }
 

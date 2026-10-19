@@ -1,0 +1,16 @@
+{
+  "schemaVersion": 1,
+  "updatedAt": "2026-10-19T00:00:00Z",
+  "recommended": "sidestore-windows",
+  "servers": [
+    {
+      "id": "sidestore-windows",
+      "name": "SideStore Windows Anisette",
+      "url": "https://win.ani.sidestore.io",
+      "headers": {
+        "X-Mme-Client-Info": "<PC> <Windows;6.2(0,0);9200> <com.apple.AuthKit/1 (com.apple.iTunes/12.12.4.1)>",
+        "User-Agent": "akd/1.0 CFNetwork/808.1.4"
+      }
+    }
+  ]
+}

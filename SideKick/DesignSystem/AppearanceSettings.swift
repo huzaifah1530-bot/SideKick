@@ -51,19 +51,30 @@ final class AppearanceSettings {
             if let customAccent { UserDefaults.standard.set(customAccent.hex, forKey: Key.accent) }
             else { UserDefaults.standard.removeObject(forKey: Key.accent) }
             applyToWindows()
+            AppIconController.scheduleUpdate(for: customAccent)
         }
     }
 
-    var isDefault: Bool { mode == .system && customAccent == nil }
+    /// Whether the app icon follows the accent hue.
+    var matchesAppIcon: Bool {
+        didSet {
+            AppIconController.matchesAccent = matchesAppIcon
+            AppIconController.scheduleUpdate(for: customAccent)
+        }
+    }
+
+    var isDefault: Bool { mode == .system && customAccent == nil && matchesAppIcon }
 
     private init() {
         mode = AppearanceMode(rawValue: UserDefaults.standard.string(forKey: Key.mode) ?? "") ?? .system
         customAccent = UserDefaults.standard.string(forKey: Key.accent).flatMap(RGBColor.init(hex:))
+        matchesAppIcon = AppIconController.matchesAccent
     }
 
     func restoreDefaults() {
         mode = .system
         customAccent = nil
+        if !matchesAppIcon { matchesAppIcon = true }
     }
 
     var accent: Color {
@@ -181,10 +192,31 @@ struct AppearanceSettingsView: View {
             }
 
             Section {
+                Toggle(isOn: $settings.matchesAppIcon) {
+                    HStack(spacing: Spacing.s) {
+                        if let preview = AppIconController.previewImage(for: settings.customAccent) {
+                            Image(uiImage: preview)
+                                .resizable()
+                                .frame(width: 44, height: 44)
+                                .clipShape(RoundedRectangle(cornerRadius: 10, style: .continuous))
+                                .accessibilityHidden(true)
+                        }
+                        Text("Match App Icon to Accent")
+                    }
+                }
+            } header: {
+                Text("App Icon")
+            } footer: {
+                Text(AppIconController.liveContainerBundle == nil
+                     ? "The icon changes to the nearest matching colour. iOS confirms each change."
+                     : "SideKick is running in LiveContainer. Its icon there updates the next time LiveContainer reloads its app list.")
+            }
+
+            Section {
                 SwiftUI.Button("Restore Defaults") { settings.restoreDefaults() }
                     .disabled(settings.isDefault)
             } footer: {
-                Text("Only resets appearance: System mode and the SideKick Teal accent. Your apps, accounts and other settings aren’t changed.")
+                Text("Only resets appearance: System mode, the SideKick Teal accent and the original app icon. Your apps, accounts and other settings aren’t changed.")
             }
         }
         .navigationTitle("Appearance")

@@ -449,7 +449,7 @@ final class SideStoreOperationService {
             } catch {
                 // Scheduled attempts are intentionally quiet; the next automation retries failures.
                 debugLog("[SideKick] Scheduled refresh failed for \(app.bundleIdentifier): \(error.localizedDescription)")
-                appResults.append(.failure(for: app, reason: error.localizedDescription,
+                appResults.append(.failure(for: app, reason: AnisetteErrorHint.message(for: error),
                     recovery: error is LocalVPNError ? .localConnection : .account))
             }
             progressHandler(index + 1, apps.count)
@@ -480,7 +480,7 @@ final class SideStoreOperationService {
                 results.append(result)
             } catch {
                 var result = previous
-                result.failureMessage = error.localizedDescription
+                result.failureMessage = AnisetteErrorHint.message(for: error)
                 result.recovery = error is LocalVPNError ? .localConnection : .account
                 results.append(result)
             }

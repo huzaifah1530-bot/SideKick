@@ -946,7 +946,7 @@ private struct RefreshConsoleView: View {
             append(operation == .refresh ? "Refresh completed successfully" : "Re-sign completed successfully")
             await ExpirationNotificationScheduler.update()
         } catch {
-            failure = error.localizedDescription
+            failure = AnisetteErrorHint.message(for: error)
             stageSummary = operation == .refresh ? "Couldn’t refresh \(app.name)" : "Couldn’t re-sign \(app.name)"
             append("ERROR · \(error.localizedDescription)")
         }
@@ -1361,7 +1361,7 @@ struct InstallConsoleView: View {
             append(isUpdate ? "Update completed successfully" : "Install completed successfully")
             await onInstalled?()
         } catch {
-            failure = error.localizedDescription
+            failure = AnisetteErrorHint.message(for: error)
             stageSummary = isUpdate ? "Couldn’t update \(app.name)" : "Couldn’t install \(app.name)"
             if isUpdate { UpdateSuccessRecord.remove(bundleIdentifier: updateTargetBundleID) }
             append("ERROR · \(error.localizedDescription)")

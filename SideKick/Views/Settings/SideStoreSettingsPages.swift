@@ -354,6 +354,9 @@ struct AnisetteSettingsView: View {
     @State private var showReset = false
     @State private var message: String?
     @State private var settingsLoaded = false
+    @State private var remoteSelection: RemoteAnisetteSelection?
+    @State private var remoteError: String?
+    @State private var isFetchingRemote = false
     private struct Draft: Equatable {
         let onDevice: Bool
         let server: String
@@ -373,12 +376,16 @@ struct AnisetteSettingsView: View {
                         .textInputAutocapitalization(.never)
                         .autocorrectionDisabled()
                 }
-                SwiftUI.Button("Use Windows Anisette Server") {
-                    server = AnisetteConfiguration.windowsServer
-                    useOnDeviceAnisette = false
-                    clientInfo = AnisetteConfiguration.windowsClientInfo
-                    userAgent = AnisetteConfiguration.windowsUserAgent
+                SwiftUI.Button {
+                    Task { await useNewestServer() }
+                } label: {
+                    HStack {
+                        Text("Use Newest Anisette Server")
+                        Spacer()
+                        if isFetchingRemote { ProgressView() }
+                    }
                 }
+                .disabled(isFetchingRemote)
                 SwiftUI.Button("Use On-Device Defaults") {
                     useOnDeviceAnisette = true
                     clientInfo = AppConstants.Anisette.defaultClientInfo
@@ -394,6 +401,21 @@ struct AnisetteSettingsView: View {
                 Text("Authentication Data")
             } footer: {
                 Text("Changing the provider regenerates authentication data. Accounts and certificates are kept.")
+            }
+
+            Section {
+                LabeledContent("Recommended", value: remoteSelection?.server.name ?? (remoteError == nil ? "Checking…" : "Unavailable"))
+                LabeledContent("List updated", value: remoteUpdatedText)
+                if let applied = AnisetteRemoteRecord.load() {
+                    LabeledContent("You switched", value: applied.appliedAt.formatted(date: .abbreviated, time: .shortened))
+                }
+                if let remoteError {
+                    Text(remoteError).font(.footnote).foregroundStyle(.secondary)
+                }
+            } header: {
+                Text("Newest Server")
+            } footer: {
+                Text("If sign-in or refresh fails with an Anisette error, the server may have stopped working. SideKick’s GitHub repository lists the current recommended server, so check here for a newer one.")
             }
 
             Section {
@@ -446,6 +468,7 @@ struct AnisetteSettingsView: View {
             userAgent = config.userAgent
             savedDraft = draft
             settingsLoaded = true
+            await loadRemoteList()
         }
         .confirmationDialog("Regenerate authentication data?", isPresented: $showReset, titleVisibility: .visible) {
             SwiftUI.Button("Regenerate Data", role: .destructive) {
@@ -476,6 +499,49 @@ struct AnisetteSettingsView: View {
         }
     }
 
+    private var remoteUpdatedText: String {
+        if let date = remoteSelection?.lastUpdated { return date.formatted(date: .abbreviated, time: .shortened) }
+        return remoteSelection == nil && remoteError == nil ? "Checking…" : "Unknown"
+    }
+
+    /// Shows what GitHub currently recommends without changing anything.
+    @MainActor private func loadRemoteList() async {
+        guard !isFetchingRemote else { return }
+        isFetchingRemote = true
+        defer { isFetchingRemote = false }
+        do {
+            remoteSelection = try await RemoteAnisetteConfigurationClient().fetchRecommended()
+            remoteError = nil
+        } catch {
+            remoteError = error.localizedDescription
+        }
+    }
+
+    /// Downloads the recommended server from the repository and applies it right away.
+    @MainActor private func useNewestServer() async {
+        guard !isFetchingRemote, !isSaving else { return }
+        isFetchingRemote = true
+        defer { isFetchingRemote = false }
+        let selection: RemoteAnisetteSelection
+        do {
+            selection = try await RemoteAnisetteConfigurationClient().fetchRecommended()
+            remoteSelection = selection
+            remoteError = nil
+        } catch {
+            remoteError = error.localizedDescription
+            message = error.localizedDescription
+            return
+        }
+        server = selection.serverURL.absoluteString
+        useOnDeviceAnisette = false
+        clientInfo = selection.server.clientInfo
+        userAgent = selection.server.userAgent
+        guard await saveAuthenticationSettings() else { return }
+        AnisetteRemoteRecord(serverID: selection.server.id, appliedAt: .now).save()
+        let updated = selection.lastUpdated.map { " The list was updated \($0.formatted(date: .abbreviated, time: .shortened))." } ?? ""
+        message = "Switched to \(selection.server.name).\(updated) Try signing in or refreshing again."
+    }
+
     private func run(_ operation: @escaping @MainActor () async throws -> Void) {
         isSaving = true
         message = nil
@@ -484,6 +550,21 @@ struct AnisetteSettingsView: View {
             do { try await operation() }
             catch { message = error.localizedDescription }
         }
+    }
+}
+
+/// When the user last applied the recommended server from GitHub.
+private struct AnisetteRemoteRecord: Codable {
+    private static let key = "sidekick.anisette.remote.applied.v1"
+    let serverID: String
+    let appliedAt: Date
+
+    static func load() -> AnisetteRemoteRecord? {
+        UserDefaults.standard.data(forKey: key).flatMap { try? JSONDecoder().decode(Self.self, from: $0) }
+    }
+
+    func save() {
+        if let data = try? JSONEncoder().encode(self) { UserDefaults.standard.set(data, forKey: Self.key) }
     }
 }
 

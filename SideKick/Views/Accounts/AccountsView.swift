@@ -8,6 +8,8 @@ struct AccountsView: View {
     @State private var errorMessage: String?
     @State private var isShowingSignIn = false
     @State private var isShowingDiagnostics = false
+    @State private var errorIsAnisetteRelated = false
+    @State private var isShowingAnisetteSettings = false
     @State private var submittedCredentials: (appleID: String, password: String)?
     @State private var githubAccount: GitHubCredentialStore.Credential?
     @State private var isShowingGitHubSignIn = false
@@ -137,10 +139,23 @@ struct AccountsView: View {
             get: { errorMessage != nil },
             set: { if !$0 { errorMessage = nil } }
         )) {
+            if errorIsAnisetteRelated {
+                SwiftUI.Button("Anisette Settings") { errorMessage = nil; isShowingAnisetteSettings = true }
+            }
             SwiftUI.Button("Diagnostics") { errorMessage = nil; isShowingDiagnostics = true }
             SwiftUI.Button("OK", role: .cancel) { errorMessage = nil }
         } message: {
             Text(errorMessage ?? "")
+        }
+        .sheet(isPresented: $isShowingAnisetteSettings) {
+            NavigationStack {
+                AnisetteSettingsView()
+                    .toolbar {
+                        ToolbarItem(placement: .cancellationAction) {
+                            SwiftUI.Button("Done") { isShowingAnisetteSettings = false }
+                        }
+                    }
+            }
         }
         .sheet(isPresented: $isShowingDiagnostics) {
             NavigationStack {
@@ -192,7 +207,8 @@ struct AccountsView: View {
                     password: submittedCredentials.password
                 )
             } catch {
-                errorMessage = error.localizedDescription
+                errorIsAnisetteRelated = AnisetteErrorHint.isAnisetteRelated(error)
+                errorMessage = AnisetteErrorHint.message(for: error)
             }
         }
     }
@@ -382,7 +398,7 @@ struct SigningAccountDetailView: View {
                 }
                 try await accountStore.addAccount(appleID: credentials.appleID, password: credentials.password)
                 await loadInventory()
-            } catch { errorMessage = error.localizedDescription }
+            } catch { errorMessage = AnisetteErrorHint.message(for: error) }
         }
     }
 

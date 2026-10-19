@@ -643,7 +643,7 @@ final class SigningAccountStore {
 
     nonisolated private static func isLiveContainerBundleIdentifier(_ value: String) -> Bool {
         let identifier = value.lowercased()
-        for base in ["com.kdt.livecontainer", "com.kdt.livecontainer2"] {
+        for base in ["com.kdt.livecontainer", "com.kdt.livecontainer2", "com.kdt.livecontainer3"] {
             if identifier == base { return true }
             guard identifier.hasPrefix(base + ".") else { continue }
             let suffix = identifier.dropFirst(base.count + 1)

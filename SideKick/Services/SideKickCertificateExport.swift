@@ -60,7 +60,7 @@ enum SideKickCertificateExport {
         }
 
         let configuredSchemes = try await LiveContainerStore.shared.snapshot().connections.map { $0.scheme.lowercased() }
-        let acceptedSchemes = Set(["livecontainer", "livecontainer2"] + configuredSchemes)
+        let acceptedSchemes = Set(LiveContainerInstallation.knownSchemes + configuredSchemes)
         guard acceptedSchemes.contains(scheme) else { throw CallbackError.untrustedScheme }
         if callbackTemplate.contains(passwordToken),
            components.queryItems?.contains(where: { $0.value?.contains(passwordMarker) == true }) != true {

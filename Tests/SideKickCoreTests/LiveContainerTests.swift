@@ -232,6 +232,65 @@ final class LiveContainerTests: XCTestCase {
         XCTAssertNil(after.connections[0].error)
     }
 
+    func testSeveralInstallationsAndSharedFolderStayIndependent() async throws {
+        let first = try fixture()
+        let second = try fixture()
+        let shared = try fixture()
+        // The same app can exist in each installation and in the shared folder.
+        for directory in [first, second, shared] { _ = try bundle("guest.app", in: directory) }
+        let store = LiveContainerStore(fileURL: first.deletingLastPathComponent().appendingPathComponent("state.json"))
+        let one = try await store.link(directory: first, name: "LiveContainer", scheme: "livecontainer", storageKind: .privateDocuments)
+        let two = try await store.link(directory: second, name: "LiveContainer 2", scheme: "livecontainer2", storageKind: .privateDocuments)
+        let sharedConnection = try await store.link(directory: shared, name: "LiveContainer Shared Apps", scheme: "livecontainer3", storageKind: .sharedDirectory)
+        var state = try await store.snapshot()
+        XCTAssertEqual(state.apps.count, 3)
+        XCTAssertEqual(Set(state.apps.map(\.id)).count, 3)
+        XCTAssertEqual(Set(state.apps.map(\.connectionID)), [one.id, two.id, sharedConnection.id])
+
+        // Losing an app from one installation leaves the others available.
+        try FileManager.default.removeItem(at: second.appendingPathComponent("guest.app"))
+        try await store.rescan(two.id)
+        state = try await store.snapshot()
+        XCTAssertEqual(state.apps.filter(\.isAvailable).map(\.connectionID).sorted { $0.uuidString < $1.uuidString },
+                       [one.id, sharedConnection.id].sorted { $0.uuidString < $1.uuidString })
+
+        // Each app launches through the installation its folder belongs to.
+        let sharedGuest = try XCTUnwrap(state.apps.first { $0.connectionID == sharedConnection.id })
+        let url = try await store.launchURL(for: sharedGuest.id)
+        XCTAssertEqual(url.scheme, "livecontainer3")
+
+        // Forgetting one installation keeps the rest.
+        for id in try await store.beginForget(one.id) { try await store.completeForgetSource(id, connectionID: one.id) }
+        state = try await store.snapshot()
+        XCTAssertEqual(Set(state.connections.map(\.id)), [two.id, sharedConnection.id])
+        XCTAssertFalse(state.apps.contains { $0.connectionID == one.id })
+    }
+
+    func testLinkingTheSameFolderTwiceIsRejected() async throws {
+        let directory = try fixture()
+        _ = try bundle("guest.app", in: directory)
+        let store = LiveContainerStore(fileURL: directory.deletingLastPathComponent().appendingPathComponent("state.json"))
+        let connection = try await store.link(directory: directory, name: "LiveContainer Shared Apps", scheme: "livecontainer", storageKind: .sharedDirectory)
+        do {
+            _ = try await store.link(directory: directory, name: "Again", scheme: "livecontainer2", storageKind: .sharedDirectory)
+            XCTFail("A folder that is already linked must not be added twice")
+        } catch LiveContainerError.alreadyLinked(let name) {
+            XCTAssertEqual(name, "LiveContainer Shared Apps")
+        }
+        // Reconnecting the existing connection is still allowed.
+        _ = try await store.link(directory: directory, name: connection.name, scheme: "livecontainer", storageKind: .sharedDirectory, replacing: connection.id)
+        let state = try await store.snapshot()
+        XCTAssertEqual(state.connections.count, 1)
+        XCTAssertEqual(state.apps.count, 1)
+    }
+
+    func testInstallationNames() {
+        XCTAssertEqual(LiveContainerInstallation.displayName(for: "livecontainer"), "LiveContainer")
+        XCTAssertEqual(LiveContainerInstallation.displayName(for: "LiveContainer3"), "LiveContainer 3")
+        XCTAssertEqual(LiveContainerInstallation.connectionName(scheme: "livecontainer2", storageKind: .privateDocuments), "LiveContainer 2")
+        XCTAssertEqual(LiveContainerInstallation.connectionName(scheme: "livecontainer2", storageKind: .sharedDirectory), "LiveContainer Shared Apps")
+    }
+
 }
 
 private final class FixtureDirectoryAccess: LiveContainerDirectoryAccess, @unchecked Sendable {

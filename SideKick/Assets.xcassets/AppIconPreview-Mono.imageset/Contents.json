@@ -1,0 +1,12 @@
+{
+  "images": [
+    {
+      "filename": "AppIconPreview-Mono.png",
+      "idiom": "universal"
+    }
+  ],
+  "info": {
+    "author": "xcode",
+    "version": 1
+  }
+}

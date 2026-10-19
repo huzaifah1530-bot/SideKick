@@ -5,9 +5,37 @@ enum LiveContainerStorageKind: String, Codable, CaseIterable, Identifiable, Send
     var id: String { rawValue }
     var title: String {
         switch self {
-        case .privateDocuments: "LiveContainer Documents"
-        case .sharedDirectory: "Exposed shared directory"
+        case .privateDocuments: "Private apps"
+        case .sharedDirectory: "Shared apps"
         case .snapshot: "Exported snapshot"
+        }
+    }
+    /// Where this folder lives inside LiveContainer, shown when linking it.
+    var location: String {
+        switch self {
+        case .privateDocuments: "One installation’s Documents/Applications folder"
+        case .sharedDirectory: "The LiveContainer/Applications folder every installation shares"
+        case .snapshot: "A copied Applications folder, read only"
+        }
+    }
+}
+
+/// LiveContainer installs side by side under these schemes (LiveContainer, LiveContainer2…).
+enum LiveContainerInstallation {
+    static let knownSchemes = ["livecontainer", "livecontainer2", "livecontainer3"]
+
+    static func displayName(for scheme: String) -> String {
+        guard let index = knownSchemes.firstIndex(of: scheme.lowercased()) else { return scheme }
+        return index == 0 ? "LiveContainer" : "LiveContainer \(index + 1)"
+    }
+
+    /// Default connection name for a scheme and folder type.
+    static func connectionName(scheme: String, storageKind: LiveContainerStorageKind) -> String {
+        switch storageKind {
+        // Shared apps belong to every installation, so the name doesn't single one out.
+        case .sharedDirectory: "LiveContainer Shared Apps"
+        case .snapshot: "\(displayName(for: scheme)) Snapshot"
+        case .privateDocuments: displayName(for: scheme)
         }
     }
 }
@@ -101,7 +129,7 @@ struct LiveContainerScan: Sendable {
 }
 
 enum LiveContainerError: LocalizedError {
-    case invalidDirectory, accessRevoked, invalidMetadata(String), unsupportedSchema, busy, disconnected, guestMissing, invalidScheme
+    case invalidDirectory, accessRevoked, invalidMetadata(String), unsupportedSchema, busy, disconnected, guestMissing, invalidScheme, alreadyLinked(String)
     var errorDescription: String? {
         switch self {
         case .invalidDirectory: "Choose LiveContainer’s actual Applications folder in Files. Private App Group storage is unavailable unless a file provider exposes it."
@@ -112,6 +140,7 @@ enum LiveContainerError: LocalizedError {
         case .disconnected: "Reconnect this LiveContainer directory first."
         case .guestMissing: "This guest app is no longer available in the linked directory. Rescan or open LiveContainer to check it."
         case .invalidScheme: "Enter a LiveContainer installation’s URL scheme, without ://. Web and SideKick schemes cannot be used."
+        case .alreadyLinked(let name): "This folder is already linked as “\(name)”. Apps in it are listed once, so you don’t need to add it again."
         }
     }
 }

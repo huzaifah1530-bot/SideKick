@@ -192,12 +192,13 @@ index 868efe8..585d482 100644
  				<string>sidestore</string>
  			</array>
  		</dict>
-@@ -78,6 +81,8 @@
+@@ -78,6 +81,9 @@
  	</array>
  	<key>LSApplicationQueriesSchemes</key>
  	<array>
 +		<string>livecontainer</string>
 +		<string>livecontainer2</string>
++		<string>livecontainer3</string>
  		<string>sidestore-com.SideStore.SideStore</string>
  		<string>sidestore-com.SideStore.SideStore.Beta</string>
  		<string>localdevvpn</string>
