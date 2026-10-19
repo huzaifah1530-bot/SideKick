@@ -126,9 +126,9 @@
     "semantic_hash": ""
   },
   "SideKick/Services/GitHubUpdateConfigurationStore.swift": {
-    "mtime": 1792179312.2504556,
-    "seen": 1792246536.6708531,
-    "ast_hash": "84dca5d75a64bb7a6d1fdf4adcca5e09",
+    "mtime": 1792439737.2898402,
+    "seen": 1792439821.510802,
+    "ast_hash": "1fa27d77bb4ba6e631560651ccc5e75c",
     "semantic_hash": ""
   },
   "SideKick/Services/GitHubUpdateDiscovery.swift": {
@@ -300,15 +300,15 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Library/GitHubUpdateDetailView.swift": {
-    "mtime": 1792249205.0339258,
-    "seen": 1792249267.8732133,
-    "ast_hash": "8754c5c55903bdd0c2d9becc421977e1",
+    "mtime": 1792439482.877696,
+    "seen": 1792439821.510925,
+    "ast_hash": "b200b9f59440b6ed1e28a36105fef46b",
     "semantic_hash": ""
   },
   "SideKick/Views/Library/GitHubUpdateSettingsView.swift": {
-    "mtime": 1792325049.9816136,
-    "seen": 1792325086.9606345,
-    "ast_hash": "c0acad390158843294fb111a6ea8a239",
+    "mtime": 1792439485.3774858,
+    "seen": 1792439821.5109282,
+    "ast_hash": "6c9e971172a26388fb66c1ecda14e37b",
     "semantic_hash": ""
   },
   "SideKick/Views/Library/GitHubUpdatesView.swift": {
@@ -324,9 +324,9 @@
     "semantic_hash": ""
   },
   "SideKick/Views/LiveContainer/LiveContainerViews.swift": {
-    "mtime": 1792437953.860492,
-    "seen": 1792438003.1794631,
-    "ast_hash": "2bc0027f36fb587ac93fc3ba35120471",
+    "mtime": 1792439768.318422,
+    "seen": 1792439821.5109427,
+    "ast_hash": "0bb3a8e775782debc323bde43eeb9d8f",
     "semantic_hash": ""
   },
   "SideKick/Views/Root/ContentView.swift": {
@@ -3792,15 +3792,15 @@
     "semantic_hash": ""
   },
   "SideKick/Services/UnsavedSettingsCoordinator.swift": {
-    "mtime": 1792258777.2447345,
-    "seen": 1792260114.9144728,
-    "ast_hash": "9d27a6876f30b28f816cadbac16dc2e7",
+    "mtime": 1792439659.7137966,
+    "seen": 1792439821.5108871,
+    "ast_hash": "7266adc3ede6be829f4e2dab997a0ca9",
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/UnsavedSettingsGuard.swift": {
-    "mtime": 1792259585.2325113,
-    "seen": 1792260114.914528,
-    "ast_hash": "7e2c6f5b1218186cc4b74537dc1716dc",
+    "mtime": 1792439689.4162776,
+    "seen": 1792439821.5109825,
+    "ast_hash": "12846f3a992c5dddc2299e3a3e850ee2",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_unsaved_settings.py": {
@@ -3810,9 +3810,9 @@
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/UnsavedSettingsTests.swift": {
-    "mtime": 1792096792.3987749,
-    "seen": 1792246536.671035,
-    "ast_hash": "734887eedc63d3f883be6014439f3c4a",
+    "mtime": 1792439695.8785713,
+    "seen": 1792439821.5111735,
+    "ast_hash": "021707b2b531d0ef029bb62a976268a9",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_local_connection.py": {
@@ -3864,9 +3864,9 @@
     "semantic_hash": ""
   },
   "SideKick/Views/LiveContainer/LiveContainerImportView.swift": {
-    "mtime": 1792179430.8414366,
-    "seen": 1792246536.6709397,
-    "ast_hash": "f191f90f4efa53256d7275346816873a",
+    "mtime": 1792439760.6607807,
+    "seen": 1792439821.5109403,
+    "ast_hash": "1376ac56f726c870fb8748bc58798349",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_livecontainer_import.py": {
@@ -3876,9 +3876,9 @@
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/LiveContainerImportTests.swift": {
-    "mtime": 1792179357.072235,
-    "seen": 1792246536.6710262,
-    "ast_hash": "8972a96b3988392e210fe74b77964818",
+    "mtime": 1792439780.6748936,
+    "seen": 1792439821.5111551,
+    "ast_hash": "f2179d486c855da687f60ad3fb0293f1",
     "semantic_hash": ""
   },
   "SideKick/Services/AppOffloadService.swift": {
@@ -3948,9 +3948,9 @@
     "semantic_hash": ""
   },
   "SideKick/DesignSystem/SideKickComponents.swift": {
-    "mtime": 1792258411.2759893,
-    "seen": 1792258441.3623993,
-    "ast_hash": "f6b796db9ac6bf243af2cce74bb54459",
+    "mtime": 1792439479.5486393,
+    "seen": 1792439821.5107217,
+    "ast_hash": "dbefb5397cc6d34d92d56ca306b9c9fa",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/Core/DataSources/PrefetchTaskRegistry.swift": {
@@ -4026,9 +4026,9 @@
     "semantic_hash": ""
   },
   "docs/next-update.md": {
-    "mtime": 1792437961.6462526,
-    "seen": 1792438003.1804626,
-    "ast_hash": "3e31767d69c0c7d32beb946a8c4ad569",
+    "mtime": 1792439790.777647,
+    "seen": 1792439821.5124576,
+    "ast_hash": "9caca7333f4bc721ffd55fea2c78f2f7",
     "semantic_hash": ""
   },
   "SideKick/DesignSystem/AppIconController.swift": {

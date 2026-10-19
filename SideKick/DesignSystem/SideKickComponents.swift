@@ -165,6 +165,24 @@ struct BottomActionBar<Content: View>: View {
     }
 }
 
+/// Page actions that sit in the content under the header, like the regular app page,
+/// instead of floating over it. Use inside a List.
+struct InlineActionsSection<Content: View>: View {
+    @ViewBuilder var content: Content
+
+    var body: some View {
+        Section {
+            VStack(spacing: Spacing.s) { content }
+                .frame(maxWidth: .infinity)
+                // Without this, a List row with several buttons fires all of them on one tap.
+                .buttonStyle(.borderless)
+        }
+        .listRowBackground(Color.clear)
+        .listRowInsets(EdgeInsets(top: Spacing.xs, leading: Spacing.m, bottom: Spacing.xs, trailing: Spacing.m))
+        .listRowSeparator(.hidden)
+    }
+}
+
 /// Full-width label used inside primary and secondary buttons.
 struct ActionLabel: View {
     let title: String

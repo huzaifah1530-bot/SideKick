@@ -170,6 +170,86 @@ final class LiveContainerImportTests: XCTestCase {
         XCTAssertNil(try LiveContainerScanner.scan(directory: directory, connectionID: id, folder: "App.app").executableIdentity)
     }
 
+    func testRememberedSourceAttachesAfterTheIPAIsGone() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let file = root.appendingPathComponent("sources.json")
+        let store = GitHubUpdateConfigurationStore(fileURL: file)
+        let connection = connection()
+        var guest = guest(connection)
+        // LiveContainer can report a different build label than the IPA; the repository still applies.
+        guest.build = "13"
+        try await store.rememberLiveContainerHandoff(ipa())
+        var catalogue = LiveContainerState()
+        catalogue.connections = [connection]
+        catalogue.apps = [guest]
+        // The IPA was deleted before the folder was scanned: no imports are passed in.
+        try await GitHubUpdateConfigurationStore(fileURL: file).reconcileLiveContainerImports([], catalogue: catalogue)
+        let saved = try await store.configuration(for: guest.id)
+        XCTAssertEqual(saved?.repositoryURL, "https://github.com/owner/repo")
+        XCTAssertEqual(saved?.tokenID, "named-token")
+        XCTAssertNil(saved?.installedBuild, "Without a binary match the installed build stays unconfirmed")
+        let remaining = try await store.pendingLiveContainerSources()
+        XCTAssertTrue(remaining.isEmpty)
+    }
+
+    func testRememberedSourceRecordsBuildOnlyForTheExactBinary() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = GitHubUpdateConfigurationStore(fileURL: root.appendingPathComponent("sources.json"))
+        let connection = connection()
+        var guest = guest(connection)
+        guest.executableIdentity = "binary-uuid"
+        var app = ipa()
+        app.executableIdentity = "binary-uuid"
+        try await store.rememberLiveContainerHandoff(app)
+        var catalogue = LiveContainerState()
+        catalogue.connections = [connection]
+        catalogue.apps = [guest]
+        try await store.reconcileLiveContainerImports([], catalogue: catalogue)
+        let saved = try await store.configuration(for: guest.id)
+        XCTAssertEqual(saved?.installedBuild?.key, app.githubUpdateKey)
+    }
+
+    func testRememberedSourceNeverGuessesBetweenCopiesButCanBeChosen() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = GitHubUpdateConfigurationStore(fileURL: root.appendingPathComponent("sources.json"))
+        let privateFolder = connection()
+        var shared = connection()
+        shared.storageKind = .sharedDirectory
+        var first = guest(privateFolder)
+        var second = guest(shared)
+        first.build = "1"; second.build = "2"
+        try await store.rememberLiveContainerHandoff(ipa())
+        var catalogue = LiveContainerState()
+        catalogue.connections = [privateFolder, shared]
+        catalogue.apps = [first, second]
+        try await store.reconcileLiveContainerImports([], catalogue: catalogue)
+        let none = try await store.all()
+        XCTAssertTrue(none.isEmpty)
+        // The guest page offers it; choosing applies it to that copy only.
+        let offered = try await store.pendingLiveContainerSource(for: second)
+        XCTAssertNotNil(offered)
+        let attached = try await store.attachPendingLiveContainerSource(to: second)
+        XCTAssertTrue(attached)
+        let saved = try await store.configuration(for: second.id)
+        let other = try await store.configuration(for: first.id)
+        XCTAssertNotNil(saved)
+        XCTAssertNil(other)
+    }
+
+    func testImportsWithoutARepositoryAreNotRemembered() async throws {
+        let root = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString)
+        defer { try? FileManager.default.removeItem(at: root) }
+        let store = GitHubUpdateConfigurationStore(fileURL: root.appendingPathComponent("sources.json"))
+        var app = ipa()
+        app.githubImportConfiguration = nil
+        try await store.rememberLiveContainerHandoff(app)
+        let pending = try await store.pendingLiveContainerSources()
+        XCTAssertTrue(pending.isEmpty)
+    }
+
     private func connection() -> LiveContainerConnection {
         LiveContainerConnection(id: UUID(), name: "LiveContainer", scheme: "livecontainer", storageKind: .privateDocuments, bookmark: Data([1]))
     }

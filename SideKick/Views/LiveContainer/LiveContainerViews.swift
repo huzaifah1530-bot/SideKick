@@ -513,9 +513,20 @@ struct LiveContainerGuestDetailView: View {
     @State private var handoffURL: URL?
     @State private var confirmingIPADelete = false
     @State private var confirmingSkip = false
+    @State private var pendingSource: LiveContainerPendingSource?
 
     private var downloadJob: GitHubUpdateDownloadJob? {
         candidate.flatMap { environment.githubUpdateDownloads.jobs[$0.id] }
+    }
+
+    @MainActor private func attachPendingSource() async {
+        guard !working, let guest else { return }
+        working = true
+        defer { working = false }
+        do {
+            guard try await GitHubUpdateConfigurationStore.shared.attachPendingLiveContainerSource(to: guest) else { return }
+            NotificationCenter.default.post(name: .sideKickGitHubSettingsDidChange, object: nil)
+        } catch { message = error.localizedDescription }
     }
 
     private var canConfirmInstalledBuild: Bool {
@@ -565,6 +576,10 @@ struct LiveContainerGuestDetailView: View {
                 .listRowInsets(EdgeInsets(top: Spacing.xs, leading: Spacing.m, bottom: Spacing.xs, trailing: Spacing.m))
                 .listRowSeparator(.hidden)
 
+                if let candidate {
+                    InlineActionsSection { updateActions(for: candidate) }
+                }
+
                 if let warning = guest.warning ?? connection?.error {
                     Section {
                         Label(warning, systemImage: "exclamationmark.triangle.fill")
@@ -577,14 +592,19 @@ struct LiveContainerGuestDetailView: View {
 
                 if let candidate {
                     updateReviewSection(for: guest, candidate: candidate)
-                    // Inline, like the regular app page, so the controls never cover content.
-                    Section { updateActions(for: candidate) }
-                        .listRowBackground(Color.clear)
-                        .listRowInsets(EdgeInsets(top: Spacing.xs, leading: Spacing.m, bottom: Spacing.xs, trailing: Spacing.m))
-                        .listRowSeparator(.hidden)
                 }
 
                 Section {
+                    if configuration == nil, let pendingSource {
+                        SwiftUI.Button { Task { await attachPendingSource() } } label: {
+                            VStack(alignment: .leading, spacing: 2) {
+                                Label("Track \(pendingSource.repositoryName)", systemImage: "arrow.down.app.fill")
+                                Text("You downloaded this app from that repository.")
+                                    .font(.subheadline).foregroundStyle(.secondary)
+                            }
+                        }
+                        .disabled(working || isBeingForgotten)
+                    }
                     NavigationLink { GitHubUpdateSettingsView(target: guest.updateTarget) } label: {
                         Label("GitHub Updates", systemImage: "arrow.down.app")
                     }
@@ -846,6 +866,11 @@ struct LiveContainerGuestDetailView: View {
                 checkFailed = false
             }
             configuration = currentConfiguration
+            if let guest {
+                pendingSource = try await GitHubUpdateConfigurationStore.shared.pendingLiveContainerSource(for: guest)
+            } else {
+                pendingSource = nil
+            }
             return true
         } catch {
             message = error.localizedDescription

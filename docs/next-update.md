@@ -33,7 +33,9 @@ Built and unit-tested in CI only. None of this has been tried on a device yet.
 
 ### Fix the LiveContainer update controls and confirmation sheet
 
-- Download / Send to LiveContainer / Re-download / Delete IPA now sit inline on the page instead of in a floating bottom bar.
+- Download / Send to LiveContainer / Re-download / Delete IPA now sit in the page, directly under the app header, on every update screen: regular app updates, LiveContainer apps and older versions. They no longer float over the content.
+- Repository downloads sent to LiveContainer now keep their GitHub source. SideKick saves the source when the IPA is sent, separately from the IPA. It attaches it once the app shows up in a linked LiveContainer folder, even if the IPA was deleted in the meantime or the build label differs. When two copies could match, the app's page offers **Track <repository>** instead of guessing.
+- Leaving Update Source with unsaved changes made on a page pushed over it (for example choosing "I've installed this build") now asks to save when you switch or re-tap a tab.
 - The "Did the Update Install?" sheet opens fully expanded.
 
 ### Make LiveContainer app pages match regular app pages

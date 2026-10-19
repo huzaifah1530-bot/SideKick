@@ -114,6 +114,14 @@ struct LiveContainerImportView: View {
             }) else { throw IPAImportError.sourceFileMissing }
             retained.liveContainerHandoffRequested = retained.githubImportConfiguration != nil
             try await environment.ipaImportStore.saveImportedIPA(retained)
+            // Keep the repository even if this IPA is deleted before LiveContainer's folder is scanned.
+            try await GitHubUpdateConfigurationStore.shared.rememberLiveContainerHandoff(retained)
+            // With LiveContainer's group, install straight into LiveContainer 1; otherwise share.
+            if let install = try? LiveContainerSharedAccess.installURL(copying: url), await UIApplication.shared.open(install) {
+                SideKickStorageCleanup.finishTemporaryFile(url)
+                handoffURL = nil
+                return
+            }
             showShare = true
         } catch {
             if let handoffURL { SideKickStorageCleanup.finishTemporaryFile(handoffURL) }

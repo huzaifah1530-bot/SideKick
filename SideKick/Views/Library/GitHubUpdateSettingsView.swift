@@ -620,6 +620,7 @@ private struct GitHubHistoricalVersionView: View {
             } footer: {
                 Text("Installing an older build replaces the app’s version. Older versions may not open data from newer ones.")
             }
+            InlineActionsSection { versionActions }
             if let message {
                 Section {
                     Label(message, systemImage: "exclamationmark.triangle.fill")
@@ -628,9 +629,6 @@ private struct GitHubHistoricalVersionView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .safeAreaInset(edge: .bottom) {
-            BottomActionBar { versionActions }
-        }
         .navigationDestination(isPresented: $isShowingInstall) {
             if let candidate = preparedCandidate, let installedApp {
                 GitHubUpdateDetailView(candidate: candidate, app: installedApp, isVersionSelection: true)

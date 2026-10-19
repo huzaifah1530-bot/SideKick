@@ -4,6 +4,45 @@ extension Notification.Name {
     static let sideKickGitHubSettingsDidChange = Notification.Name("SideKick.GitHubSettingsDidChange")
 }
 
+/// A repository IPA's GitHub source, saved when the IPA is sent to LiveContainer.
+struct LiveContainerPendingSource: Codable, Equatable, Sendable {
+    static let lifetime: TimeInterval = 30 * 86_400
+    let bundleIdentifier: String
+    let version: String
+    let build: String?
+    let executableIdentity: String?
+    let updateKey: String?
+    let configuration: GitHubUpdateConfiguration
+    let createdAt: Date
+
+    init?(_ ipa: ImportedIPA, now: Date = .now) {
+        guard let origin = ipa.githubImportConfiguration, origin.sourceIdentity == ipa.githubSourceIdentity,
+              !origin.repositoryURL.isEmpty else { return nil }
+        bundleIdentifier = ipa.bundleIdentifier
+        version = ipa.version
+        build = ipa.buildVersion
+        executableIdentity = ipa.executableIdentity
+        updateKey = ipa.githubUpdateKey?.isEmpty == false ? ipa.githubUpdateKey : nil
+        configuration = origin
+        createdAt = now
+    }
+
+    var repositoryName: String {
+        URL(string: configuration.repositoryURL)?.path.trimmingCharacters(in: CharacterSet(charactersIn: "/")) ?? configuration.repositoryURL
+    }
+
+    func matchesBuild(of guest: LiveContainerGuest) -> Bool {
+        if let executableIdentity, let observed = guest.executableIdentity { return executableIdentity == observed }
+        return guest.version == version && guest.build == (build ?? guest.build)
+    }
+
+    /// The guest runs exactly the downloaded binary, so its build can be recorded as installed.
+    func verifies(_ guest: LiveContainerGuest) -> Bool {
+        guard let executableIdentity, !executableIdentity.isEmpty else { return false }
+        return executableIdentity == guest.executableIdentity
+    }
+}
+
 actor GitHubUpdateConfigurationStore {
     static let shared = GitHubUpdateConfigurationStore()
     private static let selfUpdateOptOutKey = "sidekick.github-update.self-update-opted-out"
@@ -169,6 +208,86 @@ actor GitHubUpdateConfigurationStore {
         return try attachLiveContainerSource(origin, guest: guest)
     }
 
+    // MARK: Repository imports handed to LiveContainer
+
+    private var pendingSourcesURL: URL {
+        fileURL.deletingLastPathComponent().appendingPathComponent("livecontainer-pending-sources.json")
+    }
+
+    func pendingLiveContainerSources() throws -> [LiveContainerPendingSource] {
+        guard fileManager.fileExists(atPath: pendingSourcesURL.path) else { return [] }
+        let values = try JSONDecoder().decode([LiveContainerPendingSource].self, from: Data(contentsOf: pendingSourcesURL))
+        return values.filter { $0.createdAt > Date.now.addingTimeInterval(-LiveContainerPendingSource.lifetime) }
+    }
+
+    private func persistPendingSources(_ values: [LiveContainerPendingSource]) throws {
+        try fileManager.createDirectory(at: pendingSourcesURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+        try JSONEncoder().encode(values).write(to: pendingSourcesURL, options: .atomic)
+    }
+
+    /// Remembers a repository IPA's GitHub source when it's sent to LiveContainer. This is kept
+    /// apart from the IPA itself, so the source still attaches if the IPA is deleted, or if
+    /// LiveContainer's folder is linked only later.
+    func rememberLiveContainerHandoff(_ ipa: ImportedIPA) throws {
+        guard let source = LiveContainerPendingSource(ipa) else { return }
+        var values = try pendingLiveContainerSources().filter {
+            $0.bundleIdentifier.caseInsensitiveCompare(source.bundleIdentifier) != .orderedSame
+        }
+        values.append(source)
+        try persistPendingSources(values)
+    }
+
+    /// The pending repository source for a guest without its own, if one was sent for this app.
+    func pendingLiveContainerSource(for guest: LiveContainerGuest) throws -> LiveContainerPendingSource? {
+        guard try configuration(for: guest.id) == nil else { return nil }
+        return try pendingLiveContainerSources().first {
+            $0.bundleIdentifier.caseInsensitiveCompare(guest.bundleIdentifier) == .orderedSame
+        }
+    }
+
+    /// Attaches a remembered source to the guest the user picked. Records the installed build only
+    /// when the guest's binary is provably the downloaded one.
+    @discardableResult
+    func attachPendingLiveContainerSource(to guest: LiveContainerGuest) throws -> Bool {
+        guard let pending = try pendingLiveContainerSource(for: guest) else { return false }
+        try apply(pending, to: guest)
+        try persistPendingSources(try pendingLiveContainerSources().filter { $0 != pending })
+        return true
+    }
+
+    private func apply(_ pending: LiveContainerPendingSource, to guest: LiveContainerGuest) throws {
+        if let key = pending.updateKey, pending.verifies(guest) {
+            _ = try recordSuccessfulImport(pending.configuration, key: key, for: guest.updateTarget)
+        } else {
+            _ = try attachLiveContainerSource(pending.configuration, guest: guest)
+        }
+    }
+
+    /// Links remembered sources to the guest LiveContainer created. Never guesses between two
+    /// copies: with several candidates, an exact build match is required, otherwise the guest
+    /// page offers the source to the user.
+    private func reconcilePendingSources(catalogue: LiveContainerState) throws {
+        var pending = try pendingLiveContainerSources()
+        guard !pending.isEmpty else { return }
+        let forgetting = Set(catalogue.pendingForgetGuestIDs.values.flatMap { $0 })
+        let eligible = try catalogue.apps.filter { guest in
+            guard !forgetting.contains(guest.id), guest.isAvailable, guest.warning == nil,
+                  let connection = catalogue.connections.first(where: { $0.id == guest.connectionID }),
+                  connection.isConnected, connection.error == nil, connection.storageKind != .snapshot else { return false }
+            return try configuration(for: guest.id) == nil
+        }
+        var changed = false
+        for source in pending {
+            let sameApp = eligible.filter { $0.bundleIdentifier.caseInsensitiveCompare(source.bundleIdentifier) == .orderedSame }
+            let exact = sameApp.filter { source.matchesBuild(of: $0) }
+            guard let guest = sameApp.count == 1 ? sameApp.first : (exact.count == 1 ? exact.first : nil) else { continue }
+            try apply(source, to: guest)
+            pending.removeAll { $0 == source }
+            changed = true
+        }
+        if changed { try persistPendingSources(pending) }
+    }
+
     private func attachLiveContainerSource(_ origin: GitHubUpdateConfiguration, guest: LiveContainerGuest) throws -> Bool {
         if let existing = try configuration(for: guest.id) { return existing.hasSameSource(as: origin) }
         var source = origin
@@ -215,6 +334,7 @@ actor GitHubUpdateConfigurationStore {
             }
             linked.append(contentsOf: matching)
         }
+        try reconcilePendingSources(catalogue: catalogue)
         return linked
     }
 

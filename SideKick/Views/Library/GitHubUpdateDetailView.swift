@@ -68,11 +68,6 @@ struct GitHubUpdateDetailView: View {
             }
         }
         .listStyle(.insetGrouped)
-        .safeAreaInset(edge: .bottom) {
-            if !showsDetails && !isVersionSelection {
-                BottomActionBar { reviewActions }
-            }
-        }
         .navigationDestination(isPresented: $isShowingInstall) {
             if let queuedIPA = downloadJob?.queuedIPA { installDestination(for: queuedIPA) }
         }
@@ -259,6 +254,8 @@ struct GitHubUpdateDetailView: View {
             }
         }
         .listRowBackground(Color.clear)
+
+        InlineActionsSection { reviewActions }
 
         Section {
             LabeledContent("Installed", value: installedBuildText)
