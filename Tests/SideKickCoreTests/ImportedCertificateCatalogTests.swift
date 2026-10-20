@@ -81,3 +81,58 @@ final class ImportedCertificateCatalogTests: XCTestCase {
         XCTAssertEqual(decoded.sortedCertificates.map(\.name), ["A", "b"])
     }
 }
+
+final class ImportedCertificateProfilePairingTests: XCTestCase {
+    private func record(_ serial: String) -> ImportedCertificateRecord {
+        ImportedCertificateRecord(serialNumber: serial, name: serial, issueDate: Date(), expiryDate: Date().addingTimeInterval(3600), importedAt: Date(), fileName: "\(serial).p12")
+    }
+
+    private func profile(_ name: String) -> ImportedProfileSummary {
+        ImportedProfileSummary(uuid: UUID(), name: name, appIdentifier: "TEAM.*", teamIdentifier: "TEAM", teamName: "Team",
+                               expirationDate: Date().addingTimeInterval(3600), deviceCount: 1, fileName: "\(name).mobileprovision")
+    }
+
+    func testProfileAttachesToCertificateItEmbedsIgnoringSerialFormatting() throws {
+        var catalog = ImportedCertificateCatalog()
+        try catalog.insert(record("0A1B2C"))
+        try catalog.insert(record("FFEE"))
+
+        let result = try catalog.attach(profile("dist"), embeddingCertificateSerials: ["0x00a1b2c"])
+
+        XCTAssertEqual(result.record.serialNumber, "0A1B2C")
+        XCTAssertNil(result.replaced)
+        XCTAssertEqual(catalog.record(serialNumber: "0A1B2C")?.profile?.name, "dist")
+        XCTAssertNil(catalog.record(serialNumber: "FFEE")?.profile)
+    }
+
+    func testReplacingProfileReportsOldOne() throws {
+        var catalog = ImportedCertificateCatalog()
+        try catalog.insert(record("AA"))
+        let first = profile("old")
+        try catalog.attach(first, embeddingCertificateSerials: ["AA"])
+        let result = try catalog.attach(profile("new"), embeddingCertificateSerials: ["AA"])
+        XCTAssertEqual(result.replaced?.uuid, first.uuid)
+        XCTAssertEqual(catalog.profileUUIDs.count, 1)
+    }
+
+    func testProfileWithoutImportedCertificateIsRejected() throws {
+        var catalog = ImportedCertificateCatalog()
+        try catalog.insert(record("AA"))
+        XCTAssertThrowsError(try catalog.attach(profile("x"), embeddingCertificateSerials: ["BB"])) { error in
+            XCTAssertEqual(error as? ImportedCertificateCatalogError, .noMatchingCertificate)
+        }
+    }
+
+    func testDetachAndLegacyDecoding() throws {
+        var catalog = ImportedCertificateCatalog()
+        try catalog.insert(record("AA"))
+        try catalog.attach(profile("p"), embeddingCertificateSerials: ["AA"])
+        catalog.detachProfile(serialNumber: "aa")
+        XCTAssertNil(catalog.record(serialNumber: "AA")?.profile)
+
+        // Catalogs saved by the first build have no profile key.
+        let legacy = #"{"certificates":[{"serialNumber":"AA","name":"n","issueDate":0,"expiryDate":0,"importedAt":0,"fileName":"f"}],"assignments":{}}"#
+        let decoded = try JSONDecoder().decode(ImportedCertificateCatalog.self, from: Data(legacy.utf8))
+        XCTAssertNil(decoded.certificates.first?.profile)
+    }
+}

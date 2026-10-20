@@ -13,6 +13,10 @@ enum ImportedCertificateError: LocalizedError, Equatable {
     case expired(Date)
     case secretUnavailable
     case keychain(OSStatus)
+    case invalidProfile
+    case profileExpired(Date)
+    case profileRequired(certificateName: String)
+    case profileUnavailable
 
     var errorDescription: String? {
         switch self {
@@ -34,6 +38,14 @@ enum ImportedCertificateError: LocalizedError, Equatable {
             return "SideKick couldn’t load this certificate from the Keychain. Delete it and import it again."
         case .keychain(let status):
             return "Keychain error \(status)."
+        case .invalidProfile:
+            return "This isn’t a valid .mobileprovision file."
+        case .profileExpired(let date):
+            return "This provisioning profile expired on \(date.formatted(date: .abbreviated, time: .omitted))."
+        case .profileRequired(let name):
+            return "“\(name)” belongs to a different developer team, so it needs its provisioning profile. In Settings → Advanced → Certificates, import the matching .mobileprovision file."
+        case .profileUnavailable:
+            return "The provisioning profile for this certificate is missing. Import the .mobileprovision file again."
         }
     }
 }
@@ -114,12 +126,91 @@ final class ImportedCertificateStore {
         return record
     }
 
+    /// Imports a .mobileprovision and pairs it with the imported certificate it embeds.
+    @discardableResult
+    func importProfile(from url: URL) throws -> ImportedCertificateRecord {
+        let didAccess = url.startAccessingSecurityScopedResource()
+        defer { if didAccess { url.stopAccessingSecurityScopedResource() } }
+        guard let data = try? Data(contentsOf: url) else { throw ImportedCertificateError.unreadableFile }
+        return try importProfile(data: data, fileName: url.lastPathComponent)
+    }
+
+    @discardableResult
+    func importProfile(data: Data, fileName: String) throws -> ImportedCertificateRecord {
+        guard let profile = try? ALTProvisioningProfile(data: data) else { throw ImportedCertificateError.invalidProfile }
+        guard profile.expirationDate > .now else { throw ImportedCertificateError.profileExpired(profile.expirationDate) }
+
+        let summary = ImportedProfileSummary(
+            uuid: profile.uuid,
+            name: profile.name,
+            appIdentifier: profile.bundleIdentifier,
+            teamIdentifier: profile.teamIdentifier,
+            teamName: profile.teamName,
+            expirationDate: profile.expirationDate,
+            deviceCount: profile.deviceIDs.count,
+            fileName: fileName
+        )
+        var updated = catalog
+        let result = try updated.attach(summary, embeddingCertificateSerials: profile.certificates.map(\.serialNumber))
+        // SideStore's ProfileManager owns profile files so its signing pipeline can use them.
+        _ = try ProfileManager.shared.importProfile(data: data)
+        try ImportedCertificateCatalogFile.save(updated)
+        catalog = updated
+        if let replaced = result.replaced { ProfileManager.shared.deleteProfile(uuid: replaced.uuid) }
+        return result.record
+    }
+
+    func removeProfile(from record: ImportedCertificateRecord) throws {
+        guard let profile = record.profile else { return }
+        var updated = catalog
+        updated.detachProfile(serialNumber: record.serialNumber)
+        try ImportedCertificateCatalogFile.save(updated)
+        catalog = updated
+        ProfileManager.shared.deleteProfile(uuid: profile.uuid)
+    }
+
     func delete(_ record: ImportedCertificateRecord) throws {
+        let record = catalog.record(serialNumber: record.serialNumber) ?? record
         var updated = catalog
         updated.remove(serialNumber: record.serialNumber)
         try ImportedCertificateCatalogFile.save(updated)
         catalog = updated
+        if let profile = record.profile { ProfileManager.shared.deleteProfile(uuid: profile.uuid) }
         try vault.delete(serialNumber: record.serialNumber)
+    }
+
+    /// Points SideStore's per-app profile assignment at the imported profile for this
+    /// account, or clears an assignment SideKick made earlier. SideStore's
+    /// UpdateAppCertificateOperation reads it before profiles are fetched from Apple,
+    /// which is what lets another team's certificate sign. Needs device testing.
+    func prepareProfileAssignment(bundleIdentifiers: [String], accountIdentifier: String, teamIdentifier: String) throws {
+        let owned = catalog.profileUUIDs
+        let clearOwnedAssignments = {
+            for bundleIdentifier in Set(bundleIdentifiers) {
+                if let current = ProfileManager.shared.getAssignedProfile(for: bundleIdentifier), owned.contains(current.uuid) {
+                    ProfileManager.shared.setAssignedProfile(nil, for: bundleIdentifier)
+                }
+            }
+        }
+
+        guard let assigned = try assignedSigningCertificate(accountIdentifier: accountIdentifier, teamIdentifier: teamIdentifier) else {
+            clearOwnedAssignments()
+            return
+        }
+        guard let summary = assigned.record.profile else {
+            clearOwnedAssignments()
+            let isOtherTeam = assigned.certificate.data.map { data in
+                let details = parseCertificate(derData: data)
+                return !details.subject.contains(teamIdentifier) && !details.issuer.contains(teamIdentifier)
+            } ?? true
+            if isOtherTeam { throw ImportedCertificateError.profileRequired(certificateName: assigned.record.name) }
+            return
+        }
+        guard !summary.isExpired() else { throw ImportedCertificateError.profileExpired(summary.expirationDate) }
+        guard ProfileManager.shared.getProfile(uuid: summary.uuid) != nil else { throw ImportedCertificateError.profileUnavailable }
+        for bundleIdentifier in Set(bundleIdentifiers) {
+            ProfileManager.shared.assignProfile(uuid: summary.uuid, for: bundleIdentifier)
+        }
     }
 
     func assign(_ record: ImportedCertificateRecord?, to account: SigningAccountSummary) throws {

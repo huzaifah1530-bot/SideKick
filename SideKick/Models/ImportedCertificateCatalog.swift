@@ -9,6 +9,9 @@ struct ImportedCertificateRecord: Codable, Identifiable, Equatable, Sendable {
     let expiryDate: Date
     let importedAt: Date
     var fileName: String
+    /// Provisioning profile paired with this certificate. Required when the
+    /// certificate belongs to a different developer team than the Apple Account.
+    var profile: ImportedProfileSummary? = nil
 
     var id: String { serialNumber }
 
@@ -17,9 +20,25 @@ struct ImportedCertificateRecord: Codable, Identifiable, Equatable, Sendable {
     }
 }
 
+struct ImportedProfileSummary: Codable, Equatable, Sendable {
+    let uuid: UUID
+    let name: String
+    let appIdentifier: String
+    let teamIdentifier: String
+    let teamName: String
+    let expirationDate: Date
+    let deviceCount: Int
+    let fileName: String
+
+    func isExpired(at date: Date = .now) -> Bool {
+        expirationDate <= date
+    }
+}
+
 enum ImportedCertificateCatalogError: LocalizedError, Equatable {
     case duplicate(name: String)
     case unknownCertificate
+    case noMatchingCertificate
 
     var errorDescription: String? {
         switch self {
@@ -27,6 +46,8 @@ enum ImportedCertificateCatalogError: LocalizedError, Equatable {
             return "“\(name)” is already imported."
         case .unknownCertificate:
             return "This certificate is no longer imported in SideKick."
+        case .noMatchingCertificate:
+            return "This provisioning profile doesn’t include any imported certificate. Import its matching .p12 first."
         }
     }
 }
@@ -58,6 +79,40 @@ struct ImportedCertificateCatalog: Codable, Equatable, Sendable {
             throw ImportedCertificateCatalogError.duplicate(name: existing.name)
         }
         certificates.append(record)
+    }
+
+    /// Pairs a provisioning profile with one of the certificates it embeds.
+    /// Returns the matched certificate and the profile it replaced, if any.
+    @discardableResult
+    mutating func attach(
+        _ profile: ImportedProfileSummary,
+        embeddingCertificateSerials serials: [String]
+    ) throws -> (record: ImportedCertificateRecord, replaced: ImportedProfileSummary?) {
+        let normalized = Set(serials.map(Self.normalizedSerial))
+        guard let index = certificates.firstIndex(where: { normalized.contains(Self.normalizedSerial($0.serialNumber)) }) else {
+            throw ImportedCertificateCatalogError.noMatchingCertificate
+        }
+        let replaced = certificates[index].profile
+        certificates[index].profile = profile
+        return (certificates[index], replaced?.uuid == profile.uuid ? nil : replaced)
+    }
+
+    var profileUUIDs: Set<UUID> {
+        Set(certificates.compactMap { $0.profile?.uuid })
+    }
+
+    /// Serial numbers are compared the way SideStore's ProfileManager does:
+    /// case-insensitive, without a 0x prefix or leading zeros.
+    static func normalizedSerial(_ serial: String) -> String {
+        var value = serial.trimmingCharacters(in: .whitespacesAndNewlines).uppercased()
+        if value.hasPrefix("0X") { value.removeFirst(2) }
+        while value.hasPrefix("0") && value.count > 1 { value.removeFirst() }
+        return value
+    }
+
+    mutating func detachProfile(serialNumber: String) {
+        guard let index = certificates.firstIndex(where: { $0.serialNumber.caseInsensitiveCompare(serialNumber) == .orderedSame }) else { return }
+        certificates[index].profile = nil
     }
 
     /// Removes the certificate and returns the account keys that were using it.

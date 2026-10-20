@@ -160,7 +160,12 @@ final class SideStoreOperationService {
                     accountIdentifier: account.accountIdentifier,
                     teamIdentifier: account.teamIdentifier
                 ) {
-                    try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+                    try ImportedCertificateStore.shared.prepareProfileAssignment(
+                        bundleIdentifiers: [ipa.bundleIdentifier] + [ipa.queuedForInstalledAppID].compactMap { $0 },
+                        accountIdentifier: account.accountIdentifier,
+                        teamIdentifier: account.teamIdentifier
+                    )
+                    return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
                         guard !SideKickStorageCleanup.isRemovingFiles else {
                             continuation.resume(throwing: StorageCleanupError.operationRunning)
                             return
@@ -265,7 +270,12 @@ final class SideStoreOperationService {
         defer { LocalVPNService.shared.release(vpnLease) }
         try await retryAfterClearingRevokedAssignedProfile(for: installedApp.bundleIdentifier) {
             try await accountStore.withAccount(accountIdentifier: accountID, teamIdentifier: teamID) {
-                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                try ImportedCertificateStore.shared.prepareProfileAssignment(
+                    bundleIdentifiers: [installedApp.bundleIdentifier, installedApp.resignedBundleIdentifier],
+                    accountIdentifier: accountID,
+                    teamIdentifier: teamID
+                )
+                return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                     let group = RefreshGroup(dbContext: DatabaseManager.shared.persistentContainer.newBackgroundContext())
                     guard !SideKickStorageCleanup.isRemovingFiles else {
                         continuation.resume(throwing: StorageCleanupError.operationRunning)
@@ -336,7 +346,12 @@ final class SideStoreOperationService {
                 teamIdentifier: selectedAccount.teamIdentifier,
                 forceRefreshCertificate: true
             ) {
-                try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
+                try ImportedCertificateStore.shared.prepareProfileAssignment(
+                    bundleIdentifiers: [installedApp.bundleIdentifier, installedApp.resignedBundleIdentifier],
+                    accountIdentifier: selectedAccount.accountIdentifier,
+                    teamIdentifier: selectedAccount.teamIdentifier
+                )
+                return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                     guard !SideKickStorageCleanup.isRemovingFiles else {
                         continuation.resume(throwing: StorageCleanupError.operationRunning)
                         return

@@ -12,11 +12,16 @@ struct ImportedCertificatesView: View {
     @State private var passwordWasIncorrect = false
     @State private var recordToDelete: ImportedCertificateRecord?
     @State private var errorMessage: String?
+    @State private var importQueue: [URL] = []
+    @State private var importFailures: [String] = []
+    @State private var lastPassword: String?
 
-    private static let certificateTypes: [UTType] = [
+    static let importTypes: [UTType] = [
         UTType(filenameExtension: "p12"),
         UTType(filenameExtension: "pfx"),
-        UTType("com.rsa.pkcs-12")
+        UTType("com.rsa.pkcs-12"),
+        UTType(filenameExtension: "mobileprovision"),
+        UTType("com.apple.mobileprovision")
     ].compactMap { $0 }
 
     var body: some View {
@@ -25,7 +30,7 @@ struct ImportedCertificatesView: View {
                 ContentUnavailableView {
                     Label("No Imported Certificates", systemImage: "checkmark.seal")
                 } description: {
-                    Text("Import a .p12 file that includes its private key to sign apps with your own certificate.")
+                    Text("Select the .p12 file and its matching .mobileprovision file together to sign apps with your own certificate.")
                 } actions: {
                     SwiftUI.Button("Import Certificate") { isImporting = true }
                 }
@@ -42,7 +47,7 @@ struct ImportedCertificatesView: View {
                         }
                     }
                 } footer: {
-                    Text("Choose which Apple Account uses a certificate from that account’s page. Other accounts keep their Apple certificate.")
+                    Text("Import a certificate together with its .mobileprovision file. Choose which Apple Account uses it from that account’s page.")
                 }
             }
         }
@@ -60,20 +65,17 @@ struct ImportedCertificatesView: View {
             store.reload()
             await accountStore.reload()
         }
-        .fileImporter(isPresented: $isImporting, allowedContentTypes: Self.certificateTypes) { result in
+        .fileImporter(isPresented: $isImporting, allowedContentTypes: Self.importTypes, allowsMultipleSelection: true) { result in
             switch result {
-            case .success(let url): importCertificate(from: url, password: nil)
+            case .success(let urls): startImport(urls)
             case .failure(let error): errorMessage = error.localizedDescription
             }
         }
         .alert(passwordWasIncorrect ? "Incorrect Password" : "Certificate Password", isPresented: $isAskingForPassword) {
             SecureField("Password", text: $password)
                 .textContentType(.password)
-            SwiftUI.Button("Cancel", role: .cancel) { resetPasswordPrompt() }
-            SwiftUI.Button("Import") {
-                guard let url = pendingURL else { return }
-                importCertificate(from: url, password: password)
-            }
+            SwiftUI.Button("Skip", role: .cancel) { skipPasswordFile() }
+            SwiftUI.Button("Import") { submitPassword() }
         } message: {
             Text("Enter the password for “\(pendingURL?.lastPathComponent ?? "this file")”.")
         }
@@ -106,24 +108,81 @@ struct ImportedCertificatesView: View {
         return "Accounts using it go back to their Apple certificate the next time they sign."
     }
 
-    private func importCertificate(from url: URL, password: String?) {
+    /// Certificates are imported before profiles so each profile can find its certificate.
+    private func startImport(_ urls: [URL]) {
+        let isProfile = { (url: URL) in url.pathExtension.lowercased() == "mobileprovision" }
+        importQueue = urls.filter { !isProfile($0) } + urls.filter(isProfile)
+        importFailures = []
+        lastPassword = nil
+        continueImport()
+    }
+
+    private func continueImport() {
+        while let url = importQueue.first {
+            if url.pathExtension.lowercased() == "mobileprovision" {
+                do { try store.importProfile(from: url) }
+                catch { importFailures.append("\(url.lastPathComponent): \(error.localizedDescription)") }
+                importQueue.removeFirst()
+                continue
+            }
+            do {
+                do {
+                    try store.importCertificate(from: url, password: nil)
+                } catch ImportedCertificateError.passwordRequired where lastPassword != nil {
+                    // Certificates exported together usually share one password.
+                    try store.importCertificate(from: url, password: lastPassword)
+                }
+                importQueue.removeFirst()
+            } catch ImportedCertificateError.passwordRequired {
+                askForPassword(for: url, incorrect: false)
+                return
+            } catch ImportedCertificateError.incorrectPassword {
+                askForPassword(for: url, incorrect: false)
+                return
+            } catch {
+                importFailures.append("\(url.lastPathComponent): \(error.localizedDescription)")
+                importQueue.removeFirst()
+            }
+        }
+        if !importFailures.isEmpty {
+            errorMessage = importFailures.joined(separator: "\n\n")
+            importFailures = []
+        }
+    }
+
+    private func submitPassword() {
+        guard let url = pendingURL else { return }
         do {
             try store.importCertificate(from: url, password: password)
+            lastPassword = password
+            importQueue.removeFirst()
             resetPasswordPrompt()
-        } catch ImportedCertificateError.passwordRequired {
-            pendingURL = url
-            passwordWasIncorrect = false
-            self.password = ""
-            isAskingForPassword = true
+            continueImport()
         } catch ImportedCertificateError.incorrectPassword {
-            pendingURL = url
-            passwordWasIncorrect = true
-            self.password = ""
-            isAskingForPassword = true
+            askForPassword(for: url, incorrect: true)
         } catch {
+            importFailures.append("\(url.lastPathComponent): \(error.localizedDescription)")
+            importQueue.removeFirst()
             resetPasswordPrompt()
-            errorMessage = error.localizedDescription
+            continueImport()
         }
+    }
+
+    private func skipPasswordFile() {
+        if let url = pendingURL {
+            importFailures.append("\(url.lastPathComponent): Skipped because no password was entered.")
+            importQueue.removeFirst()
+        }
+        resetPasswordPrompt()
+        continueImport()
+    }
+
+    private func askForPassword(for url: URL, incorrect: Bool) {
+        pendingURL = url
+        passwordWasIncorrect = incorrect
+        password = ""
+        // Re-present on the next run loop so a dismissed alert can show again.
+        DispatchQueue.main.async { isAskingForPassword = true }
     }
 
     private func resetPasswordPrompt() {
@@ -165,11 +224,14 @@ private struct ImportedCertificateRow: View {
 
     private var subtitle: String {
         let expiry = "\(record.isExpired() ? "Expired" : "Expires") \(record.expiryDate.formatted(date: .abbreviated, time: .omitted))"
+        var parts = [expiry]
+        if record.profile == nil { parts.append("No profile") }
         switch usageCount {
-        case 0: return expiry
-        case 1: return "\(expiry) · 1 account"
-        default: return "\(expiry) · \(usageCount) accounts"
+        case 0: break
+        case 1: parts.append("1 account")
+        default: parts.append("\(usageCount) accounts")
         }
+        return parts.joined(separator: " · ")
     }
 }
 
@@ -179,7 +241,13 @@ private struct ImportedCertificateDetailView: View {
     @State private var store = ImportedCertificateStore.shared
     @State private var isConfirmingDeletion = false
     @State private var errorMessage: String?
+    @State private var isImportingProfile = false
     @Environment(\.dismiss) private var dismiss
+
+    /// Live copy, so a newly paired profile shows without leaving the page.
+    private var current: ImportedCertificateRecord {
+        store.catalog.record(serialNumber: record.serialNumber) ?? record
+    }
 
     private var usingAccounts: [SigningAccountSummary] {
         let keys = Set(store.assignedAccountKeys(for: record))
@@ -214,6 +282,37 @@ private struct ImportedCertificateDetailView: View {
             }
 
             Section {
+                if let profile = current.profile {
+                    LabeledContent("Name", value: profile.name)
+                    LabeledContent("App ID", value: profile.appIdentifier)
+                    LabeledContent("Team", value: profile.teamName.isEmpty ? profile.teamIdentifier : "\(profile.teamName) (\(profile.teamIdentifier))")
+                    LabeledContent("Devices", value: "\(profile.deviceCount)")
+                    LabeledContent("Expires") {
+                        Text(profile.expirationDate.formatted(date: .abbreviated, time: .omitted))
+                            .foregroundStyle(profile.isExpired() ? .red : .secondary)
+                    }
+                    SwiftUI.Button("Replace Profile") { isImportingProfile = true }
+                    SwiftUI.Button("Remove Profile", role: .destructive) {
+                        do { try store.removeProfile(from: current) } catch { errorMessage = error.localizedDescription }
+                    }
+                } else {
+                    SwiftUI.Button {
+                        isImportingProfile = true
+                    } label: {
+                        Label("Add Provisioning Profile", systemImage: "plus.circle")
+                    }
+                }
+            } header: {
+                Text("Provisioning Profile")
+            } footer: {
+                if current.profile == nil {
+                    Text("Certificates from another developer team need the .mobileprovision file they came with. It must include this iPhone.")
+                } else if !current.profile!.appIdentifier.hasSuffix("*") {
+                    Text("This profile is for one App ID only, so it can only sign that app. A wildcard profile (ending in *) works for any app.")
+                }
+            }
+
+            Section {
                 if usingAccounts.isEmpty {
                     Text("No accounts")
                         .foregroundStyle(.secondary)
@@ -242,6 +341,24 @@ private struct ImportedCertificateDetailView: View {
         .listStyle(.insetGrouped)
         .navigationTitle(record.name)
         .navigationBarTitleDisplayMode(.inline)
+        .fileImporter(
+            isPresented: $isImportingProfile,
+            allowedContentTypes: [UTType(filenameExtension: "mobileprovision"), UTType("com.apple.mobileprovision")].compactMap { $0 }
+        ) { result in
+            switch result {
+            case .success(let url):
+                do {
+                    let paired = try store.importProfile(from: url)
+                    if paired.serialNumber.caseInsensitiveCompare(record.serialNumber) != .orderedSame {
+                        errorMessage = "That profile belongs to “\(paired.name)”, so it was added there instead."
+                    }
+                } catch {
+                    errorMessage = error.localizedDescription
+                }
+            case .failure(let error):
+                errorMessage = error.localizedDescription
+            }
+        }
         .confirmationDialog("Delete “\(record.name)”?", isPresented: $isConfirmingDeletion, titleVisibility: .visible) {
             SwiftUI.Button("Delete Certificate", role: .destructive) {
                 do {
