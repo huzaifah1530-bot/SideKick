@@ -228,9 +228,9 @@
     "semantic_hash": ""
   },
   "SideKick/Services/SideStoreOperationService.swift": {
-    "mtime": 1792511385.1960213,
-    "seen": 1792511462.0346088,
-    "ast_hash": "d98a53f9b97c0e54f0d3c45b19a15e66",
+    "mtime": 1792511894.2845426,
+    "seen": 1792511947.342204,
+    "ast_hash": "0e61478224e03e534dae1072b4fb6ea4",
     "semantic_hash": ""
   },
   "SideKick/Services/SigningAccountStore.swift": {
@@ -4068,9 +4068,9 @@
     "semantic_hash": ""
   },
   "config/anisette-servers.json": {
-    "mtime": 1792501411.5900383,
-    "seen": 1792501424.8512733,
-    "ast_hash": "5e36b53f48114b1c53a9ea09ebcfff76",
+    "mtime": 1792511647.6524734,
+    "seen": 1792511947.3442798,
+    "ast_hash": "d182aafd52dde2399a602d1c736148d4",
     "semantic_hash": ""
   },
   "scripts/generate-tinted-icons.py": {
@@ -4116,9 +4116,9 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/ImportedCertificatesView.swift": {
-    "mtime": 1792511374.5479245,
-    "seen": 1792511462.03471,
-    "ast_hash": "02272ad7cb0c852d5286c4b4da6d39c3",
+    "mtime": 1792511897.2200677,
+    "seen": 1792511947.3423328,
+    "ast_hash": "8a3442fff6abea3391bee74df0eaed34",
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/ImportedCertificateCatalogTests.swift": {

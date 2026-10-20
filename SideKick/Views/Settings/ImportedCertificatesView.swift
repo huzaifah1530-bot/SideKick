@@ -341,8 +341,6 @@ private struct ImportedCertificateDetailView: View {
             } footer: {
                 if current.profile == nil {
                     Text("Certificates from another developer team need the .mobileprovision file they came with. It must include this iPhone.")
-                } else if !current.profile!.appIdentifier.hasSuffix("*") {
-                    Text("This profile is for one App ID only, so it can only sign that app. A wildcard profile (ending in *) works for any app.")
                 }
             }
 
@@ -513,10 +511,6 @@ struct ImportedCertificateResignWarningView<Destination: View>: View {
     let record: ImportedCertificateRecord
     @ViewBuilder let destination: () -> Destination
 
-    private var keepsBundleID: Bool {
-        record.profile?.appIdentifier.hasSuffix("*") ?? false
-    }
-
     var body: some View {
         List {
             Section {
@@ -537,9 +531,7 @@ struct ImportedCertificateResignWarningView<Destination: View>: View {
                 } else {
                     warningRow("The app’s saved logins", "Its Keychain data belongs to your current team, so the app may sign you out.", "key")
                 }
-                if !keepsBundleID {
-                    warningRow("This copy’s data", "The profile covers one app ID only, so \(appName) installs as a separate app with empty data. The current copy stays until you delete it.", "doc.on.doc")
-                }
+
             }
 
             if isSideKick {

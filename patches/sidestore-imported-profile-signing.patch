@@ -7,7 +7,7 @@ index 32455c22..8f8ff8a0 100644
          let finalBundleIdentifier: String
          if let profile = profiles[bundleIdentifier] {
 -            finalBundleIdentifier = profile.bundleIdentifier
-+            finalBundleIdentifier = Self.resolvedBundleIdentifier(for: profile, original: bundleIdentifier)
++            finalBundleIdentifier = Self.resolvedBundleIdentifier(for: profile, original: bundleIdentifier, keepOriginal: self.context.overrideSigningCertificate != nil)
          } else {
              finalBundleIdentifier = bundleIdentifier
          }
@@ -17,7 +17,7 @@ index 32455c22..8f8ff8a0 100644
          
 -        let newBundleID = appexBundleIds[appBundle.bundleIdentifier] ?? appexBundleIds[identifier] ?? profile.bundleIdentifier
 +        let newBundleID = appexBundleIds[appBundle.bundleIdentifier] ?? appexBundleIds[identifier]
-+            ?? Self.resolvedBundleIdentifier(for: profile, original: identifier)
++            ?? Self.resolvedBundleIdentifier(for: profile, original: identifier, keepOriginal: self.context.overrideSigningCertificate != nil)
          infoDictionary[kCFBundleIdentifierKey as String] = newBundleID
  
          // Fix-up BGTaskScheduler identifiers so they stay under the new bundle ID.
@@ -73,11 +73,11 @@ index 32455c22..8f8ff8a0 100644
          return fileURL
      }
      
-+    /// Wildcard profiles (application-identifier `TEAMID.*` or `TEAMID.com.example.*`) authorize
-+    /// any matching bundle ID, so the app keeps its own instead of a literal `*`. Needs device testing.
-+    static func resolvedBundleIdentifier(for profile: ALTProvisioningProfile, original: String) -> String {
++    /// Imported certificates keep each app's own bundle ID, like other certificate signers; iOS accepts it. Wildcard profiles
++    /// (`TEAMID.*`) authorize any matching ID, so never use a literal `*`. Needs device testing.
++    static func resolvedBundleIdentifier(for profile: ALTProvisioningProfile, original: String, keepOriginal: Bool = false) -> String {
 +        let appID = profile.bundleIdentifier
-+        guard appID.hasSuffix("*") else { return appID }
++        guard !keepOriginal, appID.hasSuffix("*") else { return keepOriginal ? original : appID }
 +        return original.hasPrefix(String(appID.dropLast())) ? original : appID
 +    }
 +

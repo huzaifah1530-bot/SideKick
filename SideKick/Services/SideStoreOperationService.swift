@@ -158,9 +158,6 @@ final class SideStoreOperationService {
         let installedID: String
         do {
             let useImportedCertificate = try await importedCertificateUse(forUpdateOf: ipa.queuedForInstalledAppID, using: account)
-            if useImportedCertificate {
-                try await ensureImportedProfileIsFree(for: ipa, using: account)
-            }
             installedID = try await retryAfterClearingRevokedAssignedProfile(
                 for: ipa.bundleIdentifier,
                 recoveryHandler: recoveryHandler
@@ -431,28 +428,6 @@ final class SideStoreOperationService {
             throw ImportedCertificateError.updateCertificateMismatch(certificateName: signingRecord.name)
         }
         return true
-    }
-
-    /// An imported profile for one specific App ID can sign only one app: every app signed
-    /// with it gets that bundle ID, so a second app would silently replace the first.
-    private func ensureImportedProfileIsFree(for ipa: ImportedIPA, using account: SigningAccountSummary) async throws {
-        guard let record = ImportedCertificateStore.shared.assignedRecord(
-            accountIdentifier: account.accountIdentifier,
-            teamIdentifier: account.teamIdentifier
-        ), let profile = record.profile, !profile.appIdentifier.hasSuffix("*") else { return }
-
-        let incoming = Set([ipa.bundleIdentifier] + [ipa.queuedForInstalledAppID].compactMap { $0 })
-        let context = DatabaseManager.shared.viewContext
-        let occupant: String? = await context.perform {
-            let apps = (try? context.fetch(InstalledApp.fetchRequest())) ?? []
-            return apps.first {
-                $0.resignedBundleIdentifier == profile.appIdentifier &&
-                    !incoming.contains($0.bundleIdentifier) && !incoming.contains($0.resignedBundleIdentifier)
-            }?.name
-        }
-        if let occupant {
-            throw ImportedCertificateError.profileInUse(appName: occupant, appIdentifier: profile.appIdentifier)
-        }
     }
 
     private func retryAfterClearingRevokedAssignedProfile<T>(
