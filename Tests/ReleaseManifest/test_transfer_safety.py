@@ -22,7 +22,7 @@ struct Catalog {
     func record(serialNumber: String) -> ImportedCertificateRecord? { records.first { $0.serialNumber == serialNumber } }
     mutating func remove(serialNumber: String) { records.removeAll { $0.serialNumber == serialNumber } }
 }
-enum SigningAccountError: Error { case engineBusy, keychain }
+enum ImportedCertificateError: Error { case engineBusy, keychain }
 enum SigningAccountOperationCoordinator {
     static var busy = false
     static func acquire() -> Bool { if busy { return false }; busy = true; return true }
@@ -36,7 +36,7 @@ class CertificateManager {
     var activeCertificate: ImportedCertificateRecord?
     var fail = false
     func clearActiveCertificateThrowing() throws {
-        if fail { throw SigningAccountError.keychain }
+        if fail { throw ImportedCertificateError.keychain }
         activeCertificate = nil
     }
 }
@@ -63,12 +63,12 @@ METHOD
         store.catalog = Catalog()
         manager.activeCertificate = record
         SigningAccountOperationCoordinator.busy = true
-        do { try store.delete(record); fatalError("Busy signing must block deletion") } catch SigningAccountError.engineBusy {}
+        do { try store.delete(record); fatalError("Busy signing must block deletion") } catch ImportedCertificateError.engineBusy {}
         precondition(!store.catalog.records.isEmpty && manager.activeCertificate != nil)
         SigningAccountOperationCoordinator.busy = false
         manager.fail = true
         let before = ImportedCertificateCatalogFile.saved
-        do { try store.delete(record); fatalError("Keychain failure must abort deletion") } catch SigningAccountError.keychain {}
+        do { try store.delete(record); fatalError("Keychain failure must abort deletion") } catch ImportedCertificateError.keychain {}
         precondition(!store.catalog.records.isEmpty && ImportedCertificateCatalogFile.saved == before)
         precondition(!SigningAccountOperationCoordinator.busy)
         print("Imported certificate deletion safety passed")
