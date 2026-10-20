@@ -97,20 +97,63 @@ final class SigningAccountStore {
     }
 
     private func prepareAnisetteDefaults() async {
+        guard await hasNoAnisetteChoice() else { return }
+        // Prefer the newest recommended server; the built-in default covers offline first runs.
+        if let selection = try? await RemoteAnisetteConfigurationClient().fetchRecommended() {
+            await applyAnisetteDefault(name: selection.server.name, server: selection.serverURL.absoluteString,
+                clientInfo: selection.server.clientInfo, userAgent: selection.server.userAgent)
+            AnisetteRemoteRecord(serverID: selection.server.id, appliedAt: .now).save()
+            return
+        }
+        await applyAnisetteDefault(name: "Windows Anisette", server: AnisetteConfiguration.windowsServer,
+            clientInfo: AnisetteConfiguration.windowsClientInfo, userAgent: AnisetteConfiguration.windowsUserAgent)
+    }
+
+    /// Applies the newest recommended Anisette server the first time SideKick opens, before
+    /// the user has chosen one. Later launches and existing choices are left alone.
+    func applyNewestAnisetteOnFirstLaunch() async {
         let defaults = UserDefaults.standard
-        let persisted = defaults.persistentDomain(forName: Bundle.main.bundleIdentifier ?? "") ?? [:]
+        let attemptedKey = "sidekick.anisette.first-launch-newest.v1"
+        guard !defaults.bool(forKey: attemptedKey) else { return }
+        guard await hasNoAnisetteChoice() else {
+            defaults.set(true, forKey: attemptedKey)
+            return
+        }
+        // Offline: try again next launch. Signing in before then still tries the newest server.
+        guard let selection = try? await RemoteAnisetteConfigurationClient().fetchRecommended(includeHistory: false) else { return }
+        guard SigningAccountOperationCoordinator.acquire() else { return }
+        defer { SigningAccountOperationCoordinator.release() }
+        guard !AppManager.shared.isActivelyManagingAnyApp, !AppOffloadService.isRunning,
+              !SideKickStorageCleanup.hasActiveOperations else { return }
+        // The network request suspends: another store may have saved a user
+        // choice or completed sign-in while it was in flight. Check under the gate.
+        guard await hasNoAnisetteChoice() else {
+            defaults.set(true, forKey: attemptedKey)
+            return
+        }
+        await applyAnisetteDefault(name: selection.server.name, server: selection.serverURL.absoluteString,
+            clientInfo: selection.server.clientInfo, userAgent: selection.server.userAgent)
+        AnisetteRemoteRecord(serverID: selection.server.id, appliedAt: .now).save()
+        defaults.set(true, forKey: attemptedKey)
+        debugLog("[SideKick] Applied newest Anisette server on first launch: \(selection.server.name)")
+    }
+
+    private func hasNoAnisetteChoice() async -> Bool {
+        let persisted = UserDefaults.standard.persistentDomain(forName: Bundle.main.bundleIdentifier ?? "") ?? [:]
         let servers = await AnisetteServersManager.shared.loadLocalServers()
-        guard AnisetteConfiguration.shouldOfferWindowsDefault(persisted: persisted,
-            hasConfigFile: AnisetteConfigManager.shared.hasConfigFile(), hasSavedServers: !servers.isEmpty) else { return }
-        await AnisetteServersManager.shared.saveLocalServers([
-            AnisetteServerItem(name: "Windows Anisette", address: AnisetteConfiguration.windowsServer)
-        ])
-        defaults.menuAnisetteURL = AnisetteConfiguration.windowsServer
+        return AnisetteConfiguration.shouldOfferWindowsDefault(persisted: persisted,
+            hasConfigFile: AnisetteConfigManager.shared.hasConfigFile(), hasSavedServers: !servers.isEmpty)
+    }
+
+    private func applyAnisetteDefault(name: String, server: String, clientInfo: String, userAgent: String) async {
+        let defaults = UserDefaults.standard
+        await AnisetteServersManager.shared.saveLocalServers([AnisetteServerItem(name: name, address: server)])
+        defaults.menuAnisetteURL = server
         defaults.useOnDeviceAnisette = false
         defaults.disableAnisetteRotation = true
         var config = await AnisetteConfigManager.shared.loadConfig()
-        config.clientInfo = AnisetteConfiguration.windowsClientInfo
-        config.userAgent = AnisetteConfiguration.windowsUserAgent
+        config.clientInfo = clientInfo
+        config.userAgent = userAgent
         await AnisetteConfigManager.shared.saveConfig(config)
         AnisetteConfigManager.shared.anisetteAdiBlob = nil
         AnisetteConfigManager.shared.anisetteIdentifier = nil
@@ -291,8 +334,14 @@ final class SigningAccountStore {
                 teamIdentifier: result.team.identifier
             )
             let existingCredentials = try? vault.load(key: sessionKey)
-            let certificateData = existingCredentials?.certificateData
-            let certificatePassword = existingCredentials?.certificatePassword
+            var certificateData = existingCredentials?.certificateData
+            var certificatePassword = existingCredentials?.certificatePassword
+            // A certificate moved from another SideKick copy lets this copy reuse it, instead of
+            // asking Apple for a new one that could revoke the original.
+            if certificateData == nil, let transferred = TransferredCertificateVault().take(key: sessionKey) {
+                certificateData = transferred.p12Data
+                certificatePassword = transferred.password
+            }
             if let certificateData {
                 let certificate = try CertificateManager.parse(certificateData, password: certificatePassword)
                 try CertificateManager.shared.setActiveCertificate(certificate)
@@ -406,6 +455,7 @@ final class SigningAccountStore {
                 teamIdentifier: teamIdentifier
             ))
         }
+        ImportedCertificateStore.shared.removeAssignments(forAccountIdentifier: account.accountIdentifier)
         await reload()
         NotificationCenter.default.post(name: .sideKickSigningAccountsDidChange, object: nil)
     }
@@ -415,6 +465,7 @@ final class SigningAccountStore {
         teamIdentifier: String,
         prepareForSigning: Bool = true,
         forceRefreshCertificate: Bool = false,
+        useImportedCertificate: Bool = true,
         operation: () async throws -> T
     ) async throws -> T {
         guard !isWorking, SigningAccountOperationCoordinator.acquire() else { throw SigningAccountError.engineBusy }
@@ -456,7 +507,11 @@ final class SigningAccountStore {
                 try await restoreAccountSession(target, activateTeam: prepareForSigning)
             }
             if prepareForSigning {
-                try await ensureSigningReady(for: target, forceRefreshCertificate: forceRefreshCertificate)
+                try await ensureSigningReady(
+                    for: target,
+                    forceRefreshCertificate: forceRefreshCertificate,
+                    useImportedCertificate: useImportedCertificate
+                )
             }
             operationStarted = true
             let result = try await operation()
@@ -621,15 +676,27 @@ final class SigningAccountStore {
             return (account.identifier, team.identifier)
         }
 
-        let credentials = try vault.load(key: SigningSessionVault.key(
+        let certificateData: Data
+        let password: String
+        if let imported = try ImportedCertificateStore.shared.assignedSigningCertificate(
             accountIdentifier: target.0,
             teamIdentifier: target.1
-        ))
-        guard let certificateData = credentials.certificateData else {
-            throw SigningAccountError.certificateUnavailable
-        }
-        guard let password = credentials.certificatePassword else {
-            throw SigningAccountError.certificateUnavailable
+        ) {
+            // LiveContainer needs the identity that actually signed it, so share the imported one.
+            let exportPassword = imported.record.serialNumber
+            certificateData = try CertificateManager.convert(imported.certificate, password: exportPassword)
+            password = exportPassword
+        } else {
+            let credentials = try vault.load(key: SigningSessionVault.key(
+                accountIdentifier: target.0,
+                teamIdentifier: target.1
+            ))
+            guard let savedData = credentials.certificateData,
+                  let savedPassword = credentials.certificatePassword else {
+                throw SigningAccountError.certificateUnavailable
+            }
+            certificateData = savedData
+            password = savedPassword
         }
         _ = try CertificateManager.parse(certificateData, password: password)
         let base64Certificate = certificateData.base64EncodedString()
@@ -654,23 +721,41 @@ final class SigningAccountStore {
 
     /// Completes the device registration and certificate setup deferred by the
     /// account sign-in screen before a real signing operation begins.
-    private func ensureSigningReady(for target: SigningAccountSummary, forceRefreshCertificate: Bool = false) async throws {
+    private func ensureSigningReady(
+        for target: SigningAccountSummary,
+        forceRefreshCertificate: Bool = false,
+        useImportedCertificate: Bool = true
+    ) async throws {
         try await SideKickDiagnostics.perform(DiagnosticsStore.operationID == nil ? .restoreAccount : DiagnosticsStore.operation, stage: .signing) {
-            try await prepareSigning(for: target, forceRefreshCertificate: forceRefreshCertificate)
+            try await prepareSigning(
+                for: target,
+                forceRefreshCertificate: forceRefreshCertificate,
+                useImportedCertificate: useImportedCertificate
+            )
         }
     }
 
-    private func prepareSigning(for target: SigningAccountSummary, forceRefreshCertificate: Bool) async throws {
+    private func prepareSigning(
+        for target: SigningAccountSummary,
+        forceRefreshCertificate: Bool,
+        useImportedCertificate: Bool
+    ) async throws {
         let key = SigningSessionVault.key(
             accountIdentifier: target.accountIdentifier,
             teamIdentifier: target.teamIdentifier
         )
         let savedCredentials = try vault.load(key: key)
+        let importedCertificate = try applyAssignedCertificate(
+            for: target,
+            savedCredentials: savedCredentials,
+            useImportedCertificate: useImportedCertificate
+        )
 
         if target.rawTeamType != nil,
            let activeCertificate = CertificateManager.shared.activeCertificate,
            UserDefaults.standard.isDeviceRegistered {
-            guard forceRefreshCertificate else { return }
+            // Imported certificates can't be renewed through Apple, so they are used as-is.
+            guard forceRefreshCertificate, importedCertificate == nil else { return }
             let team = try await developerTeam(for: target)
             let portalCertificates = try await DeveloperPortalProxy.shared.fetchCertificates(team: team)
             if portalCertificates.contains(where: { $0.serialNumber.caseInsensitiveCompare(activeCertificate.serialNumber) == .orderedSame }) {
@@ -699,7 +784,8 @@ final class SigningAccountStore {
             presentingViewController: presenter,
             signInHandler: handler,
             skipDeviceRegistration: false,
-            skipCertificateProvisioning: false,
+            // With an imported certificate, register the device only; never ask Apple for a new certificate.
+            skipCertificateProvisioning: importedCertificate != nil,
             skipResign: true,
             skipHowTos: true
         )
@@ -712,7 +798,19 @@ final class SigningAccountStore {
         }
 
         let accountIdentifier = result.team.account?.identifier ?? target.accountIdentifier
-        let certificate = CertificateManager.shared.activeCertificate
+        // The vault keeps the Apple-issued certificate; an imported one stays in ImportedCertificateStore.
+        let certificateData: Data?
+        let certificatePassword: String?
+        if let importedCertificate {
+            if CertificateManager.shared.activeCertificate?.serialNumber.caseInsensitiveCompare(importedCertificate.serialNumber) != .orderedSame {
+                try CertificateManager.shared.setActiveCertificate(importedCertificate)
+            }
+            certificateData = savedCredentials.certificateData
+            certificatePassword = savedCredentials.certificatePassword
+        } else {
+            certificateData = CertificateManager.shared.activeCertificate?.p12Data
+            certificatePassword = CertificateManager.shared.activeCertificate?.password
+        }
         let credentials = SigningSessionCredentials(
             appleID: appleID,
             password: password,
@@ -720,14 +818,59 @@ final class SigningAccountStore {
             xcodeToken: xcodeToken,
             accountIdentifier: accountIdentifier,
             teamIdentifier: result.team.identifier,
-            certificateData: certificate?.p12Data,
-            certificatePassword: certificate?.password
+            certificateData: certificateData,
+            certificatePassword: certificatePassword
         )
         try vault.save(credentials, key: SigningSessionVault.key(
             accountIdentifier: accountIdentifier,
             teamIdentifier: result.team.identifier
         ))
         await reload()
+    }
+
+    /// Makes the account's assigned imported certificate active, or puts its Apple
+    /// certificate back if an imported one was unassigned. Needs device testing.
+    private func applyAssignedCertificate(
+        for target: SigningAccountSummary,
+        savedCredentials: SigningSessionCredentials,
+        useImportedCertificate: Bool
+    ) throws -> ALTCertificate? {
+        let store = ImportedCertificateStore.shared
+        let activeSerial = CertificateManager.shared.activeCertificate?.serialNumber
+        if useImportedCertificate, let assigned = try store.assignedSigningCertificate(
+            accountIdentifier: target.accountIdentifier,
+            teamIdentifier: target.teamIdentifier
+        ) {
+            if activeSerial?.caseInsensitiveCompare(assigned.record.serialNumber) != .orderedSame {
+                try CertificateManager.shared.setActiveCertificate(assigned.certificate)
+            }
+            return assigned.certificate
+        }
+
+        let activeIsImported = activeSerial.flatMap { store.catalog.record(serialNumber: $0) } != nil
+        if activeSerial == nil || activeIsImported {
+            if let data = savedCredentials.certificateData {
+                try CertificateManager.shared.setActiveCertificate(
+                    CertificateManager.parse(data, password: savedCredentials.certificatePassword)
+                )
+            } else {
+                CertificateManager.shared.clearActiveCertificate()
+            }
+        }
+        return nil
+    }
+
+    /// Apple-issued certificate to persist for an account, ignoring an active imported one.
+    private func appleCertificatePayload(for account: SigningAccountSummary) -> (data: Data?, password: String?) {
+        let active = CertificateManager.shared.activeCertificate
+        if let active, ImportedCertificateStore.shared.catalog.record(serialNumber: active.serialNumber) != nil {
+            let saved = try? vault.load(key: SigningSessionVault.key(
+                accountIdentifier: account.accountIdentifier,
+                teamIdentifier: account.teamIdentifier
+            ))
+            return (saved?.certificateData, saved?.certificatePassword)
+        }
+        return (active?.p12Data, active?.password)
     }
 
     private func restoreAccountSession(_ account: SigningAccountSummary, activateTeam: Bool = true) async throws {
@@ -789,7 +932,12 @@ final class SigningAccountStore {
         }
 
         if activateTeam {
-            if let signingCertificate {
+            if let imported = try? ImportedCertificateStore.shared.assignedSigningCertificate(
+                accountIdentifier: credentials.accountIdentifier,
+                teamIdentifier: credentials.teamIdentifier
+            ) {
+                try CertificateManager.shared.setActiveCertificate(imported.certificate)
+            } else if let signingCertificate {
                 try CertificateManager.shared.setActiveCertificate(signingCertificate)
             } else {
                 CertificateManager.shared.clearActiveCertificate()
@@ -823,7 +971,7 @@ final class SigningAccountStore {
               let xcodeToken = AuthManager.shared.xcodeToken else {
             throw SigningAccountError.sessionNotAvailable
         }
-        let certificate = CertificateManager.shared.activeCertificate
+        let certificate = appleCertificatePayload(for: account)
         return SigningSessionCredentials(
             appleID: appleID,
             password: password,
@@ -831,8 +979,8 @@ final class SigningAccountStore {
             xcodeToken: xcodeToken,
             accountIdentifier: account.accountIdentifier,
             teamIdentifier: account.teamIdentifier,
-            certificateData: certificate?.p12Data,
-            certificatePassword: certificate?.password
+            certificateData: certificate.data,
+            certificatePassword: certificate.password
         )
     }
 }
@@ -910,6 +1058,76 @@ private struct SigningSessionCredentials: Codable {
     let teamIdentifier: String
     let certificateData: Data?
     let certificatePassword: String?
+}
+
+// MARK: - Moving certificates between SideKick copies
+
+struct TransferredAppleCertificate: Codable, Sendable {
+    let accountIdentifier: String
+    let teamIdentifier: String
+    let email: String
+    /// PKCS#12 encrypted with the password the user chose for the transfer.
+    let p12Data: Data
+}
+
+extension SigningAccountStore {
+    /// Apple-issued certificates of saved accounts, re-encrypted with `password` for a transfer folder.
+    func transferableCertificates(password: String) throws -> [TransferredAppleCertificate] {
+        try vault.all().compactMap { credentials in
+            guard let data = credentials.certificateData else { return nil }
+            let certificate = try CertificateManager.parse(data, password: credentials.certificatePassword)
+            return TransferredAppleCertificate(
+                accountIdentifier: credentials.accountIdentifier,
+                teamIdentifier: credentials.teamIdentifier,
+                email: credentials.appleID,
+                p12Data: try CertificateManager.convert(certificate, password: password)
+            )
+        }
+    }
+
+    /// Keeps transferred certificates until their account signs in here. Throws if the
+    /// password is wrong, so nothing is stored that can't be opened later.
+    static func storeTransferredCertificates(_ items: [TransferredAppleCertificate], password: String) throws -> Int {
+        let vault = TransferredCertificateVault()
+        for item in items {
+            _ = try CertificateManager.parse(item.p12Data, password: password)
+            try vault.save(.init(p12Data: item.p12Data, password: password),
+                key: SigningSessionVault.key(accountIdentifier: item.accountIdentifier, teamIdentifier: item.teamIdentifier))
+        }
+        return items.count
+    }
+}
+
+private struct TransferredCertificateVault {
+    struct Item: Codable { let p12Data: Data; let password: String }
+    private let service = "com.sidekick.transferred-certificates"
+
+    func save(_ item: Item, key: String) throws {
+        let data = try JSONEncoder().encode(item)
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service, kSecAttrAccount as String: key]
+        SecItemDelete(query as CFDictionary)
+        var add = query
+        add[kSecValueData as String] = data
+        add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        let status = SecItemAdd(add as CFDictionary, nil)
+        guard status == errSecSuccess else { throw SigningAccountError.keychain(status) }
+    }
+
+    /// Returns the item once and removes it.
+    func take(key: String) -> Item? {
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service, kSecAttrAccount as String: key]
+        var lookup = query
+        lookup[kSecReturnData as String] = true
+        lookup[kSecMatchLimit as String] = kSecMatchLimitOne
+        var result: CFTypeRef?
+        guard SecItemCopyMatching(lookup as CFDictionary, &result) == errSecSuccess,
+              let data = result as? Data,
+              let item = try? JSONDecoder().decode(Item.self, from: data) else { return nil }
+        SecItemDelete(query as CFDictionary)
+        return item
+    }
 }
 
 private struct SigningSessionVault {

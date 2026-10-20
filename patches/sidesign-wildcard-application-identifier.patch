@@ -1,0 +1,17 @@
+diff --git a/Sources/CodeSigning/CodeSignerAPI.swift b/Sources/CodeSigning/CodeSignerAPI.swift
+index 79a716a..5e97c5d 100644
+--- a/Sources/CodeSigning/CodeSignerAPI.swift
++++ b/Sources/CodeSigning/CodeSignerAPI.swift
+@@ -134,6 +134,12 @@ public struct AppBundleSigner: CodeSignerAPI, Sendable {
+                 }
+             }
+ 
++            // A wildcard profile authorizes "TEAMID.*"; the signature must name the concrete app.
++            // Needs device testing.
++            if let appID = filteredEntitlements["application-identifier"] as? String, appID.hasSuffix("*") {
++                filteredEntitlements["application-identifier"] = matchedProfile.teamIdentifier + "." + app.bundleIdentifier
++            }
++
+             verboseLog("[SideSign] Filtered entitlements for signing: \(filteredEntitlements)")
+ 
+             let plist = try PropertyListSerialization.data(

@@ -21,7 +21,7 @@ Diagnostics log local publication counts and each GitHub result state. These pro
 
 ## Compatibility
 
-The standalone project, integration patch and optional VPN-extension target deploy to iOS 18. Xcode 26 remains the build SDK because the source contains availability-gated iOS 26 APIs. Native controls use the installed system's appearance. The custom glass helper falls back to regular material, and the hidden navigation-indicator modifier falls back to the standard disclosure indicator on iOS 18.
+The standalone project and integration patch deploy to iOS 18. Xcode 26 remains the build SDK because the source contains availability-gated iOS 26 APIs. Native controls use the installed system's appearance. The custom glass helper falls back to regular material, and the hidden navigation-indicator modifier falls back to the standard disclosure indicator on iOS 18.
 
 ## Validation status
 

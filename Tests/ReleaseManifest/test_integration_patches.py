@@ -36,7 +36,6 @@ class IntegrationPatchTests(unittest.TestCase):
                 "AltWidget/Info.plist", "SideBackup/Info.plist",
                 "AltStore/Resources/ReleaseEntitlements.plist",
                 "AltStore/AltStoreFree.entitlements",
-                "SideStore/Core/Operations/PipelineOperations/RemoveAppExtensionsOperation.swift",
                 "SideStore/MaintenanceManager.swift", "SideStore/Utils/iostreams/ConsoleLog.swift",
                 "SideStore/Utils/common/FileOutputStream.swift",
                 "SideStore/Core/Anisette/AnisetteProvider.swift",
@@ -63,7 +62,7 @@ class IntegrationPatchTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, f"{patch}: {result.stderr}")
 
             import sys
-            result = subprocess.run([sys.executable, str(ROOT / "scripts/embed-local-vpn.py"), str(checkout)], capture_output=True, text=True)
+            result = subprocess.run([sys.executable, str(ROOT / "scripts/integrate-sidekick.py"), str(checkout)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             patch_path = checkout / "audit.patch"
             patch_path.write_bytes(audit_patch.encode("utf-8"))
@@ -102,9 +101,12 @@ class IntegrationPatchTests(unittest.TestCase):
             # Bundle(url:) is cached per path; restore re-stages the original app at the helper's App.app.
             self.assertNotIn('executableName == "SideBackup"', signing)
             self.assertIn(').contains(expected)', signing)
-            self.assertIn('if resignedAppBundle.isAltStoreApp {', signing)
+            # Apple-account re-signs must keep the backup group; imported certificates are
+            # exempt because SideKick warns before that re-sign.
+            guard = 'if resignedAppBundle.isAltStoreApp, self.context.overrideSigningCertificate == nil {'
+            self.assertIn(guard, signing)
             self.assertIn('existingGroup.map({ groups.contains($0) }) ?? true', signing)
-            self.assertLess(signing.index('if resignedAppBundle.isAltStoreApp {'), signing.index('return resignedAppBundle'))
+            self.assertLess(signing.index(guard), signing.index('return resignedAppBundle'))
             self.assertIn('com.apple.security.application-groups', (checkout / 'AltStore/AltStoreFree.entitlements').read_text())
             helper = (checkout / "SideBackup/ContentView.swift").read_text()
             self.assertNotIn('Color("Background")', helper)
@@ -156,7 +158,7 @@ precondition(!"other.com.sidekick.app.TEAM".isAltStoreAppID)
                 subprocess.run([compiler, str(source), "-o", str(binary)], check=True)
                 subprocess.run([str(binary)], check=True)
                 # Run the actual pre-install self-update guard against signed grants.
-                guard = re.search(r'        if resignedAppBundle.isAltStoreApp \{.*?^        \}', signing, re.S | re.M).group(0)
+                guard = re.search(r'        if resignedAppBundle.isAltStoreApp, self.context.overrideSigningCertificate == nil \{.*?^        \}', signing, re.S | re.M).group(0)
                 source.write_text('''import Foundation
 enum Entitlement: Hashable { case appGroups }
 struct Host { let altstoreAppGroup: String? }
@@ -169,18 +171,24 @@ struct SignedApp {
     let isAltStoreApp: Bool
     let entitlements: [Entitlement: Any]
 }
-func validate(_ resignedAppBundle: SignedApp) throws {
+struct Context { var overrideSigningCertificate: Int? = nil }
+struct Validator {
+    var context = Context()
+    func validate(_ resignedAppBundle: SignedApp) throws {
     GUARD
+    }
 }
-func accepts(_ groups: [String], isStore: Bool = true) -> Bool {
+func accepts(_ groups: [String], isStore: Bool = true, imported: Bool = false) -> Bool {
     do {
-        try validate(SignedApp(isAltStoreApp: isStore, entitlements: [.appGroups: groups]))
+        try Validator(context: Context(overrideSigningCertificate: imported ? 1 : nil))
+            .validate(SignedApp(isAltStoreApp: isStore, entitlements: [.appGroups: groups]))
         return true
     } catch { return false }
 }
 let group = Bundle.baseAltStoreAppGroupID
 precondition(accepts([group])) // repair a store that currently has no group
 precondition(!accepts([]))
+precondition(accepts([], imported: true)) // warned imported-certificate re-sign
 precondition(!accepts(["group.some.other.app"]))
 Bundle.main = Host(altstoreAppGroup: group + ".existing")
 precondition(!accepts([group])) // never orphan existing backups
@@ -220,7 +228,7 @@ precondition(accepts([], isStore: false)) // unrelated apps need no store group
             self.assertNotIn("requestAuthorization", delegate[begin:end])
             self.assertIn("GitHubUpdateNotificationRouteStore.recordTap", delegate)
             self.assertIn("try SideKickDataDirectory.prepareBeforeDatabaseStart()", delegate)
-            self.assertIn("MARKETING_VERSION = 0.9.2", (checkout / "Build.xcconfig").read_text(encoding="utf-8"))
+            self.assertIn("MARKETING_VERSION = 0.10.0", (checkout / "Build.xcconfig").read_text(encoding="utf-8"))
             project = (checkout / "AltStore.xcodeproj/project.pbxproj").read_text(encoding="utf-8")
             self.assertIn("App/SideKickApp.swift,", project)
             self.assertIn("path = ../../SideKick;", project)

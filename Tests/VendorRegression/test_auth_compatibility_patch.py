@@ -26,7 +26,7 @@ class AuthCompatibilityPatchTests(unittest.TestCase):
                          'sidestore-health-check.patch', 'sidestore-sidekick-styling.patch',
                          'sidestore-sidekick-shortcuts.patch'):
                 if name == 'sidestore-audit-fixes.patch':
-                    subprocess.run([sys.executable, str(ROOT / 'scripts/embed-local-vpn.py'), str(target)], check=True, capture_output=True)
+                    subprocess.run([sys.executable, str(ROOT / 'scripts/integrate-sidekick.py'), str(target)], check=True, capture_output=True)
                 args = ['git', '-C', str(target), 'apply']
                 if name in ('sidestore-certificate-error-classification.patch', 'sidestore-use-account-certificate-for-refresh.patch'):
                     args.append('--unidiff-zero')

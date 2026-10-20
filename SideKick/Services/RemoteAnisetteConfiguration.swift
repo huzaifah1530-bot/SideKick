@@ -116,11 +116,12 @@ struct RemoteAnisetteConfigurationClient: Sendable {
         return (data, http)
     }) { self.transport = transport }
 
-    func fetchRecommended() async throws -> RemoteAnisetteSelection {
+    func fetchRecommended(includeHistory: Bool = true) async throws -> RemoteAnisetteSelection {
         let (data, response) = try await transport(request(RemoteAnisetteConfiguration.fileURL, accept: "application/json"))
         guard (200..<300).contains(response.statusCode) else { throw RemoteAnisetteConfigurationError.unavailable(response.statusCode) }
         let list = try RemoteAnisetteConfiguration.decode(data)
-        let committed = await lastCommitDate()
+        // Startup needs the server immediately; commit history is only display metadata.
+        let committed = includeHistory ? await lastCommitDate() : nil
         return try RemoteAnisetteConfiguration.validatedSelection(from: list, lastUpdated: committed)
     }
 

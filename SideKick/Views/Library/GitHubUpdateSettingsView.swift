@@ -38,10 +38,7 @@ struct GitHubUpdateSettingsView: View {
     init(target: GitHubUpdateTarget) {
         self.target = target
         let isSideKick = target.kind == .installed && target.id == Bundle.main.bundleIdentifier
-        let vpnExtension = Bundle.main.bundleURL.appendingPathComponent("PlugIns/SideKickVPN.appex", isDirectory: true)
-        let defaultSelfUpdateAsset = FileManager.default.fileExists(atPath: vpnExtension.path)
-            ? "SideKick-vpn-unsigned-ipa"
-            : "SideKick-unsigned-ipa"
+        let defaultSelfUpdateAsset = "SideKick-unsigned-ipa"
         _repositoryURL = State(initialValue: isSideKick ? "https://github.com/huzaifah1530-bot/SideKick" : "")
         _source = State(initialValue: isSideKick ? .actionsArtifact : .latestRelease)
         _workflowFile = State(initialValue: isSideKick ? "ios-build.yml" : "build.yml")

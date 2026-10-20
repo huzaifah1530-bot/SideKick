@@ -6,7 +6,8 @@ import XCTest
 @testable import SideKickCore
 
 final class GitHubHistoryClientTests: XCTestCase {
-    func testPublishedSideKickNamesSelectOnlyTheInstalledVariant() async throws {
+    func testPublishedSideKickReleaseSelectsTheStandardIPA() async throws {
+        // Older releases also carried the discontinued VPN asset; only the standard IPA matches.
         let reader = GitHubHistoryClient { request in
             let value: [[String: Any]] = [["id": 1, "tag_name": "Releases", "draft": false,
                 "published_at": "2026-10-16T14:10:39Z", "assets": [
@@ -14,12 +15,10 @@ final class GitHubHistoryClientTests: XCTestCase {
                     ["id": 11, "name": "SideKick+Vpn.read.release.description.ipa", "url": "https://api.github.com/assets/11"]]]]
             return (try JSONSerialization.data(withJSONObject: value), HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
         }
-        for vpn in [false, true] {
-            let configuration = GitHubUpdateConfigurationStore.releaseDefault(for: "self", includesVPN: vpn)
-            let page = try await reader.page(configuration: configuration, token: nil, page: 1)
-            XCTAssertEqual(page.builds.count, 1)
-            XCTAssertEqual(page.builds.first?.assetName, vpn ? "SideKick+Vpn.read.release.description.ipa" : "SideKick.ipa")
-        }
+        let configuration = GitHubUpdateConfigurationStore.releaseDefault(for: "self")
+        let page = try await reader.page(configuration: configuration, token: nil, page: 1)
+        XCTAssertEqual(page.builds.count, 1)
+        XCTAssertEqual(page.builds.first?.assetName, "SideKick.ipa")
     }
 
     private func config(_ source: GitHubUpdateSource = .actionsArtifact, asset: String = "IPA", branch: String = "main") -> GitHubUpdateConfiguration {

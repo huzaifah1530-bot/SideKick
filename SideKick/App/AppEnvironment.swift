@@ -94,6 +94,9 @@ final class AppEnvironment {
                 // Populate app-owned catalogues before Home is constructed. A
                 // conditional List section is never responsible for bootstrapping.
                 await reloadLocalCatalogues()
+                // Finish the initial recommendation before Settings or sign-in can
+                // observe the upstream on-device defaults as the selected setup.
+                await SigningAccountStore().applyNewestAnisetteOnFirstLaunch()
                 databaseState = .ready
                 scheduleMaintenance()
                 rescanLiveContainerApps()

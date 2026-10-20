@@ -205,6 +205,16 @@ struct ConnectionSettingsView: View {
                         .foregroundStyle(PairingFileManager.shared.hasPairingFile() ? Color.green : Color.secondary)
                 }
                 SwiftUI.Button(PairingFileManager.shared.hasPairingFile() ? "Replace Pairing File…" : "Import Pairing File…") { isChoosingPairingFile = true }
+                SwiftUI.Button("Paste Pairing File from Clipboard") {
+                    Task {
+                        guard let text = UIPasteboard.general.string, !text.isEmpty else {
+                            pairingStatus = "Copy the pairing file’s text first. Open it in Files, choose Share → Copy, then try again."
+                            isShowingPairingStatus = true
+                            return
+                        }
+                        await importPairingFile(.success([]), pastedContents: text)
+                    }
+                }
                 Link("How to Get a Pairing File", destination: AppConstants.URLs.pairingDocumentation)
             }
 
@@ -303,13 +313,18 @@ struct ConnectionSettingsView: View {
     private var isValidFixedPortDraft: Bool { validatedFixedPortDraft != nil }
 
     @MainActor
-    private func importPairingFile(_ result: Result<[URL], Error>) async {
+    private func importPairingFile(_ result: Result<[URL], Error>, pastedContents: String? = nil) async {
         var didImport = false
         pairingRecoveryAction = nil
         do {
-            guard let url = try result.get().first else { return }
-            UserDefaults.standard.set(false, forKey: "sidekick.setup.pairing-verified")
-            try PairingSetupImporter.importFile(from: url)
+            if let pastedContents {
+                UserDefaults.standard.set(false, forKey: "sidekick.setup.pairing-verified")
+                try PairingSetupImporter.importContents(pastedContents)
+            } else {
+                guard let url = try result.get().first else { return }
+                UserDefaults.standard.set(false, forKey: "sidekick.setup.pairing-verified")
+                try PairingSetupImporter.importFile(from: url)
+            }
             didImport = true
             guard PairingFileManager.shared.fetchPairingFile() != nil else {
                 throw PairingSetupError.unreadableFile
@@ -324,9 +339,7 @@ struct ConnectionSettingsView: View {
                 pairingStatus = "Pairing is set up and SideKick can reach this iPhone. Install and refresh are ready."
             } catch {
                 await vpn.refreshStatus()
-                let recovery = vpn.mode == .external
-                    ? (vpn.externalInstalled ? "Connect LocalDevVPN" : "Get LocalDevVPN")
-                    : (vpn.isConfigured ? "Verify Device Connection" : "Allow Built-in VPN")
+                let recovery = vpn.externalInstalled ? "Connect LocalDevVPN" : "Get LocalDevVPN"
                 pairingRecoveryAction = recovery
                 let instruction = "In Settings → Connection, choose \(recovery), then retry."
                 pairingStatus = "Pairing file imported. SideKick couldn’t reach the iPhone yet. \(instruction) Check that this pairing file belongs to your iPhone.\n\n\(error.localizedDescription)"
@@ -553,8 +566,8 @@ struct AnisetteSettingsView: View {
     }
 }
 
-/// When the user last applied the recommended server from GitHub.
-private struct AnisetteRemoteRecord: Codable {
+/// When the recommended server from GitHub was last applied (by the user or on first launch).
+struct AnisetteRemoteRecord: Codable {
     private static let key = "sidekick.anisette.remote.applied.v1"
     let serverID: String
     let appliedAt: Date

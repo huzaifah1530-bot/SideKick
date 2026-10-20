@@ -237,6 +237,7 @@ struct SigningAccountDetailView: View {
     @State private var isLoadingInventory = false
     @State private var isShowingReconnect = false
     @State private var reconnectCredentials: (appleID: String, password: String)?
+    @State private var importedCertificates = ImportedCertificateStore.shared
 
     private var currentAccount: SigningAccountSummary {
         accountStore.accounts.first(where: { $0.id == account.id }) ?? account
@@ -341,6 +342,16 @@ struct SigningAccountDetailView: View {
                 Text("Developer Resources")
             }
 
+            if currentAccount.hasSavedSession {
+                Section {
+                    NavigationLink {
+                        SigningCertificatePickerView(account: currentAccount)
+                    } label: {
+                        LabeledContent("Signing Certificate", value: signingCertificateName)
+                    }
+                }
+            }
+
             Section {
                 SwiftUI.Button("Remove Account", role: .destructive) {
                     isConfirmingRemoval = true
@@ -381,6 +392,13 @@ struct SigningAccountDetailView: View {
         } message: {
             Text(errorMessage ?? "")
         }
+    }
+
+    private var signingCertificateName: String {
+        importedCertificates.assignedRecord(
+            accountIdentifier: currentAccount.accountIdentifier,
+            teamIdentifier: currentAccount.teamIdentifier
+        )?.name ?? "Apple"
     }
 
     private var needsReconnect: Bool {

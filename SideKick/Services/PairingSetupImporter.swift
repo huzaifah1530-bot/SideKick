@@ -15,7 +15,12 @@ enum PairingSetupImporter {
                 ?? String(data: data, encoding: .isoLatin1) else {
             throw CocoaError(.fileReadInapplicableStringEncoding)
         }
+        try importContents(contents)
+    }
 
+    /// Imports a pairing file's text, for example pasted from the clipboard when the
+    /// Files picker can't hand files to this copy of SideKick.
+    static func importContents(_ contents: String) throws {
         let manager = PairingFileManager.shared
         let preferenceOrder: [PairingProtocol]
         if #available(iOS 26.4, *) {

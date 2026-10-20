@@ -123,6 +123,9 @@ private struct AdvancedSettingsView: View {
                 NavigationLink { AnisetteSettingsView() } label: {
                     Label("Anisette", systemImage: "lock.shield")
                 }
+                NavigationLink { ImportedCertificatesView() } label: {
+                    Label("Certificates", systemImage: "checkmark.seal")
+                }
             }
 
             Section("Updates") {
@@ -131,6 +134,12 @@ private struct AdvancedSettingsView: View {
                 }
                 NavigationLink { GitHubAccountSettingsView() } label: {
                     Label("GitHub", systemImage: "person.crop.circle.badge.checkmark")
+                }
+            }
+
+            Section("Transfer") {
+                NavigationLink { SideKickTransferView() } label: {
+                    Label("Move to Another SideKick", systemImage: "arrow.left.arrow.right")
                 }
             }
 

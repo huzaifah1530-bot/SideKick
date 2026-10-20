@@ -14,10 +14,10 @@ This audit follows each SideKick control to the pinned SideStore implementation.
 | Prefer the resigned IPA | `CreateIpaOperation`, `SendAppOperation`, and `InstallAppOperation` read `preferResignedIPA` to choose IPA or bundle installation. |
 | Save resigned apps | `ExportResignedIpaOperation` reads `isExportResignedAppEnabled` and saves a copy in Documents/ResignedApps, replacing the same app's existing export. These user-requested copies are counted in Storage and kept by cleanup. |
 | Disable app limit | `InstalledApp` and `AppManager` read `isAppLimitDisabled`; the setting is disabled when the pinned engine reports neither MacDirtyCow nor sparseRestore support. It cannot bypass Apple limits on unsupported iOS versions. |
-| Local Connection | `LocalVPNService` manages an embedded `NETunnelProviderManager` configuration, checks host/extension signatures and profiles, and acquires/releases a shared operation connection. Its settings page requests iOS permission, verifies pairing over a temporary connection, and removes the configuration. The provider closes itself after 90 seconds without a heartbeat. |
+| Local Connection | `LocalVPNService` checks whether LocalDevVPN's 10.7.x tunnel is up and acquires/releases a shared operation connection that verifies the paired iPhone. SideKick ships no VPN extension. |
 | Pairing-port retry | Minimuxer port discovery reads `isAutoRetryRemotePairingPortEnabled`. |
 | Remote pairing port | Updates `remotePairingPortOverride` and synchronizes the live Minimuxer backend. |
-| Local addresses | The embedded tunnel uses the upstream fixed IPv4 peer/interface. An IPv6 input-acceptance toggle is not shown because this page no longer exposes a custom address editor. |
+| Local addresses | LocalDevVPN uses its fixed IPv4 peer/interface. An IPv6 input-acceptance toggle is not shown because this page no longer exposes a custom address editor. |
 | Import pairing file | `PairingSetupImporter` imports the trust record, `AppBootManager` restarts Minimuxer, and a live UDID probe updates the verified setup state. |
 | On-device Anisette | `AnisetteProvider.fetch` reads `useOnDeviceAnisette` for the next authentication request. |
 | Servers & Server Lists | Uses `AnisetteServersView`, which edits `AnisetteServersManager`'s catalogue, selects servers, syncs a remote source, and imports saved lists. Remote authentication consumes this catalogue. The prior standalone URL fields and unused authentication Offline mode toggle were removed. Catalogue file/offline mode is handled by the working server manager page. |
@@ -38,9 +38,9 @@ Storage now counts the complete app container and any accessible App Group, incl
 
 ## Free-account connection compatibility
 
-The default connection method is external LocalDevVPN. Setup, install, refresh, re-sign, JIT and scheduled refresh all use the same connection service. External mode verifies a connected local `utun` interface before starting Minimuxer; it does not call the embedded VPN manager or stop another app's tunnel. The optional built-in mode is available on a separate Connection Method page only when both installed signatures and profiles grant Network Extension permission. An unsupported signature falls back to external mode.
+The local connection always uses the LocalDevVPN app. Setup, install, refresh, re-sign, JIT and scheduled refresh all use the same connection service, which verifies the paired device before starting Minimuxer. SideKick never controls or stops LocalDevVPN's tunnel.
 
-CI packages `SideKick-unsigned.ipa` without a VPN extension or host VPN entitlement requests, preserving the existing default artifact name and free-account update source. `SideKick-vpn-unsigned.ipa` is a separate optional artifact. The in-app signing pipeline removes the optional SideKickVPN extension for a free team, and accepts the standard IPA without it. No paid-account requirement is imposed on ordinary SideKick installs or refreshes.
+CI packages `SideKick-unsigned.ipa` without a VPN extension or host VPN entitlement requests. The built-in VPN variant was removed; the local connection always uses LocalDevVPN. No paid-account requirement is imposed on ordinary SideKick installs or refreshes.
 # LiveContainer and storage additions
 
 My Apps → LiveContainer opens the connection manager. Link an actual Applications directory exposed by Files; connections retain bookmarks and support rescan/reconnect/disconnect/forget. Shared App Group access is conditional on a provider exposing it. Guest source settings reuse GitHub tokens/history and participate in normal foreground/background/shortcut update checks, while guest installations remain outside the signing pipeline.

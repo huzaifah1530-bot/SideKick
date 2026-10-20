@@ -79,6 +79,16 @@ final class RemoteAnisetteConfigurationTests: XCTestCase {
         XCTAssertEqual(fallback.lastUpdated, RemoteAnisetteConfiguration.parseDate("2026-10-19T08:30:00Z"))
     }
 
+    func testBootstrapSkipsOptionalHistoryRequest() async throws {
+        let data = list()
+        let client = RemoteAnisetteConfigurationClient { request in
+            XCTAssertEqual(request.url, RemoteAnisetteConfiguration.fileURL)
+            return (data, HTTPURLResponse(url: request.url!, statusCode: 200, httpVersion: nil, headerFields: nil)!)
+        }
+        let selection = try await client.fetchRecommended(includeHistory: false)
+        XCTAssertEqual(selection.lastUpdated, RemoteAnisetteConfiguration.parseDate("2026-10-19T08:30:00Z"))
+    }
+
     func testClientReportsMissingFile() async {
         let client = RemoteAnisetteConfigurationClient { request in
             (Data(), HTTPURLResponse(url: request.url!, statusCode: 404, httpVersion: nil, headerFields: nil)!)

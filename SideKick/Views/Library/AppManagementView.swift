@@ -136,7 +136,15 @@ struct AppManagementView: View {
                     }
                     if let installedApp, !isQueuedTargetUnavailable {
                         LabeledContent("Apple Account", value: installedApp.accountEmail)
-                        LabeledContent("Team", value: installedApp.teamIdentifier)
+                        if let certificate = installedApp.importedCertificate {
+                            // The account's team owns the record; the imported certificate's team signed it.
+                            LabeledContent("Signed With", value: certificate.name)
+                            if let profile = certificate.profile {
+                                LabeledContent("Signing Team", value: profile.teamName.isEmpty ? profile.teamIdentifier : profile.teamName)
+                            }
+                        } else {
+                            LabeledContent("Team", value: installedApp.teamIdentifier)
+                        }
                         LabeledContent("Expires", value: installedApp.expirationDate.formatted(date: .abbreviated, time: .shortened))
                     }
                     if let pendingUpdateIPA {
@@ -391,10 +399,7 @@ struct AppManagementView: View {
     @ViewBuilder
     private func queuedUpdateActions(ipa: ImportedIPA, installedApp: InstalledAppSummary) -> some View {
         let updateAccounts = accountStore.accounts
-        let installedTeamAccount = updateAccounts.first(where: {
-            $0.accountIdentifier == installedApp.accountIdentifier &&
-            $0.teamIdentifier == installedApp.teamIdentifier
-        })
+        let installedTeamAccount = updateAccounts.first(where: { installedApp.isSignable(by: $0) })
         if let account = installedTeamAccount, account.hasSavedSession {
             NavigationLink {
                 InstallConsoleView(
@@ -434,7 +439,9 @@ struct AppManagementView: View {
                 ipaStore: environment.ipaImportStore,
                 isUpdate: true,
                 onInstalled: { await finishQueuedUpdate(ipa) },
-                currentTeamIdentifier: installedApp.teamIdentifier
+                // A SideKick copy on an imported certificate has no Apple team record.
+                currentTeamIdentifier: installedApp.importedCertificate == nil && !installedApp.teamIdentifier.isEmpty
+                    ? installedApp.teamIdentifier : nil
             )
         } label: {
             Label("Update with Another Account…", systemImage: "person.2")
@@ -1013,6 +1020,29 @@ struct ResignOptionsView: View {
                                 SigningAccountDetailView(account: account, accountStore: accountStore)
                             } else if account.teamIdentifier != app.teamIdentifier {
                                 OtherTeamSourceView(app: app, account: account, accountStore: accountStore)
+                            } else if let record = ImportedCertificateStore.shared.assignedRecord(
+                                accountIdentifier: account.accountIdentifier,
+                                teamIdentifier: account.teamIdentifier
+                            ) {
+                                let isSideKick = app.id == Bundle.Info.activeBundleIdentifier
+                                ImportedCertificateResignWarningView(
+                                    appName: app.name,
+                                    isSideKick: isSideKick,
+                                    record: record
+                                ) {
+                                    if isSideKick, let profile = record.profile,
+                                       SideKickTransferService.separateCopyBundleIdentifier(for: profile) != app.id {
+                                        // iOS rejects upgrading an app to another team; install a second copy.
+                                        SeparateSideKickCopyView(account: account, accountStore: accountStore, certificate: record)
+                                    } else {
+                                        RefreshConsoleView(
+                                            app: app,
+                                            accountStore: accountStore,
+                                            selectedAccount: account,
+                                            operation: .resign
+                                        )
+                                    }
+                                }
                             } else {
                                 RefreshConsoleView(
                                     app: app,
