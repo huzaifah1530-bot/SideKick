@@ -120,10 +120,17 @@ final class SigningAccountStore {
             return
         }
         // Offline: try again next launch. Signing in before then still tries the newest server.
-        guard let selection = try? await RemoteAnisetteConfigurationClient().fetchRecommended() else { return }
+        guard let selection = try? await RemoteAnisetteConfigurationClient().fetchRecommended(includeHistory: false) else { return }
         guard SigningAccountOperationCoordinator.acquire() else { return }
         defer { SigningAccountOperationCoordinator.release() }
-        guard !AppManager.shared.isActivelyManagingAnyApp else { return }
+        guard !AppManager.shared.isActivelyManagingAnyApp, !AppOffloadService.isRunning,
+              !SideKickStorageCleanup.hasActiveOperations else { return }
+        // The network request suspends: another store may have saved a user
+        // choice or completed sign-in while it was in flight. Check under the gate.
+        guard await hasNoAnisetteChoice() else {
+            defaults.set(true, forKey: attemptedKey)
+            return
+        }
         await applyAnisetteDefault(name: selection.server.name, server: selection.serverURL.absoluteString,
             clientInfo: selection.server.clientInfo, userAgent: selection.server.userAgent)
         AnisetteRemoteRecord(serverID: selection.server.id, appliedAt: .now).save()

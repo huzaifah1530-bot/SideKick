@@ -1,12 +1,21 @@
 {
   "schemaVersion": 1,
-  "updatedAt": "2026-10-19T20:59:18Z",
-  "recommended": "ikcoxson-mac",
+  "updatedAt": "2026-10-20T13:03:31Z",
+  "recommended": "jkcoxson-mac",
   "servers": [
     {
-      "id": "ikcoxson-mac",
+      "id": "sidestore-new",
+      "name": "SideStore New (Mac Anisette)",
+      "url": "https://new.ani.sidestore.io",
+      "headers": {
+        "X-Mme-Client-Info": "<MacBookPro13,3> <Mac OS X;10.12.6;16G29> <com.apple.AuthKit/1 (com.apple.akd/1.0)>",
+        "User-Agent": "akd/1.0 CFNetwork/811.5.4 Darwin/16.7.0"
+      }
+    },
+    {
+      "id": "jkcoxson-mac",
       "name": "Mac Anisette",
-      "url": "https://mac-ani.ikcoxson.com",
+      "url": "https://mac-ani.jkcoxson.com",
       "headers": {
         "X-Mme-Client-Info": "<MacBookPro13,3> <Mac OS X;10.12.6;16G29> <com.apple.AuthKit/1 (com.apple.akd/1.0)>",
         "User-Agent": "akd/1.0 CFNetwork/811.5.4 Darwin/16.7.0"

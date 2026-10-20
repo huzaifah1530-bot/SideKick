@@ -6,9 +6,9 @@
     "semantic_hash": ""
   },
   "SideKick/App/AppEnvironment.swift": {
-    "mtime": 1792519004.0017197,
-    "seen": 1792519062.671189,
-    "ast_hash": "669c1322b5db4a076a8c5a4d8b992676",
+    "mtime": 1792523834.0157247,
+    "seen": 1792523910.119825,
+    "ast_hash": "6501554a13dc6f81f797e90daac8fc8c",
     "semantic_hash": ""
   },
   "SideKick/App/SideKickApp.swift": {
@@ -216,9 +216,9 @@
     "semantic_hash": ""
   },
   "SideKick/Services/SigningAccountStore.swift": {
-    "mtime": 1792519000.7477314,
-    "seen": 1792519062.6713629,
-    "ast_hash": "50368b9bcee4d289095a87a8e5089263",
+    "mtime": 1792523924.9979606,
+    "seen": 1792523960.4342785,
+    "ast_hash": "1d1229990b6ab5ec560efe35ef5af329",
     "semantic_hash": ""
   },
   "SideKick/Services/SigningExpiry.swift": {
@@ -378,9 +378,9 @@
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_integration_patches.py": {
-    "mtime": 1792521980.6983333,
-    "seen": 1792522013.8530245,
-    "ast_hash": "6f4be77cfc17d3871175a6dadb7365b1",
+    "mtime": 1792523834.0188072,
+    "seen": 1792523910.1201222,
+    "ast_hash": "f50b95af85110992b245fcaad78b87bd",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_release_manifest.py": {
@@ -3708,9 +3708,9 @@
     "semantic_hash": ""
   },
   "project.yml": {
-    "mtime": 1792521980.720363,
-    "seen": 1792522013.8544507,
-    "ast_hash": "13e6aa3fd4a593fb28885a1729999ee8",
+    "mtime": 1792523834.0203342,
+    "seen": 1792523910.1222897,
+    "ast_hash": "2db172b419561f813e489e1bd99d1cee",
     "semantic_hash": ""
   },
   "scripts/graphify.ps1": {
@@ -4020,9 +4020,9 @@
     "semantic_hash": ""
   },
   "SideKick/Services/RemoteAnisetteConfiguration.swift": {
-    "mtime": 1792433593.977216,
-    "seen": 1792433639.8109717,
-    "ast_hash": "d591add3a94aaccd019309537e4f676c",
+    "mtime": 1792523924.996132,
+    "seen": 1792523960.434252,
+    "ast_hash": "6d536abd63395bd98d1f49fd3b22f399",
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/AppIconVariantTests.swift": {
@@ -4032,9 +4032,9 @@
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/RemoteAnisetteConfigurationTests.swift": {
-    "mtime": 1792433271.7737408,
-    "seen": 1792433639.811231,
-    "ast_hash": "6000f7ea842c9a00f5620e991b092ddb",
+    "mtime": 1792523918.3906653,
+    "seen": 1792523960.434465,
+    "ast_hash": "48f1c9009b41b2ee7a4d3e78bef05e77",
     "semantic_hash": ""
   },
   "config/anisette-servers.json": {
@@ -4122,9 +4122,15 @@
     "semantic_hash": ""
   },
   "scripts/integrate-sidekick.py": {
-    "mtime": 1792521980.7249966,
-    "seen": 1792522013.8543289,
-    "ast_hash": "c62a3c6701862602d0d559eff3ddbf98",
+    "mtime": 1792523834.017802,
+    "seen": 1792523910.122147,
+    "ast_hash": "d02407f96a786357dcadf8097fe78c08",
+    "semantic_hash": ""
+  },
+  "Tests/ReleaseManifest/test_anisette_bootstrap.py": {
+    "mtime": 1792523966.489686,
+    "seen": 1792523989.238675,
+    "ast_hash": "e2324cee113f096f0258d608589aa4f7",
     "semantic_hash": ""
   }
 }

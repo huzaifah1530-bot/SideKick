@@ -1,41 +1,41 @@
 # Graph Report - Sidekick  (2026-10-20)
 
 ## Corpus Check
-- 673 files · ~508,144 words
+- 674 files · ~508,736 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 112 file(s) not represented in the graph (top: (none) 34, .patch 20, .xib 14)
 
 ## Summary
-- 12915 nodes · 30539 edges · 499 communities (372 shown, 127 thin omitted)
-- Extraction: 90% EXTRACTED · 10% INFERRED · 0% AMBIGUOUS · INFERRED: 3014 edges (avg confidence: 0.85)
+- 12923 nodes · 30555 edges · 525 communities (387 shown, 138 thin omitted)
+- Extraction: 90% EXTRACTED · 10% INFERRED · 0% AMBIGUOUS · INFERRED: 3017 edges (avg confidence: 0.85)
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `6436fd62`
+- Built from commit: `2b4d69e1`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
 ## Community Hubs (Navigation)
 - MyAppsViewController
-- ImportedCertificateError
+- ImportedCertificateRecord
 - UIButton
-- LiveContainerStore
-- DeveloperPortalError
+- LiveContainerState
+- DeveloperPortal
 - InstallAppOperationContext
 - UserDefaults
 - IdeviceGateway
 - LibimobiledeviceGateway
-- UIAlertController
+- SigningAccountError
 - AnisetteDataManager
 - UsbmuxdProxyServer
 - .entries
 - ConsoleLog
 - Hashable
-- View
+- InstallConsoleView
 - debugLog
 - Source
 - View
-- NSLayoutConstraint
+- UIBarButtonItem
 - run
 - ActivityViewController
 - AppOperation
@@ -44,12 +44,12 @@
 - CLIError
 - String
 - CLIError
-- LiveContainerGuest
+- GitHubUpdateSettingsView
 - Result
 - HeaderContentViewController
 - GitHubUpdateService
 - InstalledApp
-- SignInFlowHandler
+- UIAlertController
 - Codable
 - GitHubUpdateConfiguration
 - CertificateManager
@@ -70,22 +70,22 @@
 - .body
 - GitHubCredentialStore
 - InfoPlistParser
-- LocalVPNService
-- HomeView
-- LiveContainerReadOperation
+- DeveloperPortalError
+- InstalledAppSummary
+- .dismiss
 - OperationError
 - StatusTone
 - .startImport
 - MinimuxerError
-- ImportedCertificateRecord
+- ImportedCertificateCatalog
 - SideStoreOperationService
 - AppBundle
 - DeveloperPortalProxy
 - WidgetUpdateIntent
 - Account
-- LiveContainerSharedAccess
+- Device
 - CellContentDataSource
-- AppManager.swift
+- UICollectionViewController
 - LiveContainerConnection
 - StandaloneOperationContext
 - UICollectionReusableView
@@ -100,27 +100,27 @@
 - GitHubTrackingTests
 - StoreApp
 - ResignAppOperation
-- .message
+- SigningAccountDetailView
 - AnyObject
 - .export
-- BackupError
+- AppOffloadView
 - X509Certificate
-- withFFIDispatch
+- GitHubAccountSession
 - AddSourceViewController
 - SourceDetailContentViewController
-- AppCardCollectionViewCell
+- UIImage
 - InfoPlistCustomizationCoreView
 - .application
 - workflow.py
 - SideSignConfigurationViewModel
-- debugLog
+- SourceHeaderView
 - CollapsingTextView
 - AppBannerView
 - ReviewPermissionsViewController
 - SettingsViewController
 - AppIDsViewController
-- DiagnosticsStore
-- ActiveAlert
+- ImportedCertificateError
+- DynamicDataSource
 - ALTLocalizedError
 - ProfileManager
 - CertificateError
@@ -130,13 +130,13 @@
 - DeviceGatewayAPI
 - .getAuthenticatedTeam
 - AppsEntry
-- SuffixEnforcedTextField
+- prettyJSONString
 - BaseDeviceGateway
 - CacheItem
 - ConnectionConfig
 - RemoteAnisetteConfigurationError
 - EMProxyError
-- Minimuxer
+- Combine
 - BonjourDiscoveryViewModel
 - pathlib
 - FetchedResultsDataSource
@@ -144,18 +144,18 @@
 - AppDetailCollectionViewController
 - DownloadAppOperation
 - AnisetteServersManager
-- MetadataKey
+- Account
 - ConsoleLogViewModel
 - SideKickStorageCleanup
 - AppScreenshot
-- .fetchAnisetteHeaders
+- DeviceDataError
 - UserCustomizationsView
-- StorageExplorerViewModel
+- GitHubRepositoryImportView
 - BaseEntity
 - AppendTeamIDCheckboxView
 - CaseIterable
 - DeviceRegistrationFlow
-- RefreshAttempt
+- SelectTeamViewController
 - OperationStep
 - TimeInterval
 - SetupStatus
@@ -167,7 +167,7 @@
 - SideJITServerConfigView
 - LiveContainerGuest
 - CharacterSet
-- RemoteAnisetteDataProvider
+- AnisetteConfigManager
 - RFC7693BLAKE2s
 - DeviceConnectionManager
 - ProvisioningProfile
@@ -184,7 +184,7 @@
 - NetworkObserverService
 - PlatformURL
 - EntitlementsCustomizationCoreView
-- ImportedCertificatesView
+- UInt32
 - NewsItem
 - AppIconController
 - PairingProtocol
@@ -200,7 +200,7 @@
 - Stage
 - StorageExplorerViewModel
 - SideSignHeaders
-- StatusBadge
+- BaseOperation
 - GitHubUpdateDetailView
 - .fetch
 - UnsavedSettingsCoordinator
@@ -213,36 +213,36 @@
 - BackgroundRefreshAppsOperation
 - ProfileType
 - AppPermission
-- AppOffloadService
+- SignerError
 - AppearanceSettings
 - NSObject
-- UpdateSuccessRecord
+- AnisetteViewModel
 - BonjourDiscoveryViewModel
-- LoggedError
-- LocalConnectionSettingsView
+- Decoder
+- withFFIDispatch
 - LiveContainerError
 - BackgroundServiceMode
 - .presentConsent
 - ALTAppPermission.swift
 - NSManagedObject
-- SwiftUI
+- UniformTypeIdentifiers
 - StorageExplorerView
-- EMProxyError
-- PatreonViewController
+- GitHubUpdateError
+- AdvancedSettingsRow
 - DeviceService
 - PairingViewController
-- AnisetteViewModel
+- UITableView
 - AppVersion
 - KnownSource
 - StorageExplorerClipboard
 - Error
-- Array
+- GitHubAccountSettingsView
 - Foundation
-- InstallAppOperationContext
+- CertificateStatus
 - AnisetteDataViewModel
 - AppExtensionViewHostingController
 - .performBackupCoordinated
-- ImportDownloadPanel
+- AppCardCollectionViewCell
 - NSAttributedString+Markdown.swift
 - XCTest
 - PaginationIntent
@@ -254,15 +254,15 @@
 - CodeResourcesViewer
 - CertificatePortalRow
 - BackgroundLocationService
-- UITableViewCell
+- FetchedResultsCollectionViewPrefetchingDataSource
 - generate_release_notes.py
 - CertificateType
 - InstallAppOperation
 - AppEnvironment
 - OCSPValidationError
-- .getMatchingCertificate
+- SuffixEnforcedTextField
 - KeyStore
-- UIImage
+- AppIconImageView
 - .share
 - ProfilePortalDetailView
 - Error
@@ -273,42 +273,42 @@
 - .pairingFileCard
 - PerformBackupRestoreOperation
 - PaginationDataHolder
-- RefreshFailureReport
+- MetadataKey
 - OutputStream
 - NSEntityMigrationPolicy
 - FileOutputStream
 - CellContentChange
 - PFXASN1
 - FileManager
-- IntentError
-- CertificateRequest
+- InjectBatchProfilesOperation
+- .addCertificate
 - LinkedHashMap
 - .testTCP
 - PairedDeviceRecord
-- DiagnosticsView
+- GitHubCheckState
 - CoalescedEntry
 - AppSharingError
 - RefreshAllAppsIntent
-- ConnectionDetailsCard
+- Persistent Graphify map
 - InsetGroupTableViewCell
-- Node
+- LiveContainerHandoffRecord
 - NSString
-- CodingKeys
+- AnisetteError
 - CertificatesViewModel
 - .confirm
 - CertificateDetailView
-- .present
+- AppScreenshotCollectionViewCell
 - ExtensionRemovalDecision
-- ActiveAppsTimelineProvider
+- debugLog
 - CertificateProvisioningFlow
 - PrivateKeyTextEditor
-- CertificateRowView
-- Context
+- WidgetKit
+- ActiveAppsWidget
 - String
 - CodeSignKit
-- Operation
+- create-release-manifest.py
 - Existing SideKick components to reuse
-- AnisetteData
+- AppID
 - Constants
 - CellularRefreshManager
 - UIKit
@@ -319,12 +319,13 @@
 - PairingFileManager
 - RefreshShortcutViews.swift
 - ReleaseTrack17To17_1MigrationPolicy
-- ALTTeamType
+- .present
 - SettingsStorageView
+- generate_source_metadata.py
 - SceneDelegate
 - Reversible native-app offload to LiveContainer: research and proposed plan
 - Team
-- FetchSourcesError
+- LocalConnectionSettingsView
 - AppSnapshot
 - .tableView
 - SpringStiffness
@@ -332,43 +333,43 @@
 - CreateManualProfileView
 - CacheResignedMetadataOperation
 - CertificateDetailView
-- LinkedHashMapTests
+- UpdateCollectionViewCell
 - CodingKeys
-- MinimuxerComponent
-- BundleInspectorView
+- MinimuxerApi.swift
+- Code
 - AppPermissionsCard
 - Managed
-- EntitlementEntry
-- Operation
+- debugLog
+- RequiredSetupView
 - UIDevice+Vibration.swift
 - NSObject
-- ImportExport.swift
+- ClearAppCacheOperation
 - CVarArg
-- FullAppBundleView
+- DevicesListView
 - LaunchViewController
 - CodingKeys
 - minimuxer
 - UIColor
-- ToastView
-- Entry
+- .show
+- MarkdownManager
 - SelectionActionBarView
 - BackgroundTaskManager
 - Review Focus
 - StorageSortOption
 - PermissionCollectionViewCell
 - DeviceGatewayError
-- AnisetteLibraryCacheRequest
-- CodingKeys
+- NavigationBarAppearance
+- UpdateSuccessRecord
 - ImagePickerDelegateHandler
-- PreflightChecksOperation
+- ALTTeamType
 - XCTestCase
 - Bundle
 - SourceDetailViewController
 - InfoPlistCustomizationView
 - InfoPlistTarget
 - HelperPackagingTests
-- Keychain
-- Countdown
+- LocalInterfaceType
+- AppDetailWidgetView
 - ProgressFileDownload
 - .openWebURL
 - AccountCertificateListView
@@ -379,10 +380,10 @@
 - NSManagedObject
 - Result
 - LicensesViewController
-- AppIDsListView
-- DeveloperPortal
+- ActiveAlert
+- DirectoryItemListSectionView
 - UIImage
-- URL
+- Coordinator
 - SingletonGenericMap
 - .resolveServerURL
 - ProcessError
@@ -390,21 +391,21 @@
 - Context
 - AppIconVariant
 - decrypt_sideconf.py
-- Event
+- VibrantButton
 - Decoder
-- SetProfileAlertViewController
-- DeviceGatewayLogging.swift
-- Failure
+- .present
+- DeviceGatewayLogging
+- SideKickStorageCleanup.swift
 - FileManager
 - CertGroupHeaderView
 - ProfileManagementRowView
-- SideStoreOperationError
+- LoggedError
 - BuildInfo
 - SideKick
 - SecureValueTransformer
 - Review bug fixes implementation plan
 - .importBackup
-- .toSendableDictionary
+- SideStoreSettingsPages.swift
 - Date
 - .prepareBeforeDatabaseStart
 - SignableCertificateRowView
@@ -415,7 +416,7 @@
 - .compute
 - SideKickSignInFlowHandler
 - TaskMutexSerializer
-- debugLog
+- LinkedHashMapTests
 - Catalogue loading and iOS 18 compatibility
 - Stock LiveContainer file-transfer implementation
 - PackageDescription
@@ -427,18 +428,18 @@
 - FileManager
 - SideSign
 - LoadingState
-- AccountVerificationRow
+- Countdown
 - SigningAccountStore
 - CacheAppOperation
-- Error
+- RefreshFailureReport
 - CodingKeys
 - LiveContainer integration: investigation and proposed design
 - MaintenanceManager
-- ContentView
+- Node
 - .directorySize
 - LiveContainerError
 - FileImportHandler
-- CertificateAnalysisResult
+- Operation
 - MinimuxerConstants
 - InstalledAppEntity
 - UserInfoValue
@@ -447,18 +448,19 @@
 - generate-tinted-icons.py
 - TaskChainSerializer
 - UIControl
+- ImportExport.swift
 - SideKickLogStorage.swift
 - ProcessInfo
 - URL+Normalized.swift
 - Bundle+AppExtension.swift
-- LeakTester
+- ContentView
 - LocalizedError
 - Date+Widget.swift
 - FileManager
 - MachOResourceViewer
 - OperatingSystemVersion
-- .readPassword
 - String
+- StandaloneOperationContext
 - AGENTS.md
 - 2026-10-10-update-tracking.md
 - 2026-10-13-github-updates.md
@@ -467,31 +469,41 @@
 - ScreenshotCollectionViewCell
 - ALTAppPermission
 - RemoveAppExtensionsOperation
+- AppBannerCollectionViewCell
 - PreviewAppPermission
 - Reported bugs
 - ErrorLogViewController
 - DeviceGatewayError
+- GitHubDefaultTokenSettingsView
 - ProfilesListView
 - SideStoreRegressionGuards
+- ThemeManager
 - AppearanceMode
-- ErrorDetailsViewController
+- AuthDevice
+- ImportedAccount
 - RemoveBackupDataOperation
-- GitHubHistoryError
-- .validate
+- .arrayEditorView
+- StorageCleanupTests
 - ALTApplication+AltStoreApp.swift
 - StorageRemovalAction
+- BackupAndRestoreView
 - .provideAppOptionsCollection
-- AuthCompatibilityRegression.swift
+- AnisetteBootstrapTests
 - AppBundleFingerprint
-- AppID
+- DeveloperPortalAPI
 - test_hosted_lifecycle.py
 - PROJECT_CONTEXT.md
 - ActivityViewController
+- RefreshAllAppsWidgetIntent
 - AnisetteManager
+- UIColor
 - RestoreHelperSigningTests
+- Agent Guidelines for SideStore
 - Regex
+- README.md
 - Remote configuration
-- ForwardingNavigationController
+- OperationEntitlements.swift
+- Nuke
 - WidgetLogManager
 - AppOffloadTests
 - InstallStartTests
@@ -499,14 +511,27 @@
 - AuthCompatibilityPatchTests
 - RevokeDecision
 - MarkdownSpanType
-- StandaloneOperationContext
 - Building and Formatting
+- Contribution and Communication Rules
+- InstallAppOperationContext
+- Project Overview
 - ShortcutTestPanel
 - UIView+AnimatedHide.swift
 - AppIconVariantTests
-- .exportPairingFile
-- PairingErrorCode
+- PresentationEdge
+- Contributing to SideStore
+- .toSendableDictionary
+- LeakTester
+- LiveContainer integration and app-management changes
+- .info
+- ErrorDetailsViewController
 - SetCertificateAlertViewController
+- UITestsLaunchTests
+- RefreshShortcutViews.swift
+- UIScreen
+- AddSourceTextFieldCell
+- MinimuxerLogging
+- .readPassword
 
 ## God Nodes (most connected - your core abstractions)
 1. `SideSign` - 142 edges
@@ -535,27 +560,27 @@
 ## Import Cycles
 - None detected.
 
-## Communities (499 total, 127 thin omitted)
+## Communities (525 total, 138 thin omitted)
 
 ### Community 0 - "MyAppsViewController"
 Cohesion: 0.03
-Nodes (10): AssociatedKeys, UICollectionView, .nestedUpdatesCounter, .operations, UTType, MyAppsViewController, Section, activeApps (+2 more)
+Nodes (16): ToastView, .intrinsicContentSize, .isHighlighted, .layoutMargins, .presentationEdge, DynamicCollectionViewDataSource, AssociatedKeys, UICollectionView (+8 more)
 
-### Community 1 - "ImportedCertificateError"
+### Community 1 - "ImportedCertificateRecord"
 Cohesion: 0.07
-Nodes (27): ImportedCertificateCatalogFile, .url, ImportedCertificateError, deviceNotInProfile, .errorDescription, expired, incorrectPassword, invalidProfile (+19 more)
+Nodes (27): .profileUUIDs, .sortedCertificates, ImportedCertificateRecord, .effectiveExpiryDate, .id, .isRevoked, ImportedCertificateCatalogFile, .url (+19 more)
 
 ### Community 2 - "UIButton"
 Cohesion: 0.03
-Nodes (27): InstructionsViewController, .preferredStatusBarStyle, ScrollableContentViewController, UIButton, .activityCount, .activityIndicatorView, .isIndicatingActivity, SourceHeaderView (+19 more)
+Nodes (31): InstructionsViewController, .preferredStatusBarStyle, IconButtonCollectionReusableView, LargeIconCollectionViewCell, ScrollableContentViewController, UIButton, .activityCount, .activityIndicatorView (+23 more)
 
-### Community 3 - "LiveContainerStore"
-Cohesion: 0.14
-Nodes (6): LiveContainerLaunch, LiveContainerState, LiveContainerStore, BlockingDirectoryAccess, FixtureDirectoryAccess, LiveContainerTests
-
-### Community 4 - "DeveloperPortalError"
+### Community 3 - "LiveContainerState"
 Cohesion: 0.05
-Nodes (51): HTTPStatusCodes, DeveloperPortal, DeveloperPortal, FetchedAuthToken, TwoFactorAuthChannel, sms, trustedDevice, voice (+43 more)
+Nodes (20): LiveContainerLaunch, LiveContainerScan, LiveContainerState, .container, .status, LiveContainerSharedStorage, LiveContainerDirectoryAccess, LiveContainerReadContext (+12 more)
+
+### Community 4 - "DeveloperPortal"
+Cohesion: 0.11
+Nodes (16): HTTPStatusCodes, DeveloperPortal, DeveloperPortal, FetchedAuthToken, TwoFactorAuthChannel, sms, trustedDevice, voice (+8 more)
 
 ### Community 5 - "InstallAppOperationContext"
 Cohesion: 0.04
@@ -566,24 +591,24 @@ Cohesion: 0.02
 Nodes (94): UserDefaults, .acceptIPv6ConnectionConfig, .acctFileChecksum, .activeAppLimitIncludesExtensions, .activeAppsLimit, .activePairingProtocol, .alwaysShowWireGuardConfig, .appImportSourceMode (+86 more)
 
 ### Community 7 - "IdeviceGateway"
-Cohesion: 0.10
-Nodes (10): IDevice, PairedDeviceRecord, debugLog(), verboseLog(), IdeviceGateway, IdeviceGatewayError, .errorDescription, String (+2 more)
+Cohesion: 0.09
+Nodes (15): IDevice, PairedDeviceRecord, debugLog(), getFastTimestamp(), getTag(), verboseLog(), IdeviceGateway, IdeviceGatewayError (+7 more)
 
 ### Community 8 - "LibimobiledeviceGateway"
 Cohesion: 0.08
 Nodes (4): LibimobiledeviceGateway, LibimobiledeviceGatewayError, .errorDescription, free
 
-### Community 9 - "UIAlertController"
-Cohesion: 0.05
-Nodes (17): UIViewController, UIAlertAction, .cancel, InstallAppHandler, UnsupportedVersionHandler, ExportCertificateDialog, PipelineHandler, .activePresenter (+9 more)
+### Community 9 - "SigningAccountError"
+Cohesion: 0.18
+Nodes (10): SigningAccountError, certificateUnavailable, credentialsUnavailable, databaseUnavailable, engineBusy, .errorDescription, keychain, presentationUnavailable (+2 more)
 
 ### Community 10 - "AnisetteDataManager"
-Cohesion: 0.06
-Nodes (34): AnisetteDataManager, .activeMode, .defaultBaseDirectory, .libsDir, .localLibsDir, .provisioningDir, .remoteLibsDir, AnisetteError (+26 more)
+Cohesion: 0.08
+Nodes (18): AnisetteDataManager, .activeMode, .defaultBaseDirectory, .libsDir, .localLibsDir, .provisioningDir, .remoteLibsDir, AnisetteMode (+10 more)
 
 ### Community 11 - "UsbmuxdProxyServer"
 Cohesion: 0.05
-Nodes (26): DeviceGatewayAPI, IdeviceGateway, LibimobiledeviceGateway, DeviceProvider, .gateway, GatewayBackend, idevice, libimobiledevice (+18 more)
+Nodes (18): DeviceProvider, .gateway, debugLog(), getFastTimestamp(), getTag(), verboseLog(), DeviceEndpoint, .gateway (+10 more)
 
 ### Community 12 - ".entries"
 Cohesion: 0.20
@@ -594,176 +619,176 @@ Cohesion: 0.12
 Nodes (14): OSLog, Logger, OSLogEntryLog.Level, .localizedName, ConsoleLog, .bootCheckError, .isVerbose, debugLog() (+6 more)
 
 ### Community 14 - "Hashable"
-Cohesion: 0.05
-Nodes (48): NetworkIPv4Regression, MinimuxerServiceError, .description, formatNetInfoList(), IP, .description, IPAddresses, .description (+40 more)
+Cohesion: 0.06
+Nodes (47): MinimuxerServiceError, .description, formatNetInfoList(), IP, .description, IPAddresses, .description, IPv4Info (+39 more)
 
-### Community 15 - "View"
-Cohesion: 0.03
-Nodes (97): Update layout and missing Options, AccountAvatar, .logo, ActionLabel, .body, AccountAppIDListView, .body, AccountProfileListView (+89 more)
+### Community 15 - "InstallConsoleView"
+Cohesion: 0.06
+Nodes (43): AccountChoiceRow, AppSigningOperation, refresh, resign, .statusTitle, .body, InstallConsoleView, .isRunning (+35 more)
 
 ### Community 16 - "debugLog"
-Cohesion: 0.07
+Cohesion: 0.08
 Nodes (15): DeveloperPortal, DeveloperPortal, DeveloperPortal, DeveloperPortal, DeveloperPortal, debugLog(), verboseLog(), ServerError (+7 more)
 
 ### Community 17 - "Source"
-Cohesion: 0.04
-Nodes (30): Source, repository, url, .apps, .effectiveFeaturedApps, .effectiveHeaderImageURL, .effectiveIconURL, .effectiveTintColor (+22 more)
+Cohesion: 0.05
+Nodes (19): Source, repository, url, .apps, .effectiveFeaturedApps, .effectiveHeaderImageURL, .effectiveIconURL, .effectiveTintColor (+11 more)
 
 ### Community 18 - "View"
-Cohesion: 0.09
-Nodes (22): InfoPlistSemanticView, .appName, .backgroundModes, .body, .bundleID, .customKeys, .customURLSchemes, .filteredCustomKeys (+14 more)
+Cohesion: 0.11
+Nodes (18): ActionLabel, .body, GitHubUpdateCandidate, .id, JITEnableView, .body, .body, LiveContainerGuestDetailView (+10 more)
 
-### Community 19 - "NSLayoutConstraint"
-Cohesion: 0.03
-Nodes (29): AppScreenshotCollectionViewCell, .aspectRatio, .isRounded, ImageView, IconButtonCollectionReusableView, LargeIconCollectionViewCell, AppBannerCollectionViewCell, PlaceholderView (+21 more)
+### Community 19 - "UIBarButtonItem"
+Cohesion: 0.08
+Nodes (18): ActivityIndicating, ActivityIndicatingHelper, .activityCount, .activityIndicatorView, .isIndicatingActivity, NSObject, .activityIndicatingHelper, UIApplication (+10 more)
 
 ### Community 20 - "run"
 Cohesion: 0.11
 Nodes (23): CSRContext, ExtensionsContext, InspectContext, ProfileContext, RemoveSignatureContext, SignContext, VerifyContext, FlagRegistry (+15 more)
 
 ### Community 21 - "ActivityViewController"
-Cohesion: 0.07
-Nodes (31): .infoPlistURL, AppIconView, .body, AppInfoToastView, .body, AppInfoView, .activeInfoPlistURL, .activeProfileURL (+23 more)
+Cohesion: 0.06
+Nodes (40): AppIconView, .body, AppInfoToastView, .body, AppInfoView, .activeInfoPlistURL, .activeProfileURL, .appBundleURL (+32 more)
 
 ### Community 22 - "AppOperation"
-Cohesion: 0.05
+Cohesion: 0.04
 Nodes (34): AppOperation, activate, .app, backup, .bundleIdentifier, deactivate, deleteApp, .description (+26 more)
 
 ### Community 23 - "ProfileManagementViewModel"
-Cohesion: 0.12
+Cohesion: 0.13
 Nodes (10): PendingProfileImport, ProfileManagementView, .allowedImportTypes, .body, .failedRemoteProfiles, .filteredProfiles, ProfileManagementViewModel, .errorMessage (+2 more)
 
 ### Community 24 - "BundleItemRow"
-Cohesion: 0.17
-Nodes (12): BundleItem, BundleItemRow, .body, .fileIcon, .iconColor, .isCodeResourcesItem, .isMachOItem, .isMobileProvisionItem (+4 more)
+Cohesion: 0.08
+Nodes (30): QuickLook, BundleItem, BundleItemRow, .body, .destination, .fileIcon, .iconColor, .isCodeResourcesItem (+22 more)
 
 ### Community 25 - "CLIError"
 Cohesion: 0.06
-Nodes (51): Action, assign, create, delete, disable, download, dump, edit (+43 more)
+Nodes (46): Action, assign, create, delete, disable, download, dump, edit (+38 more)
 
 ### Community 26 - "String"
 Cohesion: 0.05
-Nodes (22): LocalInterfaceType, airdrop, cellular, ethernet, hotspotBridge, .isVPN, loopback, lowLatencyWLAN (+14 more)
+Nodes (22): MinimuxerAPI, Prefix, ErrorProcessing, InfoMode, fullError, localizedDescription, ServiceInstanceGroupOption, firstLetter (+14 more)
 
 ### Community 27 - "CLIError"
-Cohesion: 0.09
-Nodes (11): CommandHandler, SessionManager, .defaultSessionDirectory, .defaultSessionURL, SessionStorageError, corruptedData, decryptionFailed, encryptionFailed (+3 more)
+Cohesion: 0.08
+Nodes (16): CLIError, .errorDescription, executionFailed, invalidArgument, missingRequiredArgument, CommandHandler, SessionManager, .defaultSessionDirectory (+8 more)
 
-### Community 28 - "LiveContainerGuest"
-Cohesion: 0.15
-Nodes (12): GitHubUpdateCandidate, .id, LiveContainerGuestDetailView, .body, .canCheckUpdates, .canConfirmInstalledBuild, .downloadJob, .updateEligibilityMessage (+4 more)
+### Community 28 - "GitHubUpdateSettingsView"
+Cohesion: 0.09
+Nodes (23): GitHubTrackedBuild, .historyEntry, GitHubUpdateHistoryEntry, .id, GitHubUpdateSource, actionsArtifact, .id, latestRelease (+15 more)
 
 ### Community 29 - "Result"
 Cohesion: 0.13
 Nodes (9): AppManager, .isActivelyManagingAnyApp, InstallTarget, app, .description, url, PackageType, app (+1 more)
 
 ### Community 30 - "HeaderContentViewController"
-Cohesion: 0.05
-Nodes (9): HeaderContentViewController, .isViewingHeader, .preferredStatusBarStyle, .tintColor, VibrantButton, .contentInsets, .image, .isIndicatingActivity (+1 more)
+Cohesion: 0.07
+Nodes (4): HeaderContentViewController, .isViewingHeader, .preferredStatusBarStyle, .tintColor
 
 ### Community 31 - "GitHubUpdateService"
-Cohesion: 0.04
-Nodes (50): GitHubUpdateHistoryEntry, .id, GitHubUpdateSource, actionsArtifact, .id, latestRelease, .title, GitHubImportChoice (+42 more)
+Cohesion: 0.19
+Nodes (8): GitHubUpdateService, GitHubUser, Repository, Workflow, Workflows, WorkflowSummary, .buildsIPA, .id
 
 ### Community 32 - "InstalledApp"
 Cohesion: 0.05
 Nodes (26): InstalledApp, .appIDCount, .appsDirectoryURL, .certificateStatus, .freeAccountActiveAppsLimit, .installedBackupAppUTI, .isSideloaded, .localizedVersion (+18 more)
 
-### Community 33 - "SignInFlowHandler"
-Cohesion: 0.07
-Nodes (28): String, systemLocalizedString(), .ok, AccountRepairDecision, cancel, proceed, TrustedPhoneNumber, TwoFactorDeliveryMode (+20 more)
+### Community 33 - "UIAlertController"
+Cohesion: 0.03
+Nodes (54): UIViewController, String, systemLocalizedString(), UIAlertAction, .cancel, .ok, AccountRepairDecision, cancel (+46 more)
 
 ### Community 34 - "Codable"
 Cohesion: 0.07
-Nodes (31): Kind, liveContainer, AppTokensRequest, AssignAppGroupsRequest, ClientPayload, CodingKeys, a, au (+23 more)
+Nodes (33): Kind, liveContainer, AppTokensRequest, AssignAppGroupsRequest, ClientPayload, CodingKeys, au, c (+25 more)
 
 ### Community 35 - "GitHubUpdateConfiguration"
-Cohesion: 0.05
-Nodes (41): Comparison, newer, older, same, unknown, GitHubCheckResult, GitHubCheckState, current (+33 more)
+Cohesion: 0.08
+Nodes (19): ImportedIPARow, .body, .installedBuildLabel, GitHubUpdateConfiguration, .effectiveBaselineKey, .id, SideKickLibraryAppRow, GitHubAppUpdateStatusView (+11 more)
 
 ### Community 36 - "CertificateManager"
-Cohesion: 0.17
-Nodes (3): ActiveSigningCertificate, .serialNumber, CertificateManager
+Cohesion: 0.09
+Nodes (6): Keychain, KeychainItem, .wrappedValue, ActiveSigningCertificate, .serialNumber, CertificateManager
 
 ### Community 37 - "BonjourDiscoveryManager"
-Cohesion: 0.08
-Nodes (11): BonjourDiscoveryManager, DiscoveredService, .id, OneShotResolver, ResolvedServiceInfo, .id, ServiceTypeInfo, .displayName (+3 more)
+Cohesion: 0.10
+Nodes (8): BonjourDiscoveryManager, DiscoveredService, .id, OneShotResolver, ResolvedServiceInfo, .id, .sortedAddresses, .typeBadge
 
 ### Community 39 - "GitHubDiagnosticsStore"
 Cohesion: 0.05
 Nodes (39): Entry, .details, Event, cacheHit, checkFinished, checkPublished, checkSkipped, checkStarted (+31 more)
 
 ### Community 40 - "PillButton"
-Cohesion: 0.04
-Nodes (24): ResignAltStoreViewController, DisplayState, active, crossSigned, expired, revoked, PillButton, .accessibilityValue (+16 more)
+Cohesion: 0.05
+Nodes (21): ResignAltStoreViewController, DisplayState, active, crossSigned, expired, revoked, PillButton, .accessibilityValue (+13 more)
 
 ### Community 41 - "xcmapping-diff.py"
 Cohesion: 0.06
 Nodes (27): append_diff(), check_missing_nodes(), compare_attributes(), compare_tags(), compare_text(), create_attribute_or_relationship_mapping_key(), create_event_entity_mapping_key(), create_mapping_model_key() (+19 more)
 
 ### Community 42 - "PersistentContainer"
-Cohesion: 0.10
-Nodes (10): DatabaseError, databaseDowngradeDetected, .errorCode, .errorDescription, .errorDomain, .failureReason, migrationFailed, missingAppGroup (+2 more)
+Cohesion: 0.08
+Nodes (11): DatabaseError, databaseDowngradeDetected, .errorCode, .errorDescription, .errorDomain, .failureReason, migrationFailed, missingAppGroup (+3 more)
 
 ### Community 43 - "BrowseViewController"
 Cohesion: 0.08
 Nodes (10): BrowseViewController, .category, .searchPredicate, AppSorting, `default`, developer, .isAscending, lastUpdated (+2 more)
 
 ### Community 44 - "DeveloperServicesViewModel"
-Cohesion: 0.14
-Nodes (8): .body, .body, DeveloperServicesViewModel, .errorMessage, .isPaidAccount, .body, .body, .body
+Cohesion: 0.12
+Nodes (13): InfoRow, .body, .body, .body, .body, .body, DeveloperServicesViewModel, .errorMessage (+5 more)
 
 ### Community 45 - "MinimuxerWrapper.swift"
-Cohesion: 0.10
-Nodes (34): attachDebugger(), bindConnectionConfig(), debugApp(), dumpProfiles(), ensureMinimuxerReady(), fetchUDID(), installAppBundle(), installIPA() (+26 more)
+Cohesion: 0.09
+Nodes (36): ProfileDumpMode, raw, zip, attachDebugger(), debugApp(), dumpProfiles(), ensureMinimuxerReady(), fetchUDID() (+28 more)
 
 ### Community 46 - "WirelessPairViewModel"
-Cohesion: 0.06
-Nodes (23): .pairingMethodsSection, WirelessPairTargetDialog, .body, .clientModeContent, .fallbackEndpointRow, .serverModeContent, WirelessPairView, .body (+15 more)
+Cohesion: 0.05
+Nodes (29): .pairingMethodsSection, WirelessPairTargetDialog, .body, .clientModeContent, .fallbackEndpointRow, .serverModeContent, ConnectionDetailsCard, .body (+21 more)
 
 ### Community 47 - "ImportedIPA"
 Cohesion: 0.05
-Nodes (29): ImportedIPA, .formattedImportDate, .id, .isUpdateQueued, IPAImportError, ambiguousAppBundles, bundleIdentifierMismatch, .errorDescription (+21 more)
+Nodes (26): ImportedIPA, .formattedImportDate, .id, .isUpdateQueued, IPAImportError, ambiguousAppBundles, bundleIdentifierMismatch, .errorDescription (+18 more)
 
 ### Community 48 - "CollapsingMarkdownView"
-Cohesion: 0.06
-Nodes (10): Mode, collapsed, expanded, UpdateCollectionViewCell, .mode, CollapsingMarkdownView, .intrinsicContentSize, .isCollapsed (+2 more)
+Cohesion: 0.18
+Nodes (5): CollapsingMarkdownView, .intrinsicContentSize, .isCollapsed, .lineSpacing, .maximumNumberOfLines
 
 ### Community 49 - "AppDetailCollectionViewController"
-Cohesion: 0.09
-Nodes (12): AppDetailCollectionViewController, .collectionViewLayout, ElementKind, button, title, SafeAreaIgnoringCollectionView, .safeAreaInsets, Section (+4 more)
+Cohesion: 0.10
+Nodes (11): AppDetailCollectionViewController, .collectionViewLayout, ElementKind, button, title, SafeAreaIgnoringCollectionView, .safeAreaInsets, Section (+3 more)
 
 ### Community 50 - "MinimuxerImpl"
-Cohesion: 0.07
-Nodes (16): ProfileDumpMode, raw, zip, MinimuxerImpl, .activeProtocol, .deviceProbeTimeout, .gateway, .isLoggingEnabled (+8 more)
+Cohesion: 0.08
+Nodes (13): MinimuxerImpl, .activeProtocol, .deviceProbeTimeout, .gateway, .isLoggingEnabled, .isPairingFileLoaded, .pairingFileType, .statusPublisher (+5 more)
 
 ### Community 51 - ".body"
 Cohesion: 0.12
-Nodes (14): CertificatesView, .allowedImportTypes, .allowedKeyImportTypes, .body, CreateCertificateSheetView, .body, .canCreate, .isPaidWarningVisible (+6 more)
+Nodes (11): ActiveCertSectionView, CertificatesView, .allowedImportTypes, .allowedKeyImportTypes, .body, CreateCertificateSheetView, .canCreate, .isPaidWarningVisible (+3 more)
 
 ### Community 52 - "GitHubCredentialStore"
-Cohesion: 0.05
-Nodes (39): DeviceCode, GitHubAccountSession, .account, .isSignedIn, GitHubAppConfiguration, .installURL, .isConfigured, SessionError (+31 more)
+Cohesion: 0.22
+Nodes (9): Credential, .isGitHubAccount, GitHubCredentialError, .errorDescription, keychain, missing, GitHubCredentialStore, .baseQuery (+1 more)
 
 ### Community 53 - "InfoPlistParser"
-Cohesion: 0.05
-Nodes (35): Code, invalidApp, missingAppBundle, missingInfoPlist, missingProvisioningProfile, unknown, .errorCode, .errorDomain (+27 more)
+Cohesion: 0.07
+Nodes (24): .infoPlistURL, InfoPlistParser, .appName, .backgroundModes, .buildVersion, .bundleIdentifier, .bundleName, .customURLSchemes (+16 more)
 
-### Community 54 - "LocalVPNService"
-Cohesion: 0.10
-Nodes (12): LocalVPNError, connection, .errorDescription, externalNotConnected, inUse, pairingRequired, LocalVPNService, .externalConnected (+4 more)
+### Community 54 - "DeveloperPortalError"
+Cohesion: 0.07
+Nodes (29): DeveloperPortalError, accountRepairRequired, appGroupDoesNotExist, appIDDoesNotExist, appSpecificPasswordRequired, authenticationHandshakeFailed, bundleIdentifierUnavailable, certificateDoesNotExist (+21 more)
 
-### Community 55 - "HomeView"
+### Community 55 - "InstalledAppSummary"
 Cohesion: 0.04
-Nodes (52): .updateTargets, GitHubUpdateNotificationRoute, GitHubUpdateNotificationRouteStore, State, downloading, failed, needsTarget, ready (+44 more)
+Nodes (53): .updateTargets, InstalledAppSummary, .id, .importedCertificate, .updateMatchingBundleIdentifiers, .updateTarget, HomeContextRoute, install (+45 more)
 
-### Community 56 - "LiveContainerReadOperation"
-Cohesion: 0.13
-Nodes (10): LiveContainerScan, LiveContainerDirectoryAccess, LiveContainerReadContext, LiveContainerReadOperation, LiveContainerReadResult, guest, scan, Notification.Name (+2 more)
+### Community 56 - ".dismiss"
+Cohesion: 0.07
+Nodes (19): GitHubDownloadProgress, .fractionCompleted, IPAImportDownloadStore, .activeJobIDs, Job, State, downloading, failed (+11 more)
 
 ### Community 57 - "OperationError"
 Cohesion: 0.04
-Nodes (40): OperationError, cacheClearError, .cancelled, certificateExpired, certificateRevoked, customCertificateExpired, customCertificateRevoked, .errorDescription (+32 more)
+Nodes (39): OperationError, cacheClearError, .cancelled, certificateExpired, certificateRevoked, customCertificateExpired, customCertificateRevoked, .errorDescription (+31 more)
 
 ### Community 59 - ".startImport"
 Cohesion: 0.17
@@ -773,61 +798,57 @@ Nodes (4): Mode, export, fileImport, TVWebFileTransferManager
 Cohesion: 0.04
 Nodes (48): MinimuxerError, argv, attach, bundlePath, connectionModeNotConfigured, createAfc, createCoreDevice, createDebug (+40 more)
 
-### Community 61 - "ImportedCertificateRecord"
-Cohesion: 0.09
-Nodes (22): ImportedCertificateCatalog, .profileUUIDs, .sortedCertificates, ImportedCertificateCatalogError, duplicate, .errorDescription, noMatchingCertificate, unknownCertificate (+14 more)
+### Community 61 - "ImportedCertificateCatalog"
+Cohesion: 0.11
+Nodes (15): ImportedCertificateCatalog, ImportedCertificateCatalogError, duplicate, .errorDescription, noMatchingCertificate, unknownCertificate, ImportedCertificateStatus, revoked (+7 more)
 
 ### Community 62 - "SideStoreOperationService"
-Cohesion: 0.10
-Nodes (10): .updateMatchingBundleIdentifiers, ManagedAppRefreshRecovery, account, localConnection, ManagedAppRefreshResult, .id, ProgressObservationBox, QuietRefreshOutcome (+2 more)
+Cohesion: 0.05
+Nodes (38): Account selection, Retained payloads and temporary files, Screenshot findings, Suggested baseline overriding a choice, Update layout and missing Options, LocalVPNError, connection, .errorDescription (+30 more)
 
 ### Community 63 - "AppBundle"
 Cohesion: 0.11
 Nodes (12): AppBundle, .allAppBundles, .allEntitlements, .appExtensions, .entitlements, .entitlementsString, .executableName, .executableURL (+4 more)
 
 ### Community 65 - "WidgetUpdateIntent"
-Cohesion: 0.29
-Nodes (3): WidgetUpdateIntent, .isDiscoverable, .title
+Cohesion: 0.11
+Nodes (7): AppIntents, ShortcutsProvider, .appShortcuts, .shortcutTileColor, WidgetUpdateIntent, .isDiscoverable, .title
 
 ### Community 66 - "Account"
-Cohesion: 0.06
-Nodes (22): .localizedName, Account, .id, .name, AuthSession, CodingKeys, identifier, memberships (+14 more)
+Cohesion: 0.10
+Nodes (17): CodingKeys, identifier, memberships, name, teamType, type, Team, .id (+9 more)
 
-### Community 67 - "LiveContainerSharedAccess"
-Cohesion: 0.09
-Nodes (9): LiveContainerSharedAccess, .container, .status, Status, available, noSharedFolder, notGranted, LiveContainerSharedStorage (+1 more)
+### Community 67 - "Device"
+Cohesion: 0.11
+Nodes (13): CodingKeys, deviceClass, deviceID, identifier, name, osVersion, status, type (+5 more)
 
 ### Community 68 - "CellContentDataSource"
-Cohesion: 0.08
-Nodes (7): CellContentDataSource, .anyIndexPathTranslator, .anyIsDynamic, .anyItemCount, .isDynamic, .placeholderView, .predicate
-
-### Community 69 - "AppManager.swift"
 Cohesion: 0.09
-Nodes (7): AVFoundation, Intents, IntentsUI, MessageUI, MobileCoreServices, Observation, UserNotifications
+Nodes (8): CellContentDataSource, .anyIndexPathTranslator, .anyIsDynamic, .anyItemCount, .isDynamic, .placeholderView, .predicate, .cellConfigurationHandler
+
+### Community 69 - "UICollectionViewController"
+Cohesion: 0.08
+Nodes (3): AppScreenshotsViewController, AboutPatreonHeaderView, PatreonViewController
 
 ### Community 70 - "LiveContainerConnection"
 Cohesion: 0.07
-Nodes (25): LiveContainerConnection, .isConnected, LiveContainerGuest, .id, .updateTarget, LiveContainerImportError, .errorDescription, guestMismatch (+17 more)
+Nodes (23): LiveContainerConnection, .isConnected, LiveContainerImportError, .errorDescription, guestMismatch, missingSource, LiveContainerInstallation, LiveContainerStorageKind (+15 more)
 
 ### Community 71 - "StandaloneOperationContext"
-Cohesion: 0.11
-Nodes (4): teams, SignInHandler, SignInOperation, SignInResult
+Cohesion: 0.13
+Nodes (5): teams, StandaloneOperationContext, SignInHandler, SignInOperation, SignInResult
 
 ### Community 72 - "UICollectionReusableView"
 Cohesion: 0.11
 Nodes (6): InstalledAppsCollectionHeaderView, AppBannerFooterView, ButtonCollectionReusableView, PlaceholderCollectionReusableView, TextViewCollectionViewCell, TitleCollectionReusableView
 
 ### Community 73 - "GitHubHistoryStore"
-Cohesion: 0.14
-Nodes (7): GitHubHistoryPage, Entry, GitHubHistoryStore, Key, Fixture, GitHubHistoryStoreTests, Attempts
+Cohesion: 0.11
+Nodes (11): Entry, GitHubHistoryStore, Key, Fixture, GitHubHistoryStoreTests, Attempts, AuthCompatibilityRegression, ProbeError (+3 more)
 
 ### Community 74 - "PipelineStep"
-Cohesion: 0.04
-Nodes (43): PipelineStep, backupAppData, cacheApp, cacheResignedMetadata, cacheSigningCert, changeAppIcon, cleanStagedApp, createIPA (+35 more)
-
-### Community 75 - "NewsViewController"
-Cohesion: 0.04
-Nodes (4): NavigationBar, NavigationBarAppearance, NewsCollectionViewCell, NewsViewController
+Cohesion: 0.03
+Nodes (67): PipelineStep, backupAppData, cacheApp, cacheResignedMetadata, cacheSigningCert, changeAppIcon, cleanStagedApp, createIPA (+59 more)
 
 ### Community 76 - "FeaturedViewController"
 Cohesion: 0.06
@@ -849,6 +870,10 @@ Nodes (16): LocalInterfaceInfo, .id, ConfigRow, .body, DependencyRow, .body, Hea
 Cohesion: 0.14
 Nodes (31): AddCertificateResponse, AppGroupResponse, AppIDPayload, AppIDResponse, Attributes, CertificatesResponseDeveloperPortal, .endpoint, CertificatesResponseDeveloperServices2 (+23 more)
 
+### Community 81 - "GitHubTrackingTests"
+Cohesion: 0.19
+Nodes (9): Comparison, newer, older, same, unknown, GitHubTrackingPolicy, GitHubTrackingTests, a (+1 more)
+
 ### Community 82 - "StoreApp"
 Cohesion: 0.06
 Nodes (16): StoreApp, .allScreenshots, .altstoreAppID, .betaReleases, .category, .globallyUniqueID, .latestAvailableVersion, .otherCategoryPredicate (+8 more)
@@ -857,21 +882,29 @@ Nodes (16): StoreApp, .allScreenshots, .altstoreAppID, .betaReleases, .category,
 Cohesion: 0.15
 Nodes (3): profiles, RefreshAppOperation, ResignAppOperation
 
+### Community 84 - "SigningAccountDetailView"
+Cohesion: 0.10
+Nodes (12): AnisetteErrorHint, AccountAppIDListView, .body, AccountProfileListView, .body, SigningAccountDetailView, .body, .currentAccount (+4 more)
+
 ### Community 85 - "AnyObject"
-Cohesion: 0.15
-Nodes (11): AnyCellContentDataSource, CellContentIndexPathTranslating, AnyCompositeDataSource, CompositeCollectionViewDataSource, CompositeCollectionViewPrefetchingDataSource, CompositeDataSource, .cellConfigurationHandler, .shouldFlattenSections (+3 more)
+Cohesion: 0.14
+Nodes (11): AnyCellContentDataSource, CellContentIndexPathTranslating, CellContentPrefetchingDataSource, AnyCompositeDataSource, CompositeCollectionViewDataSource, CompositeCollectionViewPrefetchingDataSource, CompositeDataSource, .shouldFlattenSections (+3 more)
 
 ### Community 86 - ".export"
-Cohesion: 0.11
-Nodes (16): App, .keepsDataWhenReinstalled, InstalledRecord, LibraryIPA, Setting, bool, string, SideKickTransferImportResult (+8 more)
+Cohesion: 0.08
+Nodes (24): App, .keepsDataWhenReinstalled, InstalledRecord, LibraryIPA, Setting, bool, string, SideKickTransferError (+16 more)
 
-### Community 87 - "BackupError"
+### Community 87 - "AppOffloadView"
 Cohesion: 0.12
-Nodes (17): .failureReason, BackupCopyOutcome, copied, skipped, BackupError, .description, .failureReason, BackupErrorLocalizer (+9 more)
+Nodes (13): AppOffloadService, .isRunning, AppOffloadAction, .id, offload, restore, AppOffloadConsoleView, .body (+5 more)
 
 ### Community 88 - "X509Certificate"
-Cohesion: 0.05
-Nodes (31): CertificateEndpoint, developerPortal, developerServices2, .url, X509Certificate, .autoRotationEnabled, .certificateType, .certificateTypeId (+23 more)
+Cohesion: 0.06
+Nodes (32): CodeSignKit.X509Certificate, CertificateEndpoint, developerPortal, developerServices2, .url, X509Certificate, .autoRotationEnabled, .certificateType (+24 more)
+
+### Community 89 - "GitHubAccountSession"
+Cohesion: 0.13
+Nodes (15): DeviceCode, GitHubAccountSession, .account, .isSignedIn, GitHubAppConfiguration, .installURL, .isConfigured, SessionError (+7 more)
 
 ### Community 90 - "AddSourceViewController"
 Cohesion: 0.07
@@ -880,6 +913,10 @@ Nodes (9): AddSourceViewController, ReuseID, placeholderFooter, textFieldCell, S
 ### Community 91 - "SourceDetailContentViewController"
 Cohesion: 0.07
 Nodes (11): FetchedResultsCollectionViewDataSource, ElementKind, button, title, Section, about, featuredApps, news (+3 more)
+
+### Community 92 - "UIImage"
+Cohesion: 0.08
+Nodes (10): LightCacheBox, UIImage, .cachedDropShadowImage, .cachedIsPredominantlyLight, .hasAlphaChannel, .isPredominantlyLight, InstalledAppCollectionViewCell, InstalledAppsCollectionFooterView (+2 more)
 
 ### Community 93 - "InfoPlistCustomizationCoreView"
 Cohesion: 0.11
@@ -893,45 +930,53 @@ Nodes (33): boot_sim_async(), boot_sim_sync(), build(), clean(), clean_derived_d
 Cohesion: 0.19
 Nodes (4): SideSignConfigurationView, .body, .divider, SideSignConfigurationViewModel
 
-### Community 97 - "debugLog"
-Cohesion: 0.10
-Nodes (6): debugLog(), getFastTimestamp(), getTag(), MinimuxerLogging, .isLoggingEnabled, verboseLog()
+### Community 97 - "SourceHeaderView"
+Cohesion: 0.09
+Nodes (3): NibView, PlaceholderView, SourceHeaderView
 
 ### Community 98 - "CollapsingTextView"
 Cohesion: 0.07
 Nodes (7): CollapsingTextView, .isCollapsed, .lineSpacing, .maximumNumberOfLines, .text, ErrorLogMenuButton, ErrorLogTableViewCell
 
 ### Community 99 - "AppBannerView"
-Cohesion: 0.07
-Nodes (15): AppAction, custom, install, open, update, AppBannerView, .accessibilityAttributedLabel, .accessibilityAttributedValue (+7 more)
+Cohesion: 0.08
+Nodes (14): AppAction, custom, install, open, update, AppBannerView, .accessibilityAttributedLabel, .accessibilityAttributedValue (+6 more)
 
 ### Community 100 - "ReviewPermissionsViewController"
-Cohesion: 0.08
-Nodes (11): ArrayCollectionViewDataSource, ReviewPermissionsViewController, Section, approve, known, unknown, EntitlementsReviewHandler, PermissionReviewMode (+3 more)
+Cohesion: 0.11
+Nodes (5): ReviewPermissionsViewController, Section, approve, known, unknown
 
 ### Community 101 - "SettingsViewController"
 Cohesion: 0.03
-Nodes (19): UITableView, INInteraction, UINavigationBarAppearance, SettingsHeaderFooterView, .allCases, Section, account, advancedSettings (+11 more)
+Nodes (22): INInteraction, SettingsHeaderFooterView, Section, account, advancedSettings, appRefresh, betaTesting, credits (+14 more)
 
-### Community 104 - "ActiveAlert"
-Cohesion: 0.33
-Nodes (6): ActiveAlert, deleteConfirmation, .id, importError, resetCompleted, resetConfirmation
+### Community 103 - "ImportedCertificateError"
+Cohesion: 0.10
+Nodes (19): ImportedCertificateError, deviceNotInProfile, .errorDescription, expired, incorrectPassword, invalidProfile, keychain, missingPrivateKey (+11 more)
+
+### Community 104 - "DynamicDataSource"
+Cohesion: 0.18
+Nodes (4): DynamicCollectionViewPrefetchingDataSource, DynamicDataSource, .isDynamic, DynamicTableViewPrefetchingDataSource
 
 ### Community 105 - "ALTLocalizedError"
-Cohesion: 0.06
+Cohesion: 0.07
 Nodes (29): Code, incorrectPermissions, incorrectVersionOrder, noVersions, MergeError, .errorDomain, .errorFailureReason, .recoverySuggestion (+21 more)
+
+### Community 106 - "ProfileManager"
+Cohesion: 0.12
+Nodes (7): CertificateAnalysisResult, noMatch, publicOnly, signable, ProfileManager, .profilesDirectory, .readyCount
 
 ### Community 107 - "CertificateError"
 Cohesion: 0.12
 Nodes (11): 2. Certificate Management (`CertificateParser`, `PKCS12Parser`), CertificateParser, PKCS12Parser, CertificateError, csrGenerationFailed, decryptionFailed, .errorDescription, invalidData (+3 more)
 
 ### Community 108 - "UITextField"
-Cohesion: 0.11
+Cohesion: 0.10
 Nodes (6): AuthenticationViewController, .keyCommands, UITextField, .activityCount, .activityIndicatorView, .isIndicatingActivity
 
 ### Community 109 - "EntitlementsCustomizationViewModel"
-Cohesion: 0.12
-Nodes (14): .addCustomKeySheet, .dialogActionBar, .targetPickerView, EntitlementsCustomizationViewModel, .availableCatalogEntries, .bundleID, .currentTarget, .filteredActiveEntries (+6 more)
+Cohesion: 0.14
+Nodes (14): .activeEntitlementsSection, .addCustomKeySheet, EntitlementEntry, EntitlementsCustomizationViewModel, .availableCatalogEntries, .bundleID, .currentTarget, .filteredActiveEntries (+6 more)
 
 ### Community 112 - ".getAuthenticatedTeam"
 Cohesion: 0.08
@@ -940,6 +985,10 @@ Nodes (11): AuthManager, .adsid, .currentAppleID, .hasStoredPassword, .hasStored
 ### Community 113 - "AppsEntry"
 Cohesion: 0.13
 Nodes (5): SelectAppIntent, AppsEntry, AppsTimelineProvider, AppsTimelineProviderBase, SelectAppTimelineProvider
+
+### Community 114 - "prettyJSONString"
+Cohesion: 0.31
+Nodes (6): formatPayload(), formatPayloadString(), getFastTimestamp(), getTag(), prettyPrintXML(), SideSignLogging
 
 ### Community 115 - "BaseDeviceGateway"
 Cohesion: 0.12
@@ -954,28 +1003,28 @@ Cohesion: 0.07
 Nodes (29): ConnectionConfig, .defaultOverrideIP, .defaultRemoteServerIP, .defaultWireGuardServerHost, .defaultWireGuardServerPort, .formattedTunnelIface, .formattedTunnelPeer, .overrideIPStorage (+21 more)
 
 ### Community 118 - "RemoteAnisetteConfigurationError"
-Cohesion: 0.10
+Cohesion: 0.08
 Nodes (18): RemoteAnisetteConfiguration, RemoteAnisetteConfigurationClient, RemoteAnisetteConfigurationError, .errorDescription, invalidFile, missingHeaders, noRecommendedServer, unavailable (+10 more)
 
 ### Community 119 - "EMProxyError"
-Cohesion: 0.23
-Nodes (4): matchingPriority(), EMProxyImpl, HandshakeConfig, EMProxyAPI
+Cohesion: 0.13
+Nodes (15): EMProxyError, cryptoInitFailed, .description, .errorDescription, handshakeClientNotConfigured, invalidBindAddressPointer, invalidSocketAddress, invalidUTF8String (+7 more)
 
-### Community 120 - "Minimuxer"
-Cohesion: 0.07
-Nodes (11): Android, Bionic, Darwin, EMProxy, Glibc, libdeflate, Minimuxer, Musl (+3 more)
+### Community 120 - "Combine"
+Cohesion: 0.06
+Nodes (11): Android, Bionic, Combine, Darwin, Glibc, libdeflate, Minimuxer, Musl (+3 more)
 
 ### Community 121 - "BonjourDiscoveryViewModel"
 Cohesion: 0.09
 Nodes (20): BonjourDiscoveryView, .body, .domainsList, .emptyState, DetailRow, .body, ServiceDetailView, .body (+12 more)
 
 ### Community 122 - "pathlib"
-Cohesion: 0.06
-Nodes (11): verify(), package(), ShellProxy, verify_repairs(), CompletedQueueIntegrationTests, IntegrationPatchTests, LiveContainerImportIntegrationTests, LocalConnectionRegressionTests (+3 more)
+Cohesion: 0.07
+Nodes (10): verify(), package(), verify_repairs(), CompletedQueueIntegrationTests, IntegrationPatchTests, LiveContainerImportIntegrationTests, LocalConnectionRegressionTests, UnsavedSettingsIntegrationTests (+2 more)
 
 ### Community 123 - "FetchedResultsDataSource"
-Cohesion: 0.11
-Nodes (7): FetchedResultsDataSource, .contentView, .fetchedResultsController, .itemCount, .liveFetchLimit, FetchedResultsTableViewDataSource, ProxyPredicate
+Cohesion: 0.12
+Nodes (6): FetchedResultsDataSource, .contentView, .fetchedResultsController, .itemCount, .liveFetchLimit, ProxyPredicate
 
 ### Community 124 - "UITests"
 Cohesion: 0.12
@@ -983,55 +1032,59 @@ Nodes (4): SeededGenerator, String, .trimmedIndentation, UITests
 
 ### Community 125 - "AppDetailCollectionViewController"
 Cohesion: 0.07
-Nodes (12): AppScreenshotsViewController, UIFontDescriptor, AltAppIconsViewController, AltIcon, CodingKeys, iconName, imageName, name (+4 more)
+Nodes (14): InfoMode, fullError, localizedDescription, UIFontDescriptor, AltAppIconsViewController, AltIcon, CodingKeys, iconName (+6 more)
 
 ### Community 126 - "DownloadAppOperation"
-Cohesion: 0.15
+Cohesion: 0.14
 Nodes (5): AltStorePlist, Dependency, .preferredFilename, DownloadAppOperation, DownloadProgressDelegate
 
 ### Community 127 - "AnisetteServersManager"
-Cohesion: 0.14
-Nodes (10): AnisetteServerItem, .id, AnisetteServersManager, .importedFileName, .isOfflineMode, .lastDailySyncTimestamp, .lastDailySyncWasSuccessful, .lastFailureSyncTimestamp (+2 more)
+Cohesion: 0.15
+Nodes (11): json, AnisetteServerItem, .id, AnisetteServersManager, .importedFileName, .isOfflineMode, .lastDailySyncTimestamp, .lastDailySyncWasSuccessful (+3 more)
 
-### Community 128 - "MetadataKey"
-Cohesion: 0.09
-Nodes (21): MetadataKey, autoRotationEnabled, certificateType, certificateTypeId, certificateTypeName, displayName, identifier, isManaged (+13 more)
+### Community 128 - "Account"
+Cohesion: 0.13
+Nodes (5): .localizedName, Account, .id, .name, AuthSession
 
 ### Community 129 - "ConsoleLogViewModel"
-Cohesion: 0.10
-Nodes (10): Array, ConsoleLogView, .body, ConsoleLogViewModel, .activeHeaderTitle, .activeLogURL, LogSource, console (+2 more)
+Cohesion: 0.12
+Nodes (9): ConsoleLogView, .body, ConsoleLogViewModel, .activeHeaderTitle, .activeLogURL, LogSource, console, imported (+1 more)
 
 ### Community 130 - "SideKickStorageCleanup"
 Cohesion: 0.20
 Nodes (5): RemovableStorageItem, .id, SideKickStorageCleanup, .hasActiveOperations, StorageRemovalPolicy
 
 ### Community 131 - "AppScreenshot"
-Cohesion: 0.09
+Cohesion: 0.08
 Nodes (14): AppScreenshot, .aspectRatio, .deviceType, .screenshotID, .size, AppScreenshots, CodingKeys, height (+6 more)
 
-### Community 132 - ".fetchAnisetteHeaders"
+### Community 132 - "DeviceDataError"
 Cohesion: 0.14
 Nodes (10): DeviceDataError, corruptedData, decryptionFailed, encryptionFailed, .errorDescription, fileNotFound, invalidPassword, DeviceDataManager (+2 more)
 
 ### Community 133 - "UserCustomizationsView"
-Cohesion: 0.13
-Nodes (9): syncMinimuxerBackendFromUserDefaults(), EditDialogState, UserCustomizationsView, .appImportSourceModeBinding, .body, .cellularRefreshShortcutsSection, .customizeAppExtensionsBinding, .divider (+1 more)
+Cohesion: 0.09
+Nodes (14): AppImportSourceMode, .displayName, files, .id, prompt, url, EditDialogState, UserCustomizationsView (+6 more)
 
-### Community 134 - "StorageExplorerViewModel"
-Cohesion: 0.16
-Nodes (9): .body, EmptyAreaContextMenuView, .body, EmptyPasteAreaSectionView, .body, PasteConflict, .id, StorageExplorerViewModel (+1 more)
+### Community 134 - "GitHubRepositoryImportView"
+Cohesion: 0.14
+Nodes (11): GitHubImportChoice, .id, GitHubImportPage, GitHubRepositoryDownloadView, GitHubRepositoryImportView, .body, .requestKey, GitHubWorkflowPickerView (+3 more)
+
+### Community 135 - "BaseEntity"
+Cohesion: 0.13
+Nodes (3): BaseEntity, SerializationFormat, Fetchable
 
 ### Community 136 - "AppendTeamIDCheckboxView"
-Cohesion: 0.18
+Cohesion: 0.17
 Nodes (4): AppendTeamIDCheckboxView, .isChecked, .suffix, BundleIDSanitizer
 
 ### Community 137 - "CaseIterable"
-Cohesion: 0.04
-Nodes (56): PresentationEdge, bottom, left, none, right, top, AdvancedSettingsRow, anisetteServers (+48 more)
+Cohesion: 0.05
+Nodes (43): Row, description, permissions, screenshots, subtitle, versionDescription, AppRefreshRow, addToSiri (+35 more)
 
-### Community 138 - "DeviceRegistrationFlow"
-Cohesion: 0.12
-Nodes (6): DeviceProvisioningHandler, DeviceRegistrationFlow, ProvisioningErrorDecision, cancel, retry, skip
+### Community 139 - "SelectTeamViewController"
+Cohesion: 0.08
+Nodes (4): SelectTeamViewController, .preferredStatusBarStyle, RefreshAttempt, RefreshAttemptsViewController
 
 ### Community 140 - "OperationStep"
 Cohesion: 0.17
@@ -1042,8 +1095,8 @@ Cohesion: 0.08
 Nodes (23): ExpirationNotificationScheduler, TimeInterval, Anisette, .defaultODAMetadataURLString, AppConstants, AppleAuth, Bonjour, Connection (+15 more)
 
 ### Community 142 - "SetupStatus"
-Cohesion: 0.12
-Nodes (19): RequiredSetupView, .accountPage, .body, .pairingPage, .shortcutPage, .shortcutTestPage, .vpnPage, .welcomePage (+11 more)
+Cohesion: 0.16
+Nodes (12): .body, SetupStatus, .hasPairingFile, .isBusy, .isDeviceReady, .requiredTeamIdentifier, .selfSigningAccount, AdvancedSettingsView (+4 more)
 
 ### Community 143 - "Archive"
 Cohesion: 0.12
@@ -1058,56 +1111,56 @@ Cohesion: 0.12
 Nodes (10): NSManagedObject, .sourceApps, .sourceNewsItems, .sourceSourceId, .sourceSourceURL, .storeAppPermissions, .storeAppReleaseTracks, .storeAppScreenshots (+2 more)
 
 ### Community 146 - "sys"
-Cohesion: 0.12
-Nodes (19): artifact_record(), fail(), main(), packaged_app_metadata(), parse_xcconfig(), sha256(), file_size(), getFormattedLocalizedDescription() (+11 more)
+Cohesion: 0.23
+Nodes (7): ensure_app(), load_metadata(), load_source(), main(), save_source(), update_release_channel(), update_storefront_if_needed()
 
 ### Community 147 - "GitHubHistoryClient"
-Cohesion: 0.14
-Nodes (11): Artifact, Artifacts, Asset, GitHubHistoryClient, Release, Run, Runs, GitHubHistoryClientTests (+3 more)
+Cohesion: 0.09
+Nodes (20): Artifact, Artifacts, Asset, GitHubHistoryClient, GitHubHistoryError, ambiguousAsset, .errorDescription, invalidResponse (+12 more)
 
 ### Community 148 - "SideJITServerConfigView"
-Cohesion: 0.07
-Nodes (26): SideJITManager, SideJITConnectionStatus, checking, .color, disabled, disconnected, discovering, ready (+18 more)
+Cohesion: 0.06
+Nodes (29): AppBootManager, .needsPairingPrompt, .needsSideJITPrompt, SideJITManager, SideJITConnectionStatus, checking, .color, disabled (+21 more)
 
 ### Community 149 - "LiveContainerGuest"
-Cohesion: 0.13
-Nodes (7): GitHubUpdateConfigurationStore, .pendingSourcesURL, LiveContainerPendingSource, .repositoryName, Notification.Name, GitHubBaselineTests, LiveContainerImportTests
+Cohesion: 0.11
+Nodes (7): LiveContainerImportPolicy, GitHubUpdateConfigurationStore, .pendingSourcesURL, LiveContainerPendingSource, Notification.Name, GitHubBaselineTests, LiveContainerImportTests
 
 ### Community 150 - "CharacterSet"
-Cohesion: 0.13
-Nodes (9): AnisetteConfiguration, ValidationError, .errorDescription, header, server, AnisetteConfigurationTests, .activeSigningCertificateBase64Encoded, CharacterSet (+1 more)
+Cohesion: 0.15
+Nodes (6): AnisetteConfiguration, ValidationError, .errorDescription, header, server, AnisetteConfigurationTests
 
-### Community 151 - "RemoteAnisetteDataProvider"
-Cohesion: 0.18
-Nodes (4): json, ProvisioningSessionManager, RemoteAnisetteDataProvider, .requiresLocalLibraries
+### Community 151 - "AnisetteConfigManager"
+Cohesion: 0.16
+Nodes (7): AnisetteConfig, AnisetteConfigManager, .anisetteAdiBlob, .anisetteIdentifier, .configFileURL, .isOfflineMode, .serverHeadersFileURL
 
 ### Community 152 - "RFC7693BLAKE2s"
-Cohesion: 0.19
-Nodes (5): BLAKE2s, EMProxyTests, HandshakeState, RFC7693BLAKE2s, UInt32
+Cohesion: 0.22
+Nodes (4): BLAKE2s, EMProxyTests, HandshakeState, RFC7693BLAKE2s
 
 ### Community 153 - "DeviceConnectionManager"
 Cohesion: 0.13
-Nodes (11): ConnectionConfigBinding, DeviceConnectionMode, localVPN, notConfigured, remoteServer, ServicePort, CandidatePeer, DeviceConnectionManager (+3 more)
+Nodes (10): ConnectionConfigBinding, DeviceConnectionMode, localVPN, notConfigured, remoteServer, CandidatePeer, DeviceConnectionManager, .deviceProbeTimeout (+2 more)
 
 ### Community 154 - "ProvisioningProfile"
-Cohesion: 0.23
-Nodes (4): ProvisioningProfile, .certificates, .entitlements, .id
+Cohesion: 0.11
+Nodes (16): CodingKeys, bundleIdentifier, creationDate, data, deviceIDs, expirationDate, identifier, isFreeProvisioningProfile (+8 more)
 
 ### Community 155 - "NSAttributedString+Markdown.swift"
 Cohesion: 0.21
 Nodes (14): addEscapesInMarkdownString(), addTrait(), adjustRangeForWhitespace(), emitMarkdown(), MarkdownStyleKey, NSAttributedString, .markdownRepresentation, PlatformFontDescriptorSymbolicTraits (+6 more)
 
 ### Community 156 - ".tableView"
-Cohesion: 0.12
-Nodes (6): ProfileRowItemView, .body, .expirationString, .isExpired, .isReady, SelectProfileViewController
+Cohesion: 0.10
+Nodes (7): ProfileRowItemView, .body, .expirationString, .isExpired, .isReady, SelectProfileViewController, SetProfileAlertViewController
 
 ### Community 157 - "AppState"
 Cohesion: 0.09
-Nodes (11): ContentView, .body, .failure, .title, AppState, BackupOperation, backup, restore (+3 more)
+Nodes (11): ContentView, .body, AppState, BackupOperation, backup, restore, BackupOperationFailure, Bundle (+3 more)
 
 ### Community 158 - "VerificationError"
-Cohesion: 0.08
-Nodes (20): .app, ALTApplication, .storeApp, .url, AnyApp, AppProtocol, AppVersion, .bundleIdentifier (+12 more)
+Cohesion: 0.06
+Nodes (25): .app, ALTApplication, .storeApp, .url, AnyApp, AppProtocol, AppVersion, .bundleIdentifier (+17 more)
 
 ### Community 159 - "ConsoleLog"
 Cohesion: 0.13
@@ -1125,17 +1178,13 @@ Nodes (4): AbstractConsoleLogger, BufferedConsoleLogger, ConsoleLogger, UnBuffer
 Cohesion: 0.15
 Nodes (8): Color, black, red, Node, TreeMap, .isEmpty, .keys, .values
 
-### Community 163 - "AppContentViewController"
-Cohesion: 0.05
-Nodes (11): AppContentViewController, Row, description, permissions, screenshots, subtitle, versionDescription, SelectTeamViewController (+3 more)
-
 ### Community 164 - "AnisetteSettingsView"
-Cohesion: 0.09
-Nodes (13): PairingSetupImporter, .body, AnisetteRemoteRecord, AnisetteSettingsView, .body, .draft, .remoteUpdatedText, ConnectionSettingsView (+5 more)
+Cohesion: 0.12
+Nodes (15): .body, AnisetteRemoteRecord, AnisetteSettingsView, .body, .draft, .remoteUpdatedText, ConnectionSettingsView, .body (+7 more)
 
 ### Community 165 - "NetworkObserverService"
 Cohesion: 0.15
-Nodes (4): WirelessPairService, .gateway, WirelessPairStartGate, .onReadyToPair
+Nodes (4): WirelessPairService, .gateway, WirelessPairStartGate, .onRequestPin
 
 ### Community 166 - "PlatformURL"
 Cohesion: 0.12
@@ -1143,11 +1192,11 @@ Nodes (10): BuildVersion, ProcessInfo, .operatingSystemBuild, .shortVersion, .sp
 
 ### Community 167 - "EntitlementsCustomizationCoreView"
 Cohesion: 0.10
-Nodes (15): EntitlementsCustomizationCoreView, .accountBadge, .activeEntitlementsSection, .addCustomKeyButton, .availableEntitlementsSection, .body, .contentView, .dialogBody (+7 more)
+Nodes (15): EntitlementsCustomizationCoreView, .accountBadge, .addCustomKeyButton, .availableEntitlementsSection, .body, .contentView, .dialogActionBar, .dialogBody (+7 more)
 
-### Community 168 - "ImportedCertificatesView"
-Cohesion: 0.13
-Nodes (13): ImportedCertificateDetailView, .current, .statusText, ImportedCertificateResignWarningView, .body, ImportedCertificateRow, .body, .subtitle (+5 more)
+### Community 168 - "UInt32"
+Cohesion: 0.15
+Nodes (4): UInt32, ProvisioningSessionManager, RemoteAnisetteDataProvider, .requiresLocalLibraries
 
 ### Community 169 - "NewsItem"
 Cohesion: 0.09
@@ -1159,27 +1208,27 @@ Nodes (6): .matchesAppIcon, .body, AppIconController, .liveContainerBundle, .mat
 
 ### Community 171 - "PairingProtocol"
 Cohesion: 0.12
-Nodes (13): PairingFile, PairingProtocol, .defaultPort, .description, lockdown, rppairing, unknown, minimuxerPairingProtocol() (+5 more)
+Nodes (8): PairingSetupImporter, minimuxerPairingProtocol(), PairingFileManager, .activeProtocol, .persistedActiveProtocol, .preferredProtocol, .supportedContentTypes, .fileURL
 
 ### Community 172 - "DevicesListView"
-Cohesion: 0.10
-Nodes (13): AppGroupsListView, .filteredGroups, DeveloperServicesToastView, .body, DeveloperServicesView, .body, View, ActiveDeviceAlert (+5 more)
+Cohesion: 0.11
+Nodes (10): AppGroupsListView, .filteredGroups, AppIDsListView, .deleteAlertMessage, .filteredAppIDs, DeveloperServicesToastView, .body, DeveloperServicesView (+2 more)
 
 ### Community 173 - "CodingKeys"
 Cohesion: 0.10
 Nodes (21): CodingKeys, appId, certContent, certificateId, certRequestId, dateExpire, deviceIds, encodedProfile (+13 more)
 
 ### Community 174 - "NetworkObserverService"
-Cohesion: 0.13
-Nodes (8): NetworkObserverService, .currentPath, .isUsbSatisfied, .isWifiSatisfied, .isWiredSatisfied, .pathPublisher, Session, State
+Cohesion: 0.14
+Nodes (7): NetworkObserverService, .currentPath, .isWifiSatisfied, .isWiredSatisfied, .pathPublisher, Session, State
 
 ### Community 175 - "CertificateASN1Parser.swift"
 Cohesion: 0.21
 Nodes (18): CommonCrypto, ASN1Item, CertificateBriefInfo, computeSHA1Fingerprint(), computeSHA256Fingerprint(), computeValidityStats(), friendlyOIDLabel(), getBriefInfo() (+10 more)
 
 ### Community 176 - "GroupOption"
-Cohesion: 0.08
-Nodes (26): AppExtensionCustomization, .displayName, .fixedDecision, .id, keepAll, promptUser, removeAll, useMainProfile (+18 more)
+Cohesion: 0.09
+Nodes (21): FileImportMode, certificate, privateKey, GroupedCertificates, .id, GroupOption, creationDate, expiryDate (+13 more)
 
 ### Community 177 - ".run"
 Cohesion: 0.14
@@ -1198,47 +1247,47 @@ Cohesion: 0.14
 Nodes (16): AppleIDStep, .body, CompleteStep, .body, .hasPairingFile, .isAuthenticated, LocalDevVPNStep, .body (+8 more)
 
 ### Community 181 - "Stage"
-Cohesion: 0.10
-Nodes (21): Stage, anisette, anisetteResync, appDataTransfer, authComplete, authentication, authInit, authTokens (+13 more)
+Cohesion: 0.04
+Nodes (53): DiagnosticsStore, Entry, .details, ErrorKind, apple, cocoa, keychain, network (+45 more)
 
 ### Community 182 - "StorageExplorerViewModel"
-Cohesion: 0.10
-Nodes (14): ActiveAlert, bulkRename, confirmBulkDelete, confirmSingleDelete, error, .id, pasteConflictCopyError, rename (+6 more)
+Cohesion: 0.12
+Nodes (9): .body, PasteConflict, .id, StorageExplorerItem, .formattedDate, .formattedSize, .id, StorageExplorerViewModel (+1 more)
 
 ### Community 183 - "SideSignHeaders"
-Cohesion: 0.13
-Nodes (6): ObjectiveC, MergePolicy, NSConstraintConflict, .allObjects, .snapshots, RelationshipPreservingMergePolicy
+Cohesion: 0.12
+Nodes (6): ObjectiveC, Error, MergePolicy, NSConstraintConflict, .allObjects, .snapshots
 
-### Community 184 - "StatusBadge"
-Cohesion: 0.06
-Nodes (30): ImportedIPARow, .body, StatusBadge, .body, StatusSymbol, .body, StatusTone, accent (+22 more)
+### Community 184 - "BaseOperation"
+Cohesion: 0.21
+Nodes (4): AsyncOperation, BaseOperation, .totalUnitCount, BaseStandaloneOperation
 
 ### Community 185 - "GitHubUpdateDetailView"
-Cohesion: 0.11
-Nodes (14): GitHubUpdateDownloadJob, DownloadProgressBar, .body, GitHubUpdateDetailView, .account, .body, .detailsContent, .eligibleAccounts (+6 more)
+Cohesion: 0.09
+Nodes (17): GitHubUpdateDownloadJob, DownloadProgressBar, .body, GitHubUpdateDetailView, .account, .body, .detailsContent, .downloadJob (+9 more)
 
 ### Community 187 - "UnsavedSettingsCoordinator"
-Cohesion: 0.07
+Cohesion: 0.08
 Nodes (9): installed, TabReselectGuard, Draft, UnsavedSettingsCoordinator, .hasUnsavedChanges, GuardLifetime, UnsavedSettingsGuard, View (+1 more)
 
 ### Community 188 - "DirectoryItemListSectionView"
-Cohesion: 0.15
-Nodes (11): AdaptiveTappableRow, .body, DirectoryExplorerView, .folderSummaryString, DirectoryItemListSectionView, .body, ItemContextMenuView, ItemRow (+3 more)
+Cohesion: 0.20
+Nodes (12): BottomInformationBarView, .body, EmptyAreaContextMenuView, EmptyPasteAreaSectionView, .body, ItemContextMenuView, ItemRow, .body (+4 more)
 
 ### Community 189 - "WidgetDataManager"
 Cohesion: 0.14
 Nodes (8): WidgetDataManager, .containerURL, .hasWidgetData, .iconDirectoryURL, .isVerboseLoggingEnabled, .jsonFileURL, WidgetAppItem, WidgetDataSnapshot
 
 ### Community 190 - "Button"
-Cohesion: 0.11
-Nodes (8): Button, .intrinsicContentSize, .isEnabled, .isHighlighted, LuminanceToAlphaWrapper, .body, View, PaginationIntent
+Cohesion: 0.13
+Nodes (7): Button, .intrinsicContentSize, .isEnabled, .isHighlighted, LuminanceToAlphaWrapper, .body, View
 
 ### Community 191 - "PairingError"
-Cohesion: 0.19
-Nodes (11): plist, LockdownPairingFile, PairingFileParser, RPPairingFile, PairingError, ambiguous, .description, .errorDescription (+3 more)
+Cohesion: 0.16
+Nodes (13): plist, LockdownPairingFile, PairingFile, PairingFileParser, RPPairingFile, PairingError, ambiguous, .description (+5 more)
 
 ### Community 192 - "ReleaseTrack"
-Cohesion: 0.09
+Cohesion: 0.10
 Nodes (13): .hasUpdate, ReleaseTrack, .releases, .type, ReleaseTrackType, alpha, .betaTracks, .description (+5 more)
 
 ### Community 193 - "CodingKeys"
@@ -1246,44 +1295,44 @@ Cohesion: 0.09
 Nodes (23): CodingKeys, bundleIdentifier, category, developerName, downloadURL, iconURL, isBeta, localizedDescription (+15 more)
 
 ### Community 194 - "BackgroundRefreshAppsOperation"
-Cohesion: 0.21
-Nodes (3): OperationActor, BackgroundRefreshAppsOperation, CFNotificationName
+Cohesion: 0.18
+Nodes (4): OperationActor, startEMProxy(), BackgroundRefreshAppsOperation, CFNotificationName
 
 ### Community 195 - "ProfileType"
-Cohesion: 0.10
-Nodes (18): Category, development, distribution, ProfileManagementStyle, manual, xcodeManaged, ProfileType, .acceptedDeviceTypes (+10 more)
+Cohesion: 0.12
+Nodes (15): ProfileManagementStyle, manual, xcodeManaged, ProfileType, .acceptedDeviceTypes, .category, .description, .displayName (+7 more)
 
 ### Community 196 - "AppPermission"
 Cohesion: 0.13
 Nodes (9): AppPermission, .type, .usageDescription, AppPermissions, CodingKeys, entitlements, name, privacy (+1 more)
 
-### Community 197 - "AppOffloadService"
-Cohesion: 0.16
-Nodes (9): AppOffloadError, .errorDescription, inUse, restoreRequired, sourceMissing, unsupported, AppOffloadService, .isRunning (+1 more)
+### Community 197 - "SignerError"
+Cohesion: 0.11
+Nodes (15): Code, invalidApp, missingAppBundle, missingInfoPlist, missingProvisioningProfile, unknown, .errorCode, .errorDomain (+7 more)
 
 ### Community 198 - "AppearanceSettings"
 Cohesion: 0.13
 Nodes (14): AppearanceSettings, .accent, .accentTint, .accentUIColor, .customAccent, .isDefault, .mode, .onAccent (+6 more)
 
-### Community 200 - "UpdateSuccessRecord"
-Cohesion: 0.18
-Nodes (5): UpdateSuccessRecord, .id, UpdateSuccessSheet, .body, .versionLabel
+### Community 200 - "AnisetteViewModel"
+Cohesion: 0.13
+Nodes (5): AnisetteServersView, .body, AnisetteViewModel, .hasHiddenItems, .visibleItems
 
 ### Community 201 - "BonjourDiscoveryViewModel"
-Cohesion: 0.06
-Nodes (27): Dictionary, BonjourDiscoveryViewModel, .processedDomains, .processedInstances, .processedServiceTypes, .resolvedAddressItems, DiscoveredAddressItem, .id (+19 more)
+Cohesion: 0.09
+Nodes (13): ServiceTypeInfo, .displayName, .id, BonjourDiscoveryViewModel, .processedDomains, .processedInstances, .processedServiceTypes, .resolvedAddressItems (+5 more)
 
-### Community 202 - "LoggedError"
-Cohesion: 0.15
-Nodes (4): LoggedError, .error, .localizedDateString, .localizedFailure
+### Community 202 - "Decoder"
+Cohesion: 0.09
+Nodes (10): CodingUserInfoKey, Decoder, .managedObjectContext, .sourceURL, DecoderItem, .wrappedValue, Foundation.JSONDecoder, .managedObjectContext (+2 more)
 
-### Community 203 - "LocalConnectionSettingsView"
-Cohesion: 0.19
-Nodes (9): ChecklistRow, .body, LocalConnectionHelpView, LocalConnectionSettingsView, .body, .isReady, PairingSetupErrorForVPN, .errorDescription (+1 more)
+### Community 203 - "withFFIDispatch"
+Cohesion: 0.09
+Nodes (3): matchingPriority(), NativeOperationExecutor, withFFIDispatch()
 
 ### Community 205 - "BackgroundServiceMode"
-Cohesion: 0.11
-Nodes (18): CellularShortcutSettingsView, DailyRefreshAutomationGuideView, .body, InstallSigningSettingsView, .body, PairingSetupError, .errorDescription, unreadableFile (+10 more)
+Cohesion: 0.19
+Nodes (8): BackgroundService, BackgroundServiceManager, .shared, BackgroundServiceMode, audio, .displayName, location, .subtitle
 
 ### Community 206 - ".presentConsent"
 Cohesion: 0.28
@@ -1297,29 +1346,29 @@ Nodes (19): .permission, ALTAppPermissionType, .knownPermissionsKey, .localizedN
 Cohesion: 0.14
 Nodes (8): NSManagedObject, .sourceApps, .sourceNewsItems, .sourceSourceURL, .storeAppPermissions, .storeAppScreenshots, .storeAppVersions, Source11To17MigrationPolicy
 
-### Community 209 - "SwiftUI"
-Cohesion: 0.03
-Nodes (15): GameplayKit, MinimuxerCommon, View, Notification.Name, String, .capitalizedFirst, SwiftUI, UniformTypeIdentifiers (+7 more)
+### Community 209 - "UniformTypeIdentifiers"
+Cohesion: 0.06
+Nodes (12): AVFoundation, Intents, IntentsUI, MessageUI, MobileCoreServices, String, .capitalizedFirst, UniformTypeIdentifiers (+4 more)
 
 ### Community 210 - "StorageExplorerView"
-Cohesion: 0.16
-Nodes (7): StorageExplorerFooterView, .body, StorageExplorerView, .body, StorageLocationRowView, .body, .rowContent
+Cohesion: 0.14
+Nodes (9): StorageExplorerFooterView, .body, StorageExplorerView, .body, StorageLocationRowView, .body, .rowContent, StorageLocation (+1 more)
 
-### Community 211 - "EMProxyError"
-Cohesion: 0.12
-Nodes (14): EMProxyError, cryptoInitFailed, .description, .errorDescription, handshakeClientNotConfigured, invalidBindAddressPointer, invalidSocketAddress, invalidUTF8String (+6 more)
+### Community 211 - "GitHubUpdateError"
+Cohesion: 0.14
+Nodes (14): GitHubUpdateError, actionsTokenRequired, downloadFailed, .errorDescription, insufficientPermissions, invalidArtifact, invalidRepository, invalidResponse (+6 more)
+
+### Community 212 - "AdvancedSettingsRow"
+Cohesion: 0.14
+Nodes (14): AdvancedSettingsRow, .allCases, anisetteServers, backupAndRestore, certificateManagement, connectionConfig, developerServices, networkDiscovery (+6 more)
 
 ### Community 213 - "DeviceService"
-Cohesion: 0.10
+Cohesion: 0.11
 Nodes (17): libimobiledevice, OpenSSL, RPPairing, DeviceService, afc, debugserver, heartbeat, houseArrest (+9 more)
 
-### Community 214 - "PairingViewController"
-Cohesion: 0.17
-Nodes (4): AppBootManager, .needsPairingPrompt, .needsSideJITPrompt, PairingViewController
-
-### Community 215 - "AnisetteViewModel"
-Cohesion: 0.13
-Nodes (6): .items, AnisetteServersView, .body, AnisetteViewModel, .hasHiddenItems, .visibleItems
+### Community 215 - "UITableView"
+Cohesion: 0.08
+Nodes (14): ArrayCollectionViewDataSource, ArrayCollectionViewPrefetchingDataSource, ArrayDataSource, .items, ArrayTableViewDataSource, ArrayTableViewPrefetchingDataSource, CellContentCell, UICollectionViewCell (+6 more)
 
 ### Community 216 - "AppVersion"
 Cohesion: 0.08
@@ -1330,75 +1379,75 @@ Cohesion: 0.18
 Nodes (8): KnownSource, .dictionaryRepresentation, UserDefaults, .blockedSources, .recommendedSources, Response, UpdateKnownSourcesOperation, URL
 
 ### Community 218 - "StorageExplorerClipboard"
-Cohesion: 0.28
-Nodes (5): BottomInformationBarView, .body, StorageExplorerClipboard, .hasCopiedItems, .pasteLabelText
+Cohesion: 0.25
+Nodes (4): .body, StorageExplorerClipboard, .hasCopiedItems, .pasteLabelText
 
 ### Community 219 - "Error"
-Cohesion: 0.09
-Nodes (19): AbstractClassError, abstractInitializerInvoked, abstractMethodInvoked, MinimuxerInternalError, deviceEndpointNotInitialized, .errorDescription, networkIfaceNotRefreshed, pairingFailed (+11 more)
+Cohesion: 0.10
+Nodes (17): AbstractClassError, abstractInitializerInvoked, abstractMethodInvoked, MinimuxerInternalError, deviceEndpointNotInitialized, .errorDescription, networkIfaceNotRefreshed, pairingFailed (+9 more)
 
-### Community 220 - "Array"
-Cohesion: 0.09
-Nodes (24): Array, .activate, .backgroundRefreshApps, .backup, .clearAppCache, .deactivate, .deleteApp, .enableJIT (+16 more)
+### Community 220 - "GitHubAccountSettingsView"
+Cohesion: 0.14
+Nodes (10): GitHubTokenPickerView, .body, GitHubAccountSettingsView, .account, .body, .tokens, GitHubTokenEditorView, .body (+2 more)
 
 ### Community 221 - "Foundation"
 Cohesion: 0.04
-Nodes (20): AnisetteKit, CodeSignKit.X509Certificate, CoreData, Crypto, Foundation, GSACryptoKit, KeychainAccess, Security (+12 more)
+Nodes (16): CoreData, DeviceGatewayAPI, EMProxy, Foundation, KeychainAccess, MinimuxerCommon, Observation, Security (+8 more)
 
-### Community 222 - "InstallAppOperationContext"
-Cohesion: 0.08
-Nodes (15): CertificateStatus, expired, revoked, valid, updates, AlternateIconMode, preserve, remove (+7 more)
+### Community 222 - "CertificateStatus"
+Cohesion: 0.21
+Nodes (5): CertificateStatus, expired, revoked, valid, VerifyCertificateOperation
 
 ### Community 223 - "AnisetteDataViewModel"
-Cohesion: 0.10
-Nodes (11): AnisetteConfig, AnisetteConfigManager, .anisetteAdiBlob, .anisetteIdentifier, .configFileURL, .isOfflineMode, .serverHeadersFileURL, AnisetteDataView (+3 more)
+Cohesion: 0.17
+Nodes (4): AnisetteDataView, .body, .divider, AnisetteDataViewModel
 
 ### Community 224 - "AppExtensionViewHostingController"
 Cohesion: 0.15
 Nodes (7): Optional, OptionalProtocol, AppExtensionView, .body, AppExtensionViewHostingController, MultipleSelectionRow, .body
 
 ### Community 225 - ".performBackupCoordinated"
-Cohesion: 0.26
-Nodes (3): BackupEngine, CopyProgressTracker, FileManager
-
-### Community 226 - "ImportDownloadPanel"
-Cohesion: 0.24
-Nodes (8): ImportDownloadPage, .body, ImportDownloadPanel, .job, .store, View, VisibleImportDownload, .body
+Cohesion: 0.12
+Nodes (17): BackupCopyOutcome, copied, skipped, BackupEngine, BackupError, .description, BackupErrorLocalizer, Code (+9 more)
 
 ### Community 228 - "XCTest"
 Cohesion: 0.10
 Nodes (6): FoundationNetworking, SideKickTransferIdentifiers, SideKickCore, SideKickTransferIdentifiersTests, Data, XCTest
 
 ### Community 229 - "PaginationIntent"
-Cohesion: 0.23
-Nodes (3): verboseLog(), NavigationEvent, PageInfoManager
+Cohesion: 0.19
+Nodes (3): NavigationEvent, PaginationIntent, PageInfoManager
 
 ### Community 231 - "Account"
-Cohesion: 0.09
-Nodes (16): PairingFileMetadata, Color, PairingFileDetailView, .body, .creationDate, .currentSHA256, .divider, .fileInfoSection (+8 more)
+Cohesion: 0.10
+Nodes (15): PairingFileMetadata, Color, PairingFileDetailView, .body, .creationDate, .currentSHA256, .divider, .fileInfoSection (+7 more)
+
+### Community 232 - "SideSignConfigManager"
+Cohesion: 0.16
+Nodes (3): SideSignHeaders, SideSignConfigManager, .configFileURL
 
 ### Community 233 - ".isLoggingEnabled"
 Cohesion: 0.09
 Nodes (17): logOperationSummary(), OperationLogging, debugLog(), formatLogMessage(), getFastTimestamp(), getTag(), SideStoreLogging, .isLoggingEnabled (+9 more)
 
 ### Community 235 - "CodeResourcesViewer"
-Cohesion: 0.19
+Cohesion: 0.18
 Nodes (11): CodeResourceEntry, CodeResourceRule, CodeResourcesViewer, .body, .filteredEntries, .filteredRules, FilterMode, all (+3 more)
 
 ### Community 236 - "CertificatePortalRow"
 Cohesion: 0.12
-Nodes (9): CertificatePortalDetailView, .body, .isExpired, CertificatePortalRow, .body, .isExpired, CertificatesPortalListView, .body (+1 more)
+Nodes (8): CertificatePortalDetailView, .isExpired, CertificatePortalRow, .body, .isExpired, CertificatesPortalListView, .body, .filteredCertificates
 
 ### Community 237 - "BackgroundLocationService"
 Cohesion: 0.16
 Nodes (4): CoreLocation, BackgroundLocationService, .isRunning, LocationDelegateBridge
 
-### Community 238 - "UITableViewCell"
-Cohesion: 0.06
-Nodes (18): ArrayCollectionViewPrefetchingDataSource, ArrayDataSource, ArrayTableViewDataSource, ArrayTableViewPrefetchingDataSource, CellContentCell, UICollectionViewCell, .nib, UITableViewCell (+10 more)
+### Community 238 - "FetchedResultsCollectionViewPrefetchingDataSource"
+Cohesion: 0.31
+Nodes (3): FetchedResultsCollectionViewPrefetchingDataSource, FetchedResultsTableViewDataSource, FetchedResultsTableViewPrefetchingDataSource
 
 ### Community 239 - "generate_release_notes.py"
-Cohesion: 0.23
+Cohesion: 0.27
 Nodes (16): authors(), branch_base(), commit_exists(), commit_messages(), first_commit(), fmt_author(), fmt_msg(), generate_release_notes() (+8 more)
 
 ### Community 240 - "CertificateType"
@@ -1407,23 +1456,23 @@ Nodes (12): Category, development, distribution, CertificateType, .category, .de
 
 ### Community 242 - "AppEnvironment"
 Cohesion: 0.04
-Nodes (36): AppEnvironment, .githubUpdateCheckFailed, .hasGitHubUpdateTargets, DatabaseStartupState, failed, ready, starting, SideKickApp (+28 more)
+Nodes (42): AppEnvironment, .githubUpdateCheckFailed, .hasGitHubUpdateTargets, DatabaseStartupState, failed, ready, starting, RefreshActivity (+34 more)
 
 ### Community 243 - "OCSPValidationError"
 Cohesion: 0.13
 Nodes (13): OCSPLiveStatus, error, revoked, unknown, valid, OCSPValidationError, .errorDescription, expired (+5 more)
 
 ### Community 245 - "KeyStore"
-Cohesion: 0.07
+Cohesion: 0.06
 Nodes (23): AppBundleSigner, CodeSignerAPI, SigningTargetType, appExtensionBundle, appExtensionExecutable, .description, dylib, framework (+15 more)
 
-### Community 246 - "UIImage"
-Cohesion: 0.07
-Nodes (13): AppIconImageView, .image, .style, LightCacheBox, Style, circular, icon, UIImage (+5 more)
+### Community 246 - "AppIconImageView"
+Cohesion: 0.14
+Nodes (6): AppIconImageView, .image, .style, Style, circular, icon
 
 ### Community 247 - ".share"
-Cohesion: 0.31
-Nodes (4): CertificateExporter, AdaptiveMenu, .body, .body
+Cohesion: 0.23
+Nodes (6): CertificateExporter, AdaptiveMenu, CertPrivateKeyMenuItems, .body, CertPublicKeyMenuItems, .body
 
 ### Community 248 - "ProfilePortalDetailView"
 Cohesion: 0.17
@@ -1434,24 +1483,24 @@ Cohesion: 0.25
 Nodes (8): Error, corruptArchive, .errorDescription, fileNotFound, missingAppBundle, readFailed, unsupportedFormat, writeFailed
 
 ### Community 250 - ".present"
-Cohesion: 0.28
-Nodes (3): InfoPlistCustomizationSheetView, .body, SheetDismissDelegate
+Cohesion: 0.21
+Nodes (5): SheetHostingController, InfoPlistCustomizationSheetView, .body, SheetDismissDelegate, SheetHostingController
 
 ### Community 251 - "NSManagedObject"
 Cohesion: 0.14
 Nodes (8): NSManagedObject, .storeAppBundleID, .storeAppDownloadURL, .storeAppSize, .storeAppSourceID, .storeAppVersion, .storeAppVersionDate, .storeAppVersionDescription
 
 ### Community 252 - "Entitlement"
-Cohesion: 0.11
+Cohesion: 0.12
 Nodes (13): Entitlement, .displayName, .id, .isFreeAllowed, .name, .summary, .valueType, EntitlementValueType (+5 more)
 
 ### Community 253 - "ActionLabel"
-Cohesion: 0.04
-Nodes (35): RefreshActivity, .fraction, .body, AccountAvatarKind, apple, github, AccountColorStore, ActiveDownloadsButton (+27 more)
+Cohesion: 0.03
+Nodes (62): AccountAvatar, .body, .logo, AccountAvatarKind, apple, github, AccountColorStore, ActiveDownloadsButton (+54 more)
 
 ### Community 254 - ".pairingFileCard"
-Cohesion: 0.11
-Nodes (9): Color, PairingFileManagementView, .activeProtocolSection, .body, .divider, .managementSection, .pairingFilesSection, PairingFileManagementViewModel (+1 more)
+Cohesion: 0.07
+Nodes (22): PairingProtocol, .defaultPort, .description, lockdown, rppairing, unknown, minimuxerSwitchPairingProtocol(), Color (+14 more)
 
 ### Community 255 - "PerformBackupRestoreOperation"
 Cohesion: 0.22
@@ -1461,9 +1510,9 @@ Nodes (4): Action, backup, restore, PerformBackupRestoreOperation
 Cohesion: 0.17
 Nodes (8): PageLimitResult, current, empty, null, PaginationDataHolder, Direction, down, up
 
-### Community 257 - "RefreshFailureReport"
-Cohesion: 0.21
-Nodes (3): Item, RefreshFailureReport, .id
+### Community 257 - "MetadataKey"
+Cohesion: 0.09
+Nodes (21): MetadataKey, autoRotationEnabled, certificateType, certificateTypeId, certificateTypeName, displayName, identifier, isManaged (+13 more)
 
 ### Community 258 - "OutputStream"
 Cohesion: 0.20
@@ -1482,7 +1531,7 @@ Cohesion: 0.46
 Nodes (4): Data, .isPKCS12, PFXASN1, TLV
 
 ### Community 263 - "FileManager"
-Cohesion: 0.16
+Cohesion: 0.15
 Nodes (8): ArchiveExtractionError, .errorDescription, invalidExtractionRoot, resourceLimitExceeded, symbolicLinkTraversal, unsafeEntryPath, CompressionLevel, FileManager
 
 ### Community 266 - "LinkedHashMap"
@@ -1497,145 +1546,153 @@ Nodes (6): debugLog(), getFastTimestamp(), getTag(), MinimuxerCommonLogging, .is
 Cohesion: 0.13
 Nodes (5): NetworkUtils, TCPAcceptor, TCPAcceptorCancellation, .isCancelled, close
 
-### Community 269 - "DiagnosticsView"
-Cohesion: 0.23
-Nodes (4): Snapshot, DiagnosticsView, .body, DiagnosticsTests
+### Community 269 - "GitHubCheckState"
+Cohesion: 0.07
+Nodes (23): GitHubCheckState, current, failed, indeterminate, installedAhead, .message, .needsAttention, noMatchingDownload (+15 more)
 
 ### Community 270 - "CoalescedEntry"
 Cohesion: 0.26
 Nodes (3): CoalescedEntry, TaskChainCoalescer, TaskChainCoalescerWithProgress
 
 ### Community 271 - "AppSharingError"
-Cohesion: 0.09
+Cohesion: 0.10
 Nodes (12): AppSharingError, browserVerificationRequired, downloadFailed, .errorDescription, insecureURL, invalidShareLink, invalidUploadResponse, uploadFailed (+4 more)
 
 ### Community 272 - "RefreshAllAppsIntent"
-Cohesion: 0.08
-Nodes (12): AppIntents, ShortcutsProvider, .appShortcuts, .shortcutTileColor, InstallIPAIntent, .parameterSummary, RefreshAllAppsIntent, .parameterSummary (+4 more)
-
-### Community 273 - "ConnectionDetailsCard"
 Cohesion: 0.10
-Nodes (12): Installation and Codex, Known coverage limits, Persistent Graphify map, Refresh and staleness, Scope and persistence, Validation, ConnectionDetailsCard, .body (+4 more)
+Nodes (7): InstallIPAIntent, .parameterSummary, IntentError, .localizedStringResource, RefreshAllAppsIntent, .parameterSummary, .predictionConfiguration
+
+### Community 273 - "Persistent Graphify map"
+Cohesion: 0.20
+Nodes (6): Installation and Codex, Known coverage limits, Persistent Graphify map, Refresh and staleness, Scope and persistence, Validation
 
 ### Community 274 - "InsetGroupTableViewCell"
 Cohesion: 0.18
 Nodes (7): InsetGroupTableViewCell, .style, Style, bottom, middle, single, top
 
-### Community 275 - "Node"
-Cohesion: 0.18
-Nodes (3): Iterator, Node, Iterator
+### Community 275 - "LiveContainerHandoffRecord"
+Cohesion: 0.12
+Nodes (9): SideKickApp, .body, LiveContainerHandoffRecord, .id, LiveContainerHandoffSheet, .body, ContentView, .appearance (+1 more)
 
 ### Community 276 - "NSString"
 Cohesion: 0.16
 Nodes (5): AppKit, AppBundle, .icon, Entitlement, Feature
 
-### Community 277 - "CodingKeys"
-Cohesion: 0.17
-Nodes (12): CodingKeys, bundleIdentifier, creationDate, data, deviceIDs, expirationDate, identifier, isFreeProvisioningProfile (+4 more)
+### Community 277 - "AnisetteError"
+Cohesion: 0.10
+Nodes (20): AnisetteError, allServersFailed, appGroupContainerNotFound, badServerResponse, decompressionFailed, downloadFailed, .errorDescription, invalidAnisetteData (+12 more)
 
 ### Community 278 - "CertificatesViewModel"
-Cohesion: 0.09
-Nodes (17): ActiveCertSectionView, .body, .signableCert, .body, .body, CertificatesViewModel, .activeLocalCert, .availableCertificateTypes (+9 more)
+Cohesion: 0.10
+Nodes (17): .body, CertBriefInfoView, .body, .body, CertificatesViewModel, .activeLocalCert, .availableCertificateTypes, .currentImportFilename (+9 more)
 
-### Community 281 - ".present"
-Cohesion: 0.21
-Nodes (7): AppImportSourceMode, .displayName, files, .id, prompt, url, InstallAppDialog
+### Community 281 - "AppScreenshotCollectionViewCell"
+Cohesion: 0.13
+Nodes (4): AppScreenshotCollectionViewCell, .aspectRatio, .isRounded, ImageView
 
 ### Community 282 - "ExtensionRemovalDecision"
-Cohesion: 0.21
-Nodes (6): ExtensionRemovalDecision, cancel, keepAll, removeAll, removeSelected, ExtensionRemovalHandler
+Cohesion: 0.13
+Nodes (14): ExtensionRemovalDecision, cancel, keepAll, removeAll, removeSelected, ExtensionRemovalHandler, AppExtensionCustomization, .displayName (+6 more)
 
-### Community 283 - "ActiveAppsTimelineProvider"
-Cohesion: 0.29
+### Community 283 - "debugLog"
+Cohesion: 0.26
 Nodes (3): ActiveAppsTimelineProvider, WidgetData, WidgetInfo
 
-### Community 286 - "CertificateRowView"
-Cohesion: 0.22
-Nodes (9): CertBriefInfoView, CertificateRowView, .hasPrivateKey, .isActive, .isRemote, CertPrivateKeyMenuItems, CertPublicKeyMenuItems, CertTrailingIcons (+1 more)
+### Community 286 - "WidgetKit"
+Cohesion: 0.13
+Nodes (6): AltWidgetBundle, .body, AppDetailWidget, IconLockScreenWidget, TextLockScreenWidget, WidgetKit
 
-### Community 287 - "Context"
-Cohesion: 0.09
-Nodes (13): AltWidgetBundle, .body, ActiveAppsWidget, .body, ActiveAppsWidgetView, .body, .placeholder, Color (+5 more)
+### Community 287 - "ActiveAppsWidget"
+Cohesion: 0.17
+Nodes (9): GameplayKit, ActiveAppsWidget, .body, ActiveAppsWidgetView, .body, .placeholder, Color, Constants (+1 more)
 
 ### Community 289 - "CodeSignKit"
-Cohesion: 0.11
-Nodes (6): CodeSignKit, QuickLook, Testing, String, .isAltStoreAppID, DataStructuresTests
+Cohesion: 0.06
+Nodes (11): AnisetteKit, CodeSignKit, Crypto, GSACryptoKit, Testing, DeveloperPortalResultCodes, GrandSlamAuthErrorCodes, UIDeviceFamilyCodes (+3 more)
 
-### Community 290 - "Operation"
-Cohesion: 0.18
-Nodes (11): Operation, activate, backup, deactivate, enableJIT, install, refresh, remove (+3 more)
+### Community 290 - "create-release-manifest.py"
+Cohesion: 0.35
+Nodes (6): artifact_record(), fail(), main(), packaged_app_metadata(), parse_xcconfig(), sha256()
 
 ### Community 291 - "Existing SideKick components to reuse"
-Cohesion: 0.28
-Nodes (4): Existing SideKick components to reuse, GitHubUpdateNotificationScheduler, GitHubUpdateScanner, Result
+Cohesion: 0.16
+Nodes (6): Existing SideKick components to reuse, GitHubUpdateNotificationRoute, GitHubUpdateNotificationRouteStore, GitHubUpdateNotificationScheduler, GitHubUpdateScanner, Result
 
-### Community 292 - "AnisetteData"
-Cohesion: 0.11
-Nodes (8): DeveloperPortalAPI, AnisetteData, .deviceDescription, .deviceSerialNumber, .deviceUniqueIdentifier, Session, .isExpired, .isValid
+### Community 292 - "AppID"
+Cohesion: 0.06
+Nodes (19): .groupIdentifier, DeveloperPortalAPI, AppGroup, .id, CodingKeys, groupID, identifier, name (+11 more)
 
 ### Community 293 - "Constants"
 Cohesion: 0.15
 Nodes (10): Anisette, AppleAuth, Constants, DeveloperServices, DeviceData, GrandSlam, Headers, Libraries (+2 more)
 
 ### Community 294 - "CellularRefreshManager"
-Cohesion: 0.14
+Cohesion: 0.16
 Nodes (10): .body, CellularRefreshManager, .didTurnOffData, .isCellularMode, .isEnabled, .isSupported, .turnOffDataBaseDelayOverride, .turnOffDataShortcutName (+2 more)
 
 ### Community 295 - "UIKit"
-Cohesion: 0.04
-Nodes (10): Combine, Nuke, UIKit, UIAction.Identifier, TextCollectionReusableView, UIScreen, .isExtraCompactHeight, UIAction.Identifier (+2 more)
+Cohesion: 0.03
+Nodes (7): View, SideSign, SwiftUI, UIKit, UIApplication, ExportCertificateDialog, Color
 
 ### Community 296 - "AppIDDetailView"
 Cohesion: 0.17
-Nodes (5): AppIDDetailView, .appGroupsEnabled, .body, .currentAppID, .groupChoices
+Nodes (4): AppIDDetailView, .appGroupsEnabled, .currentAppID, .groupChoices
 
 ### Community 298 - "ThemePickerView"
-Cohesion: 0.07
-Nodes (21): MarkdownKit, ThemeManager, .primaryColor, ThemePreset, .color, UIColor, .hslComponents, .rgbComponents (+13 more)
+Cohesion: 0.23
+Nodes (7): ThemePreset, Color, ThemePickerView, .body, .metricsSection, .presetsSection, .previewSection
 
 ### Community 299 - "NSError"
 Cohesion: 0.07
-Nodes (17): Error, .errorUserInfo, userInfo, .errorUserInfo, .errorUserInfo, ALTWrappedError, .debugDescription, .helpAnchor (+9 more)
+Nodes (20): .errorUserInfo, userInfo, .errorUserInfo, .errorUserInfo, ALTWrappedError, .debugDescription, .helpAnchor, .localizedDescription (+12 more)
 
 ### Community 301 - "RefreshShortcutViews.swift"
-Cohesion: 0.15
-Nodes (11): Part, text, token, RefreshShortcut, .runURL, ShortcutMockCard, .body, ShortcutMockRow (+3 more)
+Cohesion: 0.18
+Nodes (9): Part, text, token, ShortcutMockCard, .body, ShortcutMockRow, .body, ShortcutRepairGuideView (+1 more)
 
-### Community 303 - "ALTTeamType"
-Cohesion: 0.14
-Nodes (8): ALTTeamType, .localizedDescription, EntitlementsCustomizationSheetView, SheetDismissDelegate, SheetHostingController, EntitlementsCustomizationView, .body, SheetHostingController
+### Community 303 - ".present"
+Cohesion: 0.29
+Nodes (3): EntitlementsCustomizationSheetView, .body, SheetDismissDelegate
 
 ### Community 304 - "SettingsStorageView"
 Cohesion: 0.21
 Nodes (10): SettingsStorageView, .body, .clearReviewExplanation, .clearReviewList, .clearReviewSheet, .clearReviewToolbar, .removableImportedApps, .removableIPAsSection (+2 more)
 
+### Community 305 - "generate_source_metadata.py"
+Cohesion: 0.36
+Nodes (6): file_size(), getFormattedLocalizedDescription(), main(), resolve_script(), sh(), sha256()
+
 ### Community 307 - "Reversible native-app offload to LiveContainer: research and proposed plan"
 Cohesion: 0.15
 Nodes (12): Approaches considered, Move, Outcome and verdict, Phased plan and acceptance gates, Preservation boundaries, Proposed user flow, Recommendation, Restore (+4 more)
 
-### Community 309 - "FetchSourcesError"
-Cohesion: 0.22
-Nodes (5): AppManager, FetchSourcesError, .errorDescription, .localizedTitle, .recoverySuggestion
-
-### Community 313 - "DocumentPickerView"
+### Community 309 - "LocalConnectionSettingsView"
 Cohesion: 0.17
-Nodes (5): BackupAndRestoreView, .body, .divider, Coordinator, DocumentPickerView
+Nodes (10): ChecklistRow, .body, LocalConnectionHelpView, .body, LocalConnectionSettingsView, .body, .isReady, PairingSetupErrorForVPN (+2 more)
+
+### Community 311 - ".tableView"
+Cohesion: 0.20
+Nodes (3): TVServices, SideStoreTopShelfProvider, Color
 
 ### Community 314 - "CreateManualProfileView"
 Cohesion: 0.15
 Nodes (5): CreateManualProfileView, .availableProfileTypes, .canSubmit, .filteredDevices, .selectedAppID
 
+### Community 317 - "UpdateCollectionViewCell"
+Cohesion: 0.12
+Nodes (5): Mode, collapsed, expanded, UpdateCollectionViewCell, .mode
+
 ### Community 318 - "CodingKeys"
 Cohesion: 0.15
 Nodes (13): CodingKeys, anisetteAdiBlob, anisetteIdentifier, certificateData, certificatePassword, certificateType, email, legacyAdiPB (+5 more)
 
-### Community 319 - "MinimuxerComponent"
-Cohesion: 0.67
-Nodes (3): MinimuxerComponent, heartbeat, mounter
+### Community 319 - "MinimuxerApi.swift"
+Cohesion: 0.11
+Nodes (18): IdeviceGateway, LibimobiledeviceGateway, EMProxyAPI, GatewayBackend, idevice, libimobiledevice, Minimuxer, .gateway (+10 more)
 
-### Community 320 - "BundleInspectorView"
-Cohesion: 0.12
-Nodes (21): BundleInspectorView, .body, .bundleID, .displayName, .infoPlist, .infoPlistParser, .provisioningProfile, .subExtensions (+13 more)
+### Community 320 - "Code"
+Cohesion: 0.18
+Nodes (11): Code, blocked, changedID, duplicate, duplicateBundleID, duplicateVersion, marketplaceNotSupported, marketplaceRequired (+3 more)
 
 ### Community 321 - "AppPermissionsCard"
 Cohesion: 0.18
@@ -1645,9 +1702,13 @@ Nodes (6): AppPermissionsCard, .body, .isTitleVisible, AppPermissionsCard_Previe
 Cohesion: 0.22
 Nodes (4): Managed, .managedObject, .projectedValue, .wrappedValue
 
-### Community 324 - "Operation"
-Cohesion: 0.18
-Nodes (11): Operation, addAccount, connection, github, install, lifecycle, refresh, resign (+3 more)
+### Community 323 - "debugLog"
+Cohesion: 0.19
+Nodes (11): AltWidgetLogging, .isVerboseLoggingEnabled, debugLog(), getFastTimestamp(), getTag(), verboseLog(), ComplicationView, .body (+3 more)
+
+### Community 324 - "RequiredSetupView"
+Cohesion: 0.36
+Nodes (7): RequiredSetupView, .accountPage, .pairingPage, .shortcutPage, .shortcutTestPage, .vpnPage, .welcomePage
 
 ### Community 325 - "UIDevice+Vibration.swift"
 Cohesion: 0.20
@@ -1657,13 +1718,17 @@ Nodes (8): AudioToolbox, CoreHaptics, SystemSoundID, UIDevice, .isVibrationSuppo
 Cohesion: 0.22
 Nodes (5): NSObject, +defaultWorkspace, -openApplicationWithBundleIdentifierusingConfigurationcompletionHandler, SideBackupAppLauncher, +openApplicationWithBundleIdentifierurlcompletionHandler
 
+### Community 327 - "ClearAppCacheOperation"
+Cohesion: 0.18
+Nodes (4): BatchError, ClearAppCacheOperation, Code, batchError
+
 ### Community 328 - "CVarArg"
 Cohesion: 0.47
 Nodes (4): DLOG(), ELOG(), ILOG(), OSLog
 
-### Community 329 - "FullAppBundleView"
-Cohesion: 0.24
-Nodes (7): FullAppBundleView, .appExtensions, .body, .displayName, .infoPlist, .infoPlistParser, .provisioningProfile
+### Community 329 - "DevicesListView"
+Cohesion: 0.22
+Nodes (6): ActiveDeviceAlert, delete, disable, .id, DevicesListView, .filteredDevices
 
 ### Community 330 - "LaunchViewController"
 Cohesion: 0.16
@@ -1677,13 +1742,13 @@ Nodes (10): Architecture, Authors, Building, Connection Modes, Credits and Refer
 Cohesion: 0.22
 Nodes (7): UIColor, .adjustedForDisplay, .altPrimary, .isTooBright, .isTooDark, .settingsBackground, .settingsHighlighted
 
-### Community 334 - "ToastView"
-Cohesion: 0.08
-Nodes (13): InfoMode, fullError, localizedDescription, ToastView, .intrinsicContentSize, .isHighlighted, .layoutMargins, .presentationEdge (+5 more)
+### Community 334 - ".show"
+Cohesion: 0.09
+Nodes (6): UISpringTimingParameters, stopEMProxy(), ExportPairingFileHandler, DeveloperOptionsView, .body, .divider
 
-### Community 335 - "Entry"
+### Community 335 - "MarkdownManager"
 Cohesion: 0.22
-Nodes (8): Entry, .details, ErrorKind, apple, cocoa, keychain, network, other
+Nodes (6): MarkdownKit, Color, Fonts, MarkdownManager, .enabledElements, .markdownParser
 
 ### Community 336 - "SelectionActionBarView"
 Cohesion: 0.25
@@ -1694,28 +1759,20 @@ Cohesion: 0.20
 Nodes (9): Execution ledger, Global Constraints, LiveContainer and app-management fixes Implementation Plan, Review Focus, Task 1: Scanner, identity, and persistence, Task 2: Shared GitHub targets and baseline corrections, Task 3: Native guest UI and launch, Task 4: Storage and account/update flows (+1 more)
 
 ### Community 339 - "StorageSortOption"
-Cohesion: 0.25
-Nodes (8): TrailingToolbarMenuView, .body, StorageSortOption, date, .id, name, size, type
+Cohesion: 0.33
+Nodes (6): StorageSortOption, date, .id, name, size, type
 
 ### Community 341 - "DeviceGatewayError"
 Cohesion: 0.14
 Nodes (5): ALTAppPermissionType, ALTAppPrivacyPermission, ALTPatreonBenefitID, ALTSourceUserInfoKey, Feature
 
-### Community 342 - "AnisetteLibraryCacheRequest"
-Cohesion: 0.44
-Nodes (3): AnisetteLibraryCacheCoordinator, AnisetteLibraryCacheRequest, InFlight
+### Community 343 - "UpdateSuccessRecord"
+Cohesion: 0.20
+Nodes (5): UpdateSuccessRecord, .id, UpdateSuccessSheet, .body, .versionLabel
 
-### Community 343 - "CodingKeys"
-Cohesion: 0.22
-Nodes (9): CodingKeys, associatedAppGroups, associatedAppGroupsCount, bundleIdentifier, entitlements, expirationDate, features, identifier (+1 more)
-
-### Community 345 - "PreflightChecksOperation"
-Cohesion: 0.16
-Nodes (7): AppGroupResolution, correctAndProceed, keepOriginal, ProfileCustomizationChoice, defaultProfile, profile, UserCustomizationHandler
-
-### Community 346 - "XCTestCase"
-Cohesion: 0.11
-Nodes (4): SelfUpdateReleaseTests, UITestsLaunchTests, .runsForEachTargetApplicationUIConfiguration, TreeMapTests
+### Community 345 - "ALTTeamType"
+Cohesion: 0.30
+Nodes (4): ALTTeamType, .localizedDescription, EntitlementsCustomizationView, .body
 
 ### Community 347 - "Bundle"
 Cohesion: 0.24
@@ -1729,17 +1786,17 @@ Nodes (4): AsyncManaged, .managedObject, .projectedValue, .wrappedValue
 Cohesion: 0.32
 Nodes (4): HelperPackagingTests, command(), missing_signature(), signing_fails()
 
-### Community 352 - "Keychain"
-Cohesion: 0.20
-Nodes (3): Keychain, KeychainItem, .wrappedValue
+### Community 352 - "LocalInterfaceType"
+Cohesion: 0.12
+Nodes (17): LocalInterfaceType, airdrop, cellular, ethernet, hotspotBridge, .isVPN, loopback, lowLatencyWLAN (+9 more)
 
-### Community 353 - "Countdown"
-Cohesion: 0.08
-Nodes (14): Countdown, .body, .fractionComplete, .numberOfDays, Countdown_Previews, .previews, .content, .body (+6 more)
+### Community 353 - "AppDetailWidgetView"
+Cohesion: 0.18
+Nodes (5): .body, AppDetailWidgetView, .body, AppIconView, .body
 
 ### Community 354 - "ProgressFileDownload"
-Cohesion: 0.16
-Nodes (3): BlockRedirects, ProgressFileDownload, RedirectResolver
+Cohesion: 0.12
+Nodes (4): BlockRedirects, ProgressFileDownload, RedirectResolver, URLSession
 
 ### Community 356 - "AccountCertificateListView"
 Cohesion: 0.43
@@ -1761,61 +1818,57 @@ Nodes (3): NSManagedObject, .storeAppReleaseTracks, StoreApp17To17_1MigrationPol
 Cohesion: 0.32
 Nodes (3): Result, .error, .value
 
-### Community 364 - "AppIDsListView"
-Cohesion: 0.29
-Nodes (3): AppIDsListView, .deleteAlertMessage, .filteredAppIDs
+### Community 364 - "ActiveAlert"
+Cohesion: 0.22
+Nodes (8): ActiveAlert, bulkRename, confirmBulkDelete, confirmSingleDelete, error, .id, pasteConflictCopyError, rename
 
-### Community 365 - "DeveloperPortal"
-Cohesion: 0.33
-Nodes (3): DeveloperPortal, .customHeaders, URLSession
-
-### Community 367 - "URL"
-Cohesion: 0.11
-Nodes (14): .destination, Coordinator, IPAContentsView, .body, IPAExtraction, PlistResourceViewer, .body, ProvisioningProfileResourceViewer (+6 more)
+### Community 365 - "DirectoryItemListSectionView"
+Cohesion: 0.19
+Nodes (8): .content, .body, AdaptiveTappableRow, .body, DirectoryExplorerView, .folderSummaryString, DirectoryItemListSectionView, .body
 
 ### Community 370 - "ProcessError"
-Cohesion: 0.22
+Cohesion: 0.21
 Nodes (8): Code, failed, terminated, timedOut, unexpectedOutput, ProcessError, .lastOutputLine, .processName
 
 ### Community 372 - "Context"
-Cohesion: 0.13
+Cohesion: 0.10
 Nodes (11): UnsupportedEntry, UnsupportedTimelineProvider, UnsupportedWidgetView, .body, .body, .body, Context, accessBackup (+3 more)
 
 ### Community 373 - "AppIconVariant"
 Cohesion: 0.27
 Nodes (3): AppIconVariant, .allNames, .variantHues
 
-### Community 375 - "Event"
-Cohesion: 0.29
-Nodes (7): Event, failed, paused, response, resumed, started, succeeded
+### Community 374 - "decrypt_sideconf.py"
+Cohesion: 0.18
+Nodes (3): ShellProxy, decrypt_sideconf(), main()
+
+### Community 375 - "VibrantButton"
+Cohesion: 0.14
+Nodes (5): VibrantButton, .contentInsets, .image, .isIndicatingActivity, .title
 
 ### Community 376 - "Decoder"
-Cohesion: 0.05
-Nodes (33): CodingUserInfoKey, Decoder, .managedObjectContext, .sourceURL, DecoderItem, .wrappedValue, Foundation.JSONDecoder, .managedObjectContext (+25 more)
+Cohesion: 0.07
+Nodes (26): AnisetteServerData, Server, .id, AnisetteLibraryCacheCoordinator, AnisetteLibraryCacheRequest, AnisetteServerData, AnisetteServerItem, .id (+18 more)
 
-### Community 378 - "DeviceGatewayLogging.swift"
-Cohesion: 0.36
-Nodes (4): DeviceGatewayLogging, .isLoggingEnabled, getFastTimestamp(), getTag()
-
-### Community 379 - "Failure"
-Cohesion: 0.33
-Nodes (6): Failure, appListUnavailable, appRefreshFailed, connectionUnavailable, noEligibleApps, operationUnavailable
+### Community 379 - "SideKickStorageCleanup.swift"
+Cohesion: 0.25
+Nodes (7): InstallTemporaryDirectory, OwnedStoragePath, StorageCleanupError, .errorDescription, operationRunning, protectedFile, unsafePath
 
 ### Community 380 - "FileManager"
 Cohesion: 0.36
 Nodes (3): FileManager, .altstoreSharedDirectory, .appBackupsDirectory
 
 ### Community 381 - "CertGroupHeaderView"
-Cohesion: 0.21
-Nodes (6): AdaptiveTappableRow, CertGroupHeaderView, .body, .headerTitle, CertificatesListView, .body
+Cohesion: 0.11
+Nodes (13): CertificateRowView, .hasPrivateKey, .isActive, .isRemote, CertTrailingIcons, .body, AdaptiveTappableRow, .body (+5 more)
 
 ### Community 382 - "ProfileManagementRowView"
 Cohesion: 0.24
 Nodes (5): ProfileManagementRowView, .assignedApps, .body, .isExpired, .matchingCert
 
-### Community 383 - "SideStoreOperationError"
-Cohesion: 0.33
-Nodes (6): SideStoreOperationError, .errorDescription, incompatibleRefreshAccount, installedAppUnavailable, noRefreshResult, presentationUnavailable
+### Community 383 - "LoggedError"
+Cohesion: 0.15
+Nodes (4): LoggedError, .error, .localizedDateString, .localizedFailure
 
 ### Community 384 - "BuildInfo"
 Cohesion: 0.29
@@ -1829,21 +1882,21 @@ Nodes (9): Audit fixes and reproducible vendor build, Build, Build and source di
 Cohesion: 0.29
 Nodes (6): Commander review checklist, Review bug fixes implementation plan, Review record, Task 1 — Startup and LiveContainer publication, Task 2 — Retained IPA sources and metadata, Task 3 — Global signing coordination and honest results
 
-### Community 388 - ".importBackup"
-Cohesion: 0.08
-Nodes (11): CertificateEncryptionType, encrypted, unencrypted, ImportedAccount, .certificateType, AccountBackupValidationError, .errorDescription, missingAccountField (+3 more)
+### Community 389 - "SideStoreSettingsPages.swift"
+Cohesion: 0.32
+Nodes (7): CellularShortcutSettingsView, DailyRefreshAutomationGuideView, .body, InstallSigningSettingsView, .body, RefreshSettingsView, .body
 
 ### Community 391 - ".prepareBeforeDatabaseStart"
 Cohesion: 0.57
 Nodes (3): PreparationState, SideKickDataDirectory, .url
 
 ### Community 392 - "SignableCertificateRowView"
-Cohesion: 0.25
-Nodes (6): SignableCertificateRowView, .body, .briefInfo, .isActiveGlobal, .isAppCert, .statusText
+Cohesion: 0.10
+Nodes (9): UINavigationBarAppearance, .signableCert, SignableCertificateRowView, .body, .briefInfo, .isActiveGlobal, .isAppCert, .statusText (+1 more)
 
 ### Community 393 - "ConnectionConfigView"
-Cohesion: 0.21
-Nodes (4): AnimatedCheckmarkView, .body, ConnectionConfigView, .body
+Cohesion: 0.15
+Nodes (8): .repositoryName, .activeSigningCertificateBase64Encoded, CharacterSet, .markdownLiteralCharacterSet, AnimatedCheckmarkView, .body, ConnectionConfigView, .body
 
 ### Community 394 - "UIApplication"
 Cohesion: 0.29
@@ -1851,11 +1904,7 @@ Nodes (3): UIApplication, .alt_keyWindow, .alt_shared
 
 ### Community 396 - "NSManagedObjectContext"
 Cohesion: 0.06
-Nodes (8): NSManagedObjectContext, DatabaseManager, .isStarted, .viewContext, WidgetDataManager, Fetchable, NSPredicate, SyncAppIDsOperation
-
-### Community 400 - "debugLog"
-Cohesion: 0.18
-Nodes (10): AltWidgetLogging, .isVerboseLoggingEnabled, debugLog(), getFastTimestamp(), getTag(), ComplicationView, .body, Style (+2 more)
+Nodes (12): NSManagedObjectContext, DatabaseManager, .isStarted, .viewContext, WidgetDataManager, NSPredicate, AppManager, FetchSourcesError (+4 more)
 
 ### Community 401 - "Catalogue loading and iOS 18 compatibility"
 Cohesion: 0.33
@@ -1870,48 +1919,48 @@ Cohesion: 0.12
 Nodes (13): StoreCategory, developer, entertainment, .filledSymbolName, games, lifestyle, .localizedName, other (+5 more)
 
 ### Community 410 - "SideSign"
-Cohesion: 0.17
-Nodes (11): Architecture Overview, Authors, Credits and References, Exporting and Parsing `.p12` Files, Features, Generating a Certificate Signing Request (CSR), License, SideSign (+3 more)
+Cohesion: 0.12
+Nodes (15): 1. IPA Resigning (`AppBundleSigner`), 3. Apple Developer API Client (`DeveloperPortal`), 4. High-Performance Archive Streaming (`Archive`), Architecture Overview, Authors, Core Capabilities, Credits and References, Exporting and Parsing `.p12` Files (+7 more)
 
 ### Community 411 - "LoadingState"
 Cohesion: 0.29
 Nodes (3): LoadingState, finished, loading
 
-### Community 412 - "AccountVerificationRow"
-Cohesion: 0.14
-Nodes (6): AccountVerificationRow, Status, actionRequired, checking, completed, lookupFailed
+### Community 412 - "Countdown"
+Cohesion: 0.19
+Nodes (6): Countdown, .body, .fractionComplete, .numberOfDays, Countdown_Previews, .previews
 
 ### Community 413 - "SigningAccountStore"
-Cohesion: 0.07
-Nodes (25): AppleDeveloperInventory, Item, LiveContainerCertificateRecipient, .id, Notification.Name, SigningAccountArchive, .url, SigningAccountError (+17 more)
+Cohesion: 0.09
+Nodes (16): AppleDeveloperInventory, Item, LiveContainerCertificateRecipient, .id, Notification.Name, SigningAccountArchive, .url, SigningAccountOperationCoordinator (+8 more)
 
-### Community 415 - "Error"
-Cohesion: 0.40
-Nodes (4): Error, .displayCode, .localizedErrorCode, .underlyingError
+### Community 415 - "RefreshFailureReport"
+Cohesion: 0.21
+Nodes (3): Item, RefreshFailureReport, .id
 
 ### Community 416 - "CodingKeys"
 Cohesion: 0.13
 Nodes (15): CodingKeys, apps, featuredApps, groupID, headerImageURL, iconURL, localizedDescription, name (+7 more)
 
 ### Community 417 - "LiveContainer integration: investigation and proposed design"
-Cohesion: 0.13
-Nodes (14): Account selection, Alternatives considered, Connection and scanner, Library, launching, and updates, LiveContainer integration: investigation and proposed design, Recommended integration design, Requested outcome, Retained payloads and temporary files (+6 more)
+Cohesion: 0.18
+Nodes (10): Alternatives considered, Connection and scanner, Library, launching, and updates, LiveContainer integration: investigation and proposed design, Recommended integration design, Requested outcome, Review checkpoint, Shortcut (+2 more)
 
 ### Community 418 - "MaintenanceManager"
 Cohesion: 0.18
 Nodes (3): MaintenanceManager, .completedCounter, .maintenanceCounterFileURL
 
-### Community 419 - "ContentView"
-Cohesion: 0.33
-Nodes (4): ContentView, .body, SideBackupApp, .body
+### Community 419 - "Node"
+Cohesion: 0.18
+Nodes (3): Iterator, Node, Iterator
 
 ### Community 421 - "LiveContainerError"
 Cohesion: 0.18
 Nodes (11): LiveContainerError, accessRevoked, alreadyLinked, busy, disconnected, .errorDescription, guestMissing, invalidDirectory (+3 more)
 
-### Community 423 - "CertificateAnalysisResult"
-Cohesion: 0.40
-Nodes (4): CertificateAnalysisResult, noMatch, publicOnly, signable
+### Community 423 - "Operation"
+Cohesion: 0.18
+Nodes (11): Operation, activate, backup, deactivate, enableJIT, install, refresh, remove (+3 more)
 
 ### Community 425 - "InstalledAppEntity"
 Cohesion: 0.25
@@ -1925,21 +1974,25 @@ Nodes (3): ProcessInfo, .machineModel, .platformName
 Cohesion: 0.27
 Nodes (5): contents(), main(), mean_hue(), variant_hues(), write()
 
+### Community 437 - "ContentView"
+Cohesion: 0.38
+Nodes (4): ContentView, .body, .failure, .title
+
 ### Community 438 - "LocalizedError"
-Cohesion: 0.11
-Nodes (17): SideKickTransferError, .errorDescription, folderUnavailable, notATransferFolder, nothingToExport, notSideKick, sameInstallation, unsupportedFormat (+9 more)
+Cohesion: 0.10
+Nodes (20): AppOffloadError, .errorDescription, inUse, restoreRequired, sourceMissing, unsupported, AppSigningError, accountRequired (+12 more)
 
 ### Community 440 - "FileManager"
 Cohesion: 0.23
 Nodes (5): FileManager, .applicationSupportDirectory, .cachesDirectory, .documentsDirectory, .libraryDirectory
 
 ### Community 444 - "String"
-Cohesion: 0.12
-Nodes (22): CopyableValueRow, .body, InfoPlistContainerView, .body, .shareURL, InfoPlistMode, .id, rawJSON (+14 more)
+Cohesion: 0.07
+Nodes (44): .body, CopyableValueRow, .body, InfoPlistContainerView, .body, .shareURL, InfoPlistMode, .id (+36 more)
 
 ### Community 454 - "ALTAppPermission"
 Cohesion: 0.18
-Nodes (8): ALTAppPermission, .effectiveSymbolName, .isKnown, .knownPermission, .localizedDescription, .localizedDisplayName, .localizedName, .symbolName
+Nodes (9): ALTAppPermission, .effectiveSymbolName, .isKnown, .knownPermission, .localizedDescription, .localizedDisplayName, .localizedName, .symbolName (+1 more)
 
 ### Community 457 - "PreviewAppPermission"
 Cohesion: 0.25
@@ -1958,44 +2011,60 @@ Cohesion: 0.25
 Nodes (6): Code, DeviceGatewayError, .description, .errorDescription, .isRetryable, .isVPNDrop
 
 ### Community 462 - "ProfilesListView"
-Cohesion: 0.19
-Nodes (6): ProfileRow, .body, .isExpired, ProfilesListView, .body, .filteredProfiles
+Cohesion: 0.24
+Nodes (5): ProfileRow, .body, .isExpired, ProfilesListView, .filteredProfiles
+
+### Community 465 - "ThemeManager"
+Cohesion: 0.33
+Nodes (3): ThemeManager, .primaryColor, .resetButtonSection
 
 ### Community 466 - "AppearanceMode"
 Cohesion: 0.20
 Nodes (8): AppearanceMode, .colorScheme, dark, .id, .interfaceStyle, light, system, .title
 
-### Community 470 - "GitHubHistoryError"
-Cohesion: 0.25
-Nodes (8): GitHubHistoryError, ambiguousAsset, .errorDescription, invalidResponse, invalidSource, paginationLimit, unauthorized, unavailable
-
-### Community 471 - ".validate"
-Cohesion: 0.14
-Nodes (8): InstallTemporaryDirectory, OwnedStoragePath, StorageCleanupError, .errorDescription, operationRunning, protectedFile, unsafePath, StorageCleanupTests
+### Community 468 - "ImportedAccount"
+Cohesion: 0.24
+Nodes (5): CertificateEncryptionType, encrypted, unencrypted, ImportedAccount, .certificateType
 
 ### Community 473 - "StorageRemovalAction"
 Cohesion: 0.33
 Nodes (5): Notification.Name, StorageFilesView, .body, StorageRemovalAction, .body
 
-### Community 476 - "AuthCompatibilityRegression.swift"
-Cohesion: 0.29
-Nodes (5): AuthCompatibilityRegression, ProbeError, rejected, unavailable, ResyncAttempts
+### Community 474 - "BackupAndRestoreView"
+Cohesion: 0.42
+Nodes (3): BackupAndRestoreView, .body, .divider
 
-### Community 478 - "AppID"
-Cohesion: 0.04
-Nodes (27): 1. IPA Resigning (`AppBundleSigner`), 3. Apple Developer API Client (`DeveloperPortal`), 4. High-Performance Archive Streaming (`Archive`), Core Capabilities, .groupIdentifier, DeveloperPortalAPI, AppGroup, .id (+19 more)
+### Community 478 - "DeveloperPortalAPI"
+Cohesion: 0.13
+Nodes (3): DeveloperPortal, .customHeaders, DeveloperPortalAPI
+
+### Community 482 - "ActivityViewController"
+Cohesion: 0.19
+Nodes (8): ActivityViewController, DeviceIDsView, .body, EntitlementRow, .body, ProfileInfoRow, .body, .body
+
+### Community 483 - "RefreshAllAppsWidgetIntent"
+Cohesion: 0.25
+Nodes (3): RefreshAllAppsWidgetIntent, .isDiscoverable, .title
 
 ### Community 484 - "AnisetteManager"
 Cohesion: 0.22
 Nodes (6): AnisetteManager, .currentURL, .currentURLString, .defaultURL, .menuURL, .userURL
 
+### Community 485 - "UIColor"
+Cohesion: 0.25
+Nodes (5): .color, UIColor, .hslComponents, .rgbComponents, .colorWheelSection
+
+### Community 487 - "Agent Guidelines for SideStore"
+Cohesion: 0.29
+Nodes (3): Agent Guidelines for SideStore, Project Overview, Project Structure
+
 ### Community 488 - "Regex"
 Cohesion: 0.33
 Nodes (3): RegexBuilder, Regex, .privacyPermission
 
-### Community 492 - "ForwardingNavigationController"
-Cohesion: 0.33
-Nodes (3): ForwardingNavigationController, .childForStatusBarHidden, .childForStatusBarStyle
+### Community 492 - "Nuke"
+Cohesion: 0.06
+Nodes (9): Nuke, UIAction.Identifier, ForwardingNavigationController, .childForStatusBarHidden, .childForStatusBarStyle, TextCollectionReusableView, UIAction.Identifier, SourcesFooterView (+1 more)
 
 ### Community 493 - "WidgetLogManager"
 Cohesion: 0.40
@@ -2009,41 +2078,57 @@ Nodes (3): RevokeDecision, keepExisting, revokeSelected
 Cohesion: 0.40
 Nodes (5): MarkdownSpanType, emphasisDouble, emphasisSingle, linkAutomatic, linkInline
 
-### Community 503 - "StandaloneOperationContext"
-Cohesion: 0.07
-Nodes (13): AsyncOperation, BaseOperation, .totalUnitCount, BaseStandaloneOperation, PendingProfileBatch, SharedPipelineContext, .appGroups, .appIDs (+5 more)
+### Community 500 - "Building and Formatting"
+Cohesion: 0.33
+Nodes (6): Building and Formatting, Building with Xcode, Code Signing, Formatting, Packaging an IPA (Makefile), Setup and Dependencies
 
-### Community 504 - "Building and Formatting"
-Cohesion: 0.05
-Nodes (37): Changed-file map, LiveContainer integration and app-management changes, Supported limits, User flows, Validation record, LiveContainer and storage additions, Third-party notices, Agent Guidelines for SideStore (+29 more)
+### Community 502 - "Contribution and Communication Rules"
+Cohesion: 0.33
+Nodes (6): Contribution and Communication Rules, Contributor LLM usage restrictions, Final instructions, Interactions with maintainers must be human to human, No automated posting on GitHub, User must demonstrate understanding
+
+### Community 503 - "InstallAppOperationContext"
+Cohesion: 0.08
+Nodes (16): updates, AlternateIconMode, preserve, remove, set, InstallAppOperationContext, .alternateIconURL, .targetBundleIdentifier (+8 more)
+
+### Community 504 - "Project Overview"
+Cohesion: 0.22
+Nodes (9): Contributing/Compilation Instructions, EM Proxy, Licensing, Minimuxer, Project Overview, Requirements, Roxas, SideStore (+1 more)
 
 ### Community 505 - "ShortcutTestPanel"
 Cohesion: 0.33
 Nodes (5): Result, notYet, passed, ShortcutTestPanel, .body
 
-### Community 515 - "PairingErrorCode"
-Cohesion: 0.50
-Nodes (3): PairingErrorCode, invalidHostID, remotePairing
+### Community 508 - "PresentationEdge"
+Cohesion: 0.33
+Nodes (6): PresentationEdge, bottom, left, none, right, top
+
+### Community 509 - "Contributing to SideStore"
+Cohesion: 0.33
+Nodes (6): Building an IPA for distribution, Contributing to SideStore, Dependencies and building with Xcode, Developing minimuxer alongside SideStore, Requirements, Setup
+
+### Community 512 - "LiveContainer integration and app-management changes"
+Cohesion: 0.40
+Nodes (5): Changed-file map, LiveContainer integration and app-management changes, Supported limits, User flows, Validation record
 
 ## Knowledge Gaps
 - **2379 isolated node(s):** `starting`, `ready`, `failed`, `.fraction`, `.hasGitHubUpdateTargets` (+2374 more)
-  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 4433 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
-- **127 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
+  These have ≤1 connection - possible missing edges or undocumented components. (Counts symbols only; 4437 node(s) total have ≤1 connection when file, concept and rationale nodes are included.)
+- **138 thin communities (<3 nodes) omitted from report** — run `graphify query` to explore isolated nodes.
 
 ## Suggested Questions
 _Questions this graph is uniquely positioned to answer:_
 
-- **Why does `Foundation` connect `Foundation` to `DeveloperPortalError`, `InstallAppOperationContext`, `IdeviceGateway`, `UsbmuxdProxyServer`, `.entries`, `ConsoleLog`, `Hashable`, `debugLog`, `run`, `CLIError`, `GitHubUpdateService`, `SignInFlowHandler`, `Codable`, `GitHubUpdateConfiguration`, `CertificateManager`, `BonjourDiscoveryManager`, `GitHubDiagnosticsStore`, `BrowseViewController`, `MinimuxerWrapper.swift`, `ImportedIPA`, `GitHubCredentialStore`, `LiveContainerReadOperation`, `OperationError`, `ImportedCertificateRecord`, `SideStoreOperationService`, `Account`, `LiveContainerSharedAccess`, `AppManager.swift`, `LiveContainerConnection`, `GitHubHistoryStore`, `PipelineStep`, `Sendable`, `.message`, `BackupError`, `debugLog`, `DiagnosticsStore`, `ALTLocalizedError`, `CertificateError`, `CacheItem`, `RemoteAnisetteConfigurationError`, `EMProxyError`, `Minimuxer`, `UITests`, `AnisetteServersManager`, `OperationStep`, `LiveContainerGuest`, `CharacterSet`, `NSAttributedString+Markdown.swift`, `ConsoleLog`, `StorageDirectoryUsage`, `AbstractConsoleLogger`, `NetworkObserverService`, `PlatformURL`, `CertificateASN1Parser.swift`, `.run`, `StatusBadge`, `WidgetDataManager`, `PairingError`, `ProfileType`, `UpdateSuccessRecord`, `BonjourDiscoveryViewModel`, `LiveContainerError`, `BackgroundServiceMode`, `SwiftUI`, `DeviceService`, `KnownSource`, `Error`, `Array`, `AppExtensionViewHostingController`, `XCTest`, `PaginationIntent`, `.isLoggingEnabled`, `BackgroundLocationService`, `CertificateType`, `AppEnvironment`, `KeyStore`, `Entitlement`, `PaginationDataHolder`, `OutputStream`, `FileOutputStream`, `FileManager`, `CertificateRequest`, `.testTCP`, `PairedDeviceRecord`, `CoalescedEntry`, `AppSharingError`, `NSString`, `CodeSignKit`, `Existing SideKick components to reuse`, `AnisetteData`, `UIKit`, `NSError`, `.tableView`, `ImportExport.swift`, `CVarArg`, `DeviceGatewayError`, `ProgressFileDownload`, `CompletionGate`, `Result`, `ProcessError`, `AppIconVariant`, `Decoder`, `DeviceGatewayLogging.swift`, `FileManager`, `BuildInfo`, `.importBackup`, `.toSendableDictionary`, `Date`, `.prepareBeforeDatabaseStart`, `.export`, `NSManagedObjectContext`, `TaskMutexSerializer`, `debugLog`, `BonjourDiscoveryTypes.swift`, `.getDateInTimeStamp`, `FileManager`, `LoadingState`, `SigningAccountStore`, `CacheAppOperation`, `.directorySize`, `MinimuxerConstants`, `UserInfoValue`, `ProcessInfo`, `TaskChainSerializer`, `SideKickLogStorage.swift`, `ProcessInfo`, `URL+Normalized.swift`, `Bundle+AppExtension.swift`, `Date+Widget.swift`, `FileManager`, `OperatingSystemVersion`, `DeviceGatewayError`, `RemoveBackupDataOperation`, `.validate`, `ALTApplication+AltStoreApp.swift`, `AuthCompatibilityRegression.swift`, `AppID`, `AnisetteManager`, `WidgetLogManager`?**
-  _High betweenness centrality (0.168) - this node is a cross-community bridge._
+- **Why does `Foundation` connect `Foundation` to `LiveContainerState`, `DeveloperPortal`, `InstallAppOperationContext`, `IdeviceGateway`, `UsbmuxdProxyServer`, `.entries`, `ConsoleLog`, `Hashable`, `debugLog`, `run`, `CLIError`, `GitHubUpdateSettingsView`, `UIAlertController`, `Codable`, `GitHubDiagnosticsStore`, `BrowseViewController`, `MinimuxerWrapper.swift`, `ImportedIPA`, `OperationError`, `ImportedCertificateCatalog`, `SideStoreOperationService`, `Account`, `Device`, `LiveContainerConnection`, `GitHubHistoryStore`, `PipelineStep`, `Sendable`, `SigningAccountDetailView`, `.export`, `X509Certificate`, `GitHubAccountSession`, `ALTLocalizedError`, `CertificateError`, `prettyJSONString`, `CacheItem`, `RemoteAnisetteConfigurationError`, `Combine`, `UITests`, `AnisetteServersManager`, `Account`, `GitHubRepositoryImportView`, `GitHubHistoryClient`, `LiveContainerGuest`, `CharacterSet`, `NSAttributedString+Markdown.swift`, `VerificationError`, `ConsoleLog`, `StorageDirectoryUsage`, `AbstractConsoleLogger`, `PlatformURL`, `CertificateASN1Parser.swift`, `.run`, `Stage`, `WidgetDataManager`, `PairingError`, `ProfileType`, `Decoder`, `withFFIDispatch`, `LiveContainerError`, `BackgroundServiceMode`, `UniformTypeIdentifiers`, `DeviceService`, `KnownSource`, `Error`, `AppExtensionViewHostingController`, `.performBackupCoordinated`, `XCTest`, `PaginationIntent`, `SideSignConfigManager`, `.isLoggingEnabled`, `BackgroundLocationService`, `CertificateType`, `AppEnvironment`, `KeyStore`, `Entitlement`, `ActionLabel`, `PaginationDataHolder`, `OutputStream`, `FileOutputStream`, `FileManager`, `.addCertificate`, `.testTCP`, `PairedDeviceRecord`, `GitHubCheckState`, `CoalescedEntry`, `AppSharingError`, `NSString`, `CodeSignKit`, `Existing SideKick components to reuse`, `AppID`, `UIKit`, `NSError`, `.tableView`, `MinimuxerApi.swift`, `debugLog`, `CVarArg`, `DeviceGatewayError`, `UpdateSuccessRecord`, `ProgressFileDownload`, `CompletionGate`, `Result`, `ProcessError`, `AppIconVariant`, `Decoder`, `SideKickStorageCleanup.swift`, `FileManager`, `BuildInfo`, `Date`, `.prepareBeforeDatabaseStart`, `.export`, `NSManagedObjectContext`, `TaskMutexSerializer`, `BonjourDiscoveryTypes.swift`, `.getDateInTimeStamp`, `FileManager`, `LoadingState`, `SigningAccountStore`, `CacheAppOperation`, `.directorySize`, `MinimuxerConstants`, `UserInfoValue`, `ProcessInfo`, `TaskChainSerializer`, `ImportExport.swift`, `SideKickLogStorage.swift`, `ProcessInfo`, `URL+Normalized.swift`, `Bundle+AppExtension.swift`, `Date+Widget.swift`, `FileManager`, `OperatingSystemVersion`, `DeviceGatewayError`, `AuthDevice`, `ImportedAccount`, `RemoveBackupDataOperation`, `ALTApplication+AltStoreApp.swift`, `AnisetteManager`, `OperationEntitlements.swift`, `Nuke`, `WidgetLogManager`, `.toSendableDictionary`?**
+  _High betweenness centrality (0.146) - this node is a cross-community bridge._
 - **What connects `starting`, `ready`, `failed` to the rest of the system?**
   _2379 weakly-connected nodes found - possible documentation gaps or missing edges._
 - **Should `MyAppsViewController` be split into smaller, more focused modules?**
-  _Cohesion score 0.03454913880445795 - nodes in this community are weakly interconnected._
-- **Why does `UIKit` connect `UIKit` to `MyAppsViewController`, `UIButton`, `CellContentChange`, `UIAlertController`, `UIApplication`, `TimeInterval`, `SetupStatus`, `View`, `InsetGroupTableViewCell`, `NSLayoutConstraint`, `NSString`, `SideJITServerConfigView`, `AppOperation`, `.present`, `NSAttributedString+Markdown.swift`, `SigningAccountStore`, `HeaderContentViewController`, `GitHubUpdateService`, `SignInFlowHandler`, `GitHubUpdateConfiguration`, `PillButton`, `AppIconController`, `ThemePickerView`, `UIColor`, `RefreshShortcutViews.swift`, `UIControl`, `CollapsingMarkdownView`, `SceneDelegate`, `.tableView`, `StatusTone`, `UnsavedSettingsCoordinator`, `SideStoreOperationService`, `Button`, `BackgroundRefreshAppsOperation`, `LiveContainerSharedAccess`, `AppManager.swift`, `ScreenshotCollectionViewCell`, `UIDevice+Vibration.swift`, `ImportExport.swift`, `UICollectionReusableView`, `NewsViewController`, `BackgroundServiceMode`, `ToastView`, `UIColor`, `SwiftUI`, `PermissionCollectionViewCell`, `AnyObject`, `ErrorDetailsViewController`, `PatreonViewController`, `Foundation`, `InfoPlistCustomizationCoreView`, `CollapsingTextView`, `AppBannerView`, `.openWebURL`, `SettingsViewController`, `LicensesViewController`, `ForwardingNavigationController`, `EntitlementsCustomizationViewModel`, `UITableViewCell`, `UIImage`, `AppDetailCollectionViewController`, `UIImage`, `StandaloneOperationContext`, `Minimuxer`, `UIView+AnimatedHide.swift`, `FetchedResultsDataSource`, `.exportPairingFile`, `ActionLabel`?**
-  _High betweenness centrality (0.076) - this node is a cross-community bridge._
-- **Should `ImportedCertificateError` be split into smaller, more focused modules?**
-  _Cohesion score 0.07137254901960784 - nodes in this community are weakly interconnected._
-- **Why does `SideSign` connect `Foundation` to `.export`, `OperationStep`, `run`, `AppOperation`, `CertificateDetailView`, `CLIError`, `SigningAccountStore`, `VerificationError`, `CertificateRowView`, `CodeSignKit`, `CertificateManager`, `UIKit`, `DevicesListView`, `CertificateASN1Parser.swift`, `GroupOption`, `SideStoreOperationService`, `BundleInspectorView`, `AppManager.swift`, `ImportExport.swift`, `ALTAppPermission.swift`, `SwiftUI`, `ALTApplication+AltStoreApp.swift`, `InfoPlistCustomizationCoreView`, `AppExtensionViewHostingController`, `EntitlementsCustomizationViewModel`, `Minimuxer`, `CertGroupHeaderView`?**
-  _High betweenness centrality (0.035) - this node is a cross-community bridge._
+  _Cohesion score 0.03418803418803419 - nodes in this community are weakly interconnected._
+- **Why does `UIKit` connect `UIKit` to `MyAppsViewController`, `UIButton`, `ErrorDetailsViewController`, `SideStoreSettingsPages.swift`, `RefreshShortcutViews.swift`, `CellContentChange`, `SignableCertificateRowView`, `UIScreen`, `AddSourceTextFieldCell`, `UIApplication`, `UserCustomizationsView`, `TimeInterval`, `SetupStatus`, `InstallConsoleView`, `View`, `UIBarButtonItem`, `InsetGroupTableViewCell`, `NSString`, `SideJITServerConfigView`, `AppOperation`, `AppScreenshotCollectionViewCell`, `NSAttributedString+Markdown.swift`, `GitHubUpdateSettingsView`, `SigningAccountStore`, `WidgetKit`, `UIAlertController`, `PillButton`, `AppIconController`, `UIColor`, `UIControl`, `ImportExport.swift`, `SceneDelegate`, `.tableView`, `BaseOperation`, `StatusTone`, `UnsavedSettingsCoordinator`, `UpdateCollectionViewCell`, `SideStoreOperationService`, `Button`, `BackgroundRefreshAppsOperation`, `ScreenshotCollectionViewCell`, `LiveContainerConnection`, `UIDevice+Vibration.swift`, `AppBannerCollectionViewCell`, `UICollectionReusableView`, `UICollectionViewController`, `NewsViewController`, `AppViewController`, `UIColor`, `.show`, `MarkdownManager`, `UniformTypeIdentifiers`, `PermissionCollectionViewCell`, `AnyObject`, `NavigationBarAppearance`, `UITableView`, `UIImage`, `Foundation`, `SourceHeaderView`, `CollapsingTextView`, `.openWebURL`, `SettingsViewController`, `LicensesViewController`, `Nuke`, `EntitlementsCustomizationViewModel`, `FetchedResultsCollectionViewPrefetchingDataSource`, `UIImage`, `AppDetailCollectionViewController`, `VibrantButton`, `Combine`, `UIView+AnimatedHide.swift`, `ActionLabel`?**
+  _High betweenness centrality (0.083) - this node is a cross-community bridge._
+- **Should `ImportedCertificateRecord` be split into smaller, more focused modules?**
+  _Cohesion score 0.06777493606138107 - nodes in this community are weakly interconnected._
+- **Why does `OperationError` connect `OperationError` to `MyAppsViewController`, `.importBackup`, `InstallAppOperationContext`, `InjectBatchProfilesOperation`, `NSManagedObjectContext`, `OperationStep`, `enableJITSideJITServer`, `Source`, `Result`, `CacheAppOperation`, `VerificationError`, `UIAlertController`, `Codable`, `CertificateManager`, `PersistentContainer`, `MinimuxerWrapper.swift`, `LocalizedError`, `CacheResignedMetadataOperation`, `MinimuxerError`, `RemoveAppExtensionsOperation`, `ClearAppCacheOperation`, `Sendable`, `ResignAppOperation`, `RemoveBackupDataOperation`, `CertificateStatus`, `FetchProvisioningProfilesOperation`, `InstallAppOperation`, `InstallAppOperationContext`, `DownloadAppOperation`, `PerformBackupRestoreOperation`?**
+  _High betweenness centrality (0.042) - this node is a cross-community bridge._
 - **Should `UIButton` be split into smaller, more focused modules?**
-  _Cohesion score 0.03292273236282195 - nodes in this community are weakly interconnected._
+  _Cohesion score 0.030952380952380953 - nodes in this community are weakly interconnected._
