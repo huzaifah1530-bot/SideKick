@@ -228,15 +228,15 @@
     "semantic_hash": ""
   },
   "SideKick/Services/SideStoreOperationService.swift": {
-    "mtime": 1792511894.2845426,
-    "seen": 1792511947.342204,
-    "ast_hash": "0e61478224e03e534dae1072b4fb6ea4",
+    "mtime": 1792517396.171361,
+    "seen": 1792517481.4626489,
+    "ast_hash": "83b0b49789e7fd1255495da29a391a40",
     "semantic_hash": ""
   },
   "SideKick/Services/SigningAccountStore.swift": {
-    "mtime": 1792510419.9880922,
-    "seen": 1792510515.8497756,
-    "ast_hash": "641666a8e509c0ac09e56d198ada0471",
+    "mtime": 1792517260.919595,
+    "seen": 1792517481.4626515,
+    "ast_hash": "f9fb4b886b16a959cbb78a51fee88421",
     "semantic_hash": ""
   },
   "SideKick/Services/SigningExpiry.swift": {
@@ -282,9 +282,9 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Library/AppManagementView.swift": {
-    "mtime": 1792516344.6476476,
-    "seen": 1792516425.8954775,
-    "ast_hash": "e1e3cab3741137d4865f4b302c668419",
+    "mtime": 1792517413.8258111,
+    "seen": 1792517481.4626837,
+    "ast_hash": "9d93dcf7e3d3e857b8a50f728357cc78",
     "semantic_hash": ""
   },
   "SideKick/Views/Library/GitHubRepositoryImportView.swift": {
@@ -300,9 +300,9 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Library/GitHubUpdateDetailView.swift": {
-    "mtime": 1792439482.877696,
-    "seen": 1792439821.510925,
-    "ast_hash": "b200b9f59440b6ed1e28a36105fef46b",
+    "mtime": 1792517399.0358267,
+    "seen": 1792517481.4626954,
+    "ast_hash": "3aa0b22978d3d8c537e18a2e362e1688",
     "semantic_hash": ""
   },
   "SideKick/Views/Library/GitHubUpdateSettingsView.swift": {
@@ -4116,9 +4116,9 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/ImportedCertificatesView.swift": {
-    "mtime": 1792511897.2200677,
-    "seen": 1792511947.3423328,
-    "ast_hash": "8a3442fff6abea3391bee74df0eaed34",
+    "mtime": 1792517421.9786012,
+    "seen": 1792517481.4627373,
+    "ast_hash": "6a0afd14b2d81c16c99c407fcf4c62d9",
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/ImportedCertificateCatalogTests.swift": {
@@ -4134,15 +4134,15 @@
     "semantic_hash": ""
   },
   "SideKick/Services/SideKickTransferService.swift": {
-    "mtime": 1792516311.444929,
-    "seen": 1792516425.895455,
-    "ast_hash": "c41c69049ff2631c0d2103f208ffd56f",
+    "mtime": 1792517301.153231,
+    "seen": 1792517481.4626455,
+    "ast_hash": "fe22400ee7be1e080b4bf1d3e331dea3",
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/SideKickTransferViews.swift": {
-    "mtime": 1792516340.887707,
-    "seen": 1792516425.8955197,
-    "ast_hash": "46afffb3b05489d08ce0ffcd059842f7",
+    "mtime": 1792517415.3161643,
+    "seen": 1792517481.4627488,
+    "ast_hash": "510e7b6e1fe61b307dcb71908b24a4b2",
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/SideKickTransferIdentifiersTests.swift": {
