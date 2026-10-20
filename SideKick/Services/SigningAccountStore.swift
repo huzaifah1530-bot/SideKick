@@ -97,20 +97,56 @@ final class SigningAccountStore {
     }
 
     private func prepareAnisetteDefaults() async {
+        guard await hasNoAnisetteChoice() else { return }
+        // Prefer the newest recommended server; the built-in default covers offline first runs.
+        if let selection = try? await RemoteAnisetteConfigurationClient().fetchRecommended() {
+            await applyAnisetteDefault(name: selection.server.name, server: selection.serverURL.absoluteString,
+                clientInfo: selection.server.clientInfo, userAgent: selection.server.userAgent)
+            AnisetteRemoteRecord(serverID: selection.server.id, appliedAt: .now).save()
+            return
+        }
+        await applyAnisetteDefault(name: "Windows Anisette", server: AnisetteConfiguration.windowsServer,
+            clientInfo: AnisetteConfiguration.windowsClientInfo, userAgent: AnisetteConfiguration.windowsUserAgent)
+    }
+
+    /// Applies the newest recommended Anisette server the first time SideKick opens, before
+    /// the user has chosen one. Later launches and existing choices are left alone.
+    func applyNewestAnisetteOnFirstLaunch() async {
         let defaults = UserDefaults.standard
-        let persisted = defaults.persistentDomain(forName: Bundle.main.bundleIdentifier ?? "") ?? [:]
+        let attemptedKey = "sidekick.anisette.first-launch-newest.v1"
+        guard !defaults.bool(forKey: attemptedKey) else { return }
+        guard await hasNoAnisetteChoice() else {
+            defaults.set(true, forKey: attemptedKey)
+            return
+        }
+        // Offline: try again next launch. Signing in before then still tries the newest server.
+        guard let selection = try? await RemoteAnisetteConfigurationClient().fetchRecommended() else { return }
+        guard SigningAccountOperationCoordinator.acquire() else { return }
+        defer { SigningAccountOperationCoordinator.release() }
+        guard !AppManager.shared.isActivelyManagingAnyApp else { return }
+        await applyAnisetteDefault(name: selection.server.name, server: selection.serverURL.absoluteString,
+            clientInfo: selection.server.clientInfo, userAgent: selection.server.userAgent)
+        AnisetteRemoteRecord(serverID: selection.server.id, appliedAt: .now).save()
+        defaults.set(true, forKey: attemptedKey)
+        debugLog("[SideKick] Applied newest Anisette server on first launch: \(selection.server.name)")
+    }
+
+    private func hasNoAnisetteChoice() async -> Bool {
+        let persisted = UserDefaults.standard.persistentDomain(forName: Bundle.main.bundleIdentifier ?? "") ?? [:]
         let servers = await AnisetteServersManager.shared.loadLocalServers()
-        guard AnisetteConfiguration.shouldOfferWindowsDefault(persisted: persisted,
-            hasConfigFile: AnisetteConfigManager.shared.hasConfigFile(), hasSavedServers: !servers.isEmpty) else { return }
-        await AnisetteServersManager.shared.saveLocalServers([
-            AnisetteServerItem(name: "Windows Anisette", address: AnisetteConfiguration.windowsServer)
-        ])
-        defaults.menuAnisetteURL = AnisetteConfiguration.windowsServer
+        return AnisetteConfiguration.shouldOfferWindowsDefault(persisted: persisted,
+            hasConfigFile: AnisetteConfigManager.shared.hasConfigFile(), hasSavedServers: !servers.isEmpty)
+    }
+
+    private func applyAnisetteDefault(name: String, server: String, clientInfo: String, userAgent: String) async {
+        let defaults = UserDefaults.standard
+        await AnisetteServersManager.shared.saveLocalServers([AnisetteServerItem(name: name, address: server)])
+        defaults.menuAnisetteURL = server
         defaults.useOnDeviceAnisette = false
         defaults.disableAnisetteRotation = true
         var config = await AnisetteConfigManager.shared.loadConfig()
-        config.clientInfo = AnisetteConfiguration.windowsClientInfo
-        config.userAgent = AnisetteConfiguration.windowsUserAgent
+        config.clientInfo = clientInfo
+        config.userAgent = userAgent
         await AnisetteConfigManager.shared.saveConfig(config)
         AnisetteConfigManager.shared.anisetteAdiBlob = nil
         AnisetteConfigManager.shared.anisetteIdentifier = nil

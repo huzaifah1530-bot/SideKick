@@ -97,6 +97,7 @@ final class AppEnvironment {
                 databaseState = .ready
                 scheduleMaintenance()
                 rescanLiveContainerApps()
+                Task { await SigningAccountStore().applyNewestAnisetteOnFirstLaunch() }
             } catch {
                 databaseState = .failed(Self.readableDescription(for: error))
             }

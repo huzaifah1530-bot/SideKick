@@ -568,8 +568,8 @@ struct AnisetteSettingsView: View {
     }
 }
 
-/// When the user last applied the recommended server from GitHub.
-private struct AnisetteRemoteRecord: Codable {
+/// When the recommended server from GitHub was last applied (by the user or on first launch).
+struct AnisetteRemoteRecord: Codable {
     private static let key = "sidekick.anisette.remote.applied.v1"
     let serverID: String
     let appliedAt: Date
