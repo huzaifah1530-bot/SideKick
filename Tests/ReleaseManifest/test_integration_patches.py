@@ -102,9 +102,12 @@ class IntegrationPatchTests(unittest.TestCase):
             # Bundle(url:) is cached per path; restore re-stages the original app at the helper's App.app.
             self.assertNotIn('executableName == "SideBackup"', signing)
             self.assertIn(').contains(expected)', signing)
-            self.assertIn('if resignedAppBundle.isAltStoreApp {', signing)
+            # Apple-account re-signs must keep the backup group; imported certificates are
+            # exempt because SideKick warns before that re-sign.
+            guard = 'if resignedAppBundle.isAltStoreApp, self.context.overrideSigningCertificate == nil {'
+            self.assertIn(guard, signing)
             self.assertIn('existingGroup.map({ groups.contains($0) }) ?? true', signing)
-            self.assertLess(signing.index('if resignedAppBundle.isAltStoreApp {'), signing.index('return resignedAppBundle'))
+            self.assertLess(signing.index(guard), signing.index('return resignedAppBundle'))
             self.assertIn('com.apple.security.application-groups', (checkout / 'AltStore/AltStoreFree.entitlements').read_text())
             helper = (checkout / "SideBackup/ContentView.swift").read_text()
             self.assertNotIn('Color("Background")', helper)

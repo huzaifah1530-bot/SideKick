@@ -55,7 +55,8 @@ edit("SideBackup/ConsoleLog.swift",
 
 edit("SideStore/Core/Operations/PipelineOperations/ResignAppOperation.swift",
      '        self.debugLog("[ResignAppOperation] Resigned app',
-     '''        if resignedAppBundle.isAltStoreApp {
+     '''        // Imported certificates may lack App Groups; SideKick warns before that re-sign.
+        if resignedAppBundle.isAltStoreApp, self.context.overrideSigningCertificate == nil {
             let groups = resignedAppBundle.entitlements[.appGroups] as? [String] ?? []
             let existingGroup = Bundle.main.altstoreAppGroup
             guard groups.contains(where: { $0.contains(Bundle.baseAltStoreAppGroupID) }),
