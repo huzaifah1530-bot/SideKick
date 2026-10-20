@@ -22,6 +22,22 @@ index e7fa6d61..35f2cc35 100644
              handler: pipelineHandler,
              dbContext: dbContext,
              completionHandler: { result in
+diff --git a/SideStore/Core/Operations/PipelineOperations/PrepareAppExtensionBundleIDsOperation.swift b/SideStore/Core/Operations/PipelineOperations/PrepareAppExtensionBundleIDsOperation.swift
+index 34c199c0..c2c6b4a8 100644
+--- a/SideStore/Core/Operations/PipelineOperations/PrepareAppExtensionBundleIDsOperation.swift
++++ b/SideStore/Core/Operations/PipelineOperations/PrepareAppExtensionBundleIDsOperation.swift
+@@ -27,7 +27,10 @@ final class PrepareAppExtensionBundleIDsOperation: BasePipelineOperation<Install
+                         throw OperationError.invalidApp(reason: "An extension's bundle ID must be a child of its app's bundle ID.")
+                     }
+                     let suffix = appex.bundleIdentifier.dropFirst(appBundle.bundleIdentifier.count)
+-                    appexBundleIds[appex.bundleIdentifier] = profile.bundleIdentifier + suffix
++                    // Imported certificates keep the app's own bundle ID, so extensions must stay
++                    // its children rather than adopting the profile's App ID. Needs device testing.
++                    let base = self.context.overrideSigningCertificate != nil ? self.context.targetBundleIdentifier : profile.bundleIdentifier
++                    appexBundleIds[appex.bundleIdentifier] = base + suffix
+                 }
+                 self.context.appexBundleIds = appexBundleIds
+             }
 diff --git a/SideStore/Core/Operations/PipelineOperations/ResignAppOperation.swift b/SideStore/Core/Operations/PipelineOperations/ResignAppOperation.swift
 index c5c4b55e..8de4c9de 100644
 --- a/SideStore/Core/Operations/PipelineOperations/ResignAppOperation.swift

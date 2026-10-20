@@ -18,14 +18,13 @@ final class SetupStatus {
     private(set) var isRefreshing = false
     private(set) var isRequestingNotifications = false
     private(set) var isImportingPairing = false
-    private(set) var isAuthorizingVPN = false
     private(set) var isCheckingPairing = false
     private(set) var isReady = UserDefaults.standard.bool(forKey: "sidekick.setup.completed")
     var message: String?
 
     var isBusy: Bool {
         isRefreshing || isRequestingNotifications || isImportingPairing ||
-            isAuthorizingVPN || isCheckingPairing || accounts.isWorking
+            isCheckingPairing || accounts.isWorking
     }
 
     var hasPairingFile: Bool {
@@ -154,28 +153,11 @@ final class SetupStatus {
         }
     }
 
-    func authorizeLocalConnection() async {
-        guard !isAuthorizingVPN else { return }
-        isAuthorizingVPN = true
-        defer { isAuthorizingVPN = false }
-        do {
-            try await LocalVPNService.shared.authorize()
-            await refresh(reportConnectionErrors: true)
-        } catch { message = error.localizedDescription }
-    }
-
     func verifyPairing() async {
         await refresh(reportConnectionErrors: true)
         if !pairingVerified, message == nil {
-            let vpn = LocalVPNService.shared
-            if vpn.mode == .external {
-                let action = vpn.externalInstalled ? "Connect LocalDevVPN" : "Get LocalDevVPN"
-                message = "Choose \(action), return here, then choose Verify This iPhone."
-            } else if vpn.isConfigured {
-                message = "Choose Verify This iPhone again."
-            } else {
-                message = "Choose Allow Built-in VPN, then choose Verify This iPhone."
-            }
+            let action = LocalVPNService.shared.externalInstalled ? "Connect LocalDevVPN" : "Get LocalDevVPN"
+            message = "Choose \(action), return here, then choose Verify This iPhone."
         }
     }
 }
@@ -283,9 +265,6 @@ struct RequiredSetupView: View {
                     }
                 }
             }
-            .onChange(of: LocalVPNService.shared.preferredMode) { _, _ in
-                Task { await status.refresh() }
-            }
             .onAppear { step = min(max(step, 0), lastStep) }
             .sheet(isPresented: $isShowingSignIn, onDismiss: finishSignIn) {
                 AppleIDSignInSheet { appleID, password in credentials = (appleID, password) }
@@ -363,11 +342,8 @@ struct RequiredSetupView: View {
         onboardingPage(
             symbol: "network.badge.shield.half.filled",
             title: "Connect to this iPhone",
-            message: LocalVPNService.shared.mode == .external
-                ? "Connect LocalDevVPN before verifying or installing apps. Disconnect it in LocalDevVPN when you finish."
-                : "Allow SideKick’s local VPN for installs and refreshes. It connects for each operation and disconnects afterward."
+            message: "Connect LocalDevVPN before verifying or installing apps. Disconnect it in LocalDevVPN when you finish."
         ) {
-            if LocalVPNService.shared.mode == .external {
                 SwiftUI.Button {
                     let vpn = LocalVPNService.shared
                     UIApplication.shared.open(vpn.externalInstalled ? LocalVPNService.externalURL : LocalVPNService.externalStoreURL)
@@ -380,21 +356,8 @@ struct RequiredSetupView: View {
                 Label(LocalVPNService.shared.externalTunnelConnected ? "Local Tunnel Connected" : "Connect Before Verifying",
                     systemImage: LocalVPNService.shared.externalTunnelConnected ? "checkmark.circle.fill" : "network.slash")
                     .foregroundStyle(.secondary)
-            } else if !LocalVPNService.shared.isConfigured {
-                SwiftUI.Button { Task { await status.authorizeLocalConnection() } } label: {
-                    Label("Allow Built-in VPN", systemImage: "checkmark.shield")
-                }
-                .secondaryActionStyle()
-                .tint(.sideKickAccent)
-                .disabled(status.isBusy)
-            } else {
-                Label("VPN Permission Saved", systemImage: "checkmark.shield.fill").foregroundStyle(.green)
-            }
-            NavigationLink { LocalConnectionModeView() } label: {
-                Label("Connection Method", systemImage: "network")
-            }.disabled(status.isBusy)
-            if status.isAuthorizingVPN || status.isCheckingPairing {
-                ProgressView(status.isCheckingPairing ? "Verifying this iPhone…" : "Saving VPN permission…")
+            if status.isCheckingPairing {
+                ProgressView("Verifying this iPhone…")
                     .frame(maxWidth: .infinity, minHeight: 44)
             }
             if status.vpnAuthorized && status.hasPairingFile && !status.pairingVerified {

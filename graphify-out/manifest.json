@@ -5,24 +5,6 @@
     "ast_hash": "95970cdb9a4330a6aed42c304d5364b5",
     "semantic_hash": ""
   },
-  "SideKickVPN/CIDRValidator.swift": {
-    "mtime": 1791637570.537004,
-    "seen": 1792246536.6707904,
-    "ast_hash": "5f2c93c5c39c20881f24c6ea000f11cd",
-    "semantic_hash": ""
-  },
-  "SideKickVPN/PacketTunnelProvider.swift": {
-    "mtime": 1791807572.265674,
-    "seen": 1792246536.6707945,
-    "ast_hash": "5e558d0ba99c57ebb77948faa7ccfbc0",
-    "semantic_hash": ""
-  },
-  "SideKickVPN/TunnelConstants.swift": {
-    "mtime": 1791637570.537004,
-    "seen": 1792246536.6707978,
-    "ast_hash": "f925b94a5c074478447da919a420073e",
-    "semantic_hash": ""
-  },
   "SideKick/App/AppEnvironment.swift": {
     "mtime": 1792519004.0017197,
     "seen": 1792519062.671189,
@@ -126,9 +108,9 @@
     "semantic_hash": ""
   },
   "SideKick/Services/GitHubUpdateConfigurationStore.swift": {
-    "mtime": 1792439737.2898402,
-    "seen": 1792439821.510802,
-    "ast_hash": "1fa27d77bb4ba6e631560651ccc5e75c",
+    "mtime": 1792521980.6673963,
+    "seen": 1792522013.8527997,
+    "ast_hash": "dc7afbfdddc5d37aa8f0a9c492162aed",
     "semantic_hash": ""
   },
   "SideKick/Services/GitHubUpdateDiscovery.swift": {
@@ -180,9 +162,9 @@
     "semantic_hash": ""
   },
   "SideKick/Services/LocalVPNService.swift": {
-    "mtime": 1792152807.501105,
-    "seen": 1792246536.6708753,
-    "ast_hash": "5b7dd8f15a93cf8e0b5992c91149e024",
+    "mtime": 1792521980.6719463,
+    "seen": 1792522013.8528397,
+    "ast_hash": "845c400d19e11ecb68f61be1d5a49a39",
     "semantic_hash": ""
   },
   "SideKick/Services/PairingSetupImporter.swift": {
@@ -306,9 +288,9 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Library/GitHubUpdateSettingsView.swift": {
-    "mtime": 1792439485.3774858,
-    "seen": 1792439821.5109282,
-    "ast_hash": "6c9e971172a26388fb66c1ecda14e37b",
+    "mtime": 1792521980.6755543,
+    "seen": 1792522013.8529313,
+    "ast_hash": "e671ba98be01d49ebc0a24dd90f4993c",
     "semantic_hash": ""
   },
   "SideKick/Views/Library/GitHubUpdatesView.swift": {
@@ -336,9 +318,9 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Root/RequiredSetupView.swift": {
-    "mtime": 1792518604.1073043,
-    "seen": 1792519062.6714358,
-    "ast_hash": "52b1769d53d7eeb3a0f8d2653557e1c9",
+    "mtime": 1792521980.6797082,
+    "seen": 1792522013.8529525,
+    "ast_hash": "cdd5721110c849d9d09df75f39e2e399",
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/GitHubAccountSettingsView.swift": {
@@ -360,9 +342,9 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/LocalConnectionSettingsView.swift": {
-    "mtime": 1792244632.9903202,
-    "seen": 1792246536.6709583,
-    "ast_hash": "2e00045075278520245ddfc7191223ac",
+    "mtime": 1792521980.6827297,
+    "seen": 1792522013.8529778,
+    "ast_hash": "70ff1a7ea1c694ace74b41c1ebca87b6",
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/SettingsView.swift": {
@@ -372,9 +354,9 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/SideStoreSettingsPages.swift": {
-    "mtime": 1792519001.974985,
-    "seen": 1792519062.6714692,
-    "ast_hash": "1a809d8c4c872d7f3293f7fab3a9ffb5",
+    "mtime": 1792521980.687331,
+    "seen": 1792522013.8529892,
+    "ast_hash": "5a1e5f6cac36a4bfc9e3190484be8115",
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/SkippedGitHubUpdatesView.swift": {
@@ -396,15 +378,15 @@
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_integration_patches.py": {
-    "mtime": 1792514346.4761114,
-    "seen": 1792516425.8955438,
-    "ast_hash": "21f9195200ffb4bdc4f46fe07acb0d2e",
+    "mtime": 1792521980.6983333,
+    "seen": 1792522013.8530245,
+    "ast_hash": "6f4be77cfc17d3871175a6dadb7365b1",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_release_manifest.py": {
-    "mtime": 1791828315.9129763,
-    "seen": 1792246536.671,
-    "ast_hash": "e6cef0f5c4b446d4655a15858c33b71f",
+    "mtime": 1792521980.7019415,
+    "seen": 1792522013.853033,
+    "ast_hash": "621c0a687a08ea3f2c1143df5f39ea40",
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/AnisetteConfigurationTests.swift": {
@@ -426,9 +408,9 @@
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/GitHubHistoryClientTests.swift": {
-    "mtime": 1792170620.9966662,
-    "seen": 1792246536.6710196,
-    "ast_hash": "2fe14328bf5f51e14c365bbf22158e97",
+    "mtime": 1792521980.7034545,
+    "seen": 1792522013.8530588,
+    "ast_hash": "1c34e3bf1ad6f9aeeea338a2f5df34ce",
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/GitHubHistoryStoreTests.swift": {
@@ -462,9 +444,9 @@
     "semantic_hash": ""
   },
   "Tests/VendorRegression/test_auth_compatibility_patch.py": {
-    "mtime": 1792253056.0565863,
-    "seen": 1792253464.2402446,
-    "ast_hash": "f61690643d55e57e3c7ce2a34a44825f",
+    "mtime": 1792521980.7095506,
+    "seen": 1792522013.853097,
+    "ast_hash": "9046ccfaade77da153cf3e3b1f68718b",
     "semantic_hash": ""
   },
   "Vendor/SideStore/AltStore/App Detail/AppContentViewController.swift": {
@@ -3492,15 +3474,9 @@
     "semantic_hash": ""
   },
   "scripts/create-release-manifest.py": {
-    "mtime": 1791828324.6588438,
-    "seen": 1792246536.674243,
-    "ast_hash": "1fe2d2c6bf441f1cf87e908931a18093",
-    "semantic_hash": ""
-  },
-  "scripts/embed-local-vpn.py": {
-    "mtime": 1792441107.1251695,
-    "seen": 1792443596.0665987,
-    "ast_hash": "16062a44b5381f67d0b2af5616250407",
+    "mtime": 1792521980.721876,
+    "seen": 1792522013.8543184,
+    "ast_hash": "99db890d5a5e665c6060adde7b5e48b6",
     "semantic_hash": ""
   },
   "scripts/verify-dependency-regressions.py": {
@@ -3516,9 +3492,9 @@
     "semantic_hash": ""
   },
   ".github/workflows/ios-build.yml": {
-    "mtime": 1792510355.2205956,
-    "seen": 1792510515.85157,
-    "ast_hash": "bdcc09f322feb4a73280e9acd46845cc",
+    "mtime": 1792521980.662353,
+    "seen": 1792522013.8543432,
+    "ast_hash": "993c0b303ec08218cf0735aa34d328e0",
     "semantic_hash": ""
   },
   "AGENTS.md": {
@@ -3528,21 +3504,15 @@
     "semantic_hash": ""
   },
   "README.md": {
-    "mtime": 1792170620.997672,
-    "seen": 1792246536.6742752,
-    "ast_hash": "d97b8d3145fdd4a687c58dac78677092",
-    "semantic_hash": ""
-  },
-  "SideKickVPN/UPSTREAM.md": {
-    "mtime": 1791636235.3483436,
-    "seen": 1792246536.6742773,
-    "ast_hash": "a725fb70004cd1e5ce6dac8c4585b120",
+    "mtime": 1792521980.6658742,
+    "seen": 1792522013.85435,
+    "ast_hash": "0fca9dfb1a17cbaf58ba4244be6638f7",
     "semantic_hash": ""
   },
   "THIRD_PARTY_NOTICES.md": {
-    "mtime": 1791635857.7245564,
-    "seen": 1792246536.67428,
-    "ast_hash": "42d73febc908ea7c68a6a7e54c2a3ca0",
+    "mtime": 1792521980.68885,
+    "seen": 1792522013.8543525,
+    "ast_hash": "71d3f5080fa7dcddb93e7cf02cbc593a",
     "semantic_hash": ""
   },
   "Vendor/SideStore/.github/ISSUE_TEMPLATE/bug_report.yml": {
@@ -3690,15 +3660,15 @@
     "semantic_hash": ""
   },
   "docs/loading-and-ios18.md": {
-    "mtime": 1791711686.1717849,
-    "seen": 1792246536.6743512,
-    "ast_hash": "6e851f90ebe81c0dc64d2da1f07ba39b",
+    "mtime": 1792521980.7142448,
+    "seen": 1792522013.8544261,
+    "ast_hash": "23b6722ec206d254717bf8a004e72c4e",
     "semantic_hash": ""
   },
   "docs/settings-functionality.md": {
-    "mtime": 1791654035.43363,
-    "seen": 1792246536.6743538,
-    "ast_hash": "5af1fba6b58433bad09df23cdb24c2df",
+    "mtime": 1792521980.7173183,
+    "seen": 1792522013.8544314,
+    "ast_hash": "8566aefb5f8fa93ba58c241c78d37649",
     "semantic_hash": ""
   },
   "docs/stock-livecontainer-transfer.md": {
@@ -3738,9 +3708,9 @@
     "semantic_hash": ""
   },
   "project.yml": {
-    "mtime": 1792441107.500198,
-    "seen": 1792443596.066757,
-    "ast_hash": "565adebb26d6219b705104409cfcb858",
+    "mtime": 1792521980.720363,
+    "seen": 1792522013.8544507,
+    "ast_hash": "13e6aa3fd4a593fb28885a1729999ee8",
     "semantic_hash": ""
   },
   "scripts/graphify.ps1": {
@@ -3750,9 +3720,9 @@
     "semantic_hash": ""
   },
   "PROJECT_CONTEXT.md": {
-    "mtime": 1792093527.033912,
-    "seen": 1792246536.6742725,
-    "ast_hash": "548bd37fa4fa5fe955e7e2ea1c64d43d",
+    "mtime": 1792521980.6638825,
+    "seen": 1792522013.8543477,
+    "ast_hash": "ef00295f9420cc6ea7db37640ac77035",
     "semantic_hash": ""
   },
   "docs/graphify.md": {
@@ -3816,9 +3786,9 @@
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_local_connection.py": {
-    "mtime": 1792152801.722358,
-    "seen": 1792246536.6709979,
-    "ast_hash": "292d66349206f46392b4dc9b6b4a2c68",
+    "mtime": 1792521980.7014205,
+    "seen": 1792522013.85303,
+    "ast_hash": "eccb58bf2723baed84a7cdcc57f85d17",
     "semantic_hash": ""
   },
   "Tests/VendorRegression/NetworkIPv4Regression.swift": {
@@ -3834,9 +3804,9 @@
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/SelfUpdateReleaseTests.swift": {
-    "mtime": 1792170510.229494,
-    "seen": 1792246536.6710308,
-    "ast_hash": "f6a0bb9c4fe2faeffd5ffa04e7c830c0",
+    "mtime": 1792521980.7075045,
+    "seen": 1792522013.8530805,
+    "ast_hash": "133130083ec65818f7340c299fc77dd5",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_install_start.py": {
@@ -3858,9 +3828,9 @@
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_helper_packaging.py": {
-    "mtime": 1792179432.0800846,
-    "seen": 1792246536.670983,
-    "ast_hash": "30bdddff1bf9e93c77b0362930e9940c",
+    "mtime": 1792521980.6927247,
+    "seen": 1792522013.8530128,
+    "ast_hash": "47bfa66235c2a86786350428784d3cf4",
     "semantic_hash": ""
   },
   "SideKick/Views/LiveContainer/LiveContainerImportView.swift": {
@@ -3912,9 +3882,9 @@
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_host_entitlements.py": {
-    "mtime": 1792437736.4467225,
-    "seen": 1792438003.1794956,
-    "ast_hash": "1ae54bf928c4d0a4416a31c7f6cfa5e7",
+    "mtime": 1792521980.6937306,
+    "seen": 1792522013.853016,
+    "ast_hash": "6ecb8e09e510e546aa35a5305de1e774",
     "semantic_hash": ""
   },
   "Tests/VendorRegression/test_explicit_peer_patch.py": {
@@ -3924,9 +3894,9 @@
     "semantic_hash": ""
   },
   "scripts/host-entitlements.py": {
-    "mtime": 1792437734.223729,
-    "seen": 1792438003.1803975,
-    "ast_hash": "1d55390d9efa917301c98cc59b6fa683",
+    "mtime": 1792521980.7234018,
+    "seen": 1792522013.8543253,
+    "ast_hash": "75eab208131d93cca5774ad04e38712a",
     "semantic_hash": ""
   },
   "scripts/integrate-backup-helper.py": {
@@ -4068,8 +4038,8 @@
     "semantic_hash": ""
   },
   "config/anisette-servers.json": {
-    "mtime": 1792511647.6524734,
-    "seen": 1792511947.3442798,
+    "mtime": 1792521980.71107,
+    "seen": 1792522013.8543167,
     "ast_hash": "d182aafd52dde2399a602d1c736148d4",
     "semantic_hash": ""
   },
@@ -4134,21 +4104,27 @@
     "semantic_hash": ""
   },
   "SideKick/Services/SideKickTransferService.swift": {
-    "mtime": 1792518549.7957082,
-    "seen": 1792519062.671357,
-    "ast_hash": "a81f8ca9ebc4498ded80d7d68be53fca",
+    "mtime": 1792521980.6734836,
+    "seen": 1792522013.8528707,
+    "ast_hash": "4dabc4ebf94dd90b8e6aad009ef2317a",
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/SideKickTransferViews.swift": {
-    "mtime": 1792518583.1708312,
-    "seen": 1792519062.671467,
-    "ast_hash": "6af12bc783f691be5e0759a48b55edd5",
+    "mtime": 1792521980.684259,
+    "seen": 1792522013.8529866,
+    "ast_hash": "8d7ff1cfd0586931b33a3e60bd1d7a19",
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/SideKickTransferIdentifiersTests.swift": {
     "mtime": 1792516371.484772,
     "seen": 1792516425.8955894,
     "ast_hash": "5c3b4a1b654b6d918d3ce01ffc1d1eea",
+    "semantic_hash": ""
+  },
+  "scripts/integrate-sidekick.py": {
+    "mtime": 1792521980.7249966,
+    "seen": 1792522013.8543289,
+    "ast_hash": "c62a3c6701862602d0d559eff3ddbf98",
     "semantic_hash": ""
   }
 }

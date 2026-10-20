@@ -16,9 +16,6 @@ struct SeparateSideKickCopyView: View {
     private var newBundleID: String? {
         certificate.profile.map(SideKickTransferService.separateCopyBundleIdentifier(for:))
     }
-    private var removesVPN: Bool {
-        SideKickTransferService.includesBuiltInVPN && !SideKickTransferService.profileAllowsVPN(certificate.profile?.uuid)
-    }
 
     var body: some View {
         List {
@@ -35,12 +32,6 @@ struct SeparateSideKickCopyView: View {
                 Section {
                     Label("“\(occupant)” already uses this App ID. Installing SideKick will replace it. Reinstall that app afterwards; it keeps its own bundle ID now.", systemImage: "exclamationmark.triangle.fill")
                         .foregroundStyle(.orange)
-                }
-            }
-
-            if removesVPN {
-                Section {
-                    Label("The new copy won’t include SideKick’s built-in VPN. This certificate’s profile doesn’t allow VPN extensions. Install LocalDevVPN from the App Store and use it for the local connection.", systemImage: "network.slash")
                 }
             }
 
@@ -75,7 +66,7 @@ struct SeparateSideKickCopyView: View {
             occupant = await SideKickTransferService.occupant(of: newBundleID)
             do {
                 copy = try await SideKickTransferService.prepareSeparateCopy(newID: newBundleID,
-                    removeVPN: removesVPN, store: environment.ipaImportStore)
+                    store: environment.ipaImportStore)
             } catch {
                 errorMessage = error.localizedDescription
             }

@@ -19,7 +19,6 @@ ARTIFACTS = ROOT / "artifacts"
 BUILD_CONFIG = ROOT / "Vendor/SideStore/Build.xcconfig"
 IPA_PATHS = {
     "standard": ARTIFACTS / "SideKick-unsigned.ipa",
-    "vpn": ARTIFACTS / "SideKick-vpn-unsigned.ipa",
 }
 SOURCE_PATH = ARTIFACTS / "SideKick-corresponding-source.tar.gz"
 MANIFEST_PATH = ARTIFACTS / "SideKick-release-manifest.json"
@@ -137,7 +136,6 @@ def main() -> None:
         },
         "packages": {
             "standardIPA": artifact_record(IPA_PATHS["standard"]),
-            "vpnIPA": artifact_record(IPA_PATHS["vpn"]),
             "correspondingSource": artifact_record(SOURCE_PATH),
         },
     }

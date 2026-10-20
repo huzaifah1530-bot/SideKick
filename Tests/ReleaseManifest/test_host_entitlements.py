@@ -46,28 +46,29 @@ class HostEntitlementTests(unittest.TestCase):
         spec.loader.exec_module(module)
         return module
 
-    def test_both_variants_keep_groups_and_only_external_vpn_permissions_are_removed(self):
+    def test_host_keeps_groups_and_never_requests_vpn_permissions(self):
         module = self.module()
-        configured = plistlib.loads((ROOT / 'SideKickVPN/Host.entitlements').read_bytes())
+        configured = plistlib.loads((ROOT / 'SideKick/Host.entitlements').read_bytes())
         self.assertEqual(configured[GROUP], ['group.com.sidekick.app', 'group.com.SideStore.SideStore'])
+        for key in VPN_KEYS:
+            self.assertNotIn(key, configured, 'SideKick uses LocalDevVPN; it must not request VPN permissions')
         # Additional permission requests must survive without another allowlist.
         configured['keychain-access-groups'] = ['TEAM.com.sidekick.app']
         configured['com.apple.developer.siri'] = True
-        self.assertEqual(module.requests(configured, external_vpn=False), configured)
-        self.assertEqual(module.requests(configured, external_vpn=True),
-                         {key: value for key, value in configured.items() if key not in VPN_KEYS})
-        self.assertIn(VPN_KEYS[0], configured, 'Filtering must not mutate the input')
+        self.assertEqual(module.requests(configured), configured)
         with self.assertRaisesRegex(ValueError, 'App Group'):
             module.requests({})
+        with self.assertRaisesRegex(ValueError, 'LocalDevVPN'):
+            module.requests({**configured, VPN_KEYS[0]: ['packet-tunnel-provider']})
 
-    def test_workflow_verifies_both_final_archives_before_upload(self):
+    def test_workflow_verifies_the_final_archive_before_upload(self):
         workflow = (ROOT / '.github/workflows/ios-build.yml').read_text()
         self.assertNotIn('plistlib.dumps({})', workflow)
-        self.assertIn('host-entitlements.py prepare SideKickVPN/Host.entitlements', workflow)
-        for name in ('SideKick-unsigned.ipa', 'SideKick-vpn-unsigned.ipa'):
-            call = f'host-entitlements.py verify artifacts/{name}'
-            self.assertIn(call, workflow)
-            self.assertLess(workflow.index(call), workflow.index('- name: Upload IPA artifact'))
+        self.assertNotIn('SideKick-vpn-unsigned', workflow, 'The built-in VPN variant was removed')
+        self.assertIn('host-entitlements.py prepare SideKick/Host.entitlements', workflow)
+        call = 'host-entitlements.py verify artifacts/SideKick-unsigned.ipa'
+        self.assertIn(call, workflow)
+        self.assertLess(workflow.index(call), workflow.index('- name: Upload IPA artifact'))
 
     def test_packaged_ipa_inspection_rejects_missing_or_changed_permissions(self):
         module = self.module()
@@ -134,9 +135,9 @@ do {
             subprocess.run([str(binary)], check=True)
 
     @unittest.skipUnless(sys.platform == 'darwin', 'Actual Mach-O signing requires macOS')
-    def test_actual_packaged_ipa_signature_preserves_both_variants(self):
+    def test_actual_packaged_ipa_signature_preserves_permissions(self):
         module = self.module()
-        source = plistlib.loads((ROOT / 'SideKickVPN/Host.entitlements').read_bytes())
+        source = plistlib.loads((ROOT / 'SideKick/Host.entitlements').read_bytes())
         source['com.apple.developer.siri'] = True
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -148,15 +149,13 @@ do {
                 'CFBundleExecutable': 'SideStore', 'CFBundleIdentifier': 'com.sidekick.app',
                 'CFBundlePackageType': 'APPL', 'CFBundleVersion': '1',
             }))
-            for external in (False, True):
-                with self.subTest(external_vpn=external):
-                    expected = module.requests(source, external_vpn=external)
-                    request = root / 'requests.plist'
-                    request.write_bytes(plistlib.dumps(expected))
-                    subprocess.run(['codesign', '--force', '--sign', '-', '--entitlements', str(request), str(app)], check=True)
-                    ipa = root / f'SideKick-{external}.ipa'
-                    subprocess.run(['ditto', '-c', '-k', '--keepParent', str(root / 'Payload'), str(ipa)], check=True)
-                    module.verify(ipa, expected)
+            expected = module.requests(source)
+            request = root / 'requests.plist'
+            request.write_bytes(plistlib.dumps(expected))
+            subprocess.run(['codesign', '--force', '--sign', '-', '--entitlements', str(request), str(app)], check=True)
+            ipa = root / 'SideKick.ipa'
+            subprocess.run(['ditto', '-c', '-k', '--keepParent', str(root / 'Payload'), str(ipa)], check=True)
+            module.verify(ipa, expected)
 
 
 if __name__ == '__main__':

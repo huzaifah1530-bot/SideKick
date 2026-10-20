@@ -39,7 +39,7 @@ class ReleaseManifestTests(unittest.TestCase):
                 "MAIN_BUNDLE_IDENTIFIER[config=Release] = $(BASE_BUNDLE_ID)\n",
                 encoding="utf-8",
             )
-            packages = {"standard": root / "standard.ipa", "vpn": root / "vpn.ipa"}
+            packages = {"standard": root / "standard.ipa"}
             info = {"CFBundleIdentifier": "com.sidekick.app", "CFBundleShortVersionString": "0.8.0", "CFBundleVersion": "42"}
             for ipa in packages.values():
                 with zipfile.ZipFile(ipa, "w") as archive:

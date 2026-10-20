@@ -100,24 +100,31 @@ actor GitHubUpdateConfigurationStore {
         guard targetID == Bundle.main.bundleIdentifier else { return nil }
         let existing = try configuration(for: targetID)
         guard existing != nil || !UserDefaults.standard.bool(forKey: Self.selfUpdateOptOutKey) else { return nil }
-        let vpnExtension = Bundle.main.bundleURL.appendingPathComponent("PlugIns/SideKickVPN.appex", isDirectory: true)
-        let configuration = Self.releaseDefault(for: targetID,
-            includesVPN: fileManager.fileExists(atPath: vpnExtension.path), replacing: existing)
+        let configuration = Self.releaseDefault(for: targetID, replacing: existing)
         if configuration != existing { try save(configuration) }
         return configuration
     }
 
-    static func releaseDefault(for targetID: String, includesVPN: Bool,
+    /// The built-in VPN build was discontinued; its release assets move to the standard IPA.
+    static let discontinuedVPNReleaseAssets = ["SideKick-vpn-unsigned.ipa", "SideKick+Vpn.read.release.description.ipa"]
+
+    static func releaseDefault(for targetID: String,
                                replacing existing: GitHubUpdateConfiguration? = nil) -> GitHubUpdateConfiguration {
         if let existing {
             guard GitHubSourceIdentity.repository(existing.repositoryURL) == GitHubSourceIdentity.repository(selfUpdateRepositoryURL) else { return existing }
             switch existing.source {
             case .actionsArtifact:
+                if existing.assetName == "SideKick-vpn-unsigned-ipa", existing.workflowFile == "ios-build.yml" {
+                    // The VPN artifact is no longer built; keep the user's Actions channel.
+                    var moved = existing
+                    moved.assetName = "SideKick-unsigned-ipa"
+                    return moved
+                }
                 guard existing.selfUpdateReleaseMigrationApplied != true,
                       existing.workflowFile == "ios-build.yml", existing.branch == "main",
-                      ["SideKick-unsigned-ipa", "SideKick-vpn-unsigned-ipa"].contains(existing.assetName) else { return existing }
+                      existing.assetName == "SideKick-unsigned-ipa" else { return existing }
             case .latestRelease:
-                guard ["SideKick-unsigned.ipa", "SideKick-vpn-unsigned.ipa"].contains(existing.assetName) else { return existing }
+                guard (["SideKick-unsigned.ipa"] + discontinuedVPNReleaseAssets).contains(existing.assetName) else { return existing }
             }
         }
 
@@ -128,7 +135,7 @@ actor GitHubUpdateConfigurationStore {
             source: .latestRelease,
             workflowFile: "",
             branch: "",
-            assetName: includesVPN ? "SideKick+Vpn.read.release.description.ipa" : "SideKick.ipa",
+            assetName: "SideKick.ipa",
             baselineUpdateKey: nil,
             lastInstalledUpdateKey: nil,
             tokenID: existing?.tokenID,

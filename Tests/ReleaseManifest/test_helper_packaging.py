@@ -36,11 +36,11 @@ class HelperPackagingTests(unittest.TestCase):
                                     check=True, stdout=subprocess.PIPE)
             self.assertEqual(plistlib.loads(result.stdout)['com.apple.security.application-groups'], ['group.com.sidekick.transfer'])
 
-    def test_workflow_preserves_embedded_helper_group_request_before_both_packages(self):
+    def test_workflow_preserves_embedded_helper_group_request_before_packaging(self):
         workflow = (ROOT / '.github/workflows/ios-build.yml').read_text()
         call = 'python3 scripts/package-backup-helper.py "$APP_PATH/SideBackup.ipa"'
         self.assertIn(call, workflow)
-        self.assertLess(workflow.index(call), workflow.index('cp -R "$APP_PATH" VPNPayload/Payload/'))
+        self.assertLess(workflow.index(call), workflow.index('cp -R "$APP_PATH" Payload/'))
 
     def test_signed_helper_is_verified_and_failed_signing_keeps_original_archive(self):
         script = ROOT / 'scripts/package-backup-helper.py'

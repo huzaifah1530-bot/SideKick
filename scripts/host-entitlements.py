@@ -6,18 +6,19 @@ import subprocess
 import tempfile
 
 GROUP_KEY = 'com.apple.security.application-groups'
+# SideKick connects through the LocalDevVPN app and never requests VPN permissions itself.
 VPN_KEYS = ('com.apple.developer.networking.networkextension', 'com.apple.developer.networking.vpn.api')
 # SideKick's own group first, then LiveContainer's shared-apps group (read only).
 GROUPS = ['group.com.sidekick.app', 'group.com.SideStore.SideStore']
 
 
-def requests(configured: dict, *, external_vpn: bool = False) -> dict:
+def requests(configured: dict) -> dict:
     result = dict(configured)
     if result.get(GROUP_KEY) != GROUPS:
         raise ValueError('SideKick must request its App Groups before packaging')
-    if external_vpn:
-        for key in VPN_KEYS:
-            result.pop(key, None)
+    for key in VPN_KEYS:
+        if key in result:
+            raise ValueError(f'SideKick must not request {key}; it uses LocalDevVPN')
     return result
 
 
@@ -42,13 +43,12 @@ if __name__ == '__main__':
     prepare = commands.add_parser('prepare')
     prepare.add_argument('source', type=Path)
     prepare.add_argument('output', type=Path)
-    prepare.add_argument('--external-vpn', action='store_true')
     inspect = commands.add_parser('verify')
     inspect.add_argument('ipa', type=Path)
     inspect.add_argument('expected', type=Path)
     args = parser.parse_args()
     if args.command == 'prepare':
         configured = plistlib.loads(args.source.read_bytes())
-        args.output.write_bytes(plistlib.dumps(requests(configured, external_vpn=args.external_vpn)))
+        args.output.write_bytes(plistlib.dumps(requests(configured)))
     else:
         verify(args.ipa, requests(plistlib.loads(args.expected.read_bytes())))

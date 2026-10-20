@@ -339,9 +339,7 @@ struct ConnectionSettingsView: View {
                 pairingStatus = "Pairing is set up and SideKick can reach this iPhone. Install and refresh are ready."
             } catch {
                 await vpn.refreshStatus()
-                let recovery = vpn.mode == .external
-                    ? (vpn.externalInstalled ? "Connect LocalDevVPN" : "Get LocalDevVPN")
-                    : (vpn.isConfigured ? "Verify Device Connection" : "Allow Built-in VPN")
+                let recovery = vpn.externalInstalled ? "Connect LocalDevVPN" : "Get LocalDevVPN"
                 pairingRecoveryAction = recovery
                 let instruction = "In Settings → Connection, choose \(recovery), then retry."
                 pairingStatus = "Pairing file imported. SideKick couldn’t reach the iPhone yet. \(instruction) Check that this pairing file belongs to your iPhone.\n\n\(error.localizedDescription)"

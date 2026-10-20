@@ -10,8 +10,9 @@ ROOT = Path(__file__).resolve().parents[2]
 class LocalConnectionRegressionTests(unittest.TestCase):
     def test_external_connection_verifies_device_without_requiring_address_hint(self):
         source = (ROOT / 'SideKick/Services/LocalVPNService.swift').read_text(encoding='utf-8')
+        self.assertNotIn('NetworkExtension', source, 'The built-in VPN was removed; SideKick uses LocalDevVPN only')
         connect = source.split('    private func connect() async throws {', 1)[1]
-        branch = connect.split('        guard extensionBundleIdentifier', 1)[0]
+        branch = connect.split('    private func prepareDeviceConnection', 1)[0].rsplit('    }', 1)[0]
         acquire = source.split('    private func performAcquire()', 1)[1].split('    func release(', 1)[0]
         self.assertNotIn('externalNotConnected', branch,
                          'An address hint must not block the real paired-device verification')
@@ -21,9 +22,7 @@ class LocalConnectionRegressionTests(unittest.TestCase):
             return
         fixture = '''import Foundation
 enum ProbeError: Error { case unreachable, unexpectedMode }
-enum Mode { case external, builtIn }
 @MainActor final class ConnectionProbe {
-    let mode = Mode.external
     let externalConnected = false
     var wasVerified = false
     var failure: ProbeError?
@@ -33,7 +32,6 @@ enum Mode { case external, builtIn }
     }
     func connect() async throws {
 ''' + branch + '''
-        throw ProbeError.unexpectedMode
     }
 }
 @main struct Main {

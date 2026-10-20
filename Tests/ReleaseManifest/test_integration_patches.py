@@ -36,7 +36,6 @@ class IntegrationPatchTests(unittest.TestCase):
                 "AltWidget/Info.plist", "SideBackup/Info.plist",
                 "AltStore/Resources/ReleaseEntitlements.plist",
                 "AltStore/AltStoreFree.entitlements",
-                "SideStore/Core/Operations/PipelineOperations/RemoveAppExtensionsOperation.swift",
                 "SideStore/MaintenanceManager.swift", "SideStore/Utils/iostreams/ConsoleLog.swift",
                 "SideStore/Utils/common/FileOutputStream.swift",
                 "SideStore/Core/Anisette/AnisetteProvider.swift",
@@ -63,7 +62,7 @@ class IntegrationPatchTests(unittest.TestCase):
                 self.assertEqual(result.returncode, 0, f"{patch}: {result.stderr}")
 
             import sys
-            result = subprocess.run([sys.executable, str(ROOT / "scripts/embed-local-vpn.py"), str(checkout)], capture_output=True, text=True)
+            result = subprocess.run([sys.executable, str(ROOT / "scripts/integrate-sidekick.py"), str(checkout)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
             patch_path = checkout / "audit.patch"
             patch_path.write_bytes(audit_patch.encode("utf-8"))

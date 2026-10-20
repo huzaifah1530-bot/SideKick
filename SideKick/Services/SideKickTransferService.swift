@@ -128,18 +128,7 @@ enum SideKickTransferService {
     /// Packages the running SideKick under a new bundle ID, ready to install as a second copy.
     /// iOS refuses to replace an app with one signed by a different team, so a cross-team
     /// SideKick has to be a separate app. Needs device testing.
-    /// Whether a profile lets SideKick's built-in VPN extension run.
-    static func profileAllowsVPN(_ profileUUID: UUID?) -> Bool {
-        guard let profileUUID, let profile = ProfileManager.shared.getProfile(uuid: profileUUID) else { return false }
-        let values = profile.entitlements["com.apple.developer.networking.networkextension"] as? [String] ?? []
-        return values.contains("packet-tunnel-provider")
-    }
-
-    static var includesBuiltInVPN: Bool {
-        FileManager.default.fileExists(atPath: Bundle.main.bundleURL.appendingPathComponent("PlugIns/SideKickVPN.appex").path)
-    }
-
-    static func prepareSeparateCopy(newID: String, removeVPN: Bool, store: IPAImportStore) async throws -> ImportedIPA {
+    static func prepareSeparateCopy(newID: String, store: IPAImportStore) async throws -> ImportedIPA {
         let currentID = Bundle.main.bundleIdentifier ?? StoreApp.altstoreAppID
         guard newID != currentID else { throw SideKickTransferError.sameInstallation }
         let source = Bundle.main.bundleURL
@@ -148,11 +137,6 @@ enum SideKickTransferService {
             try FileManager.default.createDirectory(at: temporary, withIntermediateDirectories: true)
             let copy = temporary.appendingPathComponent("App.app")
             try FileManager.default.copyItem(at: source, to: copy)
-            if removeVPN {
-                // Without the Network Extension entitlement the tunnel can't start, and iOS may
-                // refuse the whole install. The copy uses the LocalDevVPN app instead.
-                try? FileManager.default.removeItem(at: copy.appendingPathComponent("PlugIns/SideKickVPN.appex"))
-            }
             try Self.rewriteBundleIdentifiers(in: copy, from: currentID, to: newID)
             return (temporary, try FileManager.default.zipAppBundle(at: copy, compressionLevel: .none))
         }
