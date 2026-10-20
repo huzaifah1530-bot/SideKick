@@ -506,15 +506,10 @@ final class SideStoreOperationService {
     ) async -> QuietRefreshOutcome {
         let apps: [InstalledAppSummary]
         do {
-            apps = try await loadInstalledApps().filter { app in
-                guard app.isActive, !AppOffloadService.blocksNativeOperations(app.id) else { return false }
+            apps = try await loadInstalledApps().filter { $0.isActive && !AppOffloadService.blocksNativeOperations($0.id) }
                 // Imported certificates last months; refreshing them weekly reinstalls the same
                 // profile and gains nothing. Only touch them once they're close to expiring.
-                if app.importedCertificate != nil {
-                    return app.expirationDate.timeIntervalSinceNow < 7 * 24 * 60 * 60
-                }
-                return true
-            }
+                .filter { $0.importedCertificate == nil || $0.expirationDate.timeIntervalSinceNow < 7 * 24 * 60 * 60 }
         }
         catch {
             debugLog("[SideKick] Couldn’t load installed apps for scheduled refresh: \(error.localizedDescription)")
