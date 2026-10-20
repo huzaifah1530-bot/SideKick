@@ -64,7 +64,9 @@ struct ImportedCertificatesView: View {
         .task {
             store.reload()
             await accountStore.reload()
+            await store.checkStatuses()
         }
+        .refreshable { await store.checkStatuses() }
         .fileImporter(isPresented: $isImporting, allowedContentTypes: Self.importTypes, allowsMultipleSelection: true) { result in
             switch result {
             case .success(let urls): startImport(urls)
@@ -208,7 +210,11 @@ private struct ImportedCertificateRow: View {
                     .font(.body.weight(.medium))
                     .lineLimit(2)
                 Spacer(minLength: 8)
-                if record.isExpired() {
+                if record.isRevoked {
+                    Text("Revoked")
+                        .font(.caption.weight(.medium))
+                        .foregroundStyle(.red)
+                } else if record.effectiveExpiryDate <= .now {
                     Text("Expired")
                         .font(.caption.weight(.medium))
                         .foregroundStyle(.red)
@@ -223,7 +229,8 @@ private struct ImportedCertificateRow: View {
     }
 
     private var subtitle: String {
-        let expiry = "\(record.isExpired() ? "Expired" : "Expires") \(record.expiryDate.formatted(date: .abbreviated, time: .omitted))"
+        let date = record.effectiveExpiryDate
+        let expiry = "\(date <= .now ? "Expired" : "Expires") \(date.formatted(date: .abbreviated, time: .omitted))"
         var parts = [expiry]
         if record.profile == nil { parts.append("No profile") }
         switch usageCount {
@@ -249,6 +256,17 @@ private struct ImportedCertificateDetailView: View {
         store.catalog.record(serialNumber: record.serialNumber) ?? record
     }
 
+    private var statusText: String {
+        if current.isRevoked { return "Revoked" }
+        if current.effectiveExpiryDate <= .now { return "Expired" }
+        switch current.status {
+        case .valid?: return "Valid"
+        case .unknown?: return "Couldn’t check"
+        case nil: return "Not checked"
+        case .revoked?: return "Revoked"
+        }
+    }
+
     private var usingAccounts: [SigningAccountSummary] {
         let keys = Set(store.assignedAccountKeys(for: record))
         return accountStore.accounts.filter {
@@ -264,11 +282,27 @@ private struct ImportedCertificateDetailView: View {
             Section {
                 LabeledContent("Name", value: record.name)
                 LabeledContent("Status") {
-                    Text(record.isExpired() ? "Expired" : "Valid")
-                        .foregroundStyle(record.isExpired() ? .red : .secondary)
+                    Text(statusText)
+                        .foregroundStyle(current.isRevoked || current.effectiveExpiryDate <= .now ? .red : .secondary)
                 }
                 LabeledContent("Issued", value: record.issueDate.formatted(date: .abbreviated, time: .omitted))
                 LabeledContent("Expires", value: record.expiryDate.formatted(date: .abbreviated, time: .omitted))
+                if let profile = current.profile, profile.expirationDate < record.expiryDate {
+                    LabeledContent("Apps Stop Opening", value: profile.expirationDate.formatted(date: .abbreviated, time: .omitted))
+                }
+                SwiftUI.Button {
+                    Task { await store.checkStatuses() }
+                } label: {
+                    HStack {
+                        Text("Check Status")
+                        if store.isCheckingStatus { Spacer(); ProgressView() }
+                    }
+                }
+                .disabled(store.isCheckingStatus)
+            } footer: {
+                if let checked = current.statusCheckedAt {
+                    Text("Checked with Apple \(checked.formatted(.relative(presentation: .named))).")
+                }
             }
 
             Section("Details") {
@@ -409,14 +443,17 @@ struct SigningCertificatePickerView: View {
                         .foregroundStyle(.secondary)
                 } else {
                     ForEach(store.certificates) { record in
+                        let unusable = record.isRevoked || record.effectiveExpiryDate <= .now
                         choiceRow(
                             title: record.name,
-                            subtitle: "\(record.isExpired() ? "Expired" : "Expires") \(record.expiryDate.formatted(date: .abbreviated, time: .omitted))",
+                            subtitle: record.isRevoked
+                                ? "Revoked by Apple"
+                                : "\(unusable ? "Expired" : "Expires") \(record.effectiveExpiryDate.formatted(date: .abbreviated, time: .omitted))\(record.profile == nil ? " · No profile" : "")",
                             isSelected: selectedSerial?.caseInsensitiveCompare(record.serialNumber) == .orderedSame
                         ) {
                             select(record)
                         }
-                        .disabled(record.isExpired())
+                        .disabled(unusable)
                     }
                 }
                 NavigationLink { ImportedCertificatesView() } label: {

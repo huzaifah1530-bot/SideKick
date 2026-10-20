@@ -136,3 +136,35 @@ final class ImportedCertificateProfilePairingTests: XCTestCase {
         XCTAssertNil(decoded.certificates.first?.profile)
     }
 }
+
+final class ImportedCertificateStatusTests: XCTestCase {
+    private func record(_ serial: String, expiresIn interval: TimeInterval = 3600) -> ImportedCertificateRecord {
+        ImportedCertificateRecord(serialNumber: serial, name: serial, issueDate: Date(), expiryDate: Date().addingTimeInterval(interval), importedAt: Date(), fileName: "\(serial).p12")
+    }
+
+    func testUnknownResultDoesNotHideEarlierRevocation() throws {
+        var catalog = ImportedCertificateCatalog()
+        try catalog.insert(record("AA"))
+        catalog.setStatus(.revoked, serialNumber: "aa", checkedAt: Date())
+        catalog.setStatus(.unknown, serialNumber: "AA", checkedAt: Date())
+        XCTAssertEqual(catalog.record(serialNumber: "AA")?.status, .revoked)
+        catalog.setStatus(.valid, serialNumber: "AA", checkedAt: Date())
+        XCTAssertEqual(catalog.record(serialNumber: "AA")?.status, .valid)
+    }
+
+    func testEffectiveExpiryUsesEarlierProfileDate() throws {
+        var item = record("AA", expiresIn: 10_000)
+        XCTAssertEqual(item.effectiveExpiryDate, item.expiryDate)
+        let profileExpiry = Date().addingTimeInterval(100)
+        item.profile = ImportedProfileSummary(uuid: UUID(), name: "p", appIdentifier: "T.*", teamIdentifier: "T", teamName: "",
+                                              expirationDate: profileExpiry, deviceCount: 1, fileName: "p.mobileprovision")
+        XCTAssertEqual(item.effectiveExpiryDate, profileExpiry)
+    }
+
+    func testMatchingSerialIgnoresFormatting() throws {
+        var catalog = ImportedCertificateCatalog()
+        try catalog.insert(record("00ABC"))
+        XCTAssertNotNil(catalog.record(matchingSerial: "0xabc"))
+        XCTAssertNil(catalog.record(matchingSerial: "ABD"))
+    }
+}

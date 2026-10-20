@@ -18,6 +18,9 @@ enum ImportedCertificateError: LocalizedError, Equatable {
     case profileRequired(certificateName: String)
     case profileUnavailable
     case profileInUse(appName: String, appIdentifier: String)
+    case updateCertificateMismatch(certificateName: String)
+    case revoked(certificateName: String)
+    case deviceNotInProfile
 
     var errorDescription: String? {
         switch self {
@@ -47,6 +50,12 @@ enum ImportedCertificateError: LocalizedError, Equatable {
             return "“\(name)” belongs to a different developer team, so it needs its provisioning profile. In Settings → Advanced → Certificates, import the matching .mobileprovision file."
         case .profileUnavailable:
             return "The provisioning profile for this certificate is missing. Import the .mobileprovision file again."
+        case .updateCertificateMismatch(let name):
+            return "This app is signed with “\(name)”, but its account now uses a different certificate. Updating would move it to another team and lose its data. Switch the account back to “\(name)” to update it, or re-sign it first."
+        case .deviceNotInProfile:
+            return "This provisioning profile doesn’t include this iPhone, so apps signed with it won’t install. Ask your certificate provider for a profile registered to this device."
+        case .revoked(let name):
+            return "Apple has revoked “\(name)”. Apps signed with it won’t open. Import a new certificate from your provider."
         case .profileInUse(let appName, let appIdentifier):
             return "This certificate’s profile covers only one app ID (\(appIdentifier)), and “\(appName)” already uses it. Installing would replace that app. Delete it first, or ask your certificate provider for a wildcard profile."
         }
@@ -126,6 +135,7 @@ final class ImportedCertificateStore {
             throw error
         }
         catalog = updated
+        Task { await checkStatuses() }
         return record
     }
 
@@ -142,6 +152,11 @@ final class ImportedCertificateStore {
     func importProfile(data: Data, fileName: String) throws -> ImportedCertificateRecord {
         guard let profile = try? ALTProvisioningProfile(data: data) else { throw ImportedCertificateError.invalidProfile }
         guard profile.expirationDate > .now else { throw ImportedCertificateError.profileExpired(profile.expirationDate) }
+        // SideStore caches this iPhone's UDID once pairing has worked. Skip the check before that.
+        if let udid = Keychain.shared.deviceUDID, !udid.isEmpty, !profile.deviceIDs.isEmpty,
+           !profile.deviceIDs.contains(where: { $0.caseInsensitiveCompare(udid) == .orderedSame }) {
+            throw ImportedCertificateError.deviceNotInProfile
+        }
 
         let summary = ImportedProfileSummary(
             uuid: profile.uuid,
@@ -233,6 +248,38 @@ final class ImportedCertificateStore {
         catalog = updated
     }
 
+    private(set) var isCheckingStatus = false
+
+    /// Asks Apple (OCSP/CRL through Security.framework) whether each certificate is revoked.
+    func checkStatuses() async {
+        guard !isCheckingStatus else { return }
+        isCheckingStatus = true
+        defer { isCheckingStatus = false }
+        for record in catalog.certificates {
+            let status: ImportedCertificateStatus
+            do {
+                let secret = try vault.load(serialNumber: record.serialNumber)
+                let x509 = try CertificateManager.parse(secret.p12Data, password: secret.password).x509
+                try await OCSPValidator.validate(x509)
+                status = .valid
+            } catch OCSPValidationError.revoked {
+                status = .revoked
+            } catch {
+                debugLog("[SideKick] Certificate status check for \(record.serialNumber) was inconclusive: \(error.localizedDescription)")
+                status = .unknown
+            }
+            var updated = catalog
+            updated.setStatus(status, serialNumber: record.serialNumber, checkedAt: .now)
+            guard updated != catalog else { continue }
+            do {
+                try ImportedCertificateCatalogFile.save(updated)
+                catalog = updated
+            } catch {
+                debugLog("[SideKick] Could not save certificate status: \(error.localizedDescription)")
+            }
+        }
+    }
+
     func removeAssignments(forAccountIdentifier accountIdentifier: String) {
         var updated = catalog
         updated.removeAssignments(forAccountIdentifier: accountIdentifier)
@@ -259,6 +306,7 @@ final class ImportedCertificateStore {
             return nil
         }
         guard !record.isExpired() else { throw ImportedCertificateError.expired(record.expiryDate) }
+        guard !record.isRevoked else { throw ImportedCertificateError.revoked(certificateName: record.name) }
         let secret = try vault.load(serialNumber: record.serialNumber)
         do {
             let certificate = try CertificateManager.parse(secret.p12Data, password: secret.password)

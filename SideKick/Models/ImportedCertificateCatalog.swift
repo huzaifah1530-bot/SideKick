@@ -12,12 +12,29 @@ struct ImportedCertificateRecord: Codable, Identifiable, Equatable, Sendable {
     /// Provisioning profile paired with this certificate. Required when the
     /// certificate belongs to a different developer team than the Apple Account.
     var profile: ImportedProfileSummary? = nil
+    /// Last revocation check result. `nil` until the first check.
+    var status: ImportedCertificateStatus? = nil
+    var statusCheckedAt: Date? = nil
 
     var id: String { serialNumber }
 
     func isExpired(at date: Date = .now) -> Bool {
         expiryDate <= date
     }
+
+    /// Apps stop opening at whichever expires first: the certificate or its profile.
+    var effectiveExpiryDate: Date {
+        min(expiryDate, profile?.expirationDate ?? expiryDate)
+    }
+
+    var isRevoked: Bool { status == .revoked }
+}
+
+enum ImportedCertificateStatus: String, Codable, Sendable {
+    case valid
+    case revoked
+    /// The check couldn't reach Apple or got no definite answer.
+    case unknown
 }
 
 struct ImportedProfileSummary: Codable, Equatable, Sendable {
@@ -74,6 +91,12 @@ struct ImportedCertificateCatalog: Codable, Equatable, Sendable {
         certificates.first { $0.serialNumber.caseInsensitiveCompare(serialNumber) == .orderedSame }
     }
 
+    /// Like `record(serialNumber:)`, tolerating `0x` prefixes and leading zeros.
+    func record(matchingSerial serial: String) -> ImportedCertificateRecord? {
+        let target = Self.normalizedSerial(serial)
+        return certificates.first { Self.normalizedSerial($0.serialNumber) == target }
+    }
+
     mutating func insert(_ record: ImportedCertificateRecord) throws {
         if let existing = self.record(serialNumber: record.serialNumber) {
             throw ImportedCertificateCatalogError.duplicate(name: existing.name)
@@ -108,6 +131,14 @@ struct ImportedCertificateCatalog: Codable, Equatable, Sendable {
         if value.hasPrefix("0X") { value.removeFirst(2) }
         while value.hasPrefix("0") && value.count > 1 { value.removeFirst() }
         return value
+    }
+
+    mutating func setStatus(_ status: ImportedCertificateStatus, serialNumber: String, checkedAt: Date) {
+        guard let index = certificates.firstIndex(where: { $0.serialNumber.caseInsensitiveCompare(serialNumber) == .orderedSame }) else { return }
+        // A failed lookup must not hide a revocation seen earlier.
+        if status == .unknown, certificates[index].status == .revoked { return }
+        certificates[index].status = status
+        certificates[index].statusCheckedAt = checkedAt
     }
 
     mutating func detachProfile(serialNumber: String) {

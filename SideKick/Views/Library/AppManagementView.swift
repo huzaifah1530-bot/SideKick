@@ -136,7 +136,15 @@ struct AppManagementView: View {
                     }
                     if let installedApp, !isQueuedTargetUnavailable {
                         LabeledContent("Apple Account", value: installedApp.accountEmail)
-                        LabeledContent("Team", value: installedApp.teamIdentifier)
+                        if let certificate = installedApp.importedCertificate {
+                            // The account's team owns the record; the imported certificate's team signed it.
+                            LabeledContent("Signed With", value: certificate.name)
+                            if let profile = certificate.profile {
+                                LabeledContent("Signing Team", value: profile.teamName.isEmpty ? profile.teamIdentifier : profile.teamName)
+                            }
+                        } else {
+                            LabeledContent("Team", value: installedApp.teamIdentifier)
+                        }
                         LabeledContent("Expires", value: installedApp.expirationDate.formatted(date: .abbreviated, time: .shortened))
                     }
                     if let pendingUpdateIPA {

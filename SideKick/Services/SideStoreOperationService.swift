@@ -41,7 +41,7 @@ final class SideStoreOperationService {
 
             // Keep an installed record visible even if its saved account needs
             // reconnecting after a certificate/session change.
-            return candidates.map { app -> (InstalledApp, String, String, String, String, String, String, String, String, Date, String?, String?) in
+            return candidates.map { app -> (InstalledApp, String, String, String, String, String, String, String, String, Date, String?, String?, String?) in
                 let team = app.team
                 let account = team?.account
                 let runningBundle = app.bundleIdentifier == StoreApp.altstoreAppID ? Bundle(url: Bundle.Info.activeBundleURL) : nil
@@ -60,7 +60,11 @@ final class SideStoreOperationService {
                     runningBundle != nil ? runningIdentity : Bundle(url: app.fileURL)?.executableURL
                         .flatMap { try? Data(contentsOf: $0, options: .mappedIfSafe) }
                         .flatMap { GitHubExecutableIdentity.read($0) },
-                    runningBundle != nil ? runningIdentity : app.appBundleFingerprint
+                    runningBundle != nil ? runningIdentity : app.appBundleFingerprint,
+                    // SideStore records the serial only when an override certificate signed the app.
+                    runningBundle != nil
+                        ? Bundle.main.object(forInfoDictionaryKey: Bundle.Info.certificateID) as? String
+                        : app.certificateSerialNumber
                 )
             }
         }
@@ -87,7 +91,8 @@ final class SideStoreOperationService {
                 expirationDate: record.9,
                 contentFingerprint: record.11,
                 executableIdentity: record.10,
-                isActive: record.0.isActive
+                isActive: record.0.isActive,
+                signingCertificateSerial: record.12
             ))
         }
         let identities = Dictionary(grouping: summaries, by: \.bundleIdentifier).mapValues { $0.map(\.id) }
@@ -152,19 +157,24 @@ final class SideStoreOperationService {
         }
         let installedID: String
         do {
-            try await ensureImportedProfileIsFree(for: ipa, using: account)
+            let useImportedCertificate = try await importedCertificateUse(forUpdateOf: ipa.queuedForInstalledAppID, using: account)
+            if useImportedCertificate {
+                try await ensureImportedProfileIsFree(for: ipa, using: account)
+            }
             installedID = try await retryAfterClearingRevokedAssignedProfile(
                 for: ipa.bundleIdentifier,
                 recoveryHandler: recoveryHandler
             ) {
                 try await accountStore.withAccount(
                     accountIdentifier: account.accountIdentifier,
-                    teamIdentifier: account.teamIdentifier
+                    teamIdentifier: account.teamIdentifier,
+                    useImportedCertificate: useImportedCertificate
                 ) {
                     try ImportedCertificateStore.shared.prepareProfileAssignment(
                         bundleIdentifiers: [ipa.bundleIdentifier] + [ipa.queuedForInstalledAppID].compactMap { $0 },
                         accountIdentifier: account.accountIdentifier,
-                        teamIdentifier: account.teamIdentifier
+                        teamIdentifier: account.teamIdentifier,
+                        useImportedCertificate: useImportedCertificate
                     )
                     return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
                         guard !SideKickStorageCleanup.isRemovingFiles else {
@@ -390,12 +400,37 @@ final class SideStoreOperationService {
     /// profile embedded in their cached signed bundle. Needs device testing.
     static func isInstalledApp(_ installedApp: InstalledApp, signedWith serialNumber: String) -> Bool {
         let target = ImportedCertificateCatalog.normalizedSerial(serialNumber)
+        if let recorded = installedApp.certificateSerialNumber {
+            return ImportedCertificateCatalog.normalizedSerial(recorded) == target
+        }
         if installedApp.resignedBundleIdentifier == Bundle.Info.activeBundleIdentifier {
             let embedded = Bundle.main.object(forInfoDictionaryKey: Bundle.Info.certificateID) as? String
             return embedded.map(ImportedCertificateCatalog.normalizedSerial) == target
         }
         guard let profile = ALTApplication(fileURL: installedApp.fileURL)?.provisioningProfile else { return false }
         return profile.certificates.contains { ImportedCertificateCatalog.normalizedSerial($0.serialNumber) == target }
+    }
+
+    /// Updates keep the certificate that signed the installed copy, so its data and team
+    /// stay the same even if the account's certificate choice changed since. New installs
+    /// follow the account's choice.
+    private func importedCertificateUse(forUpdateOf targetID: String?, using account: SigningAccountSummary) async throws -> Bool {
+        let store = ImportedCertificateStore.shared
+        let assigned = store.assignedRecord(accountIdentifier: account.accountIdentifier, teamIdentifier: account.teamIdentifier)
+        guard let targetID else { return assigned != nil }
+        let context = DatabaseManager.shared.viewContext
+        let installed: InstalledApp? = await context.perform {
+            (try? context.fetch(InstalledApp.fetchRequest()))?.first { $0.resignedBundleIdentifier == targetID }
+                ?? InstalledApp.fetchAltStore(in: context).flatMap { $0.resignedBundleIdentifier == targetID ? $0 : nil }
+        }
+        guard let installed else { return assigned != nil }
+        let signingRecord = store.catalog.certificates.first { Self.isInstalledApp(installed, signedWith: $0.serialNumber) }
+        guard let signingRecord else { return false }
+        guard let assigned, ImportedCertificateCatalog.normalizedSerial(assigned.serialNumber)
+                == ImportedCertificateCatalog.normalizedSerial(signingRecord.serialNumber) else {
+            throw ImportedCertificateError.updateCertificateMismatch(certificateName: signingRecord.name)
+        }
+        return true
     }
 
     /// An imported profile for one specific App ID can sign only one app: every app signed
@@ -470,7 +505,17 @@ final class SideStoreOperationService {
         progressHandler: @escaping @MainActor @Sendable (Int, Int) -> Void = { _, _ in }
     ) async -> QuietRefreshOutcome {
         let apps: [InstalledAppSummary]
-        do { apps = try await loadInstalledApps().filter { $0.isActive && !AppOffloadService.blocksNativeOperations($0.id) } }
+        do {
+            apps = try await loadInstalledApps().filter { app in
+                guard app.isActive, !AppOffloadService.blocksNativeOperations(app.id) else { return false }
+                // Imported certificates last months; refreshing them weekly reinstalls the same
+                // profile and gains nothing. Only touch them once they're close to expiring.
+                if app.importedCertificate != nil {
+                    return app.expirationDate.timeIntervalSinceNow < 7 * 24 * 60 * 60
+                }
+                return true
+            }
+        }
         catch {
             debugLog("[SideKick] Couldn’t load installed apps for scheduled refresh: \(error.localizedDescription)")
             return QuietRefreshOutcome(succeeded: 0, attempted: 0, failure: .appListUnavailable,
@@ -645,8 +690,15 @@ struct InstalledAppSummary: Identifiable, Sendable {
     var contentFingerprint: String? = nil
     var executableIdentity: String? = nil
     var isActive: Bool = true
+    /// Serial of the certificate that signed the installed copy, when SideKick knows it.
+    var signingCertificateSerial: String? = nil
 
     var id: String { resignedBundleIdentifier }
+
+    /// The imported certificate that signed this app, if any.
+    @MainActor var importedCertificate: ImportedCertificateRecord? {
+        signingCertificateSerial.flatMap { ImportedCertificateStore.shared.catalog.record(matchingSerial: $0) }
+    }
 
     /// SideStore adds the signing team's identifier to this app's installed bundle ID.
     /// GitHub builds retain the stable, unsuffixed product identifier.

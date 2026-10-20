@@ -47,6 +47,9 @@ struct GitHubUpdatesView: View {
     @Environment(\.openURL) private var openURL
     @State private var sourceConfigurationID: String?
     @State private var statusConfigurationID: String?
+    @State private var removalConfigurationID: String?
+    @State private var isConfirmingOrphanCleanup = false
+    @State private var removalError: String?
 
     private var configurations: [GitHubUpdateConfiguration] {
         environment.githubConfigurations.sorted {
@@ -71,6 +74,21 @@ struct GitHubUpdatesView: View {
                 .listRowInsets(EdgeInsets(top: 0, leading: Spacing.xxs, bottom: 0, trailing: Spacing.xxs))
                 if let error = environment.githubConfigurationError {
                     Label(error, systemImage: "exclamationmark.triangle.fill").foregroundStyle(.orange)
+                }
+            }
+
+            if !orphanedConfigurations.isEmpty {
+                Section {
+                    SwiftUI.Button(role: .destructive) { isConfirmingOrphanCleanup = true } label: {
+                        Label(
+                            orphanedConfigurations.count == 1
+                                ? "Remove 1 Unavailable App"
+                                : "Remove \(orphanedConfigurations.count) Unavailable Apps",
+                            systemImage: "trash"
+                        )
+                    }
+                } footer: {
+                    Text("These apps were deleted or are no longer in LiveContainer, so they can’t be updated. If LiveContainer’s folder is just disconnected, reconnect it instead.")
                 }
             }
 
@@ -138,6 +156,33 @@ struct GitHubUpdatesView: View {
             if let configuration = configurations.first(where: { $0.id == id }) {
                 GitHubAppUpdateStatusView(configuration: configuration)
             }
+        }
+        .confirmationDialog(
+            "Stop tracking updates for “\(removalConfigurationID.flatMap { id in configurations.first { $0.id == id } }.map(name(for:)) ?? "this app")”?",
+            isPresented: Binding(get: { removalConfigurationID != nil }, set: { if !$0 { removalConfigurationID = nil } }),
+            titleVisibility: .visible
+        ) {
+            SwiftUI.Button("Stop Tracking", role: .destructive) {
+                if let id = removalConfigurationID { Task { await stopTracking([id]) } }
+                removalConfigurationID = nil
+            }
+            SwiftUI.Button("Cancel", role: .cancel) { removalConfigurationID = nil }
+        } message: {
+            Text("The app isn’t changed. You can add the source again later.")
+        }
+        .confirmationDialog("Remove unavailable apps?", isPresented: $isConfirmingOrphanCleanup, titleVisibility: .visible) {
+            SwiftUI.Button("Remove", role: .destructive) {
+                let ids = orphanedConfigurations.map(\.id)
+                Task { await stopTracking(ids) }
+            }
+            SwiftUI.Button("Cancel", role: .cancel) { }
+        } message: {
+            Text("Their GitHub update sources are removed. Installed apps aren’t affected.")
+        }
+        .alert("Updates", isPresented: Binding(get: { removalError != nil }, set: { if !$0 { removalError = nil } })) {
+            SwiftUI.Button("OK", role: .cancel) { removalError = nil }
+        } message: {
+            Text(removalError ?? "")
         }
         .task { environment.requestGitHubUpdateCheck() }
     }
@@ -211,8 +256,10 @@ struct GitHubUpdatesView: View {
             }
         }
         Section {
-            SwiftUI.Button { sourceConfigurationID = configuration.id } label: {
-                Label("Update Source…", systemImage: "slider.horizontal.3")
+            if updateTarget(for: configuration.id) != nil {
+                SwiftUI.Button { sourceConfigurationID = configuration.id } label: {
+                    Label("Update Source…", systemImage: "slider.horizontal.3")
+                }
             }
             if let url = URL(string: configuration.repositoryURL) {
                 SwiftUI.Button { openURL(url) } label: {
@@ -225,6 +272,29 @@ struct GitHubUpdatesView: View {
                 }
             }
         }
+        Section {
+            SwiftUI.Button(role: .destructive) { removalConfigurationID = configuration.id } label: {
+                Label("Stop Tracking", systemImage: "trash")
+            }
+        }
+    }
+
+    /// Tracked apps that were deleted, or LiveContainer apps that are no longer reachable.
+    private var orphanedConfigurations: [GitHubUpdateConfiguration] {
+        // An empty app list usually means My Apps hasn't loaded yet, not that everything is gone.
+        guard !environment.installedApps.isEmpty else { return [] }
+        return configurations.filter { updateTarget(for: $0.id) == nil }
+    }
+
+    @MainActor private func stopTracking(_ ids: [String]) async {
+        do {
+            for id in ids {
+                try await GitHubUpdateConfigurationStore.shared.remove(bundleIdentifier: id)
+            }
+        } catch {
+            removalError = error.localizedDescription
+        }
+        await environment.gitHubSettingsChanged()
     }
 
     private func updateTarget(for id: String) -> GitHubUpdateTarget? {
@@ -270,7 +340,9 @@ struct GitHubUpdatesView: View {
 private struct GitHubAppUpdateStatusView: View {
     let configuration: GitHubUpdateConfiguration
     @Environment(AppEnvironment.self) private var environment
+    @Environment(\.dismiss) private var dismiss
     @State private var reviewCandidateID: String?
+    @State private var isConfirmingRemoval = false
 
     private var currentConfiguration: GitHubUpdateConfiguration? {
         environment.githubConfigurations.first { $0.id == configuration.id }
@@ -355,10 +427,28 @@ private struct GitHubAppUpdateStatusView: View {
                 }
             } else {
                 ContentUnavailableView("App Unavailable", systemImage: "app.dashed",
-                    description: Text("Refresh My Apps or reconnect its LiveContainer folder to check this source."))
+                    description: Text("This app was deleted or isn’t in LiveContainer anymore. If you reinstalled it, refresh My Apps."))
+                    .listRowBackground(Color.clear)
+                if currentConfiguration != nil {
+                    Section {
+                        SwiftUI.Button("Stop Tracking", role: .destructive) { isConfirmingRemoval = true }
+                    } footer: {
+                        Text("Removes this GitHub update source. You can add it again later.")
+                    }
+                }
             }
         }
         .listStyle(.insetGrouped)
+        .confirmationDialog("Stop tracking updates?", isPresented: $isConfirmingRemoval, titleVisibility: .visible) {
+            SwiftUI.Button("Stop Tracking", role: .destructive) {
+                Task {
+                    try? await GitHubUpdateConfigurationStore.shared.remove(bundleIdentifier: configuration.id)
+                    await environment.gitHubSettingsChanged()
+                    dismiss()
+                }
+            }
+            SwiftUI.Button("Cancel", role: .cancel) { }
+        }
         .navigationDestination(item: $reviewCandidateID) { _ in
             if let candidate = check?.candidate { reviewDestination(candidate) }
         }

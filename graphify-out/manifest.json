@@ -228,9 +228,9 @@
     "semantic_hash": ""
   },
   "SideKick/Services/SideStoreOperationService.swift": {
-    "mtime": 1792510436.4651248,
-    "seen": 1792510515.8497727,
-    "ast_hash": "5b5bb598b8dfd202b0153cebb7668a8d",
+    "mtime": 1792511385.1960213,
+    "seen": 1792511462.0346088,
+    "ast_hash": "d98a53f9b97c0e54f0d3c45b19a15e66",
     "semantic_hash": ""
   },
   "SideKick/Services/SigningAccountStore.swift": {
@@ -282,9 +282,9 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Library/AppManagementView.swift": {
-    "mtime": 1792510467.8755157,
-    "seen": 1792510515.849813,
-    "ast_hash": "cb7ea1fdaeb250c7bb9d7d52235ef45d",
+    "mtime": 1792511391.389195,
+    "seen": 1792511462.0346448,
+    "ast_hash": "fad0b28757c1f04a8dce98daf56c30ad",
     "semantic_hash": ""
   },
   "SideKick/Views/Library/GitHubRepositoryImportView.swift": {
@@ -312,9 +312,9 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Library/GitHubUpdatesView.swift": {
-    "mtime": 1792325567.7932632,
-    "seen": 1792432036.389817,
-    "ast_hash": "1798e7a2b5fece08d41a4e570efe15be",
+    "mtime": 1792511283.4761126,
+    "seen": 1792511462.034663,
+    "ast_hash": "ff61a618bdb78e27d4e9639e8cfe2746",
     "semantic_hash": ""
   },
   "SideKick/Views/Library/OtherTeamInstallationView.swift": {
@@ -4104,27 +4104,27 @@
     "semantic_hash": ""
   },
   "SideKick/Models/ImportedCertificateCatalog.swift": {
-    "mtime": 1792506745.512916,
-    "seen": 1792506871.1340969,
-    "ast_hash": "3ce31c317055af0935dde8f04f5736aa",
+    "mtime": 1792511343.6985729,
+    "seen": 1792511462.0345237,
+    "ast_hash": "465ac6d144ff2d4033f7e0514ef4e068",
     "semantic_hash": ""
   },
   "SideKick/Services/ImportedCertificateStore.swift": {
-    "mtime": 1792510439.4798868,
-    "seen": 1792510515.8497212,
-    "ast_hash": "1c901cc68b303342ccc28a63bb30824d",
+    "mtime": 1792511413.1064763,
+    "seen": 1792511462.0345778,
+    "ast_hash": "220d53cd371a83ccdd2c85a043c426f7",
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/ImportedCertificatesView.swift": {
-    "mtime": 1792510467.4889145,
-    "seen": 1792510515.8498707,
-    "ast_hash": "5e35b7fcd28a5f5b944f0d31c3f44f23",
+    "mtime": 1792511374.5479245,
+    "seen": 1792511462.03471,
+    "ast_hash": "02272ad7cb0c852d5286c4b4da6d39c3",
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/ImportedCertificateCatalogTests.swift": {
-    "mtime": 1792506831.866454,
-    "seen": 1792506871.1343856,
-    "ast_hash": "01be01fef9b6c658a4b3d89902a76b3c",
+    "mtime": 1792511424.0679007,
+    "seen": 1792511462.0347922,
+    "ast_hash": "5c124865b1dbbf726f8fdefd6ca8f1b4",
     "semantic_hash": ""
   }
 }
