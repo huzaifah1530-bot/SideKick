@@ -12,6 +12,9 @@ struct SeparateSideKickCopyView: View {
     @State private var errorMessage: String?
 
     private var teamIdentifier: String? { certificate.profile?.teamIdentifier }
+    private var removesVPN: Bool {
+        SideKickTransferService.includesBuiltInVPN && !SideKickTransferService.profileAllowsVPN(certificate.profile?.uuid)
+    }
 
     var body: some View {
         List {
@@ -22,6 +25,12 @@ struct SeparateSideKickCopyView: View {
                 }
             } footer: {
                 Text("Next, open Settings → Advanced → Move to Another SideKick here to export your data, then import it in the new copy.")
+            }
+
+            if removesVPN {
+                Section {
+                    Label("The new copy won’t include SideKick’s built-in VPN. This certificate’s profile doesn’t allow VPN extensions. Install LocalDevVPN from the App Store and use it for the local connection.", systemImage: "network.slash")
+                }
             }
 
             Section {
@@ -54,7 +63,7 @@ struct SeparateSideKickCopyView: View {
             }
             do {
                 copy = try await SideKickTransferService.prepareSeparateCopy(teamIdentifier: teamIdentifier,
-                    store: environment.ipaImportStore)
+                    removeVPN: removesVPN, store: environment.ipaImportStore)
             } catch {
                 errorMessage = error.localizedDescription
             }
@@ -74,14 +83,24 @@ struct SideKickTransferView: View {
     @State private var isConfirmingDelete = false
     @State private var deletedOldCopy = false
     @State private var errorMessage: String?
+    @State private var includesCertificates = true
+    @State private var exportPassword = ""
+    @State private var pendingImportFolder: URL?
+    @State private var importPassword = ""
+    @State private var isAskingImportPassword = false
 
     var body: some View {
         List {
             Section {
+                Toggle("Include Apple Certificates", isOn: $includesCertificates)
+                if includesCertificates {
+                    SecureField("Password for the certificates", text: $exportPassword)
+                        .textContentType(.newPassword)
+                }
                 SwiftUI.Button { isPickingExportFolder = true } label: {
                     Label("Export Data…", systemImage: "square.and.arrow.up")
                 }
-                .disabled(isWorking)
+                .disabled(isWorking || (includesCertificates && exportPassword.count < 6))
                 if let exportedFolderName {
                     Label("Saved “\(exportedFolderName)”", systemImage: "checkmark.circle.fill")
                         .foregroundStyle(.green)
@@ -89,7 +108,7 @@ struct SideKickTransferView: View {
             } header: {
                 Text("From This SideKick")
             } footer: {
-                Text("Choose a folder in Files. SideKick saves your apps, imported IPAs, GitHub update sources and appearance there. Apple sign-ins, GitHub tokens and certificates stay behind; add them again in the new copy.")
+                Text("Choose a folder in Files. SideKick saves your apps, imported IPAs, GitHub update sources and appearance there. With Apple certificates included, the new copy reuses them instead of making new ones, which could stop apps signed by this copy from opening. They’re locked with your password (6+ characters). Apple sign-ins and GitHub tokens stay behind.")
             }
 
             Section {
@@ -119,10 +138,28 @@ struct SideKickTransferView: View {
                     if importResult.restoredSources > 0 {
                         LabeledContent("LiveContainer Sources", value: "\(importResult.restoredSources)")
                     }
+                    if importResult.restoredCertificates > 0 {
+                        LabeledContent("Apple Certificates", value: "\(importResult.restoredCertificates)")
+                    }
+                    if importResult.certificatesNeedPassword {
+                        Text("Apple certificates were skipped because no password was entered. Import again to add them.")
+                            .font(.footnote).foregroundStyle(.secondary)
+                    }
                     if !importResult.skipped.isEmpty {
+                        // Keep the full reasons available without crowding the summary.
                         DisclosureGroup("Skipped (\(importResult.skipped.count))") {
                             ForEach(importResult.skipped, id: \.self) { Text($0).font(.footnote).foregroundStyle(.secondary) }
                         }
+                    }
+                }
+
+                if !importResult.appsWithoutData.isEmpty {
+                    Section {
+                        ForEach(importResult.appsWithoutData, id: \.self) { Text($0) }
+                    } header: {
+                        Text("Install as New Copies")
+                    } footer: {
+                        Text("These were signed with your Apple account, so iOS keeps them separate from copies signed here. Installing creates a new app with empty data; the original keeps its data until you delete it.")
                     }
                 }
 
@@ -134,7 +171,7 @@ struct SideKickTransferView: View {
                             .disabled(isWorking)
                     }
                 } footer: {
-                    Text("Install your apps from the library first if you’d like to compare. Apps the old copy installed keep working until they expire.")
+                    Text("Until you delete the old copy, both send expiry reminders and links like sidekick:// may open either one. Install your apps from the library first if you’d like to compare.")
                 }
             }
         }
@@ -147,13 +184,30 @@ struct SideKickTransferView: View {
         }
         .fileImporter(isPresented: $isPickingImportFolder, allowedContentTypes: [.folder]) { result in
             guard case .success(let folder) = result else { return }
-            Task { await importData(from: folder) }
+            if SideKickTransferService.transferHasCertificates(folder) {
+                pendingImportFolder = folder
+                importPassword = ""
+                isAskingImportPassword = true
+            } else {
+                Task { await importData(from: folder, password: nil) }
+            }
+        }
+        .alert("Certificate Password", isPresented: $isAskingImportPassword) {
+            SecureField("Password", text: $importPassword)
+            SwiftUI.Button("Skip Certificates", role: .cancel) {
+                if let folder = pendingImportFolder { Task { await importData(from: folder, password: nil) } }
+            }
+            SwiftUI.Button("Import") {
+                if let folder = pendingImportFolder { Task { await importData(from: folder, password: importPassword) } }
+            }
+        } message: {
+            Text("Enter the password you chose when exporting, so this copy can reuse your Apple certificates.")
         }
         .confirmationDialog("Delete the old SideKick?", isPresented: $isConfirmingDelete, titleVisibility: .visible) {
             SwiftUI.Button("Delete Old SideKick", role: .destructive) { Task { await deleteOldCopy() } }
             SwiftUI.Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Its data, sign-ins and certificates are removed from this iPhone. This can’t be undone.")
+            Text(deleteMessage)
         }
         .alert("Move to Another SideKick", isPresented: Binding(
             get: { errorMessage != nil },
@@ -165,22 +219,33 @@ struct SideKickTransferView: View {
         }
     }
 
+    private var deleteMessage: String {
+        var text = "Its data, sign-ins and certificates are removed from this iPhone. This can’t be undone."
+        if let offloaded = importResult?.offloadedApps, !offloaded.isEmpty {
+            text += " Offloaded apps can’t be restored afterward: \(offloaded.joined(separator: ", "))."
+        }
+        text += " Keep another way to sideload in case this copy’s certificate is revoked."
+        return text
+    }
+
     @MainActor private func export(to parent: URL) async {
         isWorking = true
         defer { isWorking = false }
         do {
-            let folder = try await SideKickTransferService.export(to: parent, ipaStore: environment.ipaImportStore) { status = $0 }
+            let folder = try await SideKickTransferService.export(to: parent, ipaStore: environment.ipaImportStore,
+                certificatePassword: includesCertificates ? exportPassword : nil) { status = $0 }
             exportedFolderName = folder.lastPathComponent
         } catch {
             errorMessage = error.localizedDescription
         }
     }
 
-    @MainActor private func importData(from folder: URL) async {
+    @MainActor private func importData(from folder: URL, password: String?) async {
         isWorking = true
         defer { isWorking = false }
         do {
-            importResult = try await SideKickTransferService.importTransfer(from: folder, ipaStore: environment.ipaImportStore) { status = $0 }
+            importResult = try await SideKickTransferService.importTransfer(from: folder, ipaStore: environment.ipaImportStore,
+                certificatePassword: password) { status = $0 }
             await environment.gitHubSettingsChanged()
         } catch {
             errorMessage = error.localizedDescription

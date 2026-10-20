@@ -18,6 +18,10 @@ struct SideKickTransferManifest: Codable, Sendable {
     /// Update sources for LiveContainer apps; their IDs don't depend on SideKick's team.
     var liveContainerSources: [GitHubUpdateConfiguration]
     var settings: [String: Setting]
+    /// Apps offloaded in the old copy. Their backups stay there and are lost if it's deleted.
+    var offloadedApps: [String]? = nil
+    /// Apple certificates, encrypted with the password chosen at export. Optional.
+    var appleCertificates: [TransferredAppleCertificate]? = nil
 
     struct App: Codable, Sendable {
         var name: String
@@ -29,6 +33,10 @@ struct SideKickTransferManifest: Codable, Sendable {
         var ipaPath: String?
         /// The tracked GitHub source, including the installed-build receipt.
         var github: GitHubUpdateConfiguration?
+
+        /// SideStore adds the Apple team to bundle IDs it signs. Such an app can't be upgraded
+        /// by another team, so the new copy installs it separately and its data stays behind.
+        var keepsDataWhenReinstalled: Bool { installedBundleIdentifier == originalBundleIdentifier }
     }
 
     struct LibraryIPA: Codable, Sendable {
@@ -48,6 +56,11 @@ struct SideKickTransferImportResult: Sendable {
     var restoredSources: Int
     var skipped: [String]
     var sourceBundleIdentifier: String
+    /// Apps that install as new, empty copies; their data stays in the old installation.
+    var appsWithoutData: [String] = []
+    var offloadedApps: [String] = []
+    var restoredCertificates = 0
+    var certificatesNeedPassword = false
 }
 
 enum SideKickTransferError: LocalizedError {
@@ -57,6 +70,7 @@ enum SideKickTransferError: LocalizedError {
     case nothingToExport
     case sameInstallation
     case notSideKick
+    case wrongCertificatePassword
 
     var errorDescription: String? {
         switch self {
@@ -72,6 +86,8 @@ enum SideKickTransferError: LocalizedError {
             return "This data came from this same SideKick, so there’s nothing to import."
         case .notSideKick:
             return "That app isn’t a SideKick install, so it wasn’t deleted."
+        case .wrongCertificatePassword:
+            return "That password doesn’t open the transferred certificates. Nothing else was changed; try the password you chose when exporting."
         }
     }
 }
@@ -80,9 +96,9 @@ enum SideKickTransferError: LocalizedError {
 enum SideKickTransferService {
     /// UserDefaults copied across. Per-app offload and transfer state stays behind on purpose:
     /// it describes backups that only exist inside the old copy.
+    /// Setup state is deliberately not copied: the new copy still needs its own pairing file.
     private static let settingKeys = [
-        "sidekick.appearance.mode", "sidekick.appearance.accent", "sidekick.appearance.matchAppIcon",
-        "sidekick.setup.completed"
+        "sidekick.appearance.mode", "sidekick.appearance.accent", "sidekick.appearance.matchAppIcon"
     ]
 
     // MARK: Separate copy
@@ -95,7 +111,18 @@ enum SideKickTransferService {
     /// Packages the running SideKick under a new bundle ID, ready to install as a second copy.
     /// iOS refuses to replace an app with one signed by a different team, so a cross-team
     /// SideKick has to be a separate app. Needs device testing.
-    static func prepareSeparateCopy(teamIdentifier: String, store: IPAImportStore) async throws -> ImportedIPA {
+    /// Whether a profile lets SideKick's built-in VPN extension run.
+    static func profileAllowsVPN(_ profileUUID: UUID?) -> Bool {
+        guard let profileUUID, let profile = ProfileManager.shared.getProfile(uuid: profileUUID) else { return false }
+        let values = profile.entitlements["com.apple.developer.networking.networkextension"] as? [String] ?? []
+        return values.contains("packet-tunnel-provider")
+    }
+
+    static var includesBuiltInVPN: Bool {
+        FileManager.default.fileExists(atPath: Bundle.main.bundleURL.appendingPathComponent("PlugIns/SideKickVPN.appex").path)
+    }
+
+    static func prepareSeparateCopy(teamIdentifier: String, removeVPN: Bool, store: IPAImportStore) async throws -> ImportedIPA {
         let currentID = Bundle.main.bundleIdentifier ?? StoreApp.altstoreAppID
         let newID = separateCopyBundleIdentifier(teamIdentifier: teamIdentifier)
         guard newID != currentID else { throw SideKickTransferError.sameInstallation }
@@ -105,6 +132,11 @@ enum SideKickTransferService {
             try FileManager.default.createDirectory(at: temporary, withIntermediateDirectories: true)
             let copy = temporary.appendingPathComponent("App.app")
             try FileManager.default.copyItem(at: source, to: copy)
+            if removeVPN {
+                // Without the Network Extension entitlement the tunnel can't start, and iOS may
+                // refuse the whole install. The copy uses the LocalDevVPN app instead.
+                try? FileManager.default.removeItem(at: copy.appendingPathComponent("PlugIns/SideKickVPN.appex"))
+            }
             try Self.rewriteBundleIdentifiers(in: copy, from: currentID, to: newID)
             return (temporary, try FileManager.default.zipAppBundle(at: copy, compressionLevel: .none))
         }
@@ -116,7 +148,7 @@ enum SideKickTransferService {
     // MARK: Export
 
     /// Writes a "SideKick Transfer" folder inside `parent`, which the user picked in Files.
-    static func export(to parent: URL, ipaStore: IPAImportStore,
+    static func export(to parent: URL, ipaStore: IPAImportStore, certificatePassword: String? = nil,
                        progress: @escaping @MainActor (String) -> Void = { _ in }) async throws -> URL {
         let scoped = parent.startAccessingSecurityScopedResource()
         defer { if scoped { parent.stopAccessingSecurityScopedResource() } }
@@ -195,8 +227,13 @@ enum SideKickTransferService {
             }
         }
 
-        let manifest = SideKickTransferManifest(exportedAt: .now, sourceBundleIdentifier: selfID, apps: apps,
+        var manifest = SideKickTransferManifest(exportedAt: .now, sourceBundleIdentifier: selfID, apps: apps,
             library: library, liveContainerSources: liveContainerSources, settings: settings)
+        manifest.offloadedApps = try await offloadedAppNames()
+        if let certificatePassword, !certificatePassword.isEmpty {
+            progress("Protecting certificates")
+            manifest.appleCertificates = try SigningAccountStore().transferableCertificates(password: certificatePassword)
+        }
         let encoder = JSONEncoder()
         encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
         encoder.dateEncodingStrategy = .iso8601
@@ -209,7 +246,17 @@ enum SideKickTransferService {
     /// Reads a transfer folder. Each app's IPA joins the library with its GitHub source and
     /// installed-build key attached, the same way a repository download is queued. Installing
     /// it records that build, so SideKick doesn't download it again.
-    static func importTransfer(from folder: URL, ipaStore: IPAImportStore,
+    /// Whether a transfer folder carries Apple certificates, so the UI can ask for the password first.
+    static func transferHasCertificates(_ folder: URL) -> Bool {
+        let scoped = folder.startAccessingSecurityScopedResource()
+        defer { if scoped { folder.stopAccessingSecurityScopedResource() } }
+        guard let data = try? Data(contentsOf: folder.appendingPathComponent(SideKickTransferManifest.fileName)) else { return false }
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return !((try? decoder.decode(SideKickTransferManifest.self, from: data))?.appleCertificates ?? []).isEmpty
+    }
+
+    static func importTransfer(from folder: URL, ipaStore: IPAImportStore, certificatePassword: String? = nil,
                                progress: @escaping @MainActor (String) -> Void = { _ in }) async throws -> SideKickTransferImportResult {
         let scoped = folder.startAccessingSecurityScopedResource()
         defer { if scoped { folder.stopAccessingSecurityScopedResource() } }
@@ -223,6 +270,21 @@ enum SideKickTransferService {
 
         var result = SideKickTransferImportResult(importedApps: [], importedLibraryIPAs: 0, restoredSources: 0,
             skipped: [], sourceBundleIdentifier: manifest.sourceBundleIdentifier)
+        result.offloadedApps = manifest.offloadedApps ?? []
+        result.appsWithoutData = manifest.apps.filter { !$0.keepsDataWhenReinstalled }.map(\.name)
+
+        // Check the certificate password before changing anything else.
+        if let certificates = manifest.appleCertificates, !certificates.isEmpty {
+            if let certificatePassword, !certificatePassword.isEmpty {
+                do {
+                    result.restoredCertificates = try SigningAccountStore.storeTransferredCertificates(certificates, password: certificatePassword)
+                } catch {
+                    throw SideKickTransferError.wrongCertificatePassword
+                }
+            } else {
+                result.certificatesNeedPassword = true
+            }
+        }
 
         // Library first: an installed app's own build below replaces a library copy of the same app.
         for item in manifest.library {
@@ -302,6 +364,15 @@ enum SideKickTransferService {
         let version: String
         let buildVersion: String
         let fileURL: URL
+    }
+
+    private static func offloadedAppNames() async throws -> [String] {
+        let context = DatabaseManager.shared.viewContext
+        return try await context.perform {
+            try context.fetch(InstalledApp.fetchRequest())
+                .filter { !$0.isActive && UserDefaults.standard.string(forKey: "SideKick.offload." + $0.resignedBundleIdentifier) == "offloaded" }
+                .map(\.name)
+        }
     }
 
     private static func installedRecords() async throws -> [InstalledRecord] {

@@ -43,11 +43,7 @@ struct GitHubUpdateDetailView: View {
     private var eligibleAccounts: [SigningAccountSummary] { accountStore.accounts }
 
     private var account: SigningAccountSummary? {
-        eligibleAccounts.first {
-            $0.hasSavedSession &&
-            $0.accountIdentifier == app.accountIdentifier &&
-            $0.teamIdentifier == app.teamIdentifier
-        }
+        eligibleAccounts.first { $0.hasSavedSession && app.isSignable(by: $0) }
     }
 
     private var downloadJob: GitHubUpdateDownloadJob? { environment.githubUpdateDownloads.jobs[selectedCandidate.id] }
@@ -342,9 +338,7 @@ struct GitHubUpdateDetailView: View {
                 onInstalled: { await finishUpdate(queuedIPA) },
                 onSourceMissing: { await validateDownload() }
             )
-        } else if let installedTeamAccount = eligibleAccounts.first(where: {
-            $0.accountIdentifier == app.accountIdentifier && $0.teamIdentifier == app.teamIdentifier
-        }) {
+        } else if let installedTeamAccount = eligibleAccounts.first(where: { app.isSignable(by: $0) }) {
             SigningAccountDetailView(account: installedTeamAccount, accountStore: accountStore)
         } else {
             AccountsView()

@@ -399,10 +399,7 @@ struct AppManagementView: View {
     @ViewBuilder
     private func queuedUpdateActions(ipa: ImportedIPA, installedApp: InstalledAppSummary) -> some View {
         let updateAccounts = accountStore.accounts
-        let installedTeamAccount = updateAccounts.first(where: {
-            $0.accountIdentifier == installedApp.accountIdentifier &&
-            $0.teamIdentifier == installedApp.teamIdentifier
-        })
+        let installedTeamAccount = updateAccounts.first(where: { installedApp.isSignable(by: $0) })
         if let account = installedTeamAccount, account.hasSavedSession {
             NavigationLink {
                 InstallConsoleView(
@@ -442,7 +439,9 @@ struct AppManagementView: View {
                 ipaStore: environment.ipaImportStore,
                 isUpdate: true,
                 onInstalled: { await finishQueuedUpdate(ipa) },
-                currentTeamIdentifier: installedApp.teamIdentifier
+                // A SideKick copy on an imported certificate has no Apple team record.
+                currentTeamIdentifier: installedApp.importedCertificate == nil && !installedApp.teamIdentifier.isEmpty
+                    ? installedApp.teamIdentifier : nil
             )
         } label: {
             Label("Update with Another Account…", systemImage: "person.2")

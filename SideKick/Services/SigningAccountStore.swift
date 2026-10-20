@@ -291,8 +291,14 @@ final class SigningAccountStore {
                 teamIdentifier: result.team.identifier
             )
             let existingCredentials = try? vault.load(key: sessionKey)
-            let certificateData = existingCredentials?.certificateData
-            let certificatePassword = existingCredentials?.certificatePassword
+            var certificateData = existingCredentials?.certificateData
+            var certificatePassword = existingCredentials?.certificatePassword
+            // A certificate moved from another SideKick copy lets this copy reuse it, instead of
+            // asking Apple for a new one that could revoke the original.
+            if certificateData == nil, let transferred = TransferredCertificateVault().take(key: sessionKey) {
+                certificateData = transferred.p12Data
+                certificatePassword = transferred.password
+            }
             if let certificateData {
                 let certificate = try CertificateManager.parse(certificateData, password: certificatePassword)
                 try CertificateManager.shared.setActiveCertificate(certificate)
@@ -1008,6 +1014,76 @@ private struct SigningSessionCredentials: Codable {
     let teamIdentifier: String
     let certificateData: Data?
     let certificatePassword: String?
+}
+
+// MARK: - Moving certificates between SideKick copies
+
+struct TransferredAppleCertificate: Codable, Sendable {
+    let accountIdentifier: String
+    let teamIdentifier: String
+    let email: String
+    /// PKCS#12 encrypted with the password the user chose for the transfer.
+    let p12Data: Data
+}
+
+extension SigningAccountStore {
+    /// Apple-issued certificates of saved accounts, re-encrypted with `password` for a transfer folder.
+    func transferableCertificates(password: String) throws -> [TransferredAppleCertificate] {
+        try vault.all().compactMap { credentials in
+            guard let data = credentials.certificateData else { return nil }
+            let certificate = try CertificateManager.parse(data, password: credentials.certificatePassword)
+            return TransferredAppleCertificate(
+                accountIdentifier: credentials.accountIdentifier,
+                teamIdentifier: credentials.teamIdentifier,
+                email: credentials.appleID,
+                p12Data: try CertificateManager.convert(certificate, password: password)
+            )
+        }
+    }
+
+    /// Keeps transferred certificates until their account signs in here. Throws if the
+    /// password is wrong, so nothing is stored that can't be opened later.
+    static func storeTransferredCertificates(_ items: [TransferredAppleCertificate], password: String) throws -> Int {
+        let vault = TransferredCertificateVault()
+        for item in items {
+            _ = try CertificateManager.parse(item.p12Data, password: password)
+            try vault.save(.init(p12Data: item.p12Data, password: password),
+                key: SigningSessionVault.key(accountIdentifier: item.accountIdentifier, teamIdentifier: item.teamIdentifier))
+        }
+        return items.count
+    }
+}
+
+private struct TransferredCertificateVault {
+    struct Item: Codable { let p12Data: Data; let password: String }
+    private let service = "com.sidekick.transferred-certificates"
+
+    func save(_ item: Item, key: String) throws {
+        let data = try JSONEncoder().encode(item)
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service, kSecAttrAccount as String: key]
+        SecItemDelete(query as CFDictionary)
+        var add = query
+        add[kSecValueData as String] = data
+        add[kSecAttrAccessible as String] = kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly
+        let status = SecItemAdd(add as CFDictionary, nil)
+        guard status == errSecSuccess else { throw SigningAccountError.keychain(status) }
+    }
+
+    /// Returns the item once and removes it.
+    func take(key: String) -> Item? {
+        let query: [String: Any] = [kSecClass as String: kSecClassGenericPassword,
+            kSecAttrService as String: service, kSecAttrAccount as String: key]
+        var lookup = query
+        lookup[kSecReturnData as String] = true
+        lookup[kSecMatchLimit as String] = kSecMatchLimitOne
+        var result: CFTypeRef?
+        guard SecItemCopyMatching(lookup as CFDictionary, &result) == errSecSuccess,
+              let data = result as? Data,
+              let item = try? JSONDecoder().decode(Item.self, from: data) else { return nil }
+        SecItemDelete(query as CFDictionary)
+        return item
+    }
 }
 
 private struct SigningSessionVault {

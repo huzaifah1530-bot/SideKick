@@ -341,6 +341,8 @@ private struct ImportedCertificateDetailView: View {
             } footer: {
                 if current.profile == nil {
                     Text("Certificates from another developer team need the .mobileprovision file they came with. It must include this iPhone.")
+                } else {
+                    Text("Apps signed with this profile share one Keychain, so each can read logins the others save there. Only sign apps you trust with it.")
                 }
             }
 
@@ -525,6 +527,7 @@ struct ImportedCertificateResignWarningView<Destination: View>: View {
             Section("You’ll Lose") {
                 if isSideKick {
                     warningRow("Saved sign-ins", "Apple Accounts, GitHub tokens and imported certificates are stored in the Keychain of your current team. You’ll need to add them again.", "key")
+                    warningRow("Private Keychain", "The new copy’s Keychain is shared with every app signed by this certificate, so those apps could read SideKick’s sign-ins.", "lock.open")
                     warningRow("App offloading and restore", "The backup helper needs SideKick’s shared App Group, which this profile doesn’t include.", "arrow.down.app")
                     warningRow("LiveContainer app list", "SideKick can’t read LiveContainer’s shared storage without App Groups.", "square.stack.3d.up")
                     warningRow("Refreshing Apple-signed apps", "After signing in again, SideKick may need a new Apple certificate, which can stop apps signed with the old one from opening.", "arrow.clockwise")

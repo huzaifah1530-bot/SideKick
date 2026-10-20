@@ -149,16 +149,60 @@ final class SideStoreOperationService {
         defer { LocalVPNService.shared.release(vpnLease) }
         let runningBundle = Bundle(url: Bundle.Info.activeBundleURL)
         let selfTargetID = ipa.queuedForInstalledAppID == runningBundle?.bundleIdentifier ? ipa.queuedForInstalledAppID : nil
+        let useImportedCertificate = try await importedCertificateUse(forUpdateOf: ipa.queuedForInstalledAppID, using: account)
+        let importedTeam = useImportedCertificate
+            ? ImportedCertificateStore.shared.assignedRecord(accountIdentifier: account.accountIdentifier,
+                teamIdentifier: account.teamIdentifier)?.profile?.teamIdentifier
+            : nil
+        // A SideKick copy signed with an imported certificate runs under its own bundle ID
+        // (com.sidekick.app.<team>). Its updates must keep that ID to install in place.
+        let selfCustomID = useImportedCertificate && selfTargetID != nil && selfTargetID != ipa.bundleIdentifier ? selfTargetID : nil
         if let targetID = selfTargetID, let key = ipa.githubUpdateKey,
            let source = ipa.githubSourceIdentity, let identity = ipa.executableIdentity,
-           ALTApplication(fileURL: Bundle.Info.activeBundleURL)?.provisioningProfile?.teamIdentifier == account.teamIdentifier {
+           useImportedCertificate || ALTApplication(fileURL: Bundle.Info.activeBundleURL)?.provisioningProfile?.teamIdentifier == account.teamIdentifier {
             try await GitHubUpdateConfigurationStore.shared.prepareSelfUpdate(key: key, targetID: targetID,
                 expectedSource: source, executableIdentity: identity)
         }
         let installedID: String
         do {
-            let useImportedCertificate = try await importedCertificateUse(forUpdateOf: ipa.queuedForInstalledAppID, using: account)
-            installedID = try await retryAfterClearingRevokedAssignedProfile(
+            do {
+                installedID = try await runInstall(ipa, url: url, account: account, presenter: presenter,
+                    useImportedCertificate: useImportedCertificate, customBundleIdentifier: selfCustomID,
+                    recoveryHandler: recoveryHandler, progressHandler: progressHandler)
+            } catch where useImportedCertificate && selfCustomID == nil && ipa.queuedForInstalledAppID == nil
+                && importedTeam != nil && Self.isApplicationIdentifierConflict(error) {
+                // Another app (often the App Store version) already uses this bundle ID under a
+                // different team. Install alongside it with the certificate team's suffix.
+                installedID = try await runInstall(ipa, url: url, account: account, presenter: presenter,
+                    useImportedCertificate: true, customBundleIdentifier: "\(ipa.bundleIdentifier).\(importedTeam!)",
+                    recoveryHandler: recoveryHandler, progressHandler: progressHandler)
+            }
+        } catch {
+            if let targetID = selfTargetID, let key = ipa.githubUpdateKey {
+                try? await GitHubUpdateConfigurationStore.shared.cancelSelfUpdate(targetID: targetID, key: key)
+            }
+            throw error
+        }
+        try await finishInstall(ipa, installedID: installedID, selfTargetID: selfTargetID, runningBundle: runningBundle)
+    }
+
+    private static func isApplicationIdentifierConflict(_ error: Error) -> Bool {
+        let text = String(describing: error) + " " + error.localizedDescription
+        return text.contains("MismatchedApplicationIdentifierEntitlement")
+            || text.localizedCaseInsensitiveContains("does not match installed application's application-identifier")
+    }
+
+    private func runInstall(
+        _ ipa: ImportedIPA,
+        url: URL,
+        account: SigningAccountSummary,
+        presenter: UIViewController,
+        useImportedCertificate: Bool,
+        customBundleIdentifier: String?,
+        recoveryHandler: @escaping @MainActor @Sendable () -> Void,
+        progressHandler: @escaping @MainActor @Sendable (Double) -> Void
+    ) async throws -> String {
+            try await retryAfterClearingRevokedAssignedProfile(
                 for: ipa.bundleIdentifier,
                 recoveryHandler: recoveryHandler
             ) {
@@ -168,7 +212,7 @@ final class SideStoreOperationService {
                     useImportedCertificate: useImportedCertificate
                 ) {
                     try ImportedCertificateStore.shared.prepareProfileAssignment(
-                        bundleIdentifiers: [ipa.bundleIdentifier] + [ipa.queuedForInstalledAppID].compactMap { $0 },
+                        bundleIdentifiers: [ipa.bundleIdentifier] + [ipa.queuedForInstalledAppID, customBundleIdentifier].compactMap { $0 },
                         accountIdentifier: account.accountIdentifier,
                         teamIdentifier: account.teamIdentifier,
                         useImportedCertificate: useImportedCertificate
@@ -179,7 +223,8 @@ final class SideStoreOperationService {
                             return
                         }
                         let observationBox = ProgressObservationBox()
-                        let group = AppManager.shared.install(.url(url), presentingViewController: presenter) { result in
+                        let group = AppManager.shared.install(.url(url), presentingViewController: presenter,
+                                                              customBundleIdentifier: customBundleIdentifier) { result in
                             observationBox.finish()
                             switch result {
                             case .failure(let error): continuation.resume(throwing: error)
@@ -199,12 +244,9 @@ final class SideStoreOperationService {
                     }
                 }
             }
-        } catch {
-            if let targetID = selfTargetID, let key = ipa.githubUpdateKey {
-                try? await GitHubUpdateConfigurationStore.shared.cancelSelfUpdate(targetID: targetID, key: key)
-            }
-            throw error
-        }
+    }
+
+    private func finishInstall(_ ipa: ImportedIPA, installedID: String, selfTargetID: String?, runningBundle: Bundle?) async throws {
         // A self-install callback can arrive in the old process before replacement.
         // Leave the pending receipt for the new binary to confirm on its next launch.
         let selfBinaryMatches = selfTargetID == nil || (ipa.executableIdentity != nil &&
@@ -677,10 +719,30 @@ struct InstalledAppSummary: Identifiable, Sendable {
         let sideKickBundleID = "com.sidekick.app"
         var result = Set(identifiers)
         let teamQualifiedSideKickBundleID = "\(sideKickBundleID).\(teamIdentifier)".lowercased()
-        if identifiers.contains(where: { $0 == sideKickBundleID || $0 == teamQualifiedSideKickBundleID }) {
+        if identifiers.contains(where: {
+            $0 == sideKickBundleID || $0 == teamQualifiedSideKickBundleID || Self.isTeamCopy($0, of: sideKickBundleID)
+        }) {
             result.insert(sideKickBundleID)
         }
         return result
+    }
+
+    /// `com.sidekick.app.<TEAMID>`: a SideKick copy installed for another signing team.
+    private static func isTeamCopy(_ identifier: String, of base: String) -> Bool {
+        guard identifier.hasPrefix(base + ".") else { return false }
+        let suffix = identifier.dropFirst(base.count + 1)
+        return suffix.count == 10 && suffix.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber) }
+    }
+
+    /// Whether `account` can sign updates for this app: it owns the app's team, or it has the
+    /// imported certificate that signed the app assigned.
+    @MainActor func isSignable(by account: SigningAccountSummary) -> Bool {
+        if account.accountIdentifier == accountIdentifier && account.teamIdentifier == teamIdentifier { return true }
+        guard let certificate = importedCertificate,
+              let assigned = ImportedCertificateStore.shared.assignedRecord(
+                accountIdentifier: account.accountIdentifier, teamIdentifier: account.teamIdentifier) else { return false }
+        return ImportedCertificateCatalog.normalizedSerial(assigned.serialNumber)
+            == ImportedCertificateCatalog.normalizedSerial(certificate.serialNumber)
     }
 }
 

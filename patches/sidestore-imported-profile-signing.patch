@@ -1,8 +1,32 @@
+diff --git a/AltStore/Managing Apps/AppManager.swift b/AltStore/Managing Apps/AppManager.swift
+index e7fa6d61..35f2cc35 100644
+--- a/AltStore/Managing Apps/AppManager.swift	
++++ b/AltStore/Managing Apps/AppManager.swift	
+@@ -446,6 +446,7 @@ final class AppManager: ObservableObject, @unchecked Sendable
+                  presentingViewController: UIViewController? = nil,
+                  dbBackgroundContext: NSManagedObjectContext? = nil,
+                  context: StandaloneOperationContext? = nil,
++                 customBundleIdentifier: String? = nil,
+                  completionHandler: @escaping (Result<InstalledApp, Error>) -> Void) -> RefreshGroup
+     {
+         debugLog("[AppManager] install() called for target: \(target)")
+@@ -453,8 +454,10 @@ final class AppManager: ObservableObject, @unchecked Sendable
+         let dbContext = self.getValidDbContext(dbBackgroundContext ?? context?.dbBackgroundContext)
+ 
+         let app = self.resolveApp(for: target)
++        // SideKick passes a bundle ID to keep an imported-certificate install apart from an
++        // App Store copy, or to update a SideKick copy that runs under its own ID.
+         return self.pipelineRunner.performSingleOperation(
+-            .install(app),
++            .install(app, customBundleIdentifier: customBundleIdentifier),
+             handler: pipelineHandler,
+             dbContext: dbContext,
+             completionHandler: { result in
 diff --git a/SideStore/Core/Operations/PipelineOperations/ResignAppOperation.swift b/SideStore/Core/Operations/PipelineOperations/ResignAppOperation.swift
-index 32455c22..8f8ff8a0 100644
+index c5c4b55e..8de4c9de 100644
 --- a/SideStore/Core/Operations/PipelineOperations/ResignAppOperation.swift
 +++ b/SideStore/Core/Operations/PipelineOperations/ResignAppOperation.swift
-@@ -75,7 +75,7 @@ final class ResignAppOperation: BasePipelineOperation<InstallAppOperationContext
+@@ -76,7 +76,7 @@ final class ResignAppOperation: BasePipelineOperation<InstallAppOperationContext
          let bundleIdentifier = context.targetBundleIdentifier
          let finalBundleIdentifier: String
          if let profile = profiles[bundleIdentifier] {
@@ -11,7 +35,7 @@ index 32455c22..8f8ff8a0 100644
          } else {
              finalBundleIdentifier = bundleIdentifier
          }
-@@ -159,7 +159,8 @@ final class ResignAppOperation: BasePipelineOperation<InstallAppOperationContext
+@@ -160,7 +160,8 @@ final class ResignAppOperation: BasePipelineOperation<InstallAppOperationContext
          }
          var infoDictionary = parser.rawDictionary as [String: Any]
          
@@ -21,7 +45,7 @@ index 32455c22..8f8ff8a0 100644
          infoDictionary[kCFBundleIdentifierKey as String] = newBundleID
  
          // Fix-up BGTaskScheduler identifiers so they stay under the new bundle ID.
-@@ -221,7 +222,7 @@ final class ResignAppOperation: BasePipelineOperation<InstallAppOperationContext
+@@ -222,7 +223,7 @@ final class ResignAppOperation: BasePipelineOperation<InstallAppOperationContext
          let installedAppUTI = ["UTTypeConformsTo": [],
                                 "UTTypeDescription": "AltStore Installed App",
                                 "UTTypeIconFiles": [],
@@ -30,7 +54,7 @@ index 32455c22..8f8ff8a0 100644
                                 "UTTypeTagSpecification": [:]] as [String : Any]
          
          var exportedUTIs = infoDictionary[Bundle.Info.exportedUTIs] as? [[String: Any]] ?? []
-@@ -245,7 +246,7 @@ final class ResignAppOperation: BasePipelineOperation<InstallAppOperationContext
+@@ -246,7 +247,7 @@ final class ResignAppOperation: BasePipelineOperation<InstallAppOperationContext
          // Read the executable from the current Info.plist. Foundation caches Bundle per path,
          // and restore re-stages the original app at the same App.app path the helper used.
          if let app = ALTApplication(fileURL: fileURL), app.infoPlist["CFBundleExecutable"] as? String == "SideBackup" {
@@ -39,7 +63,7 @@ index 32455c22..8f8ff8a0 100644
              guard let expected = app.infoPlist["SideKickBackupAppGroup"] as? String,
                    expected == Bundle.main.altstoreAppGroup, grants.contains(expected) else {
                  throw OperationError.invalidParameters("The restore helper's signing profile must grant SideKick's existing shared backup group. Use the same signing team. The backup and installed app have not been changed.")
-@@ -255,24 +256,42 @@ final class ResignAppOperation: BasePipelineOperation<InstallAppOperationContext
+@@ -256,24 +257,42 @@ final class ResignAppOperation: BasePipelineOperation<InstallAppOperationContext
              requiredAppGroups[app.bundleIdentifier] = [expected]
          }
          if let app = ALTApplication(fileURL: fileURL), self.context.targetAppBundle?.isAltStoreApp == true || app.isAltStoreApp {
