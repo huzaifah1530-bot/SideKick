@@ -123,6 +123,9 @@ private struct AdvancedSettingsView: View {
                 NavigationLink { AnisetteSettingsView() } label: {
                     Label("Anisette", systemImage: "lock.shield")
                 }
+                NavigationLink { ImportedCertificatesView() } label: {
+                    Label("Certificates", systemImage: "checkmark.seal")
+                }
             }
 
             Section("Updates") {

@@ -1,8 +1,8 @@
 {
   "Package.swift": {
-    "mtime": 1792437858.8126469,
-    "seen": 1792438003.1793022,
-    "ast_hash": "2d77763d2e114736b1bb5533554928cf",
+    "mtime": 1792505285.787098,
+    "seen": 1792505346.044776,
+    "ast_hash": "6dac12593b9b61f37c9e737e869e5ccb",
     "semantic_hash": ""
   },
   "SideKickVPN/CIDRValidator.swift": {
@@ -234,9 +234,9 @@
     "semantic_hash": ""
   },
   "SideKick/Services/SigningAccountStore.swift": {
-    "mtime": 1792433315.9053028,
-    "seen": 1792433639.8109896,
-    "ast_hash": "25f9392dc279c98ea3fedab4cae7e029",
+    "mtime": 1792505217.737837,
+    "seen": 1792505346.044875,
+    "ast_hash": "8db91695cc908e230c55839b8adfd7c5",
     "semantic_hash": ""
   },
   "SideKick/Services/SigningExpiry.swift": {
@@ -252,9 +252,9 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Accounts/AccountsView.swift": {
-    "mtime": 1792433211.2500522,
-    "seen": 1792433639.8110006,
-    "ast_hash": "a4a4c9d6c378de95a8e09afab1c14b8c",
+    "mtime": 1792505271.6756687,
+    "seen": 1792505346.0448842,
+    "ast_hash": "40204a6f7ccc4a15d379dfe5d9c06b16",
     "semantic_hash": ""
   },
   "SideKick/Views/Accounts/AppleIDSignInSheet.swift": {
@@ -366,9 +366,9 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/SettingsView.swift": {
-    "mtime": 1792260079.3501458,
-    "seen": 1792260114.9145215,
-    "ast_hash": "8298d55acc6f8a8733248f01d6b5be6a",
+    "mtime": 1792505267.9374228,
+    "seen": 1792505346.0449252,
+    "ast_hash": "9998a042ac5aab0cb78dcd26ed52978d",
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/SideStoreSettingsPages.swift": {
@@ -396,9 +396,9 @@
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_integration_patches.py": {
-    "mtime": 1792325050.0427108,
-    "seen": 1792325086.9606802,
-    "ast_hash": "bd9e0ed7af73cff1b9f63cdf16367c0b",
+    "mtime": 1792441107.1462092,
+    "seen": 1792443596.065279,
+    "ast_hash": "51e0e21b5de2d26e9cd305beaacb7f8d",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_release_manifest.py": {
@@ -3498,9 +3498,9 @@
     "semantic_hash": ""
   },
   "scripts/embed-local-vpn.py": {
-    "mtime": 1792325050.0264273,
-    "seen": 1792325086.9614356,
-    "ast_hash": "be8edd71785030ce06e537de4c816548",
+    "mtime": 1792441107.1251695,
+    "seen": 1792443596.0665987,
+    "ast_hash": "16062a44b5381f67d0b2af5616250407",
     "semantic_hash": ""
   },
   "scripts/verify-dependency-regressions.py": {
@@ -3738,9 +3738,9 @@
     "semantic_hash": ""
   },
   "project.yml": {
-    "mtime": 1792325050.0319786,
-    "seen": 1792325086.961505,
-    "ast_hash": "4d037a454a7aacbca0f4e6d578001121",
+    "mtime": 1792441107.500198,
+    "seen": 1792443596.066757,
+    "ast_hash": "565adebb26d6219b705104409cfcb858",
     "semantic_hash": ""
   },
   "scripts/graphify.ps1": {
@@ -4026,9 +4026,9 @@
     "semantic_hash": ""
   },
   "docs/next-update.md": {
-    "mtime": 1792439790.777647,
-    "seen": 1792439821.5124576,
-    "ast_hash": "9caca7333f4bc721ffd55fea2c78f2f7",
+    "mtime": 1792441113.2539604,
+    "seen": 1792443596.0667317,
+    "ast_hash": "ebe979f6185954a8f5ed788f54a86921",
     "semantic_hash": ""
   },
   "SideKick/DesignSystem/AppIconController.swift": {
@@ -4068,9 +4068,9 @@
     "semantic_hash": ""
   },
   "config/anisette-servers.json": {
-    "mtime": 1792433159.7082496,
-    "seen": 1792433639.8124802,
-    "ast_hash": "d1db1b848718f4c0358e0ce17efb967f",
+    "mtime": 1792501411.5900383,
+    "seen": 1792501424.8512733,
+    "ast_hash": "5e36b53f48114b1c53a9ea09ebcfff76",
     "semantic_hash": ""
   },
   "scripts/generate-tinted-icons.py": {
@@ -4101,6 +4101,30 @@
     "mtime": 1792437940.6563265,
     "seen": 1792438003.1795278,
     "ast_hash": "a8f50c092af22517ab44354ecb49b5a4",
+    "semantic_hash": ""
+  },
+  "SideKick/Models/ImportedCertificateCatalog.swift": {
+    "mtime": 1792505151.04135,
+    "seen": 1792505346.0448105,
+    "ast_hash": "09c9f4943ade75a4a6bca5fd7b40890b",
+    "semantic_hash": ""
+  },
+  "SideKick/Services/ImportedCertificateStore.swift": {
+    "mtime": 1792505180.2786663,
+    "seen": 1792505346.0448499,
+    "ast_hash": "50c0d61dcce29ee3c4985e07791d0a4e",
+    "semantic_hash": ""
+  },
+  "SideKick/Views/Settings/ImportedCertificatesView.swift": {
+    "mtime": 1792505267.8796782,
+    "seen": 1792505346.044921,
+    "ast_hash": "e1833150b2f98fdd532767c32f96e1c9",
+    "semantic_hash": ""
+  },
+  "Tests/SideKickCoreTests/ImportedCertificateCatalogTests.swift": {
+    "mtime": 1792505297.7831273,
+    "seen": 1792505346.0449662,
+    "ast_hash": "e7d8801a0003311b8165268eb90bc80a",
     "semantic_hash": ""
   }
 }

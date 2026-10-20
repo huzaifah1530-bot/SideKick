@@ -406,6 +406,7 @@ final class SigningAccountStore {
                 teamIdentifier: teamIdentifier
             ))
         }
+        ImportedCertificateStore.shared.removeAssignments(forAccountIdentifier: account.accountIdentifier)
         await reload()
         NotificationCenter.default.post(name: .sideKickSigningAccountsDidChange, object: nil)
     }
@@ -621,15 +622,27 @@ final class SigningAccountStore {
             return (account.identifier, team.identifier)
         }
 
-        let credentials = try vault.load(key: SigningSessionVault.key(
+        let certificateData: Data
+        let password: String
+        if let imported = try ImportedCertificateStore.shared.assignedSigningCertificate(
             accountIdentifier: target.0,
             teamIdentifier: target.1
-        ))
-        guard let certificateData = credentials.certificateData else {
-            throw SigningAccountError.certificateUnavailable
-        }
-        guard let password = credentials.certificatePassword else {
-            throw SigningAccountError.certificateUnavailable
+        ) {
+            // LiveContainer needs the identity that actually signed it, so share the imported one.
+            let exportPassword = imported.record.serialNumber
+            certificateData = try CertificateManager.convert(imported.certificate, password: exportPassword)
+            password = exportPassword
+        } else {
+            let credentials = try vault.load(key: SigningSessionVault.key(
+                accountIdentifier: target.0,
+                teamIdentifier: target.1
+            ))
+            guard let savedData = credentials.certificateData,
+                  let savedPassword = credentials.certificatePassword else {
+                throw SigningAccountError.certificateUnavailable
+            }
+            certificateData = savedData
+            password = savedPassword
         }
         _ = try CertificateManager.parse(certificateData, password: password)
         let base64Certificate = certificateData.base64EncodedString()
@@ -666,11 +679,13 @@ final class SigningAccountStore {
             teamIdentifier: target.teamIdentifier
         )
         let savedCredentials = try vault.load(key: key)
+        let importedCertificate = try applyAssignedCertificate(for: target, savedCredentials: savedCredentials)
 
         if target.rawTeamType != nil,
            let activeCertificate = CertificateManager.shared.activeCertificate,
            UserDefaults.standard.isDeviceRegistered {
-            guard forceRefreshCertificate else { return }
+            // Imported certificates can't be renewed through Apple, so they are used as-is.
+            guard forceRefreshCertificate, importedCertificate == nil else { return }
             let team = try await developerTeam(for: target)
             let portalCertificates = try await DeveloperPortalProxy.shared.fetchCertificates(team: team)
             if portalCertificates.contains(where: { $0.serialNumber.caseInsensitiveCompare(activeCertificate.serialNumber) == .orderedSame }) {
@@ -699,7 +714,8 @@ final class SigningAccountStore {
             presentingViewController: presenter,
             signInHandler: handler,
             skipDeviceRegistration: false,
-            skipCertificateProvisioning: false,
+            // With an imported certificate, register the device only; never ask Apple for a new certificate.
+            skipCertificateProvisioning: importedCertificate != nil,
             skipResign: true,
             skipHowTos: true
         )
@@ -712,7 +728,19 @@ final class SigningAccountStore {
         }
 
         let accountIdentifier = result.team.account?.identifier ?? target.accountIdentifier
-        let certificate = CertificateManager.shared.activeCertificate
+        // The vault keeps the Apple-issued certificate; an imported one stays in ImportedCertificateStore.
+        let certificateData: Data?
+        let certificatePassword: String?
+        if let importedCertificate {
+            if CertificateManager.shared.activeCertificate?.serialNumber.caseInsensitiveCompare(importedCertificate.serialNumber) != .orderedSame {
+                try CertificateManager.shared.setActiveCertificate(importedCertificate)
+            }
+            certificateData = savedCredentials.certificateData
+            certificatePassword = savedCredentials.certificatePassword
+        } else {
+            certificateData = CertificateManager.shared.activeCertificate?.p12Data
+            certificatePassword = CertificateManager.shared.activeCertificate?.password
+        }
         let credentials = SigningSessionCredentials(
             appleID: appleID,
             password: password,
@@ -720,14 +748,57 @@ final class SigningAccountStore {
             xcodeToken: xcodeToken,
             accountIdentifier: accountIdentifier,
             teamIdentifier: result.team.identifier,
-            certificateData: certificate?.p12Data,
-            certificatePassword: certificate?.password
+            certificateData: certificateData,
+            certificatePassword: certificatePassword
         )
         try vault.save(credentials, key: SigningSessionVault.key(
             accountIdentifier: accountIdentifier,
             teamIdentifier: result.team.identifier
         ))
         await reload()
+    }
+
+    /// Makes the account's assigned imported certificate active, or puts its Apple
+    /// certificate back if an imported one was unassigned. Needs device testing.
+    private func applyAssignedCertificate(
+        for target: SigningAccountSummary,
+        savedCredentials: SigningSessionCredentials
+    ) throws -> ALTCertificate? {
+        let store = ImportedCertificateStore.shared
+        let activeSerial = CertificateManager.shared.activeCertificate?.serialNumber
+        if let assigned = try store.assignedSigningCertificate(
+            accountIdentifier: target.accountIdentifier,
+            teamIdentifier: target.teamIdentifier
+        ) {
+            if activeSerial?.caseInsensitiveCompare(assigned.record.serialNumber) != .orderedSame {
+                try CertificateManager.shared.setActiveCertificate(assigned.certificate)
+            }
+            return assigned.certificate
+        }
+
+        if let activeSerial, store.catalog.record(serialNumber: activeSerial) != nil {
+            if let data = savedCredentials.certificateData {
+                try CertificateManager.shared.setActiveCertificate(
+                    CertificateManager.parse(data, password: savedCredentials.certificatePassword)
+                )
+            } else {
+                CertificateManager.shared.clearActiveCertificate()
+            }
+        }
+        return nil
+    }
+
+    /// Apple-issued certificate to persist for an account, ignoring an active imported one.
+    private func appleCertificatePayload(for account: SigningAccountSummary) -> (data: Data?, password: String?) {
+        let active = CertificateManager.shared.activeCertificate
+        if let active, ImportedCertificateStore.shared.catalog.record(serialNumber: active.serialNumber) != nil {
+            let saved = try? vault.load(key: SigningSessionVault.key(
+                accountIdentifier: account.accountIdentifier,
+                teamIdentifier: account.teamIdentifier
+            ))
+            return (saved?.certificateData, saved?.certificatePassword)
+        }
+        return (active?.p12Data, active?.password)
     }
 
     private func restoreAccountSession(_ account: SigningAccountSummary, activateTeam: Bool = true) async throws {
@@ -789,7 +860,12 @@ final class SigningAccountStore {
         }
 
         if activateTeam {
-            if let signingCertificate {
+            if let imported = try? ImportedCertificateStore.shared.assignedSigningCertificate(
+                accountIdentifier: credentials.accountIdentifier,
+                teamIdentifier: credentials.teamIdentifier
+            ) {
+                try CertificateManager.shared.setActiveCertificate(imported.certificate)
+            } else if let signingCertificate {
                 try CertificateManager.shared.setActiveCertificate(signingCertificate)
             } else {
                 CertificateManager.shared.clearActiveCertificate()
@@ -823,7 +899,7 @@ final class SigningAccountStore {
               let xcodeToken = AuthManager.shared.xcodeToken else {
             throw SigningAccountError.sessionNotAvailable
         }
-        let certificate = CertificateManager.shared.activeCertificate
+        let certificate = appleCertificatePayload(for: account)
         return SigningSessionCredentials(
             appleID: appleID,
             password: password,
@@ -831,8 +907,8 @@ final class SigningAccountStore {
             xcodeToken: xcodeToken,
             accountIdentifier: account.accountIdentifier,
             teamIdentifier: account.teamIdentifier,
-            certificateData: certificate?.p12Data,
-            certificatePassword: certificate?.password
+            certificateData: certificate.data,
+            certificatePassword: certificate.password
         )
     }
 }
