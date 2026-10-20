@@ -4080,9 +4080,9 @@
     "semantic_hash": ""
   },
   "SideKick/Services/ImportedCertificateStore.swift": {
-    "mtime": 1792524579.8923652,
-    "seen": 1792524658.5935442,
-    "ast_hash": "0c3dcc75b9965ba678c3e34a02bcc599",
+    "mtime": 1792524988.6538918,
+    "seen": 1792525047.5379329,
+    "ast_hash": "e979de7b824a60dcd1471640beb0aa1a",
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/ImportedCertificatesView.swift": {
@@ -4134,9 +4134,9 @@
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_transfer_safety.py": {
-    "mtime": 1792524603.6214578,
-    "seen": 1792524658.593769,
-    "ast_hash": "d748733b473caa75fc9bd05ed5e4f6e4",
+    "mtime": 1792524988.6554346,
+    "seen": 1792525047.538099,
+    "ast_hash": "f55d628518a637e2f6e5765bb28e0bc4",
     "semantic_hash": ""
   }
 }

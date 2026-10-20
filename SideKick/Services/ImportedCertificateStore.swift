@@ -4,6 +4,7 @@ import Security
 import SideSign
 
 enum ImportedCertificateError: LocalizedError, Equatable {
+    case engineBusy
     case unreadableFile
     case publicCertificateOnly
     case unsupportedFormat
@@ -24,6 +25,8 @@ enum ImportedCertificateError: LocalizedError, Equatable {
 
     var errorDescription: String? {
         switch self {
+        case .engineBusy:
+            return "Wait for the current signing or app operation to finish, then try again."
         case .unreadableFile:
             return "SideKick couldn’t read this file."
         case .publicCertificateOnly:
@@ -188,10 +191,10 @@ final class ImportedCertificateStore {
     }
 
     func delete(_ record: ImportedCertificateRecord) throws {
-        guard SigningAccountOperationCoordinator.acquire() else { throw SigningAccountError.engineBusy }
+        guard SigningAccountOperationCoordinator.acquire() else { throw ImportedCertificateError.engineBusy }
         defer { SigningAccountOperationCoordinator.release() }
         guard !AppManager.shared.isActivelyManagingAnyApp, !AppOffloadService.isRunning,
-              !SideKickStorageCleanup.hasActiveOperations else { throw SigningAccountError.engineBusy }
+              !SideKickStorageCleanup.hasActiveOperations else { throw ImportedCertificateError.engineBusy }
         let record = catalog.record(serialNumber: record.serialNumber) ?? record
         var updated = catalog
         updated.remove(serialNumber: record.serialNumber)
