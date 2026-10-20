@@ -1013,6 +1013,22 @@ struct ResignOptionsView: View {
                                 SigningAccountDetailView(account: account, accountStore: accountStore)
                             } else if account.teamIdentifier != app.teamIdentifier {
                                 OtherTeamSourceView(app: app, account: account, accountStore: accountStore)
+                            } else if let record = ImportedCertificateStore.shared.assignedRecord(
+                                accountIdentifier: account.accountIdentifier,
+                                teamIdentifier: account.teamIdentifier
+                            ) {
+                                ImportedCertificateResignWarningView(
+                                    appName: app.name,
+                                    isSideKick: app.id == Bundle.Info.activeBundleIdentifier,
+                                    record: record
+                                ) {
+                                    RefreshConsoleView(
+                                        app: app,
+                                        accountStore: accountStore,
+                                        selectedAccount: account,
+                                        operation: .resign
+                                    )
+                                }
                             } else {
                                 RefreshConsoleView(
                                     app: app,

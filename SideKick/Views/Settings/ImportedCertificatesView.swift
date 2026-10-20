@@ -468,3 +468,75 @@ struct SigningCertificatePickerView: View {
         do { try store.assign(record, to: account) } catch { errorMessage = error.localizedDescription }
     }
 }
+
+/// Shown before re-signing an app with an imported certificate from another team.
+struct ImportedCertificateResignWarningView<Destination: View>: View {
+    let appName: String
+    let isSideKick: Bool
+    let record: ImportedCertificateRecord
+    @ViewBuilder let destination: () -> Destination
+
+    private var keepsBundleID: Bool {
+        record.profile?.appIdentifier.hasSuffix("*") ?? false
+    }
+
+    var body: some View {
+        List {
+            Section {
+                Label {
+                    Text("Re-signing replaces \(appName)’s signature with “\(record.name)”. This can’t be undone. Switching back means re-signing again with your Apple certificate.")
+                } icon: {
+                    Image(systemName: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                }
+            }
+
+            Section("You’ll Lose") {
+                if isSideKick {
+                    warningRow("Saved sign-ins", "Apple Accounts, GitHub tokens and imported certificates are stored in the Keychain of your current team. You’ll need to add them again.", "key")
+                    warningRow("App offloading and restore", "The backup helper needs SideKick’s shared App Group, which this profile doesn’t include.", "arrow.down.app")
+                    warningRow("LiveContainer app list", "SideKick can’t read LiveContainer’s shared storage without App Groups.", "square.stack.3d.up")
+                    warningRow("Refreshing Apple-signed apps", "After signing in again, SideKick may need a new Apple certificate, which can stop apps signed with the old one from opening.", "arrow.clockwise")
+                } else {
+                    warningRow("The app’s saved logins", "Its Keychain data belongs to your current team, so the app may sign you out.", "key")
+                }
+                if !keepsBundleID {
+                    warningRow("This copy’s data", "The profile covers one app ID only, so \(appName) installs as a separate app with empty data. The current copy stays until you delete it.", "doc.on.doc")
+                }
+            }
+
+            if isSideKick {
+                Section {
+                    Text("Recommended: keep SideKick on your Apple certificate and use imported certificates for other apps.")
+                        .foregroundStyle(.secondary)
+                }
+            }
+
+            Section {
+                NavigationLink {
+                    destination()
+                } label: {
+                    Text("Re-sign Anyway")
+                        .foregroundStyle(.red)
+                }
+            }
+        }
+        .listStyle(.insetGrouped)
+        .navigationTitle("Before You Re-sign")
+        .navigationBarTitleDisplayMode(.inline)
+    }
+
+    private func warningRow(_ title: String, _ detail: String, _ symbol: String) -> some View {
+        Label {
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title)
+                Text(detail)
+                    .font(.footnote)
+                    .foregroundStyle(.secondary)
+            }
+        } icon: {
+            Image(systemName: symbol)
+        }
+        .padding(.vertical, 2)
+    }
+}

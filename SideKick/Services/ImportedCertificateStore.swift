@@ -17,6 +17,7 @@ enum ImportedCertificateError: LocalizedError, Equatable {
     case profileExpired(Date)
     case profileRequired(certificateName: String)
     case profileUnavailable
+    case profileInUse(appName: String, appIdentifier: String)
 
     var errorDescription: String? {
         switch self {
@@ -46,6 +47,8 @@ enum ImportedCertificateError: LocalizedError, Equatable {
             return "“\(name)” belongs to a different developer team, so it needs its provisioning profile. In Settings → Advanced → Certificates, import the matching .mobileprovision file."
         case .profileUnavailable:
             return "The provisioning profile for this certificate is missing. Import the .mobileprovision file again."
+        case .profileInUse(let appName, let appIdentifier):
+            return "This certificate’s profile covers only one app ID (\(appIdentifier)), and “\(appName)” already uses it. Installing would replace that app. Delete it first, or ask your certificate provider for a wildcard profile."
         }
     }
 }
@@ -183,7 +186,12 @@ final class ImportedCertificateStore {
     /// account, or clears an assignment SideKick made earlier. SideStore's
     /// UpdateAppCertificateOperation reads it before profiles are fetched from Apple,
     /// which is what lets another team's certificate sign. Needs device testing.
-    func prepareProfileAssignment(bundleIdentifiers: [String], accountIdentifier: String, teamIdentifier: String) throws {
+    func prepareProfileAssignment(
+        bundleIdentifiers: [String],
+        accountIdentifier: String,
+        teamIdentifier: String,
+        useImportedCertificate: Bool = true
+    ) throws {
         let owned = catalog.profileUUIDs
         let clearOwnedAssignments = {
             for bundleIdentifier in Set(bundleIdentifiers) {
@@ -193,7 +201,8 @@ final class ImportedCertificateStore {
             }
         }
 
-        guard let assigned = try assignedSigningCertificate(accountIdentifier: accountIdentifier, teamIdentifier: teamIdentifier) else {
+        guard useImportedCertificate,
+              let assigned = try assignedSigningCertificate(accountIdentifier: accountIdentifier, teamIdentifier: teamIdentifier) else {
             clearOwnedAssignments()
             return
         }

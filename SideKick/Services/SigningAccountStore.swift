@@ -416,6 +416,7 @@ final class SigningAccountStore {
         teamIdentifier: String,
         prepareForSigning: Bool = true,
         forceRefreshCertificate: Bool = false,
+        useImportedCertificate: Bool = true,
         operation: () async throws -> T
     ) async throws -> T {
         guard !isWorking, SigningAccountOperationCoordinator.acquire() else { throw SigningAccountError.engineBusy }
@@ -457,7 +458,11 @@ final class SigningAccountStore {
                 try await restoreAccountSession(target, activateTeam: prepareForSigning)
             }
             if prepareForSigning {
-                try await ensureSigningReady(for: target, forceRefreshCertificate: forceRefreshCertificate)
+                try await ensureSigningReady(
+                    for: target,
+                    forceRefreshCertificate: forceRefreshCertificate,
+                    useImportedCertificate: useImportedCertificate
+                )
             }
             operationStarted = true
             let result = try await operation()
@@ -667,19 +672,35 @@ final class SigningAccountStore {
 
     /// Completes the device registration and certificate setup deferred by the
     /// account sign-in screen before a real signing operation begins.
-    private func ensureSigningReady(for target: SigningAccountSummary, forceRefreshCertificate: Bool = false) async throws {
+    private func ensureSigningReady(
+        for target: SigningAccountSummary,
+        forceRefreshCertificate: Bool = false,
+        useImportedCertificate: Bool = true
+    ) async throws {
         try await SideKickDiagnostics.perform(DiagnosticsStore.operationID == nil ? .restoreAccount : DiagnosticsStore.operation, stage: .signing) {
-            try await prepareSigning(for: target, forceRefreshCertificate: forceRefreshCertificate)
+            try await prepareSigning(
+                for: target,
+                forceRefreshCertificate: forceRefreshCertificate,
+                useImportedCertificate: useImportedCertificate
+            )
         }
     }
 
-    private func prepareSigning(for target: SigningAccountSummary, forceRefreshCertificate: Bool) async throws {
+    private func prepareSigning(
+        for target: SigningAccountSummary,
+        forceRefreshCertificate: Bool,
+        useImportedCertificate: Bool
+    ) async throws {
         let key = SigningSessionVault.key(
             accountIdentifier: target.accountIdentifier,
             teamIdentifier: target.teamIdentifier
         )
         let savedCredentials = try vault.load(key: key)
-        let importedCertificate = try applyAssignedCertificate(for: target, savedCredentials: savedCredentials)
+        let importedCertificate = try applyAssignedCertificate(
+            for: target,
+            savedCredentials: savedCredentials,
+            useImportedCertificate: useImportedCertificate
+        )
 
         if target.rawTeamType != nil,
            let activeCertificate = CertificateManager.shared.activeCertificate,
@@ -762,11 +783,12 @@ final class SigningAccountStore {
     /// certificate back if an imported one was unassigned. Needs device testing.
     private func applyAssignedCertificate(
         for target: SigningAccountSummary,
-        savedCredentials: SigningSessionCredentials
+        savedCredentials: SigningSessionCredentials,
+        useImportedCertificate: Bool
     ) throws -> ALTCertificate? {
         let store = ImportedCertificateStore.shared
         let activeSerial = CertificateManager.shared.activeCertificate?.serialNumber
-        if let assigned = try store.assignedSigningCertificate(
+        if useImportedCertificate, let assigned = try store.assignedSigningCertificate(
             accountIdentifier: target.accountIdentifier,
             teamIdentifier: target.teamIdentifier
         ) {

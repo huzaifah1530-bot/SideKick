@@ -85,6 +85,11 @@ jobs:
           git -C Vendor/SideStore apply ../../patches/sidestore-signing-repairs.patch
           git -C Vendor/SideStore/Dependencies/SideSign apply ../../../../patches/sidesign-required-app-groups.patch
 
+      - name: Sign with imported certificates and wildcard profiles
+        run: |
+          git -C Vendor/SideStore apply ../../patches/sidestore-imported-profile-signing.patch
+          git -C Vendor/SideStore/Dependencies/SideSign apply ../../../../patches/sidesign-wildcard-application-identifier.patch
+
       - name: Test vendor audit regressions
         run: |
           python3 scripts/verify-sidestore-regressions.py

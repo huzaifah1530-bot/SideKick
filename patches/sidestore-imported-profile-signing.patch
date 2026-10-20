@@ -1,0 +1,91 @@
+diff --git a/SideStore/Core/Operations/PipelineOperations/ResignAppOperation.swift b/SideStore/Core/Operations/PipelineOperations/ResignAppOperation.swift
+index 32455c22..8f8ff8a0 100644
+--- a/SideStore/Core/Operations/PipelineOperations/ResignAppOperation.swift
++++ b/SideStore/Core/Operations/PipelineOperations/ResignAppOperation.swift
+@@ -75,7 +75,7 @@ final class ResignAppOperation: BasePipelineOperation<InstallAppOperationContext
+         let bundleIdentifier = context.targetBundleIdentifier
+         let finalBundleIdentifier: String
+         if let profile = profiles[bundleIdentifier] {
+-            finalBundleIdentifier = profile.bundleIdentifier
++            finalBundleIdentifier = Self.resolvedBundleIdentifier(for: profile, original: bundleIdentifier)
+         } else {
+             finalBundleIdentifier = bundleIdentifier
+         }
+@@ -159,7 +159,8 @@ final class ResignAppOperation: BasePipelineOperation<InstallAppOperationContext
+         }
+         var infoDictionary = parser.rawDictionary as [String: Any]
+         
+-        let newBundleID = appexBundleIds[appBundle.bundleIdentifier] ?? appexBundleIds[identifier] ?? profile.bundleIdentifier
++        let newBundleID = appexBundleIds[appBundle.bundleIdentifier] ?? appexBundleIds[identifier]
++            ?? Self.resolvedBundleIdentifier(for: profile, original: identifier)
+         infoDictionary[kCFBundleIdentifierKey as String] = newBundleID
+ 
+         // Fix-up BGTaskScheduler identifiers so they stay under the new bundle ID.
+@@ -221,7 +222,7 @@ final class ResignAppOperation: BasePipelineOperation<InstallAppOperationContext
+         let installedAppUTI = ["UTTypeConformsTo": [],
+                                "UTTypeDescription": "AltStore Installed App",
+                                "UTTypeIconFiles": [],
+-                               "UTTypeIdentifier": InstalledApp.installedAppUTI(forBundleIdentifier: profile.bundleIdentifier),
++                               "UTTypeIdentifier": InstalledApp.installedAppUTI(forBundleIdentifier: newBundleID),
+                                "UTTypeTagSpecification": [:]] as [String : Any]
+         
+         var exportedUTIs = infoDictionary[Bundle.Info.exportedUTIs] as? [[String: Any]] ?? []
+@@ -245,7 +246,7 @@ final class ResignAppOperation: BasePipelineOperation<InstallAppOperationContext
+         // Read the executable from the current Info.plist. Foundation caches Bundle per path,
+         // and restore re-stages the original app at the same App.app path the helper used.
+         if let app = ALTApplication(fileURL: fileURL), app.infoPlist["CFBundleExecutable"] as? String == "SideBackup" {
+-            let grants = profiles.first(where: { $0.bundleIdentifier == app.bundleIdentifier })?.entitlements[.appGroups] as? [String] ?? []
++            let grants = Self.profile(in: profiles, for: app.bundleIdentifier)?.entitlements[.appGroups] as? [String] ?? []
+             guard let expected = app.infoPlist["SideKickBackupAppGroup"] as? String,
+                   expected == Bundle.main.altstoreAppGroup, grants.contains(expected) else {
+                 throw OperationError.invalidParameters("The restore helper's signing profile must grant SideKick's existing shared backup group. Use the same signing team. The backup and installed app have not been changed.")
+@@ -255,24 +256,42 @@ final class ResignAppOperation: BasePipelineOperation<InstallAppOperationContext
+             requiredAppGroups[app.bundleIdentifier] = [expected]
+         }
+         if let app = ALTApplication(fileURL: fileURL), self.context.targetAppBundle?.isAltStoreApp == true || app.isAltStoreApp {
+-            let grants = profiles.first(where: { $0.bundleIdentifier == app.bundleIdentifier })?.entitlements[.appGroups] as? [String] ?? []
++            let grants = Self.profile(in: profiles, for: app.bundleIdentifier)?.entitlements[.appGroups] as? [String] ?? []
+             let expected = app.bundleIdentifier == Bundle.Info.activeBundleIdentifier ? Bundle.main.altstoreAppGroup : nil
+             let backup = expected.map { [$0] } ?? grants.filter {
+                 $0 == Bundle.baseAltStoreAppGroupID || $0.hasPrefix(Bundle.baseAltStoreAppGroupID + ".")
+             }
+-            guard !backup.isEmpty, backup.allSatisfy({ grants.contains($0) }) else {
++            if !backup.isEmpty, backup.allSatisfy({ grants.contains($0) }) {
++                // Optional: lets SideKick list LiveContainer's shared apps. Never required.
++                let required = backup + grants.filter { $0.hasPrefix(Bundle.liveContainerAppGroupID + ".") && !backup.contains($0) }
++                // Older retained sources can lack the request even when the live app has it.
++                // Pass only the exact manager bundle's profile-authorized backup groups.
++                requiredAppGroups[app.bundleIdentifier] = required
++            } else if self.context.overrideSigningCertificate != nil {
++                // Imported certificate with a profile that has no App Groups. SideKick warns the
++                // user before this re-sign; shared storage features stop working. Needs device testing.
++                self.debugLog("[ResignAppOperation] Imported profile grants no backup App Group; signing SideKick without shared storage.")
++            } else {
+                 throw OperationError.invalidParameters("The signing profile does not grant SideKick's shared backup group. Use the same signing team and a profile with App Groups enabled. The installed app has not been replaced.")
+             }
+-            // Optional: lets SideKick list LiveContainer's shared apps. Never required.
+-            let required = backup + grants.filter { $0.hasPrefix(Bundle.liveContainerAppGroupID + ".") && !backup.contains($0) }
+-            // Older retained sources can lack the request even when the live app has it.
+-            // Pass only the exact manager bundle's profile-authorized backup groups.
+-            requiredAppGroups[app.bundleIdentifier] = required
+         }
+         try await signer.signApp(at: fileURL, provisioningProfiles: profiles, progress: nil, requiredAppGroups: requiredAppGroups)
+         return fileURL
+     }
+     
++    /// Wildcard profiles (application-identifier `TEAMID.*` or `TEAMID.com.example.*`) authorize
++    /// any matching bundle ID, so the app keeps its own instead of a literal `*`. Needs device testing.
++    static func resolvedBundleIdentifier(for profile: ALTProvisioningProfile, original: String) -> String {
++        let appID = profile.bundleIdentifier
++        guard appID.hasSuffix("*") else { return appID }
++        return original.hasPrefix(String(appID.dropLast())) ? original : appID
++    }
++
++    private static func profile(in profiles: [ALTProvisioningProfile], for bundleIdentifier: String) -> ALTProvisioningProfile? {
++        profiles.first { $0.bundleIdentifier == bundleIdentifier }
++            ?? profiles.first { $0.bundleIdentifier.hasSuffix("*") && resolvedBundleIdentifier(for: $0, original: bundleIdentifier) == bundleIdentifier }
++    }
++
+     private func removeMissingAppExtensionReferences(from appBundle: ALTApplication) throws {
+         // If app extensions have been removed from an app (either by AltStore or the developer),
+         // we must remove all references to them from SC_Info/Manifest.plist (if it exists).

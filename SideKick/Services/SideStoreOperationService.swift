@@ -152,6 +152,7 @@ final class SideStoreOperationService {
         }
         let installedID: String
         do {
+            try await ensureImportedProfileIsFree(for: ipa, using: account)
             installedID = try await retryAfterClearingRevokedAssignedProfile(
                 for: ipa.bundleIdentifier,
                 recoveryHandler: recoveryHandler
@@ -268,12 +269,24 @@ final class SideStoreOperationService {
 
         let vpnLease = try await LocalVPNService.shared.acquire()
         defer { LocalVPNService.shared.release(vpnLease) }
+        // A refresh only installs new profiles; the app keeps its existing signature. Use the
+        // imported certificate only for apps it actually signed, or iOS ignores the profile.
+        let importedSerial = ImportedCertificateStore.shared.assignedRecord(
+            accountIdentifier: accountID,
+            teamIdentifier: teamID
+        )?.serialNumber
+        let useImportedCertificate = importedSerial.map { Self.isInstalledApp(installedApp, signedWith: $0) } ?? false
         try await retryAfterClearingRevokedAssignedProfile(for: installedApp.bundleIdentifier) {
-            try await accountStore.withAccount(accountIdentifier: accountID, teamIdentifier: teamID) {
+            try await accountStore.withAccount(
+                accountIdentifier: accountID,
+                teamIdentifier: teamID,
+                useImportedCertificate: useImportedCertificate
+            ) {
                 try ImportedCertificateStore.shared.prepareProfileAssignment(
                     bundleIdentifiers: [installedApp.bundleIdentifier, installedApp.resignedBundleIdentifier],
                     accountIdentifier: accountID,
-                    teamIdentifier: teamID
+                    teamIdentifier: teamID,
+                    useImportedCertificate: useImportedCertificate
                 )
                 return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                     let group = RefreshGroup(dbContext: DatabaseManager.shared.persistentContainer.newBackgroundContext())
@@ -370,6 +383,41 @@ final class SideStoreOperationService {
             }
         }
         await ExpirationNotificationScheduler.update()
+    }
+
+    /// Whether the certificate with `serialNumber` signed the installed copy of the app.
+    /// SideKick reads its own embedded certificate ID; other apps are checked against the
+    /// profile embedded in their cached signed bundle. Needs device testing.
+    static func isInstalledApp(_ installedApp: InstalledApp, signedWith serialNumber: String) -> Bool {
+        let target = ImportedCertificateCatalog.normalizedSerial(serialNumber)
+        if installedApp.resignedBundleIdentifier == Bundle.Info.activeBundleIdentifier {
+            let embedded = Bundle.main.object(forInfoDictionaryKey: Bundle.Info.certificateID) as? String
+            return embedded.map(ImportedCertificateCatalog.normalizedSerial) == target
+        }
+        guard let profile = ALTApplication(fileURL: installedApp.fileURL)?.provisioningProfile else { return false }
+        return profile.certificates.contains { ImportedCertificateCatalog.normalizedSerial($0.serialNumber) == target }
+    }
+
+    /// An imported profile for one specific App ID can sign only one app: every app signed
+    /// with it gets that bundle ID, so a second app would silently replace the first.
+    private func ensureImportedProfileIsFree(for ipa: ImportedIPA, using account: SigningAccountSummary) async throws {
+        guard let record = ImportedCertificateStore.shared.assignedRecord(
+            accountIdentifier: account.accountIdentifier,
+            teamIdentifier: account.teamIdentifier
+        ), let profile = record.profile, !profile.appIdentifier.hasSuffix("*") else { return }
+
+        let incoming = Set([ipa.bundleIdentifier] + [ipa.queuedForInstalledAppID].compactMap { $0 })
+        let context = DatabaseManager.shared.viewContext
+        let occupant: String? = await context.perform {
+            let apps = (try? context.fetch(InstalledApp.fetchRequest())) ?? []
+            return apps.first {
+                $0.resignedBundleIdentifier == profile.appIdentifier &&
+                    !incoming.contains($0.bundleIdentifier) && !incoming.contains($0.resignedBundleIdentifier)
+            }?.name
+        }
+        if let occupant {
+            throw ImportedCertificateError.profileInUse(appName: occupant, appIdentifier: profile.appIdentifier)
+        }
     }
 
     private func retryAfterClearingRevokedAssignedProfile<T>(
