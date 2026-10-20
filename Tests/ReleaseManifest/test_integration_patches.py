@@ -172,18 +172,24 @@ struct SignedApp {
     let isAltStoreApp: Bool
     let entitlements: [Entitlement: Any]
 }
-func validate(_ resignedAppBundle: SignedApp) throws {
+struct Context { var overrideSigningCertificate: Int? = nil }
+struct Validator {
+    var context = Context()
+    func validate(_ resignedAppBundle: SignedApp) throws {
     GUARD
+    }
 }
-func accepts(_ groups: [String], isStore: Bool = true) -> Bool {
+func accepts(_ groups: [String], isStore: Bool = true, imported: Bool = false) -> Bool {
     do {
-        try validate(SignedApp(isAltStoreApp: isStore, entitlements: [.appGroups: groups]))
+        try Validator(context: Context(overrideSigningCertificate: imported ? 1 : nil))
+            .validate(SignedApp(isAltStoreApp: isStore, entitlements: [.appGroups: groups]))
         return true
     } catch { return false }
 }
 let group = Bundle.baseAltStoreAppGroupID
 precondition(accepts([group])) // repair a store that currently has no group
 precondition(!accepts([]))
+precondition(accepts([], imported: true)) // warned imported-certificate re-sign
 precondition(!accepts(["group.some.other.app"]))
 Bundle.main = Host(altstoreAppGroup: group + ".existing")
 precondition(!accepts([group])) // never orphan existing backups
