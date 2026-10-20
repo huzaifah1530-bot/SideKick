@@ -847,7 +847,8 @@ final class SigningAccountStore {
             return assigned.certificate
         }
 
-        if let activeSerial, store.catalog.record(serialNumber: activeSerial) != nil {
+        let activeIsImported = activeSerial.flatMap { store.catalog.record(serialNumber: $0) } != nil
+        if activeSerial == nil || activeIsImported {
             if let data = savedCredentials.certificateData {
                 try CertificateManager.shared.setActiveCertificate(
                     CertificateManager.parse(data, password: savedCredentials.certificatePassword)

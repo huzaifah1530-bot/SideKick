@@ -188,9 +188,18 @@ final class ImportedCertificateStore {
     }
 
     func delete(_ record: ImportedCertificateRecord) throws {
+        guard SigningAccountOperationCoordinator.acquire() else { throw SigningAccountError.engineBusy }
+        defer { SigningAccountOperationCoordinator.release() }
+        guard !AppManager.shared.isActivelyManagingAnyApp, !AppOffloadService.isRunning,
+              !SideKickStorageCleanup.hasActiveOperations else { throw SigningAccountError.engineBusy }
         let record = catalog.record(serialNumber: record.serialNumber) ?? record
         var updated = catalog
         updated.remove(serialNumber: record.serialNumber)
+        // Clear the active identity while its imported ownership is still known.
+        // If Keychain cleanup fails, keep the catalog so it cannot be saved as Apple-issued.
+        if CertificateManager.shared.activeCertificate?.serialNumber.caseInsensitiveCompare(record.serialNumber) == .orderedSame {
+            try CertificateManager.shared.clearActiveCertificateThrowing()
+        }
         try ImportedCertificateCatalogFile.save(updated)
         catalog = updated
         if let profile = record.profile { ProfileManager.shared.deleteProfile(uuid: profile.uuid) }

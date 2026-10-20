@@ -216,9 +216,9 @@
     "semantic_hash": ""
   },
   "SideKick/Services/SigningAccountStore.swift": {
-    "mtime": 1792523924.9979606,
-    "seen": 1792523960.4342785,
-    "ast_hash": "1d1229990b6ab5ec560efe35ef5af329",
+    "mtime": 1792524579.8954694,
+    "seen": 1792524658.5936053,
+    "ast_hash": "a22277512cca62019eb19865f926a11f",
     "semantic_hash": ""
   },
   "SideKick/Services/SigningExpiry.swift": {
@@ -4080,9 +4080,9 @@
     "semantic_hash": ""
   },
   "SideKick/Services/ImportedCertificateStore.swift": {
-    "mtime": 1792511413.1064763,
-    "seen": 1792511462.0345778,
-    "ast_hash": "220d53cd371a83ccdd2c85a043c426f7",
+    "mtime": 1792524579.8923652,
+    "seen": 1792524658.5935442,
+    "ast_hash": "0c3dcc75b9965ba678c3e34a02bcc599",
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/ImportedCertificatesView.swift": {
@@ -4104,15 +4104,15 @@
     "semantic_hash": ""
   },
   "SideKick/Services/SideKickTransferService.swift": {
-    "mtime": 1792521980.6734836,
-    "seen": 1792522013.8528707,
-    "ast_hash": "4dabc4ebf94dd90b8e6aad009ef2317a",
+    "mtime": 1792524514.8314507,
+    "seen": 1792524658.5935996,
+    "ast_hash": "0b6ae89b3d6c318c0dbe7c4731b67164",
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/SideKickTransferViews.swift": {
-    "mtime": 1792521980.684259,
-    "seen": 1792522013.8529866,
-    "ast_hash": "8d7ff1cfd0586931b33a3e60bd1d7a19",
+    "mtime": 1792524514.8329978,
+    "seen": 1792524658.5937088,
+    "ast_hash": "4b1fc7e7cf1ee3b55a20394a99355fc2",
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/SideKickTransferIdentifiersTests.swift": {
@@ -4131,6 +4131,12 @@
     "mtime": 1792523966.489686,
     "seen": 1792523989.238675,
     "ast_hash": "e2324cee113f096f0258d608589aa4f7",
+    "semantic_hash": ""
+  },
+  "Tests/ReleaseManifest/test_transfer_safety.py": {
+    "mtime": 1792524603.6214578,
+    "seen": 1792524658.593769,
+    "ast_hash": "d748733b473caa75fc9bd05ed5e4f6e4",
     "semantic_hash": ""
   }
 }

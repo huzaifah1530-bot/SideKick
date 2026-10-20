@@ -83,8 +83,6 @@ struct SideKickTransferView: View {
     @State private var isWorking = false
     @State private var exportedFolderName: String?
     @State private var importResult: SideKickTransferImportResult?
-    @State private var isConfirmingDelete = false
-    @State private var deletedOldCopy = false
     @State private var errorMessage: String?
     @State private var includesCertificates = true
     @State private var exportPassword = ""
@@ -167,12 +165,8 @@ struct SideKickTransferView: View {
                 }
 
                 Section {
-                    if deletedOldCopy {
-                        Label("Old SideKick deleted", systemImage: "checkmark.circle.fill").foregroundStyle(.green)
-                    } else {
-                        SwiftUI.Button("Delete Old SideKick", role: .destructive) { isConfirmingDelete = true }
-                            .disabled(isWorking)
-                    }
+                    Text("After checking your imported apps, delete the old copy through iOS when you’re ready.")
+                    Text(deleteMessage).font(.footnote).foregroundStyle(.secondary)
                 } footer: {
                     Text("Until you delete the old copy, both send expiry reminders and links like sidekick:// may open either one. Install your apps from the library first if you’d like to compare.")
                 }
@@ -205,12 +199,6 @@ struct SideKickTransferView: View {
             }
         } message: {
             Text("Enter the password you chose when exporting, so this copy can reuse your Apple certificates.")
-        }
-        .confirmationDialog("Delete the old SideKick?", isPresented: $isConfirmingDelete, titleVisibility: .visible) {
-            SwiftUI.Button("Delete Old SideKick", role: .destructive) { Task { await deleteOldCopy() } }
-            SwiftUI.Button("Cancel", role: .cancel) { }
-        } message: {
-            Text(deleteMessage)
         }
         .alert("Move to Another SideKick", isPresented: Binding(
             get: { errorMessage != nil },
@@ -255,16 +243,4 @@ struct SideKickTransferView: View {
         }
     }
 
-    @MainActor private func deleteOldCopy() async {
-        guard let source = importResult?.sourceBundleIdentifier else { return }
-        isWorking = true
-        status = "Deleting old SideKick"
-        defer { isWorking = false }
-        do {
-            try await SideKickTransferService.deleteOldCopy(bundleIdentifier: source)
-            deletedOldCopy = true
-        } catch {
-            errorMessage = error.localizedDescription
-        }
-    }
 }

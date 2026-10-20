@@ -341,19 +341,6 @@ enum SideKickTransferService {
         return result
     }
 
-    // MARK: Removing the old copy
-
-    /// Uninstalls the SideKick a transfer came from, over the local connection.
-    /// An app can't remove itself, so the new copy does it after the import.
-    static func deleteOldCopy(bundleIdentifier: String) async throws {
-        guard bundleIdentifier != Bundle.main.bundleIdentifier else { throw SideKickTransferError.sameInstallation }
-        // Only the copy the transfer came from; its ID was recorded by that SideKick itself.
-        guard !bundleIdentifier.isEmpty else { throw SideKickTransferError.notSideKick }
-        let lease = try await LocalVPNService.shared.acquire()
-        defer { LocalVPNService.shared.release(lease) }
-        try await removeApp(bundleIdentifier)
-    }
-
     // MARK: Helpers
 
     private struct InstalledRecord: Sendable {
