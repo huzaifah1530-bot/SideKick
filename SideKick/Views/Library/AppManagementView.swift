@@ -1030,7 +1030,8 @@ struct ResignOptionsView: View {
                                     isSideKick: isSideKick,
                                     record: record
                                 ) {
-                                    if isSideKick, let team = record.profile?.teamIdentifier, team != app.teamIdentifier {
+                                    if isSideKick, let profile = record.profile,
+                                       SideKickTransferService.separateCopyBundleIdentifier(for: profile) != app.id {
                                         // iOS rejects upgrading an app to another team; install a second copy.
                                         SeparateSideKickCopyView(account: account, accountStore: accountStore, certificate: record)
                                     } else {

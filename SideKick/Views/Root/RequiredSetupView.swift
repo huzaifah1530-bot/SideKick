@@ -122,6 +122,22 @@ final class SetupStatus {
         await refresh()
     }
 
+    func importPairingFromClipboard() async {
+        guard !isImportingPairing else { return }
+        guard let text = UIPasteboard.general.string, !text.isEmpty else {
+            message = "Copy the pairing file’s text first. Open it in Files, choose Share → Copy, then try again."
+            return
+        }
+        isImportingPairing = true
+        defer { isImportingPairing = false }
+        do {
+            try PairingSetupImporter.importContents(text)
+            await refresh()
+        } catch {
+            message = "The clipboard doesn’t contain a valid pairing file. \(error.localizedDescription)"
+        }
+    }
+
     func importPairingFile(from url: URL) async {
         guard !isImportingPairing else { return }
         isImportingPairing = true
@@ -330,6 +346,11 @@ struct RequiredSetupView: View {
                 isChoosingPairingFile = true
             }
             .secondaryActionStyle()
+            SwiftUI.Button("Paste from Clipboard") {
+                Task { await status.importPairingFromClipboard() }
+            }
+            .font(.subheadline)
+            .disabled(status.isBusy)
                 .tint(.sideKickAccent)
             .disabled(status.isBusy)
             if status.isImportingPairing { ProgressView("Importing pairing file…") }

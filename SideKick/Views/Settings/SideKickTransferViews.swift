@@ -11,7 +11,11 @@ struct SeparateSideKickCopyView: View {
     @State private var copy: ImportedIPA?
     @State private var errorMessage: String?
 
-    private var teamIdentifier: String? { certificate.profile?.teamIdentifier }
+    @State private var occupant: String?
+
+    private var newBundleID: String? {
+        certificate.profile.map(SideKickTransferService.separateCopyBundleIdentifier(for:))
+    }
     private var removesVPN: Bool {
         SideKickTransferService.includesBuiltInVPN && !SideKickTransferService.profileAllowsVPN(certificate.profile?.uuid)
     }
@@ -20,11 +24,18 @@ struct SeparateSideKickCopyView: View {
         List {
             Section {
                 Text("iOS can’t move an installed app to another signing team, so SideKick installs a second copy signed with “\(certificate.name)”. This copy stays until you delete it.")
-                if let teamIdentifier {
-                    LabeledContent("New Bundle ID", value: SideKickTransferService.separateCopyBundleIdentifier(teamIdentifier: teamIdentifier))
+                if let newBundleID {
+                    LabeledContent("New Bundle ID", value: newBundleID)
                 }
             } footer: {
-                Text("Next, open Settings → Advanced → Move to Another SideKick here to export your data, then import it in the new copy.")
+                Text("The copy uses the profile’s own App ID so Files, pairing and IPA imports work in it. Next, export your data from Settings → Advanced → Move to Another SideKick, then import it in the new copy.")
+            }
+
+            if let occupant {
+                Section {
+                    Label("“\(occupant)” already uses this App ID. Installing SideKick will replace it. Reinstall that app afterwards; it keeps its own bundle ID now.", systemImage: "exclamationmark.triangle.fill")
+                        .foregroundStyle(.orange)
+                }
             }
 
             if removesVPN {
@@ -57,12 +68,13 @@ struct SeparateSideKickCopyView: View {
         .navigationBarTitleDisplayMode(.inline)
         .task {
             guard copy == nil else { return }
-            guard let teamIdentifier else {
+            guard let newBundleID else {
                 errorMessage = ImportedCertificateError.profileRequired(certificateName: certificate.name).localizedDescription
                 return
             }
+            occupant = await SideKickTransferService.occupant(of: newBundleID)
             do {
-                copy = try await SideKickTransferService.prepareSeparateCopy(teamIdentifier: teamIdentifier,
+                copy = try await SideKickTransferService.prepareSeparateCopy(newID: newBundleID,
                     removeVPN: removesVPN, store: environment.ipaImportStore)
             } catch {
                 errorMessage = error.localizedDescription

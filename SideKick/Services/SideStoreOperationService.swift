@@ -719,8 +719,10 @@ struct InstalledAppSummary: Identifiable, Sendable {
         let sideKickBundleID = "com.sidekick.app"
         var result = Set(identifiers)
         let teamQualifiedSideKickBundleID = "\(sideKickBundleID).\(teamIdentifier)".lowercased()
+        let runningID = Bundle.Info.activeBundleIdentifier.lowercased()
         if identifiers.contains(where: {
-            $0 == sideKickBundleID || $0 == teamQualifiedSideKickBundleID || Self.isTeamCopy($0, of: sideKickBundleID)
+            // A copy on an imported certificate may run under the profile's App ID instead.
+            $0 == sideKickBundleID || $0 == teamQualifiedSideKickBundleID || Self.isTeamCopy($0, of: sideKickBundleID) || $0 == runningID
         }) {
             result.insert(sideKickBundleID)
         }

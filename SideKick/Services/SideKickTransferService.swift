@@ -103,9 +103,26 @@ enum SideKickTransferService {
 
     // MARK: Separate copy
 
-    /// The bundle ID SideKick gets when signed by `teamIdentifier`.
-    static func separateCopyBundleIdentifier(teamIdentifier: String) -> String {
-        "\(StoreApp.altstoreAppID).\(teamIdentifier)"
+    /// The bundle ID for a SideKick copy signed with `profile`.
+    ///
+    /// With a single-App-ID profile the copy must use exactly that App ID. If its bundle ID
+    /// differs from the signed application-identifier, iOS can't deliver files from the
+    /// document picker, so pairing files, IPAs and transfer folders can't be imported.
+    /// Wildcard profiles allow any ID, so the copy keeps a recognisable team-suffixed one.
+    static func separateCopyBundleIdentifier(for profile: ImportedProfileSummary) -> String {
+        if profile.appIdentifier.hasSuffix("*") {
+            return "\(StoreApp.altstoreAppID).\(profile.teamIdentifier)"
+        }
+        return profile.appIdentifier
+    }
+
+    /// An installed app that already uses `bundleIdentifier`, which a new install would replace.
+    static func occupant(of bundleIdentifier: String) async -> String? {
+        let context = DatabaseManager.shared.viewContext
+        return await context.perform {
+            (try? context.fetch(InstalledApp.fetchRequest()))?
+                .first { $0.resignedBundleIdentifier == bundleIdentifier }?.name
+        }
     }
 
     /// Packages the running SideKick under a new bundle ID, ready to install as a second copy.
@@ -122,9 +139,8 @@ enum SideKickTransferService {
         FileManager.default.fileExists(atPath: Bundle.main.bundleURL.appendingPathComponent("PlugIns/SideKickVPN.appex").path)
     }
 
-    static func prepareSeparateCopy(teamIdentifier: String, removeVPN: Bool, store: IPAImportStore) async throws -> ImportedIPA {
+    static func prepareSeparateCopy(newID: String, removeVPN: Bool, store: IPAImportStore) async throws -> ImportedIPA {
         let currentID = Bundle.main.bundleIdentifier ?? StoreApp.altstoreAppID
-        let newID = separateCopyBundleIdentifier(teamIdentifier: teamIdentifier)
         guard newID != currentID else { throw SideKickTransferError.sameInstallation }
         let source = Bundle.main.bundleURL
         let packaging = Task.detached(priority: .userInitiated) { () throws -> (URL, URL) in
@@ -347,9 +363,8 @@ enum SideKickTransferService {
     /// An app can't remove itself, so the new copy does it after the import.
     static func deleteOldCopy(bundleIdentifier: String) async throws {
         guard bundleIdentifier != Bundle.main.bundleIdentifier else { throw SideKickTransferError.sameInstallation }
-        guard bundleIdentifier == StoreApp.altstoreAppID || bundleIdentifier.hasPrefix(StoreApp.altstoreAppID + ".") else {
-            throw SideKickTransferError.notSideKick
-        }
+        // Only the copy the transfer came from; its ID was recorded by that SideKick itself.
+        guard !bundleIdentifier.isEmpty else { throw SideKickTransferError.notSideKick }
         let lease = try await LocalVPNService.shared.acquire()
         defer { LocalVPNService.shared.release(lease) }
         try await removeApp(bundleIdentifier)
