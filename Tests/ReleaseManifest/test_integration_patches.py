@@ -159,7 +159,7 @@ precondition(!"other.com.sidekick.app.TEAM".isAltStoreAppID)
                 subprocess.run([compiler, str(source), "-o", str(binary)], check=True)
                 subprocess.run([str(binary)], check=True)
                 # Run the actual pre-install self-update guard against signed grants.
-                guard = re.search(r'        if resignedAppBundle.isAltStoreApp \{.*?^        \}', signing, re.S | re.M).group(0)
+                guard = re.search(r'        if resignedAppBundle.isAltStoreApp, self.context.overrideSigningCertificate == nil \{.*?^        \}', signing, re.S | re.M).group(0)
                 source.write_text('''import Foundation
 enum Entitlement: Hashable { case appGroups }
 struct Host { let altstoreAppGroup: String? }
