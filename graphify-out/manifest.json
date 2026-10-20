@@ -1,8 +1,8 @@
 {
   "Package.swift": {
-    "mtime": 1792505285.787098,
-    "seen": 1792505346.044776,
-    "ast_hash": "6dac12593b9b61f37c9e737e869e5ccb",
+    "mtime": 1792516370.6608064,
+    "seen": 1792516425.8953185,
+    "ast_hash": "95970cdb9a4330a6aed42c304d5364b5",
     "semantic_hash": ""
   },
   "SideKickVPN/CIDRValidator.swift": {
@@ -282,9 +282,9 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Library/AppManagementView.swift": {
-    "mtime": 1792511391.389195,
-    "seen": 1792511462.0346448,
-    "ast_hash": "fad0b28757c1f04a8dce98daf56c30ad",
+    "mtime": 1792516344.6476476,
+    "seen": 1792516425.8954775,
+    "ast_hash": "e1e3cab3741137d4865f4b302c668419",
     "semantic_hash": ""
   },
   "SideKick/Views/Library/GitHubRepositoryImportView.swift": {
@@ -366,9 +366,9 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/SettingsView.swift": {
-    "mtime": 1792505267.9374228,
-    "seen": 1792505346.0449252,
-    "ast_hash": "9998a042ac5aab0cb78dcd26ed52978d",
+    "mtime": 1792516341.480643,
+    "seen": 1792516425.8955183,
+    "ast_hash": "6db030c81cbc29190c4896cd0079be21",
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/SideStoreSettingsPages.swift": {
@@ -396,9 +396,9 @@
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_integration_patches.py": {
-    "mtime": 1792441107.1462092,
-    "seen": 1792443596.065279,
-    "ast_hash": "51e0e21b5de2d26e9cd305beaacb7f8d",
+    "mtime": 1792514346.4761114,
+    "seen": 1792516425.8955438,
+    "ast_hash": "21f9195200ffb4bdc4f46fe07acb0d2e",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_release_manifest.py": {
@@ -3930,9 +3930,9 @@
     "semantic_hash": ""
   },
   "scripts/integrate-backup-helper.py": {
-    "mtime": 1792246494.9916914,
-    "seen": 1792246536.6742544,
-    "ast_hash": "1fe28c08fd5749501e283cd40b3cfe58",
+    "mtime": 1792513354.5447457,
+    "seen": 1792516425.89702,
+    "ast_hash": "8203d7aea185eaa6fe798f9ec625e087",
     "semantic_hash": ""
   },
   "scripts/templates/SideKickBackupView.swift": {
@@ -4125,6 +4125,30 @@
     "mtime": 1792511424.0679007,
     "seen": 1792511462.0347922,
     "ast_hash": "5c124865b1dbbf726f8fdefd6ca8f1b4",
+    "semantic_hash": ""
+  },
+  "SideKick/Models/SideKickTransferIdentifiers.swift": {
+    "mtime": 1792516295.597248,
+    "seen": 1792516425.895385,
+    "ast_hash": "6c73fd47af122f289397e2bd77dbf6cc",
+    "semantic_hash": ""
+  },
+  "SideKick/Services/SideKickTransferService.swift": {
+    "mtime": 1792516311.444929,
+    "seen": 1792516425.895455,
+    "ast_hash": "c41c69049ff2631c0d2103f208ffd56f",
+    "semantic_hash": ""
+  },
+  "SideKick/Views/Settings/SideKickTransferViews.swift": {
+    "mtime": 1792516340.887707,
+    "seen": 1792516425.8955197,
+    "ast_hash": "46afffb3b05489d08ce0ffcd059842f7",
+    "semantic_hash": ""
+  },
+  "Tests/SideKickCoreTests/SideKickTransferIdentifiersTests.swift": {
+    "mtime": 1792516371.484772,
+    "seen": 1792516425.8955894,
+    "ast_hash": "5c3b4a1b654b6d918d3ce01ffc1d1eea",
     "semantic_hash": ""
   }
 }

@@ -1025,17 +1025,23 @@ struct ResignOptionsView: View {
                                 accountIdentifier: account.accountIdentifier,
                                 teamIdentifier: account.teamIdentifier
                             ) {
+                                let isSideKick = app.id == Bundle.Info.activeBundleIdentifier
                                 ImportedCertificateResignWarningView(
                                     appName: app.name,
-                                    isSideKick: app.id == Bundle.Info.activeBundleIdentifier,
+                                    isSideKick: isSideKick,
                                     record: record
                                 ) {
-                                    RefreshConsoleView(
-                                        app: app,
-                                        accountStore: accountStore,
-                                        selectedAccount: account,
-                                        operation: .resign
-                                    )
+                                    if isSideKick, let team = record.profile?.teamIdentifier, team != app.teamIdentifier {
+                                        // iOS rejects upgrading an app to another team; install a second copy.
+                                        SeparateSideKickCopyView(account: account, accountStore: accountStore, certificate: record)
+                                    } else {
+                                        RefreshConsoleView(
+                                            app: app,
+                                            accountStore: accountStore,
+                                            selectedAccount: account,
+                                            operation: .resign
+                                        )
+                                    }
                                 }
                             } else {
                                 RefreshConsoleView(

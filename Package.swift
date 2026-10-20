@@ -22,6 +22,7 @@ let package = Package(
             "Models/GitHubBuildTracking.swift",
             "Models/ImportedIPA.swift",
             "Models/ImportedCertificateCatalog.swift",
+            "Models/SideKickTransferIdentifiers.swift",
             "Models/LiveContainerModels.swift",
             "Models/GitHubUpdateConfiguration.swift",
             "Services/GitHubHistoryClient.swift",

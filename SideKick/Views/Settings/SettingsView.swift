@@ -137,6 +137,12 @@ private struct AdvancedSettingsView: View {
                 }
             }
 
+            Section("Transfer") {
+                NavigationLink { SideKickTransferView() } label: {
+                    Label("Move to Another SideKick", systemImage: "arrow.left.arrow.right")
+                }
+            }
+
             Section("Troubleshooting") {
                 NavigationLink { HealthCheckView(readyTitle: "SideKick Ready") } label: {
                     Label("Health Check", systemImage: "stethoscope")
