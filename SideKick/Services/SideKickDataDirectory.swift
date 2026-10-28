@@ -18,6 +18,10 @@ enum SideKickDataDirectory {
         defer { state.lock.unlock() }
         if let cachedURL = state.cachedURL { return cachedURL }
 
+        // Runs only on the first preparation in a new process, before Core Data
+        // resolves its store URL. Never unlink a database during an active session.
+        DeferredStorageRemoval.applyBeforeDatabaseStart()
+
         let manager = FileManager.default
         let support = manager.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
         let destination = support.appendingPathComponent("SideKick", isDirectory: true)

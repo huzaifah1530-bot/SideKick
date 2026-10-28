@@ -36,6 +36,16 @@ final class AppOffloadService {
 
     func isOffloaded() async throws -> Bool { !(try await installedRecord()).isActive }
 
+    /// Hides only the saved row; never uninstalls an app or deletes its recovery data.
+    func forgetSavedApp() async throws {
+        guard !Self.running, !AppManager.shared.isActivelyManagingAnyApp else { throw AppOffloadError.inUse }
+        Self.running = true
+        defer { Self.running = false }
+        let installed = try await installedRecord()
+        guard !installed.isActive else { throw AppOffloadError.unsupported }
+        UserDefaults.standard.set(true, forKey: "SideKick.hidden-offloaded." + app.id)
+    }
+
     func perform(restoring: Bool,
                  stageHandler: @escaping @MainActor @Sendable (String) -> Void = { _ in },
                  progressHandler: @escaping @MainActor @Sendable (Double) -> Void = { _ in }) async throws {
@@ -59,9 +69,6 @@ final class AppOffloadService {
         defer { NotificationCenter.default.removeObserver(observer) }
         try SideKickStorageCleanup.beginOperation()
         defer { SideKickStorageCleanup.endOperation() }
-        stageHandler("Connecting to this iPhone")
-        let lease = try await LocalVPNService.shared.acquire()
-        defer { LocalVPNService.shared.release(lease) }
         // Use SideStore's normal backup/restore pipeline, including its App Group.
         let legacy = UserDefaults.standard.isLegacyDeactivationSupported
         UserDefaults.standard.isLegacyDeactivationSupported = false
@@ -71,11 +78,39 @@ final class AppOffloadService {
         let hasBackup = backup.map { FileManager.default.fileExists(atPath: $0.path) } ?? false
         // An interrupted uninstall can leave Core Data marked active even after
         // device removal. Restore its completed backup instead of a blank binary.
-        let recoverBinary = restoring && (Self.needsLegacyRecovery(app.id) || (installed.isActive && !hasBackup))
+        let binaryRecoveryKey = "SideKick.binary-recovery." + app.id
+        let knownOffload = Self.blocksNativeOperations(app.id) && !UserDefaults.standard.bool(forKey: binaryRecoveryKey)
+        // A failed install can leave only a false inactive flag. Reinstall that
+        // retained binary directly; a real offload must keep its backup intact.
+        let recoverBinary = restoring && !hasBackup && !knownOffload
+        if restoring && knownOffload && !hasBackup { throw AppOffloadError.backupUnavailable }
+        if !recoverBinary {
+            guard let group = Bundle.main.altstoreAppGroup,
+                  FileManager.default.containerURL(forSecurityApplicationGroupIdentifier: group) != nil else {
+                throw AppOffloadError.backupUnavailable
+            }
+        }
+        if restoring {
+            let assigned = try ImportedCertificateStore.shared.assignedSigningCertificate(
+                accountIdentifier: app.accountIdentifier, teamIdentifier: app.teamIdentifier)
+            try SigningIdentityPolicy.validateResign(
+                installedTeam: SideStoreOperationService.installedSigningTeam(installed),
+                targetTeam: assigned?.record.profile?.teamIdentifier ?? app.teamIdentifier)
+            if let profile = assigned?.record.profile {
+                try SigningIdentityPolicy.validateProfile(profile.appIdentifier, for: installed.resignedBundleIdentifier)
+            }
+        }
+        stageHandler("Connecting to this iPhone")
+        let lease = try await LocalVPNService.shared.acquire()
+        defer { LocalVPNService.shared.release(lease) }
+        UserDefaults.standard.set(recoverBinary, forKey: binaryRecoveryKey)
         UserDefaults.standard.set(restoring ? "restoring" : "offloading", forKey: key)
         do {
             stageHandler("Preparing the signing account")
             try await accounts.withAccount(accountIdentifier: app.accountIdentifier, teamIdentifier: app.teamIdentifier) {
+                try ImportedCertificateStore.shared.prepareProfileAssignment(
+                    bundleIdentifiers: [installed.bundleIdentifier, installed.resignedBundleIdentifier],
+                    accountIdentifier: app.accountIdentifier, teamIdentifier: app.teamIdentifier)
                 try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                     let observationBox = ProgressObservationBox()
                     let finished: (Result<InstalledApp, Error>) -> Void = {
@@ -102,6 +137,7 @@ final class AppOffloadService {
                 }
             }
             UserDefaults.standard.set(restoring ? "active" : "offloaded", forKey: key)
+            UserDefaults.standard.removeObject(forKey: binaryRecoveryKey)
             if restoring { UserDefaults.standard.removeObject(forKey: "SideKick.transfer." + app.id) }
             await ExpirationNotificationScheduler.update()
         } catch {
@@ -157,13 +193,14 @@ final class AppOffloadService {
 }
 
 enum AppOffloadError: LocalizedError {
-    case unsupported, sourceMissing, inUse, restoreRequired
+    case unsupported, sourceMissing, inUse, restoreRequired, backupUnavailable
     var errorDescription: String? {
         switch self {
         case .unsupported: "SideKick cannot offload itself."
         case .sourceMissing: "The retained app source is unavailable. Import its original IPA before continuing."
         case .inUse: "Another app operation is running. Try again when it finishes."
         case .restoreRequired: "Restore or recover this offloaded app before updating or refreshing it."
+        case .backupUnavailable: "SideKick cannot access this app's shared backup storage. Restore SideKick's original signing team and App Group permissions before continuing. The saved app and its backup have not been deleted."
         }
     }
 }

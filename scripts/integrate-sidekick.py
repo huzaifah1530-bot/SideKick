@@ -8,6 +8,7 @@ app_delegate = root / "AltStore/AppDelegate.swift"
 source = app_delegate.read_text(encoding="utf-8")
 original = "        _ = try? AppManager.shared.backgroundRefresh(installedApps, completionHandler: refreshAppsCompletionHandler)"
 replacement = """        Task { @MainActor in
+            await DailyRefreshReminderScheduler.update()
             await GitHubUpdateScanner.scanAndNotify()
             do {
                 let lease = try await LocalVPNService.shared.acquire()
@@ -15,6 +16,10 @@ replacement = """        Task { @MainActor in
                     _ = try AppManager.shared.backgroundRefresh(installedApps) { result in
                         Task { @MainActor in
                             LocalVPNService.shared.release(lease)
+                            if case .success(let apps) = result, !apps.isEmpty,
+                               apps.values.allSatisfy({ if case .success = $0 { return true }; return false }) {
+                                await DailyRefreshReminderScheduler.recordSuccess()
+                            }
                             refreshAppsCompletionHandler(result)
                         }
                     }

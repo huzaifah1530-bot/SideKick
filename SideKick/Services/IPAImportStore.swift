@@ -17,6 +17,15 @@ actor IPAImportStore {
     private let directory: URL
     private let indexURL: URL
     private var pendingManagedFiles: Set<String> = []
+    private var storageRemovalActive = false
+    private var activeFileReaders = 0
+
+    func beginStorageRemoval() throws {
+        guard !storageRemovalActive, pendingManagedFiles.isEmpty, activeFileReaders == 0 else { throw StorageCleanupError.operationRunning }
+        storageRemovalActive = true
+    }
+
+    func endStorageRemoval() { storageRemovalActive = false }
 
     init(fileManager: FileManager = .default) {
         self.fileManager = fileManager
@@ -37,6 +46,7 @@ actor IPAImportStore {
     }
 
     func prepareIPA(from sourceURL: URL, remoteSourceURL: URL? = nil) throws -> ImportedIPA {
+        guard !storageRemovalActive else { throw StorageCleanupError.operationRunning }
         guard remoteSourceURL != nil || sourceURL.pathExtension.lowercased() == "ipa" else {
             throw IPAImportError.notAnIPA
         }
@@ -80,6 +90,7 @@ actor IPAImportStore {
     /// nothing else (Finder's __MACOSX and .DS_Store entries are ignored). The IPA is kept as a
     /// managed copy because a file inside a zip can't be bookmarked.
     func prepareZippedIPA(from zipURL: URL) throws -> ImportedIPA {
+        guard !storageRemovalActive else { throw StorageCleanupError.operationRunning }
         let securityScoped = zipURL.startAccessingSecurityScopedResource()
         defer { if securityScoped { zipURL.stopAccessingSecurityScopedResource() } }
         guard fileManager.isReadableFile(atPath: zipURL.path) else { throw IPAImportError.inaccessibleFile }
@@ -178,6 +189,7 @@ actor IPAImportStore {
     }
 
     func importManagedIPA(from sourceURL: URL, expectedBundleIdentifiers: Set<String>, updateKey: String? = nil, repositoryURL: String? = nil, targetID: String? = nil, sourceIdentity: String? = nil, importConfiguration: GitHubUpdateConfiguration? = nil, queuedForUpdate: Bool = true) throws -> ImportedIPA {
+        guard !storageRemovalActive else { throw StorageCleanupError.operationRunning }
         try Task.checkCancellation()
         let metadata = try readMetadata(from: sourceURL)
         let expected = expectedBundleIdentifiers.map { $0.lowercased() }
@@ -273,6 +285,9 @@ actor IPAImportStore {
     }
 
     func fileURL(for requestedApp: ImportedIPA) async throws -> URL {
+        guard !storageRemovalActive else { throw StorageCleanupError.operationRunning }
+        activeFileReaders += 1
+        defer { activeFileReaders -= 1 }
         // A caller may still hold a pre-migration value after another access has
         // already retained this URL source. Resolve the latest row by stable import
         // identity so later accesses immediately use the managed file.

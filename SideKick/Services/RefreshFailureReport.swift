@@ -18,8 +18,6 @@ struct RefreshFailureReport: Codable, Equatable, Sendable {
     private static let pendingKey = "sidekick.automation.failure-tapped"
     static let tappedNotification = Notification.Name("sideKickRefreshFailureNotificationTapped")
     static let notificationKind = "refreshFailure"
-    /// Only nag when it matters: with 5 or more days left, a missed refresh is harmless.
-    static let notifyThresholdDays = 4
 
     static func load() -> RefreshFailureReport? {
         guard let data = UserDefaults.standard.data(forKey: key) else { return nil }
@@ -58,7 +56,7 @@ struct RefreshFailureReport: Codable, Equatable, Sendable {
     private static let notificationID = "sidekick.refresh-failure"
 
     func notifyIfNeeded() async {
-        guard soonestDays <= Self.notifyThresholdDays else { return }
+        guard await DailyRefreshReminderScheduler.isEnabled else { return }
         let center = UNUserNotificationCenter.current()
         let settings = await center.notificationSettings()
         guard settings.authorizationStatus == .authorized || settings.authorizationStatus == .provisional else { return }

@@ -17,7 +17,7 @@ let package = Package(
             "Services/AppOffloadService.swift", "Services/SideKickDiagnostics.swift",
             "Services/IPAImportDownloadStore.swift", "Services/RefreshFailureReport.swift", "Services/UpdateSuccessRecord.swift",
             "Services/LiveContainerSharedAccess.swift",
-            "Services/GitHubAccountSession.swift"
+            "Services/GitHubAccountSession.swift", "Services/ManagedStorageFiles.swift"
         ], sources: [
             "Models/GitHubBuildTracking.swift",
             "Models/ImportedIPA.swift",
@@ -32,6 +32,9 @@ let package = Package(
             "Services/UnsavedSettingsCoordinator.swift",
             "Services/GitHubUpdateDiscovery.swift",
             "Services/AnisetteConfiguration.swift",
+            "Services/DailyRefreshReminderPlan.swift",
+            "Services/SigningIdentityPolicy.swift",
+            "Services/StorageArchiveImportance.swift",
             "Services/AppIconVariant.swift",
             "Services/RemoteAnisetteConfiguration.swift",
             "Services/AnisetteErrorHint.swift",

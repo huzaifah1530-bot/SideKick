@@ -8,7 +8,7 @@ struct StorageFilesView: View {
     var body: some View {
         List {
             Section {
-                Text("Signing sources let SideKick refresh apps without downloading them again. You can remove them to reclaim space, but may need to import the original IPA before the next refresh. SideKick automatically cleans completed install files. Recent recovery sources and temporary files in use stay protected.")
+                Text("Delete files individually, or browse All App Data in Storage to manage other files and folders. Only current app builds, backups and settings ask for confirmation.")
                     .font(.footnote).foregroundStyle(.secondary)
             }
             if loading { ProgressView("Measuring files…") }
@@ -19,10 +19,8 @@ struct StorageFilesView: View {
                         Text(item.name).fontWeight(.medium)
                         Text(item.url.lastPathComponent).font(.caption).foregroundStyle(.secondary).textSelection(.enabled)
                         Text(ByteCountFormatter.string(fromByteCount: item.bytes, countStyle: .file)).foregroundStyle(.secondary)
-                        if let reason = item.protectedReason { Text(reason).font(.footnote).foregroundStyle(.secondary) }
-                        else if item.policy.requiresSourceConfirmation { Text("Retained for app refresh; removable with confirmation.").font(.footnote).foregroundStyle(.secondary) }
                     }
-                    if item.protectedReason == nil { StorageRemovalAction(item: item) }
+                    StorageRemovalAction(item: item)
                 }
             }
             if let error { Text(error).foregroundStyle(.red).font(.footnote) }
@@ -44,36 +42,60 @@ struct StorageFilesView: View {
 
 struct StorageRemovalAction: View {
     let item: RemovableStorageItem
+    var body: some View { ManagedStorageRemovalAction(url: item.url) }
+}
+
+struct ManagedStorageRemovalAction: View {
+    let url: URL
     @Environment(AppEnvironment.self) private var environment
+    @State private var review: ManagedStorageReview?
     @State private var confirming = false
     @State private var working = false
+    @State private var queued = false
     @State private var error: String?
 
     var body: some View {
-        SwiftUI.Button(role: .destructive) { confirming = true } label: {
-            Label(item.policy.requiresSourceConfirmation ? "Remove Cached Source" : "Delete File", systemImage: "trash")
+        Group {
+            if queued {
+                Text("Scheduled for deletion on next launch").font(.footnote).foregroundStyle(.secondary)
+            } else {
+                SwiftUI.Button(role: .destructive) {
+                    guard let review else { return }
+                    if review.warning != nil { confirming = true }
+                    else { Task { await remove(confirmed: false) } }
+                } label: {
+                    Label(review?.requiresRestart == true ? "Delete on Next Launch" : "Delete", systemImage: "trash")
+                }
+                .disabled(working || review == nil)
+            }
         }
-        .disabled(working)
-        .alert(item.policy.requiresSourceConfirmation ? "Remove cached app source?" : "Delete this file?", isPresented: $confirming) {
-            SwiftUI.Button("Delete", role: .destructive) { Task { await remove() } }
+        .task { await reloadReview() }
+        .alert("Delete important files?", isPresented: $confirming) {
+            SwiftUI.Button(review?.requiresRestart == true ? "Delete on Next Launch" : "Delete", role: .destructive) {
+                Task { await remove(confirmed: true) }
+            }
             SwiftUI.Button("Cancel", role: .cancel) { }
-        } message: {
-            Text(item.policy.requiresSourceConfirmation
-                ? "This removes the extracted source for \(item.policy.owner ?? "this app"). The installed app and its records stay in place. Refresh may require importing its original IPA again."
-                : "This removes \(item.url.lastPathComponent) from SideKick and reclaims \(ByteCountFormatter.string(fromByteCount: item.bytes, countStyle: .file)).")
-        }
+        } message: { Text(review?.warning ?? "") }
         .alert("Storage", isPresented: Binding(get: { error != nil }, set: { if !$0 { error = nil } })) {
             SwiftUI.Button("OK", role: .cancel) { error = nil }
         } message: { Text(error ?? "") }
     }
 
-    @MainActor private func remove() async {
+    private func reloadReview() async {
+        do { review = try await ManagedStorageFiles.review(url) }
+        catch { self.error = error.localizedDescription }
+    }
+
+    private func remove(confirmed: Bool) async {
+        guard let review, !working else { return }
         working = true
         defer { working = false }
         do {
-            try await SideKickStorageCleanup.remove(item, downloads: environment.githubUpdateDownloads, allowRetainedSource: item.policy.requiresSourceConfirmation)
-            NotificationCenter.default.post(name: .sideKickStorageDidChange, object: nil)
-        } catch { self.error = error.localizedDescription }
+            queued = try await ManagedStorageFiles.remove(review, downloads: environment.githubUpdateDownloads, confirmed: confirmed)
+        } catch {
+            self.error = error.localizedDescription
+            await reloadReview()
+        }
     }
 }
 

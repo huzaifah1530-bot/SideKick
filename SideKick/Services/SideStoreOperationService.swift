@@ -114,7 +114,9 @@ final class SideStoreOperationService {
                 }
             }
         }
-        return summaries.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        return summaries.filter {
+            $0.isActive || !UserDefaults.standard.bool(forKey: "SideKick.hidden-offloaded." + $0.id)
+        }.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
     }
 
     func install(
@@ -211,6 +213,11 @@ final class SideStoreOperationService {
                     teamIdentifier: account.teamIdentifier,
                     useImportedCertificate: useImportedCertificate
                 ) {
+                    if useImportedCertificate, let profile = ImportedCertificateStore.shared.assignedRecord(
+                        accountIdentifier: account.accountIdentifier, teamIdentifier: account.teamIdentifier)?.profile {
+                        try SigningIdentityPolicy.validateProfile(profile.appIdentifier,
+                            for: customBundleIdentifier ?? ipa.queuedForInstalledAppID ?? ipa.bundleIdentifier)
+                    }
                     try ImportedCertificateStore.shared.prepareProfileAssignment(
                         bundleIdentifiers: [ipa.bundleIdentifier] + [ipa.queuedForInstalledAppID, customBundleIdentifier].compactMap { $0 },
                         accountIdentifier: account.accountIdentifier,
@@ -397,6 +404,15 @@ final class SideStoreOperationService {
             throw SideStoreOperationError.incompatibleRefreshAccount
         }
 
+        let assigned = try ImportedCertificateStore.shared.assignedSigningCertificate(
+            accountIdentifier: selectedAccount.accountIdentifier, teamIdentifier: selectedAccount.teamIdentifier)
+        let targetTeam = assigned?.record.profile?.teamIdentifier ?? selectedAccount.teamIdentifier
+        let installedTeam = Self.installedSigningTeam(installedApp)
+        try SigningIdentityPolicy.validateResign(installedTeam: installedTeam, targetTeam: targetTeam)
+        if let profile = assigned?.record.profile {
+            try SigningIdentityPolicy.validateProfile(profile.appIdentifier, for: installedApp.resignedBundleIdentifier)
+        }
+
         try SideKickStorageCleanup.beginOperation()
         defer { SideKickStorageCleanup.endOperation() }
 
@@ -432,6 +448,16 @@ final class SideStoreOperationService {
             }
         }
         await ExpirationNotificationScheduler.update()
+    }
+
+    /// The retained source can be the original, unsigned IPA, so its embedded
+    /// profile is not evidence of the currently installed signing team.
+    static func installedSigningTeam(_ app: InstalledApp) -> String? {
+        if let serial = app.certificateSerialNumber {
+            return ImportedCertificateStore.shared.catalog.record(matchingSerial: serial)?.profile?.teamIdentifier
+                ?? app.customProvisioningProfile?.teamIdentifier
+        }
+        return app.team?.identifier
     }
 
     /// Whether the certificate with `serialNumber` signed the installed copy of the app.
@@ -534,6 +560,7 @@ final class SideStoreOperationService {
                 appResults: [], failureMessage: error.localizedDescription)
         }
         guard !apps.isEmpty else {
+            await DailyRefreshReminderScheduler.recordSuccess()
             await ExpirationNotificationScheduler.update()
             return QuietRefreshOutcome(succeeded: 0, attempted: 0, failure: .noEligibleApps,
                 appResults: [], failureMessage: nil)
@@ -578,6 +605,7 @@ final class SideStoreOperationService {
             }
             progressHandler(index + 1, apps.count)
         }
+        if succeeded == apps.count { await DailyRefreshReminderScheduler.recordSuccess() }
         await ExpirationNotificationScheduler.update()
         return QuietRefreshOutcome(
             succeeded: succeeded,

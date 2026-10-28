@@ -1,8 +1,8 @@
 {
   "Package.swift": {
-    "mtime": 1792516370.6608064,
-    "seen": 1792516425.8953185,
-    "ast_hash": "95970cdb9a4330a6aed42c304d5364b5",
+    "mtime": 1793215724.9064627,
+    "seen": 1793216171.6741004,
+    "ast_hash": "6c90a3722ce06cbb75390b87582c6283",
     "semantic_hash": ""
   },
   "SideKick/App/AppEnvironment.swift": {
@@ -72,15 +72,15 @@
     "semantic_hash": ""
   },
   "SideKick/Services/DailyRefreshShortcut.swift": {
-    "mtime": 1792255253.3409352,
-    "seen": 1792255292.1671846,
-    "ast_hash": "040b5d829b2511970c09962f6f4eb051",
+    "mtime": 1793215132.5642362,
+    "seen": 1793215516.7758584,
+    "ast_hash": "493ea85f6bcfb7649a22bb505e8fe2fe",
     "semantic_hash": ""
   },
   "SideKick/Services/ExpirationNotificationScheduler.swift": {
-    "mtime": 1792179288.5571558,
-    "seen": 1792246536.6708407,
-    "ast_hash": "8a6c44dd88e7fb0f0008b72edfdae91f",
+    "mtime": 1793216648.9012337,
+    "seen": 1793216678.1968803,
+    "ast_hash": "e578ae5d6a9b04e0bdf9e3b3aceb02e3",
     "semantic_hash": ""
   },
   "SideKick/Services/GitHubCredentialStore.swift": {
@@ -144,9 +144,9 @@
     "semantic_hash": ""
   },
   "SideKick/Services/IPAImportStore.swift": {
-    "mtime": 1792258274.2004738,
-    "seen": 1792258375.6908033,
-    "ast_hash": "5c045256dbfc4274b5923cf95c6645dd",
+    "mtime": 1793216385.5767303,
+    "seen": 1793216467.587509,
+    "ast_hash": "5b073982a47d4a9fbc7db1b6f125a13f",
     "semantic_hash": ""
   },
   "SideKick/Services/LiveContainerScanner.swift": {
@@ -186,9 +186,9 @@
     "semantic_hash": ""
   },
   "SideKick/Services/SideKickDataDirectory.swift": {
-    "mtime": 1791809005.834321,
-    "seen": 1792246536.6708846,
-    "ast_hash": "ebc98ff3a9f688b1254cc17520c1cab6",
+    "mtime": 1793215959.86056,
+    "seen": 1793216171.6741924,
+    "ast_hash": "8405192259e860d1030c335aafa73c8f",
     "semantic_hash": ""
   },
   "SideKick/Services/SideKickLogStorage.swift": {
@@ -198,9 +198,9 @@
     "semantic_hash": ""
   },
   "SideKick/Services/SideKickStorageCleanup.swift": {
-    "mtime": 1791890052.8141792,
-    "seen": 1792246536.6708918,
-    "ast_hash": "ed967e5b99e35a090d73c490dd3d07fe",
+    "mtime": 1793216312.76733,
+    "seen": 1793216467.5875342,
+    "ast_hash": "33a72ca244ae8b194a514f3e41d5c37f",
     "semantic_hash": ""
   },
   "SideKick/Services/SideKickStorageUsage.swift": {
@@ -210,9 +210,9 @@
     "semantic_hash": ""
   },
   "SideKick/Services/SideStoreOperationService.swift": {
-    "mtime": 1792518631.098469,
-    "seen": 1792519062.6713595,
-    "ast_hash": "e9c5464373c837bc78b22194ca52e8eb",
+    "mtime": 1793215332.438929,
+    "seen": 1793215516.775915,
+    "ast_hash": "944d4be981510c59db2f529ad9209af7",
     "semantic_hash": ""
   },
   "SideKick/Services/SigningAccountStore.swift": {
@@ -252,9 +252,9 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Home/HomeView.swift": {
-    "mtime": 1792258214.890894,
-    "seen": 1792258375.6908352,
-    "ast_hash": "787ed983ddad7e2da40cbb146bd3a931",
+    "mtime": 1793216721.1805367,
+    "seen": 1793216733.4507933,
+    "ast_hash": "f9f818913e77c24af4c19f38d2fc6251",
     "semantic_hash": ""
   },
   "SideKick/Views/Home/IPASharingViews.swift": {
@@ -354,9 +354,9 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/SideStoreSettingsPages.swift": {
-    "mtime": 1792521980.687331,
-    "seen": 1792522013.8529892,
-    "ast_hash": "5a1e5f6cac36a4bfc9e3190484be8115",
+    "mtime": 1793216045.7948701,
+    "seen": 1793216171.6742601,
+    "ast_hash": "3cecc76cfe71672922efea7c787491a4",
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/SkippedGitHubUpdatesView.swift": {
@@ -366,9 +366,9 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Settings/StorageFilesView.swift": {
-    "mtime": 1791668500.4835894,
-    "seen": 1792246536.6709669,
-    "ast_hash": "4639b28c50d83610f3cceb5da49a25e4",
+    "mtime": 1793216004.6895435,
+    "seen": 1793216171.6742632,
+    "ast_hash": "db845416f778da44398bb9d41fc922c6",
     "semantic_hash": ""
   },
   "Tests/PrefetchRegistry/PrefetchTaskRegistryRegression.swift": {
@@ -378,9 +378,9 @@
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_integration_patches.py": {
-    "mtime": 1792523834.0188072,
-    "seen": 1792523910.1201222,
-    "ast_hash": "f50b95af85110992b245fcaad78b87bd",
+    "mtime": 1793215263.498898,
+    "seen": 1793215516.7760098,
+    "ast_hash": "3d4bc199539b67c74c6f34aacdc7152a",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_release_manifest.py": {
@@ -3666,9 +3666,9 @@
     "semantic_hash": ""
   },
   "docs/settings-functionality.md": {
-    "mtime": 1792521980.7173183,
-    "seen": 1792522013.8544314,
-    "ast_hash": "8566aefb5f8fa93ba58c241c78d37649",
+    "mtime": 1793216547.832935,
+    "seen": 1793216567.3510695,
+    "ast_hash": "93447561819b54312671e8c0a9a92af9",
     "semantic_hash": ""
   },
   "docs/stock-livecontainer-transfer.md": {
@@ -3852,21 +3852,21 @@
     "semantic_hash": ""
   },
   "SideKick/Services/AppOffloadService.swift": {
-    "mtime": 1792188071.7121227,
-    "seen": 1792246536.6708302,
-    "ast_hash": "660c12d04528092ba4ddc92fc6e6a93d",
+    "mtime": 1793215414.8438783,
+    "seen": 1793215516.7758536,
+    "ast_hash": "2415cac9608f3fc1f58cef00bac840f6",
     "semantic_hash": ""
   },
   "SideKick/Views/Library/AppOffloadView.swift": {
-    "mtime": 1792245051.4339864,
-    "seen": 1792246536.670923,
-    "ast_hash": "d9cfc36a101032e78744a40477c32c81",
+    "mtime": 1793215332.4409332,
+    "seen": 1793215516.775944,
+    "ast_hash": "9cc0f52049f75611466456debf18c315",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_app_offload.py": {
-    "mtime": 1792245291.6476824,
-    "seen": 1792246536.6709774,
-    "ast_hash": "89ddd3ccdca1420eb2d07afbe7aae4b6",
+    "mtime": 1793215414.8438783,
+    "seen": 1793215516.775997,
+    "ast_hash": "29247d8c994ab8376a4ec01940b1640b",
     "semantic_hash": ""
   },
   "scripts/package-backup-helper.py": {
@@ -3900,9 +3900,9 @@
     "semantic_hash": ""
   },
   "scripts/integrate-backup-helper.py": {
-    "mtime": 1792513354.5447457,
-    "seen": 1792516425.89702,
-    "ast_hash": "8203d7aea185eaa6fe798f9ec625e087",
+    "mtime": 1793216547.832935,
+    "seen": 1793216567.3509748,
+    "ast_hash": "b27a215c3fa75ee9a18ad7d6e021093e",
     "semantic_hash": ""
   },
   "scripts/templates/SideKickBackupView.swift": {
@@ -3948,9 +3948,9 @@
     "semantic_hash": ""
   },
   "SideKick/Services/RefreshFailureReport.swift": {
-    "mtime": 1792253078.7154953,
-    "seen": 1792253464.2401402,
-    "ast_hash": "844decf00a9bf80aab958cd59962bd0c",
+    "mtime": 1793215077.4996192,
+    "seen": 1793215516.775899,
+    "ast_hash": "30fa752925f37dda875e08db353bf0c4",
     "semantic_hash": ""
   },
   "SideKick/Services/UpdateSuccessRecord.swift": {
@@ -4080,8 +4080,8 @@
     "semantic_hash": ""
   },
   "SideKick/Services/ImportedCertificateStore.swift": {
-    "mtime": 1792524988.6538918,
-    "seen": 1792525047.5379329,
+    "mtime": 1793215219.750438,
+    "seen": 1793215516.7758858,
     "ast_hash": "e979de7b824a60dcd1471640beb0aa1a",
     "semantic_hash": ""
   },
@@ -4122,9 +4122,9 @@
     "semantic_hash": ""
   },
   "scripts/integrate-sidekick.py": {
-    "mtime": 1792523834.017802,
-    "seen": 1792523910.122147,
-    "ast_hash": "d02407f96a786357dcadf8097fe78c08",
+    "mtime": 1793216648.9002273,
+    "seen": 1793216678.1977959,
+    "ast_hash": "d1f35b9cd850ec345ffc9bd9881be7b6",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_anisette_bootstrap.py": {
@@ -4137,6 +4137,60 @@
     "mtime": 1792524988.6554346,
     "seen": 1792525047.538099,
     "ast_hash": "f55d628518a637e2f6e5765bb28e0bc4",
+    "semantic_hash": ""
+  },
+  "SideKick/Services/DailyRefreshReminderPlan.swift": {
+    "mtime": 1793215049.2409544,
+    "seen": 1793215516.7758567,
+    "ast_hash": "a5877a803b7edaf6a381f42dbf4f65eb",
+    "semantic_hash": ""
+  },
+  "SideKick/Services/SigningIdentityPolicy.swift": {
+    "mtime": 1793215049.2409544,
+    "seen": 1793215516.7759194,
+    "ast_hash": "354786a69a36e146c0f6accca1a489d5",
+    "semantic_hash": ""
+  },
+  "Tests/ReleaseManifest/test_certificate_recovery.py": {
+    "mtime": 1793215477.3946674,
+    "seen": 1793215516.775998,
+    "ast_hash": "f96054e400a574777e74702199b74052",
+    "semantic_hash": ""
+  },
+  "Tests/SideKickCoreTests/DailyRefreshReminderPlanTests.swift": {
+    "mtime": 1793215005.3042357,
+    "seen": 1793215516.776096,
+    "ast_hash": "e489e558417a349b9ed72626755ceeb9",
+    "semantic_hash": ""
+  },
+  "Tests/SideKickCoreTests/SigningIdentityPolicyTests.swift": {
+    "mtime": 1793215132.5642362,
+    "seen": 1793215516.7761662,
+    "ast_hash": "c8d1dcb58088b83b8a160b2b2dd6b91f",
+    "semantic_hash": ""
+  },
+  "SideKick/Services/ManagedStorageFiles.swift": {
+    "mtime": 1793216385.5777304,
+    "seen": 1793216467.5875206,
+    "ast_hash": "375f76167013c30fc9ab8459043ce860",
+    "semantic_hash": ""
+  },
+  "SideKick/Services/StorageArchiveImportance.swift": {
+    "mtime": 1793215724.9051006,
+    "seen": 1793216171.6742082,
+    "ast_hash": "18cbfd9dea40f149f298c71f119724be",
+    "semantic_hash": ""
+  },
+  "Tests/SideKickCoreTests/StorageArchiveImportanceTests.swift": {
+    "mtime": 1793215724.9051006,
+    "seen": 1793216171.674319,
+    "ast_hash": "fd5cd38aa71a50c3835b38628d573e59",
+    "semantic_hash": ""
+  },
+  "Tests/ReleaseManifest/test_storage_file_management.py": {
+    "mtime": 1793216437.9548018,
+    "seen": 1793216467.5876274,
+    "ast_hash": "88f24290b1476c496386c8a71f626fd5",
     "semantic_hash": ""
   }
 }

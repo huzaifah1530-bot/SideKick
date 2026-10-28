@@ -19,6 +19,10 @@ struct AppOffloadView: View {
             return ("exclamationmark.arrow.circlepath", .warning, "Recovery Needed",
                     "An earlier transfer didn’t finish. Reinstall the original app first. Exported SideKickData folders are kept.")
         }
+        if offloaded && !AppOffloadService.blocksNativeOperations(app.id) {
+            return ("arrow.clockwise", .warning, "Saved App Needs Recovery",
+                    "The app was recorded as inactive after an interrupted installation. Restore its retained app to repair the saved status.")
+        }
         if offloaded {
             return ("icloud.and.arrow.down", .accent, "Offloaded",
                     "\(app.name) is backed up and removed from this iPhone. Restore it any time.")

@@ -55,6 +55,7 @@ private enum DailyRefreshAutomation {
 
     static func run() async -> (outcome: RefreshShortcutOutcome, succeeded: Int, attempted: Int) {
         UserDefaults.standard.set(Date.now, forKey: "sidekick.automation.last-attempt")
+        await DailyRefreshReminderScheduler.update()
         do {
             try SideKickDataDirectory.prepareBeforeDatabaseStart()
             if !DatabaseManager.shared.isStarted {
@@ -92,8 +93,7 @@ private enum DailyRefreshAutomation {
                 }
                 return (result, outcome.succeeded, outcome.attempted)
             }
-            UserDefaults.standard.set(Date.now, forKey: lastSuccessfulRunKey)
-            RefreshFailureReport.clear()
+            await DailyRefreshReminderScheduler.recordSuccess()
             return (.success, outcome.succeeded, outcome.attempted)
         } catch {
             debugLog("[SideKick] Scheduled refresh did not complete: \(error.localizedDescription)")
@@ -108,7 +108,7 @@ private enum DailyRefreshAutomation {
         }
     }
 
-    /// Saves what went wrong and notifies only when the soonest-expiring app has 4 days or fewer.
+    /// Keep failure details; the already-scheduled reminder works even if this shortcut never runs.
     private static func reportFailure(summary: String, detail: String?, items: [RefreshFailureReport.Item],
                                       service: SideStoreOperationService) async {
         let apps = await service.installedApps().filter(\.isActive)
@@ -121,7 +121,7 @@ private enum DailyRefreshAutomation {
         let report = RefreshFailureReport(date: .now, summary: summary, items: allItems,
                                           soonestDays: days, soonestAppName: soonest?.name)
         report.save()
-        await report.notifyIfNeeded()
+        await DailyRefreshReminderScheduler.update()
     }
 
     private static func shortcutOutcome(for failure: QuietRefreshOutcome.Failure?) -> RefreshShortcutOutcome {
