@@ -92,3 +92,37 @@ edit("SideStore/Core/Operations/PipelineExecutor.swift",
 (root / "SideBackup/ContentView.swift").write_text(
     (repo / "scripts/templates/SideKickBackupView.swift").read_text(encoding="utf-8"), encoding="utf-8", newline="\n")
 print("Installed SideKick backup group routing, helper interface and pipeline progress")
+
+# Ordinary app installs must commit their new identity/status only after iOS
+# accepts the replacement. The legacy path remains for SideKick's self-staging
+# and for the temporary backup helper, which have separate recovery rules.
+edit("SideStore/Core/Operations/PipelineOperations/InstallAppOperation.swift",
+     '        let (installedApp, isDifferentSideStore, bundleID, isSelfReinstall, isSideBackup) = try await backgroundContext.perform {',
+     '''        let isBackupHelper = resignedAppBundle.infoPlist["CFBundleExecutable"] as? String == "SideBackup"
+        if !resignedAppBundle.isAltStoreApp && !isBackupHelper {
+            guard self.context.appBundleFingerprint != nil else {
+                throw OperationError.invalidParameters("The retained app source has no build fingerprint. Reimport its original IPA before reinstalling; the installed app has not been changed.")
+            }
+            let bundleID = self.context.targetBundleIdentifier
+            if UserDefaults.standard.preferResignedIPA {
+                try await installIPA(bundleID)
+            } else {
+                try await installAppBundle(bundleID, appName: resignedAppBundle.fileURL.lastPathComponent)
+            }
+            // No Core Data identity or active-state changes occur before the
+            // device installation succeeds. Needs device regression testing.
+            let installedApp = try await backgroundContext.perform {
+                let installed = try self.fetchOrCreateApp(in: backgroundContext,
+                    certificate: certificate, resignedAppBundle: resignedAppBundle,
+                    storeBuildVersion: storeBuildVersion, authTeam: authTeam)
+                installed.appExtensions = try self.fetchOrCreateExtensions(
+                    for: resignedAppBundle, installedApp: installed, in: backgroundContext)
+                installed.isActive = true
+                installed.refreshedDate = Date()
+                self.context.beginInstallationHandler?(installed)
+                return installed
+            }
+            self.setProgress(100)
+            return installedApp
+        }
+        let (installedApp, isDifferentSideStore, bundleID, isSelfReinstall, isSideBackup) = try await backgroundContext.perform {''')

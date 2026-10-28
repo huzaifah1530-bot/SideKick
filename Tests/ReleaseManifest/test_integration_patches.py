@@ -41,6 +41,7 @@ class IntegrationPatchTests(unittest.TestCase):
                 "SideStore/Core/Anisette/AnisetteProvider.swift",
                 "SideStore/Core/Anisette/OnDeviceAnisetteManager.swift",
                 "SideStore/Core/Operations/StandaloneOperations/SignInOperation.swift",
+                "SideStore/Core/Operations/PipelineOperations/InstallAppOperation.swift",
             ])
             for patch in PATCHES:
                 content = (ROOT / "patches" / patch).read_text(encoding="utf-8")
@@ -80,6 +81,10 @@ class IntegrationPatchTests(unittest.TestCase):
             patch_path.write_bytes((ROOT / 'patches/sidestore-signing-repairs.patch').read_text(encoding='utf-8').encode('utf-8'))
             result = subprocess.run(['git', '-C', str(checkout), 'apply', str(patch_path)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
+            installation = (checkout / 'SideStore/Core/Operations/PipelineOperations/InstallAppOperation.swift').read_text()
+            atomic = installation[installation.index('        let isBackupHelper ='):installation.index('        let (installedApp, isDifferentSideStore, bundleID, isSelfReinstall, isSideBackup)')]
+            self.assertLess(atomic.index('try await installIPA'), atomic.index('self.fetchOrCreateApp'))
+            self.assertIn('installed.isActive = true', atomic)
             stage = (checkout / "SideStore/Core/Operations/PipelineOperations/StageBackupAppOperation.swift").read_text()
             self.assertIn('updates["SideKickBackupAppGroup"] = backupGroup', stage)
             shared = (checkout / "Shared/Extensions/Bundle+AltStore.swift").read_text()

@@ -111,6 +111,18 @@ enum SideKickStorageCleanup {
     private static var initialTemporaryPaths: Set<String>?
     private static var completedTemporaryPaths: Set<String> = []
 
+    static func beginManualRemoval(downloads: GitHubUpdateDownloadStore) throws {
+        guard !isRemovingFiles, !hasActiveOperations, !AppManager.shared.isActivelyManagingAnyApp,
+              !downloads.jobs.values.contains(where: \.isDownloading) else { throw StorageCleanupError.operationRunning }
+        guard SigningAccountOperationCoordinator.acquire() else { throw StorageCleanupError.operationRunning }
+        isRemovingFiles = true
+    }
+
+    static func endManualRemoval() {
+        isRemovingFiles = false
+        SigningAccountOperationCoordinator.release()
+    }
+
     // Snapshot before preparation; only newly created staging folders belong
     // to this signing batch. Unknown and recovery folders remain protected.
     static func beginOperation() throws {

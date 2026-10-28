@@ -10,11 +10,37 @@ struct RefreshSettingsView: View {
     @AppStorage("isCellularRefreshEnabled") private var cellularRefresh = false
     @AppStorage("isBackgroundServiceEnabled") private var keepAliveEnabled = true
     @AppStorage("backgroundServiceMode") private var keepAliveMode = "audio"
+    @AppStorage("sidekick.automation.reminders-enabled") private var refreshReminders = true
+    @AppStorage("sidekick.automation.refresh-hour") private var refreshHour = 9
+    @AppStorage("sidekick.automation.refresh-minute") private var refreshMinute = 0
     @Environment(\.scenePhase) private var scenePhase
     @State private var locationAccess = CLLocationManager().authorizationStatus
 
     var body: some View {
         Form {
+            Section {
+                Toggle("Daily refresh reminders", isOn: $refreshReminders)
+                    .onChange(of: refreshReminders) { _, enabled in
+                        Task {
+                            if enabled { await SetupStatus().requestNotifications() }
+                            await ExpirationNotificationScheduler.update()
+                        }
+                    }
+                DatePicker("Shortcut refresh time", selection: Binding(
+                    get: { Calendar.current.date(bySettingHour: refreshHour, minute: refreshMinute, second: 0, of: .now) ?? .now },
+                    set: { date in
+                        let parts = Calendar.current.dateComponents([.hour, .minute], from: date)
+                        refreshHour = parts.hour ?? 9
+                        refreshMinute = parts.minute ?? 0
+                        Task { await ExpirationNotificationScheduler.update() }
+                    }), displayedComponents: .hourAndMinute)
+                    .disabled(!refreshReminders)
+            } header: {
+                Text("Auto-refresh Reminders")
+            } footer: {
+                Text("Set your daily Shortcuts automation to the same time. SideKick schedules reminders in advance for 10 minutes later, even if the shortcut never runs. A successful refresh of all eligible apps moves the reminder to tomorrow. Reminders are kept four weeks ahead and renewed whenever SideKick or its shortcut runs.")
+            }
+
             Section {
                 Toggle("Automatic app refresh", isOn: $backgroundRefresh)
                     .onChange(of: backgroundRefresh) { _, enabled in
@@ -90,6 +116,7 @@ struct RefreshSettingsView: View {
             }
         }
         .navigationTitle("App Refresh")
+        .task { await ExpirationNotificationScheduler.update() }
         .navigationBarTitleDisplayMode(.inline)
         .onChange(of: scenePhase) { _, phase in
             if phase == .active { locationAccess = CLLocationManager().authorizationStatus }
@@ -591,6 +618,8 @@ struct SettingsStorageView: View {
     @State private var selectedRemovalKeys = Set<String>()
     @State private var errorMessage: String?
     @State private var cleanReport: String?
+    @State private var importantRemovalWarning: String?
+    @State private var importantRemovalReviews: [ManagedStorageReview] = []
 
     var body: some View {
         List {
@@ -607,6 +636,11 @@ struct SettingsStorageView: View {
         .sheet(isPresented: $isShowingClearReview) { clearReviewSheet }
         .messageAlert("Couldn’t Update Storage", message: $errorMessage)
         .messageAlert("Storage Cleaned", message: $cleanReport)
+        .alert("Delete current app builds?", isPresented: Binding(
+            get: { importantRemovalWarning != nil }, set: { if !$0 { importantRemovalWarning = nil } })) {
+            SwiftUI.Button("Delete", role: .destructive) { Task { await clearSelectedManagedIPAs(confirmed: true) } }
+            SwiftUI.Button("Cancel", role: .cancel) { importantRemovalWarning = nil }
+        } message: { Text(importantRemovalWarning ?? "") }
     }
 
     private var allAppDataSection: some View {
@@ -626,7 +660,7 @@ struct SettingsStorageView: View {
                 .fullWidthListSeparators()
             }
         } header: { Text("All App Data") } footer: {
-            Text("Tap a folder to see what’s using space. iOS Storage may count differently.")
+            Text("Browse, inspect and delete individual files or folders. Current app builds, backups and saved settings ask for confirmation; outdated files do not. iOS Storage may count differently.")
         }
     }
 
@@ -764,12 +798,26 @@ struct SettingsStorageView: View {
     }
 
     @MainActor
-    private func clearSelectedManagedIPAs() async {
+    private func clearSelectedManagedIPAs(confirmed: Bool = false) async {
         do {
-            for app in importedApps where app.fileName != nil && selectedRemovalKeys.contains(removalKey(for: app)) {
-                try await environment.ipaImportStore.delete(app)
+            var reviews: [ManagedStorageReview] = confirmed ? importantRemovalReviews : []
+            let root = FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0].appendingPathComponent("ImportedIPAs")
+            for app in importedApps where !confirmed && app.fileName != nil && selectedRemovalKeys.contains(removalKey(for: app)) {
+                if let name = app.fileName { reviews.append(try await ManagedStorageFiles.review(root.appendingPathComponent(name))) }
             }
-            try await environment.ipaImportStore.cleanupOrphanedManagedIPAs()
+            if !confirmed {
+                let warnings = reviews.compactMap(\.warning)
+                if !warnings.isEmpty {
+                    importantRemovalReviews = reviews
+                    importantRemovalWarning = warnings.joined(separator: "\n\n")
+                    return
+                }
+            }
+            for review in reviews {
+                _ = try await ManagedStorageFiles.remove(review, downloads: environment.githubUpdateDownloads, confirmed: confirmed)
+            }
+            importantRemovalWarning = nil
+            importantRemovalReviews = []
             selectedRemovalKeys.removeAll()
             await reload()
         } catch {
@@ -808,7 +856,6 @@ struct StorageDirectoryDetailView: View {
     let directory: StorageDirectoryUsage
     @State private var entries: [StorageDirectoryUsage] = []
     @State private var isLoading = true
-    @State private var removable: [RemovableStorageItem] = []
 
     var body: some View {
         List {
@@ -827,11 +874,7 @@ struct StorageDirectoryDetailView: View {
                         LabeledContent(entry.name, value: ByteCountFormatter.string(fromByteCount: entry.bytes, countStyle: .file))
                             .fullWidthListSeparators()
                     }
-                    if let item = removable.first(where: { $0.id == entry.id }) {
-                        if let owner = item.policy.owner { Text("Retained signing source · \(owner)").font(.footnote).foregroundStyle(.secondary) }
-                        if let reason = item.protectedReason { Text(reason).font(.footnote).foregroundStyle(.secondary) }
-                        else { StorageRemovalAction(item: item) }
-                    }
+                    ManagedStorageRemovalAction(url: entry.url)
                 }
             }
         }
@@ -845,7 +888,6 @@ struct StorageDirectoryDetailView: View {
     private func reload() async {
         isLoading = true
         entries = await SideKickStorageUsage.children(of: directory.url)
-        removable = (try? await SideKickStorageCleanup.items()) ?? []
         isLoading = false
     }
 }
