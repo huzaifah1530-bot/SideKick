@@ -135,14 +135,13 @@ struct AppManagementView: View {
                         LabeledContent("Imported", value: importedApp.formattedImportDate)
                     }
                     if let installedApp, !isQueuedTargetUnavailable {
-                        LabeledContent("Apple Account", value: installedApp.accountEmail)
                         if let certificate = installedApp.importedCertificate {
-                            // The account's team owns the record; the imported certificate's team signed it.
                             LabeledContent("Signed With", value: certificate.name)
                             if let profile = certificate.profile {
                                 LabeledContent("Signing Team", value: profile.teamName.isEmpty ? profile.teamIdentifier : profile.teamName)
                             }
                         } else {
+                            LabeledContent("Apple Account", value: installedApp.accountEmail)
                             LabeledContent("Team", value: installedApp.teamIdentifier)
                         }
                         LabeledContent("Expires", value: installedApp.expirationDate.formatted(date: .abbreviated, time: .shortened))
@@ -224,8 +223,8 @@ struct AppManagementView: View {
             // Buttons, not NavigationLinks: a link inside a List row renders as a plain row
             // with a chevron and ignores the button style.
             HStack(spacing: Spacing.s) {
-                SwiftUI.Button { route = accountStore.accounts.isEmpty ? .addAccount : .install } label: {
-                    ActionLabel(accountStore.accounts.isEmpty ? "Add Account" : "Install")
+                SwiftUI.Button { route = !accountStore.hasSigningIdentities ? .addAccount : .install } label: {
+                    ActionLabel(!accountStore.hasSigningIdentities ? "Add Account" : "Install")
                 }
                 .primaryActionStyle()
                 .disabled(accountStore.isWorking)
@@ -338,7 +337,7 @@ struct AppManagementView: View {
         if let installedApp, canActOnInstalledApp, !AppOffloadService.blocksNativeOperations(installedApp.id) {
             Section {
                 SwiftUI.Button { route = .refreshAccount } label: {
-                    Label("Refresh with Account…", systemImage: "person.crop.circle")
+                    Label("Refresh with…", systemImage: "person.crop.circle")
                 }
                 SwiftUI.Button { route = .resign } label: {
                     Label("Re-sign…", systemImage: "signature")
@@ -400,7 +399,15 @@ struct AppManagementView: View {
     private func queuedUpdateActions(ipa: ImportedIPA, installedApp: InstalledAppSummary) -> some View {
         let updateAccounts = accountStore.accounts
         let installedTeamAccount = updateAccounts.first(where: { installedApp.isSignable(by: $0) })
-        if let account = installedTeamAccount, account.hasSavedSession {
+        if let certificate = installedApp.importedCertificate {
+            NavigationLink {
+                InstallConsoleView(app: ipa, account: nil, accountStore: accountStore,
+                    ipaStore: environment.ipaImportStore, isUpdate: true,
+                    onInstalled: { await finishQueuedUpdate(ipa) }, certificate: certificate)
+            } label: {
+                Label("Update to \(ipa.version)", systemImage: "arrow.down.circle.fill")
+            }
+        } else if let account = installedTeamAccount, account.hasSavedSession {
             NavigationLink {
                 InstallConsoleView(
                     app: ipa,
@@ -444,7 +451,7 @@ struct AppManagementView: View {
                     ? installedApp.teamIdentifier : nil
             )
         } label: {
-            Label("Update with Another Account…", systemImage: "person.2")
+            Label("Update with Another Identity…", systemImage: "person.2")
         }
         SwiftUI.Button(role: .destructive) {
             isConfirmingQueuedUpdateRemoval = true
@@ -894,6 +901,7 @@ private struct RefreshConsoleView: View {
     let app: InstalledAppSummary
     let accountStore: SigningAccountStore
     var selectedAccount: SigningAccountSummary? = nil
+    var selectedCertificate: ImportedCertificateRecord? = nil
     var operation: AppSigningOperation = .refresh
 
     @Environment(AppEnvironment.self) private var environment
@@ -932,17 +940,16 @@ private struct RefreshConsoleView: View {
         failure = nil
         stageSummary = operation == .refresh ? "Refreshing \(app.name)" : "Re-signing \(app.name)"
         append("Starting \(operation == .refresh ? "refresh" : "re-sign") · \(Date.now.formatted(date: .omitted, time: .standard))")
-        append("Account selected · \(selectedAccount?.email ?? app.accountEmail)")
+        append("Signing identity · \(selectedCertificate?.name ?? selectedAccount?.email ?? app.accountEmail)")
         append(operation == .refresh ? "Preparing signing refresh" : "Preparing app re-sign")
         do {
             let service = SideStoreOperationService(accountStore: accountStore, ipaStore: environment.ipaImportStore)
             if operation == .resign {
-                guard let selectedAccount else {
-                    throw AppSigningError.accountRequired
-                }
-                try await service.resign(bundleIdentifier: app.id, using: selectedAccount) { value in
-                    updateProgress(value)
-                }
+                if let selectedCertificate {
+                    try await service.resign(bundleIdentifier: app.id, using: selectedCertificate) { updateProgress($0) }
+                } else if let selectedAccount {
+                    try await service.resign(bundleIdentifier: app.id, using: selectedAccount) { updateProgress($0) }
+                } else { throw AppSigningError.accountRequired }
             } else {
                 try await service.refresh(bundleIdentifier: app.id, using: selectedAccount) { value in
                     updateProgress(value)
@@ -978,7 +985,8 @@ private struct RefreshConsoleView: View {
     }
 
     private var reconnectAccount: SigningAccountSummary? {
-        selectedAccount ?? accountStore.accounts.first {
+        if selectedCertificate != nil || (selectedAccount == nil && app.importedCertificate != nil) { return nil }
+        return selectedAccount ?? accountStore.accounts.first {
             $0.accountIdentifier == app.accountIdentifier && $0.teamIdentifier == app.teamIdentifier
         }
     }
@@ -1005,7 +1013,7 @@ struct ResignOptionsView: View {
         List {
             if eligibleAccounts.isEmpty {
                 Section {
-                    Text("Add an Apple Account on this app’s team to re-sign it.")
+                    Text("Apple Accounts can also sign apps. Certificates are listed below.")
                         .foregroundStyle(.secondary)
                 } header: {
                     Text("Apple Account")
@@ -1020,29 +1028,6 @@ struct ResignOptionsView: View {
                                 SigningAccountDetailView(account: account, accountStore: accountStore)
                             } else if account.teamIdentifier != app.teamIdentifier {
                                 OtherTeamSourceView(app: app, account: account, accountStore: accountStore)
-                            } else if let record = ImportedCertificateStore.shared.assignedRecord(
-                                accountIdentifier: account.accountIdentifier,
-                                teamIdentifier: account.teamIdentifier
-                            ) {
-                                let isSideKick = app.id == Bundle.Info.activeBundleIdentifier
-                                ImportedCertificateResignWarningView(
-                                    appName: app.name,
-                                    isSideKick: isSideKick,
-                                    record: record
-                                ) {
-                                    if isSideKick, let profile = record.profile,
-                                       SideKickTransferService.separateCopyBundleIdentifier(for: profile) != app.id {
-                                        // iOS rejects upgrading an app to another team; install a second copy.
-                                        SeparateSideKickCopyView(account: account, accountStore: accountStore, certificate: record)
-                                    } else {
-                                        RefreshConsoleView(
-                                            app: app,
-                                            accountStore: accountStore,
-                                            selectedAccount: account,
-                                            operation: .resign
-                                        )
-                                    }
-                                }
                             } else {
                                 RefreshConsoleView(
                                     app: app,
@@ -1060,6 +1045,22 @@ struct ResignOptionsView: View {
                 } footer: {
                     Text("An account on another team installs a separate copy with its own data.")
                 }
+            }
+            Section("Certificates") {
+                ForEach(ImportedCertificateStore.shared.certificates) { certificate in
+                    NavigationLink {
+                        if certificate.profile == nil {
+                            ImportedCertificateDetailView(record: certificate, accountStore: accountStore)
+                        } else {
+                            RefreshConsoleView(app: app, accountStore: accountStore,
+                                selectedCertificate: certificate, operation: .resign)
+                        }
+                    } label: {
+                        ImportedCertificateRow(record: certificate, usageCount: 0)
+                    }
+                    .disabled(certificate.profile.map { $0.teamIdentifier != app.teamIdentifier } ?? false)
+                }
+                NavigationLink("Manage Certificates") { ImportedCertificatesView() }
             }
         }
         .listStyle(.insetGrouped)
@@ -1081,7 +1082,7 @@ private struct RefreshOptionsView: View {
         List {
             if eligibleAccounts.isEmpty {
                 Section {
-                    Text("Add or reconnect an Apple Account to continue.")
+                    Text("No saved Apple Accounts. Certificates are listed below.")
                         .foregroundStyle(.secondary)
                 } header: {
                     Text("Apple Account")
@@ -1113,9 +1114,18 @@ private struct RefreshOptionsView: View {
                     Text("An account on another team installs a separate copy with its own data.")
                 }
             }
+            if let certificate = app.importedCertificate {
+                Section("Certificate") {
+                    NavigationLink {
+                        RefreshConsoleView(app: app, accountStore: accountStore, selectedCertificate: certificate)
+                    } label: {
+                        ImportedCertificateRow(record: certificate, usageCount: 0)
+                    }
+                }
+            }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle("Refresh with Account")
+        .navigationTitle("Refresh with Signing Identity")
         .navigationBarTitleDisplayMode(.inline)
         .task { await accountStore.reload() }
     }
@@ -1237,7 +1247,7 @@ struct InstallAccountSelectionView: View {
         List {
             Section {
                 if accounts.isEmpty {
-                    Text("Add an Apple Account to continue.").foregroundStyle(.secondary)
+                    Text("Add an Apple Account or choose a certificate below.").foregroundStyle(.secondary)
                     NavigationLink("Accounts") { AccountsView() }
                 }
                 ForEach(accounts) { account in
@@ -1258,9 +1268,26 @@ struct InstallAccountSelectionView: View {
             } footer: {
                 Text("An account on another team installs a separate copy with its own data.")
             }
+            Section("Certificates") {
+                ForEach(ImportedCertificateStore.shared.certificates) { certificate in
+                    NavigationLink {
+                        if certificate.profile == nil {
+                            ImportedCertificateDetailView(record: certificate, accountStore: accountStore)
+                        } else {
+                            InstallConsoleView(app: app, account: nil, accountStore: accountStore,
+                                ipaStore: ipaStore, isUpdate: isUpdate, onInstalled: onInstalled,
+                                onSourceMissing: onSourceMissing, certificate: certificate)
+                        }
+                    } label: {
+                        ImportedCertificateRow(record: certificate, usageCount: 0)
+                    }
+                    .disabled(currentTeamIdentifier.map { $0 != certificate.profile?.teamIdentifier } ?? false)
+                }
+                NavigationLink("Import Certificate") { ImportedCertificatesView() }
+            }
         }
         .listStyle(.insetGrouped)
-        .navigationTitle("Choose Account")
+        .navigationTitle("Choose Signing Identity")
         .navigationBarTitleDisplayMode(.inline)
         .onAppear { Task { await accountStore.reload() } }
         .onReceive(NotificationCenter.default.publisher(for: .sideKickSigningAccountsDidChange)) { _ in
@@ -1290,12 +1317,15 @@ enum InstallStartState: Equatable {
 struct InstallConsoleView: View {
     @Environment(AppEnvironment.self) private var environment
     let app: ImportedIPA
-    let account: SigningAccountSummary
+    let account: SigningAccountSummary?
     let accountStore: SigningAccountStore
     let ipaStore: IPAImportStore
     let isUpdate: Bool
     let onInstalled: (() async -> Void)?
     var onSourceMissing: (() async -> Void)? = nil
+    var certificate: ImportedCertificateRecord? = nil
+
+    private var signerName: String { certificate?.name ?? account?.email ?? "Signing identity" }
 
     @Environment(\.dismiss) private var dismiss
     @State private var lines: [String] = []
@@ -1313,7 +1343,7 @@ struct InstallConsoleView: View {
                 ScrollView {
                     DetailHeader(iconData: app.iconData, title: app.name, subtitle: app.version)
                         .padding(.top, Spacing.xl)
-                    Text("Signs with \(account.email)")
+                    Text("Signs with \(signerName)")
                         .font(.subheadline)
                         .foregroundStyle(.secondary)
                         .padding(.top, Spacing.xs)
@@ -1365,27 +1395,23 @@ struct InstallConsoleView: View {
         failure = nil
         stageSummary = isUpdate ? "Updating \(app.name)" : "Installing \(app.name)"
         append("Starting install · \(Date.now.formatted(date: .omitted, time: .standard))")
-        append("Account selected · \(account.email)")
+        append("Signing identity · \(signerName)")
         append(isUpdate ? "Preparing update IPA" : "Preparing imported IPA")
         do {
-            try await SideStoreOperationService(accountStore: accountStore, ipaStore: ipaStore)
-                .install(
-                    app,
-                    using: account,
-                    recoveryHandler: {
-                        append("Revoked custom certificate found · switching to the selected Apple ID certificate and retrying")
-                    }
-                ) { fraction in
-                    let clamped = min(max(fraction, 0), 1)
-                    progress = clamped
-                    if clamped > 0 {
-                        let summary = clamped < 0.75 ? "Signing \(app.name)" : "Installing \(app.name)"
-                        if summary != stageSummary {
-                            stageSummary = summary
-                            append(summary)
-                        }
-                    }
+            let service = SideStoreOperationService(accountStore: accountStore, ipaStore: ipaStore)
+            let updateProgress: @MainActor @Sendable (Double) -> Void = { fraction in
+                progress = min(max(fraction, 0), 1)
+                if fraction > 0 {
+                    stageSummary = fraction < 0.75 ? "Signing \(app.name)" : "Installing \(app.name)"
                 }
+            }
+            if let certificate {
+                try await service.install(app, using: certificate, progressHandler: updateProgress)
+            } else if let account {
+                try await service.install(app, using: account, recoveryHandler: {
+                    append("Retrying with the selected Apple Account")
+                }, progressHandler: updateProgress)
+            } else { throw AppSigningError.accountRequired }
             progress = 1
             stageSummary = isUpdate ? "\(app.name) is updated" : "\(app.name) is installed"
             append(isUpdate ? "Update completed successfully" : "Install completed successfully")

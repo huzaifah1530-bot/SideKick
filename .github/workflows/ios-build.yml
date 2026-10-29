@@ -89,6 +89,9 @@ jobs:
           git -C Vendor/SideStore apply ../../patches/sidestore-imported-profile-signing.patch
           git -C Vendor/SideStore/Dependencies/SideSign apply ../../../../patches/sidesign-wildcard-application-identifier.patch
 
+      - name: Support imported certificates without Apple accounts
+        run: python3 scripts/integrate-standalone-certificates.py Vendor/SideStore
+
       - name: Test vendor audit regressions
         run: |
           python3 scripts/verify-sidestore-regressions.py

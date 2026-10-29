@@ -90,15 +90,12 @@ final class AppOffloadService {
                 throw AppOffloadError.backupUnavailable
             }
         }
+        let certificate = app.signingCertificateSerial.flatMap { ImportedCertificateStore.shared.catalog.record(matchingSerial: $0) }
+        if app.signingCertificateSerial != nil && certificate == nil { throw ImportedCertificateError.secretUnavailable }
         if restoring {
-            let assigned = try ImportedCertificateStore.shared.assignedSigningCertificate(
-                accountIdentifier: app.accountIdentifier, teamIdentifier: app.teamIdentifier)
             try SigningIdentityPolicy.validateResign(
                 installedTeam: SideStoreOperationService.installedSigningTeam(installed),
-                targetTeam: assigned?.record.profile?.teamIdentifier ?? app.teamIdentifier)
-            if let profile = assigned?.record.profile {
-                try SigningIdentityPolicy.validateProfile(profile.appIdentifier, for: installed.resignedBundleIdentifier)
-            }
+                targetTeam: certificate?.profile?.teamIdentifier ?? app.teamIdentifier)
         }
         stageHandler("Connecting to this iPhone")
         let lease = try await LocalVPNService.shared.acquire()
@@ -106,11 +103,8 @@ final class AppOffloadService {
         UserDefaults.standard.set(recoverBinary, forKey: binaryRecoveryKey)
         UserDefaults.standard.set(restoring ? "restoring" : "offloading", forKey: key)
         do {
-            stageHandler("Preparing the signing account")
-            try await accounts.withAccount(accountIdentifier: app.accountIdentifier, teamIdentifier: app.teamIdentifier) {
-                try ImportedCertificateStore.shared.prepareProfileAssignment(
-                    bundleIdentifiers: [installed.bundleIdentifier, installed.resignedBundleIdentifier],
-                    accountIdentifier: app.accountIdentifier, teamIdentifier: app.teamIdentifier)
+            stageHandler("Preparing the signing identity")
+            let operation = {
                 try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                     let observationBox = ProgressObservationBox()
                     let finished: (Result<InstalledApp, Error>) -> Void = {
@@ -134,6 +128,17 @@ final class AppOffloadService {
                         Task { @MainActor in progressHandler(value) }
                     }
                     observationBox.retain(observation)
+                }
+            }
+            if let certificate {
+                try await StandaloneCertificateSigning.withCertificate(certificate, operation: operation)
+            } else {
+                try await accounts.withAccount(accountIdentifier: app.accountIdentifier, teamIdentifier: app.teamIdentifier,
+                    useImportedCertificate: false) {
+                    try ImportedCertificateStore.shared.prepareProfileAssignment(
+                        bundleIdentifiers: [installed.bundleIdentifier, installed.resignedBundleIdentifier],
+                        accountIdentifier: app.accountIdentifier, teamIdentifier: app.teamIdentifier, useImportedCertificate: false)
+                    try await operation()
                 }
             }
             UserDefaults.standard.set(restoring ? "active" : "offloaded", forKey: key)

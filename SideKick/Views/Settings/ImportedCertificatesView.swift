@@ -47,7 +47,7 @@ struct ImportedCertificatesView: View {
                         }
                     }
                 } footer: {
-                    Text("Import a certificate together with its .mobileprovision file. Choose which Apple Account uses it from that account’s page.")
+                    Text("Import a certificate together with its .mobileprovision file. Select it directly when installing or re-signing an app. No Apple Account sign-in is required.")
                 }
             }
         }
@@ -104,10 +104,7 @@ struct ImportedCertificatesView: View {
     }
 
     private var deletionMessage: String {
-        guard let recordToDelete, !store.assignedAccountKeys(for: recordToDelete).isEmpty else {
-            return "It’s removed from this iPhone. Installed apps keep working until they expire."
-        }
-        return "Accounts using it go back to their Apple certificate the next time they sign."
+        "It is removed from this iPhone. Installed apps keep working until they expire, but need this certificate to refresh or update."
     }
 
     /// Certificates are imported before profiles so each profile can find its certificate.
@@ -199,7 +196,7 @@ struct ImportedCertificatesView: View {
     }
 }
 
-private struct ImportedCertificateRow: View {
+struct ImportedCertificateRow: View {
     let record: ImportedCertificateRecord
     let usageCount: Int
 
@@ -233,16 +230,12 @@ private struct ImportedCertificateRow: View {
         let expiry = "\(date <= .now ? "Expired" : "Expires") \(date.formatted(date: .abbreviated, time: .omitted))"
         var parts = [expiry]
         if record.profile == nil { parts.append("No profile") }
-        switch usageCount {
-        case 0: break
-        case 1: parts.append("1 account")
-        default: parts.append("\(usageCount) accounts")
-        }
+        if let profile = record.profile { parts.append(profile.teamIdentifier) }
         return parts.joined(separator: " · ")
     }
 }
 
-private struct ImportedCertificateDetailView: View {
+struct ImportedCertificateDetailView: View {
     let record: ImportedCertificateRecord
     let accountStore: SigningAccountStore
     @State private var store = ImportedCertificateStore.shared
@@ -264,16 +257,6 @@ private struct ImportedCertificateDetailView: View {
         case .unknown?: return "Couldn’t check"
         case nil: return "Not checked"
         case .revoked?: return "Revoked"
-        }
-    }
-
-    private var usingAccounts: [SigningAccountSummary] {
-        let keys = Set(store.assignedAccountKeys(for: record))
-        return accountStore.accounts.filter {
-            keys.contains(ImportedCertificateCatalog.accountKey(
-                accountIdentifier: $0.accountIdentifier,
-                teamIdentifier: $0.teamIdentifier
-            ))
         }
     }
 
@@ -340,32 +323,15 @@ private struct ImportedCertificateDetailView: View {
                 Text("Provisioning Profile")
             } footer: {
                 if current.profile == nil {
-                    Text("Certificates from another developer team need the .mobileprovision file they came with. It must include this iPhone.")
+                    Text("Certificates need the matching .mobileprovision file they came with. It must include this iPhone.")
                 } else {
                     Text("Apps signed with this profile share one Keychain, so each can read logins the others save there. Only sign apps you trust with it.")
                 }
             }
 
-            Section {
-                if usingAccounts.isEmpty {
-                    Text("No accounts")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(usingAccounts) { account in
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(account.email)
-                            if !account.teamName.isEmpty {
-                                Text(account.teamName)
-                                    .font(.footnote)
-                                    .foregroundStyle(.secondary)
-                            }
-                        }
-                    }
-                }
-            } header: {
-                Text("Used By")
-            } footer: {
-                Text("To use this certificate, open an account in Accounts and choose Signing Certificate.")
+            Section("Signing") {
+                Text("Choose this certificate directly when installing or re-signing. Its signing team comes from its provisioning profile; no Apple Account sign-in is needed.")
+                    .font(.footnote).foregroundStyle(.secondary)
             }
 
             Section {
@@ -404,9 +370,7 @@ private struct ImportedCertificateDetailView: View {
             }
             SwiftUI.Button("Cancel", role: .cancel) { }
         } message: {
-            Text(usingAccounts.isEmpty
-                 ? "It’s removed from this iPhone. Installed apps keep working until they expire."
-                 : "Accounts using it go back to their Apple certificate the next time they sign.")
+            Text("It is removed from this iPhone. Installed apps keep working until they expire, but need this certificate to refresh or update.")
         }
         .alert("Certificate", isPresented: Binding(
             get: { errorMessage != nil },
@@ -416,93 +380,6 @@ private struct ImportedCertificateDetailView: View {
         } message: {
             Text(errorMessage ?? "")
         }
-    }
-}
-
-/// Account → Signing Certificate. Picks Apple's certificate or an imported one.
-struct SigningCertificatePickerView: View {
-    let account: SigningAccountSummary
-    @State private var store = ImportedCertificateStore.shared
-    @State private var errorMessage: String?
-
-    private var selectedSerial: String? {
-        store.assignedRecord(accountIdentifier: account.accountIdentifier, teamIdentifier: account.teamIdentifier)?.serialNumber
-    }
-
-    var body: some View {
-        List {
-            Section {
-                choiceRow(title: "Apple Certificate", subtitle: "Created and renewed by Apple for this account", isSelected: selectedSerial == nil) {
-                    select(nil)
-                }
-            }
-
-            Section {
-                if store.certificates.isEmpty {
-                    Text("No imported certificates")
-                        .foregroundStyle(.secondary)
-                } else {
-                    ForEach(store.certificates) { record in
-                        let unusable = record.isRevoked || record.effectiveExpiryDate <= .now
-                        choiceRow(
-                            title: record.name,
-                            subtitle: record.isRevoked
-                                ? "Revoked by Apple"
-                                : "\(unusable ? "Expired" : "Expires") \(record.effectiveExpiryDate.formatted(date: .abbreviated, time: .omitted))\(record.profile == nil ? " · No profile" : "")",
-                            isSelected: selectedSerial?.caseInsensitiveCompare(record.serialNumber) == .orderedSame
-                        ) {
-                            select(record)
-                        }
-                        .disabled(unusable)
-                    }
-                }
-                NavigationLink { ImportedCertificatesView() } label: {
-                    Text("Manage Certificates")
-                }
-            } header: {
-                Text("Imported")
-            } footer: {
-                Text("SideKick won’t create or revoke Apple certificates while an imported one is selected. Apps signed with it stop opening if the certificate is revoked.")
-            }
-        }
-        .listStyle(.insetGrouped)
-        .navigationTitle("Signing Certificate")
-        .navigationBarTitleDisplayMode(.inline)
-        .onAppear { store.reload() }
-        .alert("Signing Certificate", isPresented: Binding(
-            get: { errorMessage != nil },
-            set: { if !$0 { errorMessage = nil } }
-        )) {
-            SwiftUI.Button("OK", role: .cancel) { errorMessage = nil }
-        } message: {
-            Text(errorMessage ?? "")
-        }
-    }
-
-    private func choiceRow(title: String, subtitle: String, isSelected: Bool, action: @escaping () -> Void) -> some View {
-        SwiftUI.Button(action: action) {
-            HStack {
-                VStack(alignment: .leading, spacing: 2) {
-                    Text(title)
-                        .foregroundStyle(.primary)
-                    Text(subtitle)
-                        .font(.footnote)
-                        .foregroundStyle(.secondary)
-                }
-                Spacer()
-                if isSelected {
-                    Image(systemName: "checkmark")
-                        .font(.body.weight(.semibold))
-                        .foregroundStyle(.tint)
-                }
-            }
-            .contentShape(Rectangle())
-        }
-        .accessibilityAddTraits(isSelected ? .isSelected : [])
-    }
-
-    private func select(_ record: ImportedCertificateRecord?) {
-        do { try store.assign(record, to: account) } catch { errorMessage = error.localizedDescription }
     }
 }
 

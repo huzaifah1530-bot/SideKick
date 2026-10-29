@@ -4,6 +4,7 @@ import SideSign
 struct AccountsView: View {
     let showsNavigationStack: Bool
     @State private var accountStore = SigningAccountStore()
+    @State private var certificates = ImportedCertificateStore.shared
     @State private var hasLoadedAccounts = false
     @State private var errorMessage: String?
     @State private var isShowingSignIn = false
@@ -57,11 +58,11 @@ struct AccountsView: View {
                 ProgressView("Loading Apple Accounts…")
                     .frame(maxWidth: .infinity)
                     .listRowBackground(Color.clear)
-            } else if accountStore.accounts.isEmpty && githubAccount == nil && accountStore.loadError == nil && !accountStore.isWorking {
+            } else if accountStore.accounts.isEmpty && certificates.certificates.isEmpty && githubAccount == nil && accountStore.loadError == nil && !accountStore.isWorking {
                 ContentUnavailableView {
                     Label("No Apple Accounts", systemImage: "person.crop.circle")
                 } description: {
-                    Text("Add an Apple Account to sign and install apps, or sign in with GitHub to check for updates.")
+                    Text("Add an Apple Account or import a certificate below to sign apps. GitHub sign-in enables update checks.")
                 } actions: {
                     SwiftUI.Button { isShowingSignIn = true } label: {
                         Text("Add Apple Account").font(.headline).padding(.horizontal, Spacing.m)
@@ -83,6 +84,22 @@ struct AccountsView: View {
                 } footer: {
                     Text("Apps are signed with these accounts. Passwords are stored in the iOS Keychain.")
                 }
+            }
+            Section {
+                ForEach(certificates.certificates) { record in
+                    NavigationLink {
+                        ImportedCertificateDetailView(record: record, accountStore: accountStore)
+                    } label: {
+                        ImportedCertificateRow(record: record, usageCount: 0)
+                    }
+                }
+                NavigationLink { ImportedCertificatesView() } label: {
+                    Label("Import or Manage Certificates", systemImage: "checkmark.seal")
+                }
+            } header: {
+                Text("Certificates")
+            } footer: {
+                Text("Sign with a .p12 certificate and its provisioning profile. An Apple Account sign-in is not required.")
             }
             if let githubAccount {
                 Section {
@@ -237,7 +254,6 @@ struct SigningAccountDetailView: View {
     @State private var isLoadingInventory = false
     @State private var isShowingReconnect = false
     @State private var reconnectCredentials: (appleID: String, password: String)?
-    @State private var importedCertificates = ImportedCertificateStore.shared
 
     private var currentAccount: SigningAccountSummary {
         accountStore.accounts.first(where: { $0.id == account.id }) ?? account
@@ -342,16 +358,6 @@ struct SigningAccountDetailView: View {
                 Text("Developer Resources")
             }
 
-            if currentAccount.hasSavedSession {
-                Section {
-                    NavigationLink {
-                        SigningCertificatePickerView(account: currentAccount)
-                    } label: {
-                        LabeledContent("Signing Certificate", value: signingCertificateName)
-                    }
-                }
-            }
-
             Section {
                 SwiftUI.Button("Remove Account", role: .destructive) {
                     isConfirmingRemoval = true
@@ -392,13 +398,6 @@ struct SigningAccountDetailView: View {
         } message: {
             Text(errorMessage ?? "")
         }
-    }
-
-    private var signingCertificateName: String {
-        importedCertificates.assignedRecord(
-            accountIdentifier: currentAccount.accountIdentifier,
-            teamIdentifier: currentAccount.teamIdentifier
-        )?.name ?? "Apple"
     }
 
     private var needsReconnect: Bool {

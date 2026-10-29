@@ -279,7 +279,7 @@ struct HomeView: View {
                                 SwiftUI.Button { contextRoute = .install(app.id) } label: {
                                     Label("Install…", systemImage: "arrow.down.circle")
                                 }
-                                .disabled(accountStore.accounts.isEmpty)
+                                .disabled(!accountStore.hasSigningIdentities)
                                 SwiftUI.Button { contextRoute = .liveContainer(app.id) } label: {
                                     Label("Install in LiveContainer…", systemImage: "square.stack.3d.up")
                                 }

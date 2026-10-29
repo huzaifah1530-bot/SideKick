@@ -38,6 +38,7 @@ struct LiveContainerCertificateRecipient: Identifiable, Equatable, Sendable {
 @MainActor
 @Observable
 final class SigningAccountStore {
+    var hasSigningIdentities: Bool { !accounts.isEmpty || !ImportedCertificateStore.shared.certificates.isEmpty }
     private(set) var accounts: [SigningAccountSummary] = []
     private(set) var isWorking = false
     private(set) var signInCheckpoint = UserDefaults.standard.string(forKey: "sidekick.sign-in-checkpoint")
@@ -465,7 +466,7 @@ final class SigningAccountStore {
         teamIdentifier: String,
         prepareForSigning: Bool = true,
         forceRefreshCertificate: Bool = false,
-        useImportedCertificate: Bool = true,
+        useImportedCertificate: Bool = false,
         operation: () async throws -> T
     ) async throws -> T {
         guard !isWorking, SigningAccountOperationCoordinator.acquire() else { throw SigningAccountError.engineBusy }

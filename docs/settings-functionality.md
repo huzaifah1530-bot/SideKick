@@ -53,6 +53,12 @@ App Refresh includes daily reminder notifications and a chosen shortcut time. Th
 
 Ordinary app installation writes its new identity and active status only after iOS accepts the replacement. Re-signing cannot silently switch the installed app's real signing team. Recovery of a false inactive record can reinstall its retained binary without the shared backup helper; genuine offloads keep their backups protected and require the original shared-storage permissions. The offloaded row's menu can remove the saved row without deleting recovery files; Storage is where users deliberately remove those files.
 
-Signing expands wildcard application identifiers using the profile's original App ID prefix. Explicit profiles must match the app they sign. A profile restricted to SideKick cannot also make Spotify or another app claim SideKick's identity; use a wildcard or a matching per-app profile. Existing affected device installations require re-signing with a suitable profile.
+Signing expands wildcard application identifiers using the profile's original App ID prefix. Explicit profiles retain their supplied signing entitlement for compatibility with certificate providers that supply a single App ID.
 
 Refresh/re-sign/update account options show all saved sessions. Same-team accounts operate on the current app; another team offers a separate IPA-based installation review. Installed GitHub build selection preserves manual changes and retains exact historical keys. See [integration documentation](livecontainer-integration.md) for supported limits and device validation.
+
+## Independent imported certificates
+
+Accounts has separate Apple Accounts and Certificates sections. Imported .p12/profile pairs are selected directly for installs and re-signs; they do not require an Apple sign-in or create an Apple Account record. The profile supplies the signing Team ID. Updates and refreshes find the imported identity by the certificate serial recorded on the installed app. Legacy account assignments are retained for catalog compatibility but Apple-account signing defaults to Apple's certificate.
+
+Explicit (single-App-ID) profiles retain their supplied signing entitlement without an additional bundle-ID restriction. Wildcard profiles expand to the app bundle ID using the profile's original App ID prefix. Re-signing an existing app still requires the same actual signing team.

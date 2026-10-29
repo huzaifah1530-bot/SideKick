@@ -84,9 +84,9 @@ final class SideStoreOperationService {
                 name: record.3,
                 version: record.4,
                 buildVersion: record.5,
-                accountEmail: record.6,
-                accountIdentifier: record.7,
-                teamIdentifier: record.8,
+                accountEmail: record.12.flatMap { ImportedCertificateStore.shared.catalog.record(matchingSerial: $0)?.name } ?? record.6,
+                accountIdentifier: record.12 == nil ? record.7 : "",
+                teamIdentifier: record.12.flatMap { ImportedCertificateStore.shared.catalog.record(matchingSerial: $0)?.profile?.teamIdentifier } ?? record.8,
                 iconData: iconData,
                 expirationDate: record.9,
                 contentFingerprint: record.11,
@@ -130,9 +130,33 @@ final class SideStoreOperationService {
         }
     }
 
+    func install(
+        _ ipa: ImportedIPA,
+        using certificate: ImportedCertificateRecord,
+        recoveryHandler: @escaping @MainActor @Sendable () -> Void = {},
+        progressHandler: @escaping @MainActor @Sendable (Double) -> Void = { _ in }
+    ) async throws {
+        try await SideKickDiagnostics.perform(.install, stage: .installation) {
+            try await performInstall(ipa, using: nil, certificate: certificate,
+                recoveryHandler: recoveryHandler, progressHandler: progressHandler)
+        }
+    }
+
+    private func withSigningIdentity<T>(account: SigningAccountSummary?, certificate: ImportedCertificateRecord?,
+        forceRefreshCertificate: Bool = false, operation: () async throws -> T) async throws -> T {
+        if let certificate {
+            return try await StandaloneCertificateSigning.withCertificate(certificate, operation: operation)
+        }
+        guard let account else { throw SideStoreOperationError.installedAppUnavailable }
+        return try await accountStore.withAccount(accountIdentifier: account.accountIdentifier,
+            teamIdentifier: account.teamIdentifier, forceRefreshCertificate: forceRefreshCertificate,
+            useImportedCertificate: false, operation: operation)
+    }
+
     private func performInstall(
         _ ipa: ImportedIPA,
-        using account: SigningAccountSummary,
+        using account: SigningAccountSummary?,
+        certificate: ImportedCertificateRecord? = nil,
         recoveryHandler: @escaping @MainActor @Sendable () -> Void = {},
         progressHandler: @escaping @MainActor @Sendable (Double) -> Void = { _ in }
     ) async throws {
@@ -151,32 +175,39 @@ final class SideStoreOperationService {
         defer { LocalVPNService.shared.release(vpnLease) }
         let runningBundle = Bundle(url: Bundle.Info.activeBundleURL)
         let selfTargetID = ipa.queuedForInstalledAppID == runningBundle?.bundleIdentifier ? ipa.queuedForInstalledAppID : nil
-        let useImportedCertificate = try await importedCertificateUse(forUpdateOf: ipa.queuedForInstalledAppID, using: account)
-        let importedTeam = useImportedCertificate
-            ? ImportedCertificateStore.shared.assignedRecord(accountIdentifier: account.accountIdentifier,
-                teamIdentifier: account.teamIdentifier)?.profile?.teamIdentifier
-            : nil
+        let useImportedCertificate = certificate != nil
+        let importedTeam = certificate?.profile?.teamIdentifier
+        if let targetID = ipa.queuedForInstalledAppID {
+            let context = DatabaseManager.shared.viewContext
+            let installed = try await context.perform {
+                try context.fetch(InstalledApp.fetchRequest()).first { $0.resignedBundleIdentifier == targetID }
+            }
+            if let installed {
+                try SigningIdentityPolicy.validateResign(installedTeam: Self.installedSigningTeam(installed),
+                    targetTeam: importedTeam ?? account?.teamIdentifier ?? "")
+            }
+        }
         // A SideKick copy signed with an imported certificate runs under its own bundle ID
         // (com.sidekick.app.<team>). Its updates must keep that ID to install in place.
         let selfCustomID = useImportedCertificate && selfTargetID != nil && selfTargetID != ipa.bundleIdentifier ? selfTargetID : nil
         if let targetID = selfTargetID, let key = ipa.githubUpdateKey,
            let source = ipa.githubSourceIdentity, let identity = ipa.executableIdentity,
-           useImportedCertificate || ALTApplication(fileURL: Bundle.Info.activeBundleURL)?.provisioningProfile?.teamIdentifier == account.teamIdentifier {
+           useImportedCertificate || ALTApplication(fileURL: Bundle.Info.activeBundleURL)?.provisioningProfile?.teamIdentifier == account?.teamIdentifier {
             try await GitHubUpdateConfigurationStore.shared.prepareSelfUpdate(key: key, targetID: targetID,
                 expectedSource: source, executableIdentity: identity)
         }
         let installedID: String
         do {
             do {
-                installedID = try await runInstall(ipa, url: url, account: account, presenter: presenter,
-                    useImportedCertificate: useImportedCertificate, customBundleIdentifier: selfCustomID,
+                installedID = try await runInstall(ipa, url: url, account: account, certificate: certificate, presenter: presenter,
+                    customBundleIdentifier: selfCustomID,
                     recoveryHandler: recoveryHandler, progressHandler: progressHandler)
             } catch where useImportedCertificate && selfCustomID == nil && ipa.queuedForInstalledAppID == nil
                 && importedTeam != nil && Self.isApplicationIdentifierConflict(error) {
                 // Another app (often the App Store version) already uses this bundle ID under a
                 // different team. Install alongside it with the certificate team's suffix.
-                installedID = try await runInstall(ipa, url: url, account: account, presenter: presenter,
-                    useImportedCertificate: true, customBundleIdentifier: "\(ipa.bundleIdentifier).\(importedTeam!)",
+                installedID = try await runInstall(ipa, url: url, account: account, certificate: certificate, presenter: presenter,
+                    customBundleIdentifier: "\(ipa.bundleIdentifier).\(importedTeam!)",
                     recoveryHandler: recoveryHandler, progressHandler: progressHandler)
             }
         } catch {
@@ -197,9 +228,9 @@ final class SideStoreOperationService {
     private func runInstall(
         _ ipa: ImportedIPA,
         url: URL,
-        account: SigningAccountSummary,
+        account: SigningAccountSummary?,
+        certificate: ImportedCertificateRecord?,
         presenter: UIViewController,
-        useImportedCertificate: Bool,
         customBundleIdentifier: String?,
         recoveryHandler: @escaping @MainActor @Sendable () -> Void,
         progressHandler: @escaping @MainActor @Sendable (Double) -> Void
@@ -208,22 +239,13 @@ final class SideStoreOperationService {
                 for: ipa.bundleIdentifier,
                 recoveryHandler: recoveryHandler
             ) {
-                try await accountStore.withAccount(
-                    accountIdentifier: account.accountIdentifier,
-                    teamIdentifier: account.teamIdentifier,
-                    useImportedCertificate: useImportedCertificate
-                ) {
-                    if useImportedCertificate, let profile = ImportedCertificateStore.shared.assignedRecord(
-                        accountIdentifier: account.accountIdentifier, teamIdentifier: account.teamIdentifier)?.profile {
-                        try SigningIdentityPolicy.validateProfile(profile.appIdentifier,
-                            for: customBundleIdentifier ?? ipa.queuedForInstalledAppID ?? ipa.bundleIdentifier)
+                try await withSigningIdentity(account: account, certificate: certificate) {
+                    if let account {
+                        try ImportedCertificateStore.shared.prepareProfileAssignment(
+                            bundleIdentifiers: [ipa.bundleIdentifier] + [ipa.queuedForInstalledAppID, customBundleIdentifier].compactMap { $0 },
+                            accountIdentifier: account.accountIdentifier, teamIdentifier: account.teamIdentifier,
+                            useImportedCertificate: false)
                     }
-                    try ImportedCertificateStore.shared.prepareProfileAssignment(
-                        bundleIdentifiers: [ipa.bundleIdentifier] + [ipa.queuedForInstalledAppID, customBundleIdentifier].compactMap { $0 },
-                        accountIdentifier: account.accountIdentifier,
-                        teamIdentifier: account.teamIdentifier,
-                        useImportedCertificate: useImportedCertificate
-                    )
                     return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
                         guard !SideKickStorageCleanup.isRemovingFiles else {
                             continuation.resume(throwing: StorageCleanupError.operationRunning)
@@ -312,38 +334,33 @@ final class SideStoreOperationService {
         guard let installedApp = try await context.perform({
             (try? context.fetch(InstalledApp.fetchRequest()))?.first { $0.resignedBundleIdentifier == bundleIdentifier }
                 ?? InstalledApp.fetchAltStore(in: context).flatMap { $0.resignedBundleIdentifier == bundleIdentifier ? $0 : nil }
-        }), let team = installedApp.team, let account = team.account else {
+        }) else {
             throw SideStoreOperationError.installedAppUnavailable
         }
-        if let selectedAccount, selectedAccount.teamIdentifier != team.identifier {
+        let certificate = installedApp.certificateSerialNumber.flatMap {
+            ImportedCertificateStore.shared.catalog.record(matchingSerial: $0)
+        }
+        if installedApp.certificateSerialNumber != nil && certificate == nil { throw ImportedCertificateError.secretUnavailable }
+        if selectedAccount != nil, certificate != nil { throw SideStoreOperationError.incompatibleRefreshAccount }
+        let account = selectedAccount ?? accountStore.accounts.first {
+            $0.accountIdentifier == installedApp.team?.account?.identifier && $0.teamIdentifier == installedApp.team?.identifier
+        }
+        if certificate == nil, account?.teamIdentifier != installedApp.team?.identifier {
             throw SideStoreOperationError.incompatibleRefreshAccount
         }
-        let accountID = selectedAccount?.accountIdentifier ?? account.identifier
-        let teamID = selectedAccount?.teamIdentifier ?? team.identifier
         try SideKickStorageCleanup.beginOperation()
         defer { SideKickStorageCleanup.endOperation() }
 
         let vpnLease = try await LocalVPNService.shared.acquire()
         defer { LocalVPNService.shared.release(vpnLease) }
-        // A refresh only installs new profiles; the app keeps its existing signature. Use the
-        // imported certificate only for apps it actually signed, or iOS ignores the profile.
-        let importedSerial = ImportedCertificateStore.shared.assignedRecord(
-            accountIdentifier: accountID,
-            teamIdentifier: teamID
-        )?.serialNumber
-        let useImportedCertificate = importedSerial.map { Self.isInstalledApp(installedApp, signedWith: $0) } ?? false
         try await retryAfterClearingRevokedAssignedProfile(for: installedApp.bundleIdentifier) {
-            try await accountStore.withAccount(
-                accountIdentifier: accountID,
-                teamIdentifier: teamID,
-                useImportedCertificate: useImportedCertificate
-            ) {
-                try ImportedCertificateStore.shared.prepareProfileAssignment(
-                    bundleIdentifiers: [installedApp.bundleIdentifier, installedApp.resignedBundleIdentifier],
-                    accountIdentifier: accountID,
-                    teamIdentifier: teamID,
-                    useImportedCertificate: useImportedCertificate
-                )
+            try await withSigningIdentity(account: account, certificate: certificate) {
+                if let account, certificate == nil {
+                    try ImportedCertificateStore.shared.prepareProfileAssignment(
+                        bundleIdentifiers: [installedApp.bundleIdentifier, installedApp.resignedBundleIdentifier],
+                        accountIdentifier: account.accountIdentifier, teamIdentifier: account.teamIdentifier,
+                        useImportedCertificate: false)
+                }
                 return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                     let group = RefreshGroup(dbContext: DatabaseManager.shared.persistentContainer.newBackgroundContext())
                     guard !SideKickStorageCleanup.isRemovingFiles else {
@@ -383,9 +400,18 @@ final class SideStoreOperationService {
         }
     }
 
+    func resign(bundleIdentifier: String, using certificate: ImportedCertificateRecord,
+        progressHandler: @escaping @MainActor @Sendable (Double) -> Void = { _ in }) async throws {
+        try await SideKickDiagnostics.perform(.resign, stage: .signing) {
+            try await performResign(bundleIdentifier: bundleIdentifier, using: nil,
+                certificate: certificate, progressHandler: progressHandler)
+        }
+    }
+
     private func performResign(
         bundleIdentifier: String,
-        using selectedAccount: SigningAccountSummary,
+        using selectedAccount: SigningAccountSummary?,
+        certificate: ImportedCertificateRecord? = nil,
         progressHandler: @escaping @MainActor @Sendable (Double) -> Void = { _ in }
     ) async throws {
         guard !AppOffloadService.isRunning else { throw AppOffloadError.inUse }
@@ -397,21 +423,12 @@ final class SideStoreOperationService {
         guard let installedApp = try await context.perform({
             (try? context.fetch(InstalledApp.fetchRequest()))?.first { $0.resignedBundleIdentifier == bundleIdentifier }
                 ?? InstalledApp.fetchAltStore(in: context).flatMap { $0.resignedBundleIdentifier == bundleIdentifier ? $0 : nil }
-        }), let team = installedApp.team, team.account != nil else {
+        }) else {
             throw SideStoreOperationError.installedAppUnavailable
         }
-        guard selectedAccount.teamIdentifier == team.identifier else {
-            throw SideStoreOperationError.incompatibleRefreshAccount
-        }
-
-        let assigned = try ImportedCertificateStore.shared.assignedSigningCertificate(
-            accountIdentifier: selectedAccount.accountIdentifier, teamIdentifier: selectedAccount.teamIdentifier)
-        let targetTeam = assigned?.record.profile?.teamIdentifier ?? selectedAccount.teamIdentifier
+        let targetTeam = certificate?.profile?.teamIdentifier ?? selectedAccount?.teamIdentifier ?? ""
         let installedTeam = Self.installedSigningTeam(installedApp)
         try SigningIdentityPolicy.validateResign(installedTeam: installedTeam, targetTeam: targetTeam)
-        if let profile = assigned?.record.profile {
-            try SigningIdentityPolicy.validateProfile(profile.appIdentifier, for: installedApp.resignedBundleIdentifier)
-        }
 
         try SideKickStorageCleanup.beginOperation()
         defer { SideKickStorageCleanup.endOperation() }
@@ -419,16 +436,13 @@ final class SideStoreOperationService {
         let vpnLease = try await LocalVPNService.shared.acquire()
         defer { LocalVPNService.shared.release(vpnLease) }
         try await retryAfterClearingRevokedAssignedProfile(for: installedApp.bundleIdentifier) {
-            try await accountStore.withAccount(
-                accountIdentifier: selectedAccount.accountIdentifier,
-                teamIdentifier: selectedAccount.teamIdentifier,
-                forceRefreshCertificate: true
-            ) {
-                try ImportedCertificateStore.shared.prepareProfileAssignment(
-                    bundleIdentifiers: [installedApp.bundleIdentifier, installedApp.resignedBundleIdentifier],
-                    accountIdentifier: selectedAccount.accountIdentifier,
-                    teamIdentifier: selectedAccount.teamIdentifier
-                )
+            try await withSigningIdentity(account: selectedAccount, certificate: certificate, forceRefreshCertificate: true) {
+                if let selectedAccount {
+                    try ImportedCertificateStore.shared.prepareProfileAssignment(
+                        bundleIdentifiers: [installedApp.bundleIdentifier, installedApp.resignedBundleIdentifier],
+                        accountIdentifier: selectedAccount.accountIdentifier, teamIdentifier: selectedAccount.teamIdentifier,
+                        useImportedCertificate: false)
+                }
                 return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<Void, Error>) in
                     guard !SideKickStorageCleanup.isRemovingFiles else {
                         continuation.resume(throwing: StorageCleanupError.operationRunning)
@@ -474,28 +488,6 @@ final class SideStoreOperationService {
         }
         guard let profile = ALTApplication(fileURL: installedApp.fileURL)?.provisioningProfile else { return false }
         return profile.certificates.contains { ImportedCertificateCatalog.normalizedSerial($0.serialNumber) == target }
-    }
-
-    /// Updates keep the certificate that signed the installed copy, so its data and team
-    /// stay the same even if the account's certificate choice changed since. New installs
-    /// follow the account's choice.
-    private func importedCertificateUse(forUpdateOf targetID: String?, using account: SigningAccountSummary) async throws -> Bool {
-        let store = ImportedCertificateStore.shared
-        let assigned = store.assignedRecord(accountIdentifier: account.accountIdentifier, teamIdentifier: account.teamIdentifier)
-        guard let targetID else { return assigned != nil }
-        let context = DatabaseManager.shared.viewContext
-        let installed: InstalledApp? = await context.perform {
-            (try? context.fetch(InstalledApp.fetchRequest()))?.first { $0.resignedBundleIdentifier == targetID }
-                ?? InstalledApp.fetchAltStore(in: context).flatMap { $0.resignedBundleIdentifier == targetID ? $0 : nil }
-        }
-        guard let installed else { return assigned != nil }
-        let signingRecord = store.catalog.certificates.first { Self.isInstalledApp(installed, signedWith: $0.serialNumber) }
-        guard let signingRecord else { return false }
-        guard let assigned, ImportedCertificateCatalog.normalizedSerial(assigned.serialNumber)
-                == ImportedCertificateCatalog.normalizedSerial(signingRecord.serialNumber) else {
-            throw ImportedCertificateError.updateCertificateMismatch(certificateName: signingRecord.name)
-        }
-        return true
     }
 
     private func retryAfterClearingRevokedAssignedProfile<T>(
@@ -601,7 +593,7 @@ final class SideStoreOperationService {
                 // Scheduled attempts are intentionally quiet; the next automation retries failures.
                 debugLog("[SideKick] Scheduled refresh failed for \(app.bundleIdentifier): \(error.localizedDescription)")
                 appResults.append(.failure(for: app, reason: AnisetteErrorHint.message(for: error),
-                    recovery: error is LocalVPNError ? .localConnection : .account))
+                    recovery: error is LocalVPNError ? .localConnection : (app.signingCertificateSerial == nil ? .account : nil)))
             }
             progressHandler(index + 1, apps.count)
         }
@@ -764,16 +756,11 @@ struct InstalledAppSummary: Identifiable, Sendable {
         return suffix.count == 10 && suffix.allSatisfy { $0.isASCII && ($0.isLetter || $0.isNumber) }
     }
 
-    /// Whether `account` can sign updates for this app: it owns the app's team, or it has the
-    /// imported certificate that signed the app assigned.
+    /// Apple-account updates use their own signing identity. Certificates are separate choices.
     @MainActor func isSignable(by account: SigningAccountSummary) -> Bool {
-        if account.accountIdentifier == accountIdentifier && account.teamIdentifier == teamIdentifier { return true }
-        guard let certificate = importedCertificate,
-              let assigned = ImportedCertificateStore.shared.assignedRecord(
-                accountIdentifier: account.accountIdentifier, teamIdentifier: account.teamIdentifier) else { return false }
-        return ImportedCertificateCatalog.normalizedSerial(assigned.serialNumber)
-            == ImportedCertificateCatalog.normalizedSerial(certificate.serialNumber)
+        importedCertificate == nil && account.accountIdentifier == accountIdentifier && account.teamIdentifier == teamIdentifier
     }
+
 }
 
 private enum SideStoreOperationError: LocalizedError {

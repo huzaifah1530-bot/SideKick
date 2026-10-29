@@ -50,11 +50,11 @@ enum ImportedCertificateError: LocalizedError, Equatable {
         case .profileExpired(let date):
             return "This provisioning profile expired on \(date.formatted(date: .abbreviated, time: .omitted))."
         case .profileRequired(let name):
-            return "“\(name)” belongs to a different developer team, so it needs its provisioning profile. In Settings → Advanced → Certificates, import the matching .mobileprovision file."
+            return "“\(name)” needs its matching provisioning profile. Open Accounts → Certificates and import the .mobileprovision file."
         case .profileUnavailable:
             return "The provisioning profile for this certificate is missing. Import the .mobileprovision file again."
         case .updateCertificateMismatch(let name):
-            return "This app is signed with “\(name)”, but its account now uses a different certificate. Updating would move it to another team and lose its data. Switch the account back to “\(name)” to update it, or re-sign it first."
+            return "This app is signed with “\(name)”, so select that certificate to keep its signing identity. Choose “\(name)” to update it."
         case .deviceNotInProfile:
             return "This provisioning profile doesn’t include this iPhone, so apps signed with it won’t install. Ask your certificate provider for a profile registered to this device."
         case .revoked(let name):
@@ -317,6 +317,12 @@ final class ImportedCertificateStore {
         guard let record = assignedRecord(accountIdentifier: accountIdentifier, teamIdentifier: teamIdentifier) else {
             return nil
         }
+        return try signingCertificate(serialNumber: record.serialNumber)
+    }
+
+    /// Loads an imported signing identity without an Apple account or saved session.
+    func signingCertificate(serialNumber: String) throws -> (record: ImportedCertificateRecord, certificate: ALTCertificate, p12Data: Data, password: String?) {
+        guard let record = catalog.record(matchingSerial: serialNumber) else { throw ImportedCertificateError.secretUnavailable }
         guard !record.isExpired() else { throw ImportedCertificateError.expired(record.expiryDate) }
         guard !record.isRevoked else { throw ImportedCertificateError.revoked(certificateName: record.name) }
         let secret = try vault.load(serialNumber: record.serialNumber)

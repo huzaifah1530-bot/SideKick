@@ -1,25 +1,16 @@
 --- a/Sources/CodeSigning/CodeSignerAPI.swift
 +++ b/Sources/CodeSigning/CodeSignerAPI.swift
-@@ -132,6 +132,23 @@
+@@ -132,6 +132,14 @@
                  {
                      filteredEntitlements.removeValue(forKey: key)
                  }
 +            }
 +
-+            // Every app must claim its own authorized identity, never another app's.
-+            // Preserve the profile's App ID prefix, which can differ from its Team ID.
-+            if let allowed = filteredEntitlements["application-identifier"] as? String {
-+                guard let separator = allowed.firstIndex(of: ".") else {
-+                    throw SignerError.invalidApp(cause: "The provisioning profile has an invalid application identifier.")
-+                }
++            // Expand wildcard profiles using their original App ID prefix.
++            // Explicit profiles retain their supplied signing identity.
++            if let allowed = filteredEntitlements["application-identifier"] as? String,
++               allowed.contains("*"), let separator = allowed.firstIndex(of: ".") {
 +                let prefix = String(allowed[..<separator])
-+                let allowedBundle = String(allowed[allowed.index(after: separator)...])
-+                let matches = allowedBundle.hasSuffix("*")
-+                    ? app.bundleIdentifier.hasPrefix(String(allowedBundle.dropLast()))
-+                    : app.bundleIdentifier == allowedBundle
-+                guard matches, !app.bundleIdentifier.contains("*") else {
-+                    throw SignerError.invalidApp(cause: "The provisioning profile does not authorize this app's bundle ID. Use a matching or wildcard profile; sharing another app's signed identity breaks playback and system links.")
-+                }
 +                filteredEntitlements["application-identifier"] = prefix + "." + app.bundleIdentifier
              }
  

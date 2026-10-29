@@ -26,6 +26,10 @@ class IntegrationPatchTests(unittest.TestCase):
             audit_patch = (ROOT / "patches/sidestore-audit-fixes.patch").read_text(encoding="utf-8")
             paths.update(path.rstrip("\t\r") for path in re.findall(r"^--- a/(.+)$", audit_patch, re.M))
             paths.update([
+                "AltStore/Core/Model/Team.swift", "SideStore/Core/Auth/AuthManager.swift",
+                "SideStore/Core/Operations/PipelineRunner.swift",
+                "SideStore/Core/Operations/PipelineOperations/UpdateAppCertificateOperation.swift",
+                "SideStore/Core/Operations/PipelineOperations/VerifyCertificateOperation.swift",
                 "SideBackup/SideBackupApp.swift", "SideStore/Core/Operations/PipelineOperations/StageBackupAppOperation.swift",
                 "SideBackup/ContentView.swift", "SideBackup/ConsoleLog.swift",
                 "Shared/Extensions/Bundle+AltStore.swift", "SideStore/Core/Operations/PipelineExecutor.swift",
@@ -81,6 +85,22 @@ class IntegrationPatchTests(unittest.TestCase):
             patch_path.write_bytes((ROOT / 'patches/sidestore-signing-repairs.patch').read_text(encoding='utf-8').encode('utf-8'))
             result = subprocess.run(['git', '-C', str(checkout), 'apply', str(patch_path)], capture_output=True, text=True)
             self.assertEqual(result.returncode, 0, result.stderr)
+            result = subprocess.run([sys.executable, str(ROOT / "scripts/integrate-standalone-certificates.py"), str(checkout)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            verify = (checkout / "SideStore/Core/Operations/PipelineOperations/VerifyCertificateOperation.swift").read_text()
+            standalone = verify[verify.index('if let identity = await StandaloneCertificateSigning.current'):verify.index('let team = try await AuthManager.shared.getAuthenticatedTeam()')]
+            self.assertIn('self.ocspCheck(certificate)', standalone)
+            self.assertNotIn('DeveloperPortalProxy', standalone)
+            self.assertIn('return', standalone)
+            team_source = (checkout / "AltStore/Core/Model/Team.swift").read_text()
+            accountless = team_source[team_source.index('public init(certificateTeam:'):team_source.index('public init(_ team:')]
+            self.assertNotIn('self.account =', accountless)
+            if compiler := shutil.which("swiftc"):
+                for relative in ["AltStore/Core/Model/Team.swift", "SideStore/Core/Auth/AuthManager.swift",
+                    "SideStore/Core/Operations/PipelineRunner.swift",
+                    "SideStore/Core/Operations/PipelineOperations/UpdateAppCertificateOperation.swift",
+                    "SideStore/Core/Operations/PipelineOperations/VerifyCertificateOperation.swift"]:
+                    subprocess.run([compiler, "-frontend", "-parse", str(checkout / relative)], check=True)
             installation = (checkout / 'SideStore/Core/Operations/PipelineOperations/InstallAppOperation.swift').read_text()
             atomic = installation[installation.index('        let isBackupHelper ='):installation.index('        let (installedApp, isDifferentSideStore, bundleID, isSelfReinstall, isSideBackup)')]
             self.assertLess(atomic.index('try await installIPA'), atomic.index('self.fetchOrCreateApp'))

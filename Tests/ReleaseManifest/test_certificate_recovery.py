@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class CertificateRecoveryTests(unittest.TestCase):
-    def test_shipping_signer_preserves_unique_authorized_app_identity(self):
+    def test_shipping_signer_keeps_explicit_profiles_compatible(self):
         relative = 'Sources/CodeSigning/CodeSignerAPI.swift'
         with tempfile.TemporaryDirectory(prefix='sidekick-profile-identity-') as directory:
             root = Path(directory)
@@ -21,8 +21,8 @@ class CertificateRecoveryTests(unittest.TestCase):
                 patch.write_bytes((ROOT / 'patches' / name).read_text(encoding='utf-8').encode())
                 subprocess.run(['git', '-C', str(root), 'apply', '--include=' + relative, str(patch)], check=True)
             text = source.read_text(encoding='utf-8')
-            block = text[text.index('            // Every app must claim'):text.index('            verboseLog("[SideSign] Filtered entitlements')]
-            self.assertIn('guard matches', block)
+            block = text[text.index('            // Expand wildcard profiles'):text.index('            verboseLog("[SideSign] Filtered entitlements')]
+            self.assertNotIn('guard matches', block)
             self.assertIn('prefix + "." + app.bundleIdentifier', block)
             if not shutil.which('swiftc'):
                 return
@@ -43,8 +43,9 @@ BLOCK
         precondition(second == "OLDPREFIX.com.spotify.client")
         let third = try identity("OLDPREFIX.com.spotify.client", "com.spotify.client")
         precondition(third == "OLDPREFIX.com.spotify.client")
-        do { _ = try identity("TEAM.com.sidekick.app", "com.spotify.client"); fatalError("Shared identity accepted") } catch {}
-        do { _ = try identity("TEAM.com.other.*", "com.spotify.client"); fatalError("Wrong wildcard accepted") } catch {}
+        let fixed = try identity("TEAM.com.sidekick.app", "com.spotify.client")
+        precondition(fixed == "TEAM.com.sidekick.app")
+
         print("Per-app signing identity regression passed")
     }
 }
