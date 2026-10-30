@@ -375,6 +375,12 @@ final class SigningAccountStore {
             try archive.save()
             setSignInCheckpoint("Session saved; refreshing the account list")
             await reload()
+            if let savedAccount = accounts.first(where: {
+                $0.accountIdentifier == accountIdentifier && $0.teamIdentifier == result.team.identifier
+            }) {
+                do { try UpdateSigningIdentityStore.shared.learnRunningAccount(savedAccount) }
+                catch { debugLog("[SideKick] Account saved, but could not remember its update association: \(error.localizedDescription)") }
+            }
             NotificationCenter.default.post(name: .sideKickSigningAccountsDidChange, object: nil)
             setSignInCheckpoint("Account saved successfully")
         } catch {

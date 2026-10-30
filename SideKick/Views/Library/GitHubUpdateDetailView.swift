@@ -13,6 +13,7 @@ struct GitHubUpdateDetailView: View {
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @State private var accountStore = SigningAccountStore()
+    @State private var updateIdentities = UpdateSigningIdentityStore.shared
     @State private var errorMessage: String?
     @State private var isConfirmingInstalledBuild = false
     @State private var isConfirmingSkip = false
@@ -42,9 +43,17 @@ struct GitHubUpdateDetailView: View {
 
     private var eligibleAccounts: [SigningAccountSummary] { accountStore.accounts }
 
-    private var account: SigningAccountSummary? {
-        eligibleAccounts.first { $0.hasSavedSession && app.isSignable(by: $0) }
+    private var currentApp: InstalledAppSummary { environment.installedApps.first { $0.id == app.id } ?? app }
+    private var updateIdentity: ResolvedUpdateSigningIdentity? {
+        updateIdentities.resolve(for: currentApp, accounts: eligibleAccounts)
     }
+    private var account: SigningAccountSummary? {
+        guard let account = updateIdentity?.account, account.hasSavedSession else { return nil }
+        return account
+    }
+    private var certificate: ImportedCertificateRecord? { updateIdentity?.certificate }
+    private var canInstall: Bool { account != nil || certificate != nil }
+    private var identityActionTitle: String { updateIdentity?.account == nil ? "Choose Signing Identity" : "Reconnect" }
 
     private var downloadJob: GitHubUpdateDownloadJob? { environment.githubUpdateDownloads.jobs[selectedCandidate.id] }
 
@@ -81,9 +90,9 @@ struct GitHubUpdateDetailView: View {
         .toolbar { reviewToolbar }
         .navigationTitle(isVersionSelection ? "Install Version" : showsDetails ? "Builds" : "Update")
         .navigationBarTitleDisplayMode(.inline)
-        .onAppear { Task { await accountStore.reload() } }
+        .onAppear { Task { await accountStore.reload(); await environment.reloadLocalCatalogues() } }
         .onReceive(NotificationCenter.default.publisher(for: .sideKickSigningAccountsDidChange)) { _ in
-            Task { await accountStore.reload() }
+            Task { await accountStore.reload(); await environment.reloadLocalCatalogues() }
         }
         .task {
             do {
@@ -319,8 +328,8 @@ struct GitHubUpdateDetailView: View {
     @ViewBuilder
     private func installAction(for queuedIPA: ImportedIPA) -> some View {
         NavigationLink { installDestination(for: queuedIPA) } label: {
-            Label(account == nil ? "Reconnect Account to Install" : (isVersionSelection ? "Install This Version" : "Install Update"),
-                  systemImage: account == nil ? "person.crop.circle.badge.exclamationmark" : "arrow.down.circle.fill")
+            Label(!canInstall ? identityActionTitle : (isVersionSelection ? "Install This Version" : "Install Update"),
+                  systemImage: !canInstall ? "person.crop.circle.badge.exclamationmark" : "arrow.down.circle.fill")
                 .font(.body.weight(.semibold))
                 .foregroundStyle(Color.sideKickAccent)
         }
@@ -328,7 +337,12 @@ struct GitHubUpdateDetailView: View {
 
     @ViewBuilder
     private func installDestination(for queuedIPA: ImportedIPA) -> some View {
-        if let account {
+        if let certificate {
+            InstallConsoleView(app: queuedIPA, account: nil, accountStore: accountStore,
+                ipaStore: environment.ipaImportStore, isUpdate: true,
+                onInstalled: { await finishUpdate(queuedIPA) },
+                onSourceMissing: { await validateDownload() }, certificate: certificate)
+        } else if let account {
             InstallConsoleView(
                 app: queuedIPA,
                 account: account,
@@ -338,10 +352,14 @@ struct GitHubUpdateDetailView: View {
                 onInstalled: { await finishUpdate(queuedIPA) },
                 onSourceMissing: { await validateDownload() }
             )
-        } else if let installedTeamAccount = eligibleAccounts.first(where: { app.isSignable(by: $0) }) {
+        } else if let installedTeamAccount = updateIdentity?.account {
             SigningAccountDetailView(account: installedTeamAccount, accountStore: accountStore)
         } else {
-            AccountsView()
+            InstallAccountSelectionView(app: queuedIPA, accountStore: accountStore,
+                ipaStore: environment.ipaImportStore, isUpdate: true,
+                onInstalled: { await finishUpdate(queuedIPA) },
+                onSourceMissing: { await validateDownload() },
+                currentTeamIdentifier: currentApp.teamIdentifier.isEmpty ? nil : currentApp.teamIdentifier)
         }
     }
 
@@ -367,7 +385,7 @@ struct GitHubUpdateDetailView: View {
         } else if downloadJob?.queuedIPA != nil {
             HStack(spacing: Spacing.s) {
                 SwiftUI.Button { isShowingInstall = true } label: {
-                    ActionLabel(account == nil ? "Reconnect" : (isVersionSelection ? "Install" : "Update"))
+                    ActionLabel(!canInstall ? identityActionTitle : (isVersionSelection ? "Install" : "Update"))
                 }
                 .primaryActionStyle()
                 SwiftUI.Button { startDownload() } label: {

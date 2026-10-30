@@ -17,10 +17,11 @@ let package = Package(
             "Services/AppOffloadService.swift", "Services/SideKickDiagnostics.swift",
             "Services/IPAImportDownloadStore.swift", "Services/RefreshFailureReport.swift", "Services/UpdateSuccessRecord.swift",
             "Services/LiveContainerSharedAccess.swift",
-            "Services/NativeInstallReplacementReview.swift", "Services/StandaloneCertificateSigning.swift", "Services/GitHubAccountSession.swift", "Services/ManagedStorageFiles.swift"
+            "Services/UpdateSigningIdentityStore.swift", "Services/NativeInstallReplacementReview.swift", "Services/StandaloneCertificateSigning.swift", "Services/GitHubAccountSession.swift", "Services/ManagedStorageFiles.swift"
         ], sources: [
             "Models/GitHubBuildTracking.swift",
             "Models/ImportedIPA.swift",
+            "Models/UpdateSigningIdentity.swift",
             "Models/ImportedCertificateCatalog.swift",
             "Models/SideKickTransferIdentifiers.swift",
             "Models/LiveContainerModels.swift",

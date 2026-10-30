@@ -8,12 +8,15 @@ enum NativeInstallReplacementReview {
     private struct Request {
         let id = UUID()
         let expectedUpdateIdentifier: String?
+        let beforeInstall: @MainActor (String) throws -> Void
     }
     private static var current: Request?
 
-    static func withReview<T>(expectedUpdateIdentifier: String?, operation: () async throws -> T) async rethrows -> T {
+    static func withReview<T>(expectedUpdateIdentifier: String?,
+        beforeInstall: @escaping @MainActor (String) throws -> Void = { _ in },
+        operation: () async throws -> T) async rethrows -> T {
         let previous = current
-        current = Request(expectedUpdateIdentifier: expectedUpdateIdentifier)
+        current = Request(expectedUpdateIdentifier: expectedUpdateIdentifier, beforeInstall: beforeInstall)
         defer { current = previous }
         return try await operation()
     }
@@ -27,7 +30,10 @@ enum NativeInstallReplacementReview {
             throw OperationError.invalidParameters("The signed package has an invalid bundle ID.")
         }
         // A queued update is explicit permission for only that installed bundle ID.
-        if finalIdentifier.caseInsensitiveCompare(request.expectedUpdateIdentifier ?? "") == .orderedSame { return }
+        if finalIdentifier.caseInsensitiveCompare(request.expectedUpdateIdentifier ?? "") == .orderedSame {
+            try request.beforeInstall(finalIdentifier)
+            return
+        }
         let installedName: String?
         do { installedName = try await lookupInstalledAppName(finalIdentifier) }
         catch {
@@ -37,7 +43,10 @@ enum NativeInstallReplacementReview {
         guard let installedName,
               let replacement = InstallReplacementPolicy.replacement(finalIdentifier: finalIdentifier,
                 expectedUpdateIdentifier: request.expectedUpdateIdentifier,
-                installed: [.init(identifier: finalIdentifier, name: installedName)]) else { return }
+                installed: [.init(identifier: finalIdentifier, name: installedName)]) else {
+            try request.beforeInstall(finalIdentifier)
+            return
+        }
         guard UIApplication.shared.applicationState == .active,
               let presenter = UIApplication.shared.topViewController() else {
             throw OperationError.invalidParameters("SideKick could not show the replacement review. The installed app has not been changed. Try again with SideKick open.")
@@ -52,5 +61,6 @@ enum NativeInstallReplacementReview {
         }
         guard current?.id == request.id, !Task.isCancelled else { throw OperationError.cancelled }
         guard accepted else { throw OperationError.cancelled }
+        try request.beforeInstall(finalIdentifier)
     }
 }

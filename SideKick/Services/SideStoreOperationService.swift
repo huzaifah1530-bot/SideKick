@@ -22,21 +22,39 @@ final class SideStoreOperationService {
     }
 
     func loadInstalledApps(loadIcons: Bool = true) async throws -> [InstalledAppSummary] {
+        let embeddedProfile = ALTApplication(fileURL: Bundle.Info.activeBundleURL)?.provisioningProfile
+        let embeddedTeam = embeddedProfile?.teamIdentifier
+        let embeddedSerial = CertificateManager.shared.getSigningCertificate(at: Bundle.Info.activeBundleURL)?.serialNumber
+            ?? (embeddedProfile?.certificates.count == 1 ? embeddedProfile?.certificates.first?.serialNumber : nil)
+        let knownImportedSerial = embeddedSerial.flatMap {
+            ImportedCertificateStore.shared.catalog.record(matchingSerial: $0)?.serialNumber
+        }
         let context = DatabaseManager.shared.viewContext
         let records = try await context.perform {
-            let selfTeamIdentifier = ALTApplication(fileURL: Bundle.Info.activeBundleURL)?
-                .provisioningProfile?.teamIdentifier
             let apps = try context.fetch(InstalledApp.fetchRequest())
             let selfApp = InstalledApp.fetchAltStore(in: context)
             let candidates = apps.contains(where: { $0.bundleIdentifier == StoreApp.altstoreAppID })
                 ? apps
                 : apps + (selfApp.map { [$0] } ?? [])
 
-            if let selfApp, selfApp.team == nil,
-               let teamIdentifier = selfTeamIdentifier,
-               let ownerTeam = (try? context.fetch(Team.fetchRequest()))?.first(where: { $0.identifier == teamIdentifier }) {
-                selfApp.team = ownerTeam
-                try? context.save()
+            if let selfApp {
+                var repairedSelf = false
+                if selfApp.resignedBundleIdentifier != Bundle.Info.activeBundleIdentifier {
+                    selfApp.resignedBundleIdentifier = Bundle.Info.activeBundleIdentifier
+                    repairedSelf = true
+                }
+                if let embeddedTeam,
+                   selfApp.team?.identifier != embeddedTeam || selfApp.team?.account == nil {
+                    let teams = try context.fetch(Team.fetchRequest()).filter { $0.identifier == embeddedTeam }
+                    let ownedTeams = teams.filter { $0.account != nil }
+                    // An account added after external installation can now own the self record.
+                    let owner = ownedTeams.count == 1 ? ownedTeams[0] : teams.first(where: { $0.account == nil })
+                    if selfApp.team?.objectID != owner?.objectID {
+                        selfApp.team = owner
+                        repairedSelf = true
+                    }
+                }
+                if repairedSelf { try context.save() }
             }
 
             // Keep an installed record visible even if its saved account needs
@@ -55,7 +73,7 @@ final class SideStoreOperationService {
                     runningBundle?.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? app.buildVersion,
                     account?.appleID ?? "Sign in required",
                     account?.identifier ?? "",
-                    team?.identifier ?? app.customProvisioningProfile?.teamIdentifier ?? "",
+                    (runningBundle != nil ? embeddedTeam : nil) ?? team?.identifier ?? app.customProvisioningProfile?.teamIdentifier ?? "",
                     app.expirationDate,
                     runningBundle != nil ? runningIdentity : Bundle(url: app.fileURL)?.executableURL
                         .flatMap { try? Data(contentsOf: $0, options: .mappedIfSafe) }
@@ -63,7 +81,7 @@ final class SideStoreOperationService {
                     runningBundle != nil ? runningIdentity : app.appBundleFingerprint,
                     // SideStore records the serial only when an override certificate signed the app.
                     runningBundle != nil
-                        ? Bundle.main.object(forInfoDictionaryKey: Bundle.Info.certificateID) as? String
+                        ? knownImportedSerial
                         : app.certificateSerialNumber
                 )
             }
@@ -247,7 +265,10 @@ final class SideStoreOperationService {
                             useImportedCertificate: false)
                     }
                     return try await NativeInstallReplacementReview.withReview(
-                        expectedUpdateIdentifier: ipa.isUpdateQueued ? ipa.queuedForInstalledAppID : nil) {
+                        expectedUpdateIdentifier: ipa.isUpdateQueued ? ipa.queuedForInstalledAppID : nil,
+                        beforeInstall: { identifier in
+                            try self.rememberUpdateIdentity(for: identifier, account: account, certificate: certificate)
+                        }) {
                         return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
                             guard !SideKickStorageCleanup.isRemovingFiles else {
                                 continuation.resume(throwing: StorageCleanupError.operationRunning)
@@ -276,6 +297,16 @@ final class SideStoreOperationService {
                     }
                 }
             }
+    }
+
+    private func rememberUpdateIdentity(for identifier: String, account: SigningAccountSummary?, certificate: ImportedCertificateRecord?) throws {
+        if let certificate, let profile = certificate.profile {
+            try UpdateSigningIdentityStore.shared.remember(.certificate(serialNumber: certificate.serialNumber,
+                teamIdentifier: profile.teamIdentifier), for: identifier)
+        } else if let account {
+            try UpdateSigningIdentityStore.shared.remember(.account(identifier: account.accountIdentifier,
+                teamIdentifier: account.teamIdentifier), for: identifier)
+        }
     }
 
     private func finishInstall(_ ipa: ImportedIPA, installedID: String, selfTargetID: String?, runningBundle: Bundle?) async throws {
@@ -436,6 +467,8 @@ final class SideStoreOperationService {
         let targetTeam = certificate?.profile?.teamIdentifier ?? selectedAccount?.teamIdentifier ?? ""
         let installedTeam = Self.installedSigningTeam(installedApp)
         try SigningIdentityPolicy.validateResign(installedTeam: installedTeam, targetTeam: targetTeam)
+        try rememberUpdateIdentity(for: installedApp.resignedBundleIdentifier, account: selectedAccount, certificate: certificate)
+
 
         try SideKickStorageCleanup.beginOperation()
         defer { SideKickStorageCleanup.endOperation() }
@@ -474,6 +507,9 @@ final class SideStoreOperationService {
     /// The retained source can be the original, unsigned IPA, so its embedded
     /// profile is not evidence of the currently installed signing team.
     static func installedSigningTeam(_ app: InstalledApp) -> String? {
+        if app.bundleIdentifier == StoreApp.altstoreAppID || app.resignedBundleIdentifier == Bundle.Info.activeBundleIdentifier {
+            return ALTApplication(fileURL: Bundle.Info.activeBundleURL)?.provisioningProfile?.teamIdentifier
+        }
         if let serial = app.certificateSerialNumber {
             return ImportedCertificateStore.shared.catalog.record(matchingSerial: serial)?.profile?.teamIdentifier
                 ?? app.customProvisioningProfile?.teamIdentifier
@@ -486,12 +522,12 @@ final class SideStoreOperationService {
     /// profile embedded in their cached signed bundle. Needs device testing.
     static func isInstalledApp(_ installedApp: InstalledApp, signedWith serialNumber: String) -> Bool {
         let target = ImportedCertificateCatalog.normalizedSerial(serialNumber)
+        if installedApp.resignedBundleIdentifier == Bundle.Info.activeBundleIdentifier {
+            let embedded = CertificateManager.shared.getSigningCertificate(at: Bundle.Info.activeBundleURL)?.serialNumber
+            return embedded.map(ImportedCertificateCatalog.normalizedSerial) == target
+        }
         if let recorded = installedApp.certificateSerialNumber {
             return ImportedCertificateCatalog.normalizedSerial(recorded) == target
-        }
-        if installedApp.resignedBundleIdentifier == Bundle.Info.activeBundleIdentifier {
-            let embedded = Bundle.main.object(forInfoDictionaryKey: Bundle.Info.certificateID) as? String
-            return embedded.map(ImportedCertificateCatalog.normalizedSerial) == target
         }
         guard let profile = ALTApplication(fileURL: installedApp.fileURL)?.provisioningProfile else { return false }
         return profile.certificates.contains { ImportedCertificateCatalog.normalizedSerial($0.serialNumber) == target }

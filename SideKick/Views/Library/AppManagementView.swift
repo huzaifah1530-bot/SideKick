@@ -8,6 +8,7 @@ struct AppManagementView: View {
     @Environment(\.scenePhase) private var scenePhase
     @State private var expirationClock = Date.now
     @State private var accountStore = SigningAccountStore()
+    @State private var updateIdentities = UpdateSigningIdentityStore.shared
     @State private var isShowingRefreshConsole = false
     @State private var isFindingShareIPA = false
     @State private var shareIPA: ImportedIPA?
@@ -418,9 +419,9 @@ struct AppManagementView: View {
 
     @ViewBuilder
     private func queuedUpdateActions(ipa: ImportedIPA, installedApp: InstalledAppSummary) -> some View {
-        let updateAccounts = accountStore.accounts
-        let installedTeamAccount = updateAccounts.first(where: { installedApp.isSignable(by: $0) })
-        if let certificate = installedApp.importedCertificate {
+        let identity = updateIdentities.resolve(for: installedApp, accounts: accountStore.accounts)
+        let installedTeamAccount = identity?.account
+        if let certificate = identity?.certificate {
             NavigationLink {
                 InstallConsoleView(app: ipa, account: nil, accountStore: accountStore,
                     ipaStore: environment.ipaImportStore, isUpdate: true,
@@ -455,9 +456,12 @@ struct AppManagementView: View {
             }
         } else {
             NavigationLink {
-                AccountsView()
+                InstallAccountSelectionView(app: ipa, accountStore: accountStore,
+                    ipaStore: environment.ipaImportStore, isUpdate: true,
+                    onInstalled: { await finishQueuedUpdate(ipa) },
+                    currentTeamIdentifier: installedApp.teamIdentifier.isEmpty ? nil : installedApp.teamIdentifier)
             } label: {
-                Label("Add the Account for Team \(installedApp.teamIdentifier)", systemImage: "person.crop.circle.badge.plus")
+                Label("Choose Signing Identity", systemImage: "person.crop.circle.badge.plus")
             }
         }
         NavigationLink {
@@ -1269,7 +1273,6 @@ struct InstallAccountSelectionView: View {
             Section {
                 if accounts.isEmpty {
                     Text("Add an Apple Account or choose a certificate below.").foregroundStyle(.secondary)
-                    NavigationLink("Accounts") { AccountsView() }
                 }
                 ForEach(accounts) { account in
                     NavigationLink {
@@ -1284,6 +1287,7 @@ struct InstallAccountSelectionView: View {
                         AccountChoiceRow(account: account, currentTeamIdentifier: currentTeamIdentifier)
                     }
                 }
+                NavigationLink("Add or Manage Accounts") { AccountsView() }
             } header: {
                 Text("Apple Account")
             } footer: {
