@@ -29,21 +29,10 @@ struct ImportDownloadPanel: View {
                 .accessibilityElement(children: .combine)
                 SwiftUI.Button("Cancel Download", role: .destructive) { Task { await store.cancel(jobID) } }
 
-            case .needsTarget(let ipa, let installations):
-                Label("\(ipa.name) is already installed", systemImage: "arrow.triangle.2.circlepath")
+            case .needsTarget(let ipa, _):
+                Label("Imported \(ipa.name)", systemImage: "arrow.down.doc")
                     .font(.body.weight(.semibold))
-                ForEach(installations) { installation in
-                    SwiftUI.Button {
-                        Task { await store.choose(jobID, target: installation) }
-                    } label: {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text("Use as Update for \(installation.name)").foregroundStyle(Color.sideKickAccent)
-                            Text("\(installation.accountEmail) · \(installation.teamIdentifier)")
-                                .font(.subheadline).foregroundStyle(.secondary)
-                        }
-                    }
-                }
-                SwiftUI.Button("Delete IPA", role: .destructive) { Task { await store.cancel(jobID) } }
+                SwiftUI.Button("Review Imported Package") { store.reviewRequestedJobID = jobID }
 
             case .ready(let ipa, let isUpdate):
                 Label(isUpdate ? "Update ready for \(ipa.name)" : "\(ipa.name) is ready to install", systemImage: "checkmark.circle.fill")
@@ -97,7 +86,7 @@ struct ImportDownloadPage: View {
 }
 
 extension View {
-    /// Hides this job from the floating button while its page is on screen.
+    /// Tracks the visible download and opens matching-package review at page level.
     func trackVisibleImportDownload(_ id: UUID?) -> some View {
         modifier(VisibleImportDownload(id: id))
     }
@@ -106,13 +95,66 @@ extension View {
 private struct VisibleImportDownload: ViewModifier {
     let id: UUID?
     @Environment(AppEnvironment.self) private var environment
+    @State private var showingImportReview = false
+    @State private var autoReviewedPackage: ImportedIPA?
+    @State private var isVisible = false
+
+    private var store: IPAImportDownloadStore { environment.importDownloads }
+    private var job: IPAImportDownloadStore.Job? { id.flatMap { store.jobs[$0] } }
 
     func body(content: Content) -> some View {
         content
-            .onAppear { if let id { environment.importDownloads.visibleJobID = id } }
-            .onChange(of: id) { _, new in environment.importDownloads.visibleJobID = new }
-            .onDisappear {
-                if environment.importDownloads.visibleJobID == id { environment.importDownloads.visibleJobID = nil }
+            .onAppear {
+                isVisible = true
+                if let id { store.visibleJobID = id }
+                openImportReviewIfNeeded()
             }
+            .onChange(of: id) { _, new in
+                store.visibleJobID = new
+                openImportReviewIfNeeded()
+            }
+            .onChange(of: job?.state) { _, _ in openImportReviewIfNeeded() }
+            .onChange(of: store.reviewRequestedJobID) { _, requested in
+                if let requested, requested == id, isVisible {
+                    store.reviewRequestedJobID = nil
+                    showingImportReview = true
+                }
+            }
+            .onDisappear {
+                isVisible = false
+                if !showingImportReview, store.visibleJobID == id { store.visibleJobID = nil }
+            }
+            .navigationDestination(isPresented: $showingImportReview) {
+                if let id, case .needsTarget(let ipa, let installations) = job?.state {
+                    MatchingIPAImportReviewView(app: ipa, installations: installations,
+                        onQueueUpdate: { identifier in
+                            if let target = installations.first(where: { $0.id == identifier }) {
+                                await store.choose(id, target: target)
+                            }
+                            showingImportReview = false
+                        },
+                        onSeparateInstall: {
+                            await store.choose(id, target: nil)
+                            showingImportReview = false
+                        },
+                        onCancel: {
+                            showingImportReview = false
+                            Task { await store.cancel(id) }
+                        })
+                    .id(ipa.importedAt)
+                }
+            }
+    }
+
+    private func openImportReviewIfNeeded() {
+        guard isVisible, let id else { return }
+        if case .needsTarget(let ipa, _) = job?.state, autoReviewedPackage != ipa {
+            autoReviewedPackage = ipa
+            store.reviewRequestedJobID = nil
+            showingImportReview = true
+        } else if store.reviewRequestedJobID == id {
+            store.reviewRequestedJobID = nil
+            showingImportReview = true
+        }
     }
 }

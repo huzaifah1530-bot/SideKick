@@ -226,33 +226,15 @@ struct URLImportView: View {
         .trackVisibleImportDownload(importJobID)
         .navigationTitle("Import from URL")
         .navigationBarTitleDisplayMode(.inline)
-        .confirmationDialog(
-            "\(ipaAwaitingUpdateChoice?.name ?? "This app") is already installed",
-            isPresented: Binding(
-                get: { ipaAwaitingUpdateChoice != nil },
-                set: {
-                    if !$0 {
-                        if !isQueueingSelectedIPA, let app = ipaAwaitingUpdateChoice {
-                            discardPendingPreparedIPA(app)
-                        }
-                        ipaAwaitingUpdateChoice = nil
-                    }
-                }
-            )
-        ) {
-            ForEach(matchingInstallations) { installation in
-                SwiftUI.Button("Queue for \(installation.name) \(installation.accountEmail) (\(installation.teamIdentifier))") {
-                    guard let app = ipaAwaitingUpdateChoice else { return }
-                    isQueueingSelectedIPA = true
-                    Task { await queuePendingUpdate(app, for: installation.id) }
-                }
-            }
-            SwiftUI.Button("Cancel", role: .cancel) {
-                if let app = ipaAwaitingUpdateChoice { discardPendingPreparedIPA(app) }
-                ipaAwaitingUpdateChoice = nil
-            }
-        } message: {
-            Text("Queue this IPA as the update for the installed app?")
+        .navigationDestination(item: $ipaAwaitingUpdateChoice) { app in
+            MatchingIPAImportReviewView(app: app, installations: matchingInstallations,
+                onQueueUpdate: { await queuePendingUpdate(app, for: $0) },
+                onSeparateInstall: { await queuePendingUpdate(app, for: nil) },
+                onCancel: {
+                    discardPendingPreparedIPA(app)
+                    if ipaAwaitingUpdateChoice == app { ipaAwaitingUpdateChoice = nil }
+                })
+                .id(app.importedAt)
         }
         .onAppear {
             guard let initialURL else { return }
@@ -266,7 +248,7 @@ struct URLImportView: View {
             directDownloadTask?.cancel()
             directDownloadTask = nil
             isDownloading = false
-            guard let app = pendingPreparedIPA else { return }
+            guard ipaAwaitingUpdateChoice == nil, let app = pendingPreparedIPA else { return }
             pendingPreparedIPA = nil
             Task { await environment.ipaImportStore.discardPreparedIPA(app) }
         }
@@ -409,10 +391,14 @@ struct URLImportView: View {
     }
 
     @MainActor
-    private func queuePendingUpdate(_ app: ImportedIPA, for targetID: String) async {
-        defer { isQueueingSelectedIPA = false }
-        if ipaAwaitingUpdateChoice == app { ipaAwaitingUpdateChoice = nil }
-        do { try await savePreparedIPA(app, asUpdate: true, targetID: targetID) }
+    private func queuePendingUpdate(_ app: ImportedIPA, for targetID: String?) async {
+        guard !isQueueingSelectedIPA else { return }
+        isQueueingSelectedIPA = true
+        defer {
+            isQueueingSelectedIPA = false
+            if ipaAwaitingUpdateChoice == app { ipaAwaitingUpdateChoice = nil }
+        }
+        do { try await savePreparedIPA(app, asUpdate: targetID != nil, targetID: targetID, asSeparateApp: targetID == nil) }
         catch {
             discardPendingPreparedIPA(app)
             errorMessage = error.localizedDescription
@@ -420,10 +406,11 @@ struct URLImportView: View {
     }
 
     @MainActor
-    private func savePreparedIPA(_ app: ImportedIPA, asUpdate: Bool, targetID: String? = nil) async throws {
+    private func savePreparedIPA(_ app: ImportedIPA, asUpdate: Bool, targetID: String? = nil, asSeparateApp: Bool = false) async throws {
         var savedApp = app
         savedApp.isQueuedForUpdate = asUpdate
         savedApp.queuedForInstalledAppID = targetID
+        savedApp.separateInstallationRequested = asSeparateApp
         try await environment.ipaImportStore.saveImportedIPA(savedApp)
         if pendingPreparedIPA == app { pendingPreparedIPA = nil }
         importedApp = savedApp

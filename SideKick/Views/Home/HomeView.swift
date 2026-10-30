@@ -72,9 +72,8 @@ struct HomeView: View {
     private var filteredImportedApps: [ImportedIPA] {
         let queuedManualIPAIDs = Set(queuedManualUpdates.map(\.ipa.id) + unresolvedQueuedManualUpdates.map(\.id))
         return viewModel.importedApps.filter {
-            !queuedManualIPAIDs.contains($0.id) &&
-            $0.queuedForInstalledAppID?.hasPrefix("livecontainer:") != true &&
-            !installedBundleIdentifiers.contains($0.bundleIdentifier.lowercased())
+            IPAImportIndex.isVisibleInImports($0, installedBundleIdentifiers: installedBundleIdentifiers,
+                queuedImportIDs: queuedManualIPAIDs)
         }
     }
 
@@ -422,37 +421,12 @@ struct HomeView: View {
                 await load()
                 await environment.awaitPendingGitHubChecks()
             }
-            .confirmationDialog(
-                "\(ipaAwaitingUpdateChoice?.name ?? "This app") is already installed",
-                isPresented: Binding(
-                    get: { ipaAwaitingUpdateChoice != nil },
-                    set: {
-                        if !$0 {
-                            if !isQueueingSelectedIPA, let app = ipaAwaitingUpdateChoice {
-                                Task { await environment.ipaImportStore.discardPreparedIPA(app) }
-                                matchingInstallationsForUpdateChoice = []
-                            }
-                            ipaAwaitingUpdateChoice = nil
-                        }
-                    }
-                )
-            ) {
-                ForEach(matchingInstallationsForUpdateChoice) { installation in
-                    SwiftUI.Button("Queue for \(installation.name) · \(installation.accountEmail) (\(installation.teamIdentifier))") {
-                        guard let app = ipaAwaitingUpdateChoice else { return }
-                        isQueueingSelectedIPA = true
-                        Task { await queuePendingUpdate(app, for: installation.id) }
-                    }
-                }
-                SwiftUI.Button("Cancel", role: .cancel) {
-                    if let app = ipaAwaitingUpdateChoice {
-                        ipaAwaitingUpdateChoice = nil
-                        matchingInstallationsForUpdateChoice = []
-                        Task { await environment.ipaImportStore.discardPreparedIPA(app) }
-                    }
-                }
-            } message: {
-                Text("Queue this IPA as the update for the installed app?")
+            .navigationDestination(item: $ipaAwaitingUpdateChoice) { app in
+                MatchingIPAImportReviewView(app: app, installations: matchingInstallationsForUpdateChoice,
+                    onQueueUpdate: { await queuePendingUpdate(app, for: $0) },
+                    onSeparateInstall: { await queuePendingUpdate(app, for: nil) },
+                    onCancel: { cancelImportReview(app) })
+                    .id(app.importedAt)
             }
             .alert(appRefreshErrorMessage != nil ? "Couldn’t refresh app"
                 : (viewModel.errorMessage == nil ? "IPA imported" : "Couldn’t import IPA"), isPresented: Binding(
@@ -761,7 +735,7 @@ struct HomeView: View {
     }
 
     /// Imports queued files in order. Stops when one needs an update choice; the choice
-    /// dialog closing resumes the queue. Failures are collected and reported once at the end.
+    /// page closing resumes the queue. Failures are collected and reported once at the end.
     private func importNextFile() async {
         while !pendingFileImports.isEmpty, !isImportReviewActive {
             let url = pendingFileImports.removeFirst()
@@ -807,21 +781,32 @@ struct HomeView: View {
         ipaAwaitingUpdateChoice = app
     }
 
-    private func queuePendingUpdate(_ app: ImportedIPA, for targetID: String) async {
-        defer { isQueueingSelectedIPA = false }
-        if ipaAwaitingUpdateChoice == app { ipaAwaitingUpdateChoice = nil }
-        matchingInstallationsForUpdateChoice = []
-        await savePreparedIPA(app, update: true, targetID: targetID)
+    private func cancelImportReview(_ app: ImportedIPA) {
+        if ipaAwaitingUpdateChoice == app {
+            ipaAwaitingUpdateChoice = nil
+            matchingInstallationsForUpdateChoice = []
+        }
+        Task { await environment.ipaImportStore.discardPreparedIPA(app) }
     }
 
-    private func savePreparedIPA(_ app: ImportedIPA, update: Bool, targetID: String? = nil) async {
+    private func queuePendingUpdate(_ app: ImportedIPA, for targetID: String?) async {
+        guard !isQueueingSelectedIPA else { return }
+        isQueueingSelectedIPA = true
+        defer { isQueueingSelectedIPA = false }
+        await savePreparedIPA(app, update: targetID != nil, targetID: targetID, showNotice: false, asSeparateApp: targetID == nil)
+        if ipaAwaitingUpdateChoice == app { ipaAwaitingUpdateChoice = nil }
+        matchingInstallationsForUpdateChoice = []
+    }
+
+    private func savePreparedIPA(_ app: ImportedIPA, update: Bool, targetID: String? = nil, showNotice: Bool = true, asSeparateApp: Bool = false) async {
         do {
             var savedApp = app
             savedApp.isQueuedForUpdate = update
             savedApp.queuedForInstalledAppID = targetID
+            savedApp.separateInstallationRequested = asSeparateApp
             try await environment.ipaImportStore.saveImportedIPA(savedApp)
             await viewModel.load()
-            viewModel.noticeMessage = update ? "\(app.name) is queued as an update." : "\(app.name) is ready to install."
+            if showNotice { viewModel.noticeMessage = update ? "\(app.name) is queued as an update." : "\(app.name) is ready to install." }
         } catch {
             await environment.ipaImportStore.discardPreparedIPA(app)
             viewModel.errorMessage = error.localizedDescription

@@ -23,6 +23,7 @@ struct ImportedIPA: Codable, Identifiable, Hashable, Sendable {
     var githubRepositoryURL: String? = nil
     var githubImportConfiguration: GitHubUpdateConfiguration? = nil
     var liveContainerHandoffRequested: Bool? = nil
+    var separateInstallationRequested: Bool? = nil
 
     // Before queue state was persisted, every retained IPA matching an installed app
     // came from the explicit "Queue for Update" choice.
@@ -65,6 +66,12 @@ enum IPAImportError: LocalizedError {
 
 // Metadata edits move the same import; distinct installations retain distinct queues.
 enum IPAImportIndex {
+    static func isVisibleInImports(_ app: ImportedIPA, installedBundleIdentifiers: Set<String>, queuedImportIDs: Set<String>) -> Bool {
+        !queuedImportIDs.contains(app.id) &&
+            app.queuedForInstalledAppID?.hasPrefix("livecontainer:") != true &&
+            (app.separateInstallationRequested == true || !installedBundleIdentifiers.contains(app.bundleIdentifier.lowercased()))
+    }
+
     static func completedSelfUpdates(in entries: [ImportedIPA], targetID: String,
                                      version: String, build: String, executableIdentity: String) -> [ImportedIPA] {
         guard !executableIdentity.isEmpty else { return [] }

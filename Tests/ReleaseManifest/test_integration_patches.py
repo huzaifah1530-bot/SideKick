@@ -26,6 +26,7 @@ class IntegrationPatchTests(unittest.TestCase):
             audit_patch = (ROOT / "patches/sidestore-audit-fixes.patch").read_text(encoding="utf-8")
             paths.update(path.rstrip("\t\r") for path in re.findall(r"^--- a/(.+)$", audit_patch, re.M))
             paths.update([
+                "SideStore/Core/DeviceApi/MinimuxerWrapper.swift",
                 "AltStore/Core/Model/Team.swift", "SideStore/Core/Auth/AuthManager.swift",
                 "SideStore/Core/Operations/PipelineRunner.swift",
                 "SideStore/Core/Operations/PipelineOperations/UpdateAppCertificateOperation.swift",
@@ -57,6 +58,12 @@ class IntegrationPatchTests(unittest.TestCase):
                     "git", "-C", str(ROOT / "Vendor/SideStore"), "show", "HEAD:" + path,
                 ])
                 target = checkout / path
+                target.parent.mkdir(parents=True, exist_ok=True)
+                target.write_bytes(content)
+            for path in ["DeviceGateway/DeviceGatewayAPI.swift", "DeviceGateway/idevice/IdeviceGateway.swift",
+                         "DeviceGateway/libimobiledevice/LibimobiledeviceGateway.swift"]:
+                content = subprocess.check_output(["git", "-C", str(ROOT / "Vendor/SideStore/Dependencies/minimuxer"), "show", "HEAD:" + path])
+                target = checkout / "Dependencies/minimuxer" / path
                 target.parent.mkdir(parents=True, exist_ok=True)
                 target.write_bytes(content)
             for patch in PATCHES:
@@ -101,7 +108,22 @@ class IntegrationPatchTests(unittest.TestCase):
                     "SideStore/Core/Operations/PipelineOperations/UpdateAppCertificateOperation.swift",
                     "SideStore/Core/Operations/PipelineOperations/VerifyCertificateOperation.swift"]:
                     subprocess.run([compiler, "-frontend", "-parse", str(checkout / relative)], check=True)
+            result = subprocess.run([sys.executable, str(ROOT / "scripts/integrate-install-review.py"), str(checkout)], capture_output=True, text=True)
+            self.assertEqual(result.returncode, 0, result.stderr)
             installation = (checkout / 'SideStore/Core/Operations/PipelineOperations/InstallAppOperation.swift').read_text()
+            execute = installation[installation.index('override func execute'):installation.index('private func removeRefreshedIPA')]
+            self.assertLess(execute.index('NativeInstallReplacementReview.review'), execute.index('let installedApp = try await installApp'))
+            self.assertIn('finalIdentifier: resignedAppBundle.bundleIdentifier', execute)
+            if compiler := shutil.which("swiftc"):
+                from install_review_checks import verify_lookup
+                verify_lookup(checkout, compiler)
+                for relative in ["SideStore/Core/DeviceApi/MinimuxerWrapper.swift",
+                    "Dependencies/minimuxer/DeviceGateway/DeviceGatewayAPI.swift",
+                    "Dependencies/minimuxer/DeviceGateway/idevice/IdeviceGateway.swift",
+                    "Dependencies/minimuxer/DeviceGateway/libimobiledevice/LibimobiledeviceGateway.swift"]:
+                    subprocess.run([compiler, "-frontend", "-parse", str(checkout / relative)], check=True)
+
+
             atomic = installation[installation.index('        let isBackupHelper ='):installation.index('        let (installedApp, isDifferentSideStore, bundleID, isSelfReinstall, isSideBackup)')]
             self.assertLess(atomic.index('try await installIPA'), atomic.index('self.fetchOrCreateApp'))
             self.assertIn('installed.isActive = true', atomic)

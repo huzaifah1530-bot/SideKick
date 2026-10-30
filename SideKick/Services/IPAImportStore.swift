@@ -233,6 +233,16 @@ actor IPAImportStore {
         return app
     }
 
+    /// Complete only the package that was actually installed; another import may
+    /// have replaced its library row while signing was in progress.
+    func completeSeparateInstallation(_ installed: ImportedIPA) throws {
+        guard var current = try importedApps().first(where: {
+            $0.id == installed.id && $0.importedAt == installed.importedAt && $0.fileName == installed.fileName
+        }), current.separateInstallationRequested == true else { return }
+        current.separateInstallationRequested = false
+        try saveImportedIPA(current)
+    }
+
     func saveImportedIPA(_ app: ImportedIPA) throws {
         if let fileName = app.fileName,
            !fileManager.isReadableFile(atPath: directory.appendingPathComponent(fileName).path) {

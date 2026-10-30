@@ -1,8 +1,8 @@
 {
   "Package.swift": {
-    "mtime": 1793378607.043838,
-    "seen": 1793378618.8196373,
-    "ast_hash": "07820c9cf54e15eb35ad9d89d3ce2e73",
+    "mtime": 1793380340.181389,
+    "seen": 1793381258.1357603,
+    "ast_hash": "f8cc4ce3d141129aaa896db8b1ea4925",
     "semantic_hash": ""
   },
   "SideKick/App/AppEnvironment.swift": {
@@ -48,9 +48,9 @@
     "semantic_hash": ""
   },
   "SideKick/Models/ImportedIPA.swift": {
-    "mtime": 1792258253.952649,
-    "seen": 1792258375.6907694,
-    "ast_hash": "0944fba4c7234fd93ed3b81a8bf65510",
+    "mtime": 1793381348.3123565,
+    "seen": 1793381663.917471,
+    "ast_hash": "1b1c05c07146595116aec9500ebf10cf",
     "semantic_hash": ""
   },
   "SideKick/Models/LiveContainerModels.swift": {
@@ -144,9 +144,9 @@
     "semantic_hash": ""
   },
   "SideKick/Services/IPAImportStore.swift": {
-    "mtime": 1793216385.5767303,
-    "seen": 1793216467.587509,
-    "ast_hash": "5b073982a47d4a9fbc7db1b6f125a13f",
+    "mtime": 1793381348.3153546,
+    "seen": 1793381663.917519,
+    "ast_hash": "8da2b75106253dd72ba9cf90a30ea03e",
     "semantic_hash": ""
   },
   "SideKick/Services/LiveContainerScanner.swift": {
@@ -210,9 +210,9 @@
     "semantic_hash": ""
   },
   "SideKick/Services/SideStoreOperationService.swift": {
-    "mtime": 1793312646.3453598,
-    "seen": 1793312658.8279378,
-    "ast_hash": "b78bec9816e49cf4a5248f7be17590ab",
+    "mtime": 1793381348.3163557,
+    "seen": 1793381663.917554,
+    "ast_hash": "857d1de10bfd396c285ab1fb4ee25ce2",
     "semantic_hash": ""
   },
   "SideKick/Services/SigningAccountStore.swift": {
@@ -252,15 +252,15 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Home/HomeView.swift": {
-    "mtime": 1793378607.049351,
-    "seen": 1793378618.819772,
-    "ast_hash": "90fc4e20a5cec627dbd6c424e6788534",
+    "mtime": 1793381348.3133574,
+    "seen": 1793381663.917575,
+    "ast_hash": "65fa0da721c9a8db07cd948ceffb373b",
     "semantic_hash": ""
   },
   "SideKick/Views/Home/IPASharingViews.swift": {
-    "mtime": 1792258318.4574835,
-    "seen": 1792258375.6908367,
-    "ast_hash": "b9932975b2ea199b3f85e9f16b4e52e6",
+    "mtime": 1793381348.314356,
+    "seen": 1793381663.917576,
+    "ast_hash": "9d033c1a104da50c7c00ae733cf9de96",
     "semantic_hash": ""
   },
   "SideKick/Views/Library/AppManagementView.swift": {
@@ -378,9 +378,9 @@
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_integration_patches.py": {
-    "mtime": 1793378607.0513506,
-    "seen": 1793378618.8198428,
-    "ast_hash": "7cc99c964111509c148a3ceef655e521",
+    "mtime": 1793380998.819596,
+    "seen": 1793381258.1359951,
+    "ast_hash": "e3e9bd7a735ceefa5ed1d1966bf69512",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_release_manifest.py": {
@@ -3492,9 +3492,9 @@
     "semantic_hash": ""
   },
   ".github/workflows/ios-build.yml": {
-    "mtime": 1793312646.3424327,
-    "seen": 1793312658.8291984,
-    "ast_hash": "d42bd4b1e1a53affb185d8c315e14cb2",
+    "mtime": 1793380408.821327,
+    "seen": 1793381258.1377316,
+    "ast_hash": "d8899265ae19f857690a5458baeba132",
     "semantic_hash": ""
   },
   "AGENTS.md": {
@@ -3666,9 +3666,9 @@
     "semantic_hash": ""
   },
   "docs/settings-functionality.md": {
-    "mtime": 1793378607.0533495,
-    "seen": 1793378618.8208025,
-    "ast_hash": "b5e9acece609a4afb7a72109e83d8d87",
+    "mtime": 1793381108.3730166,
+    "seen": 1793381258.1378365,
+    "ast_hash": "0b2aeea4065ec6b2541a31af9c556e54",
     "semantic_hash": ""
   },
   "docs/stock-livecontainer-transfer.md": {
@@ -3936,15 +3936,15 @@
     "semantic_hash": ""
   },
   "SideKick/Services/IPAImportDownloadStore.swift": {
-    "mtime": 1792251902.0389216,
-    "seen": 1792252018.9400892,
-    "ast_hash": "f9498227553b2a8a09346cb59ba07b00",
+    "mtime": 1793381563.357164,
+    "seen": 1793381663.9175177,
+    "ast_hash": "fab16a80e1ebfa640bf70828d0ce5b1b",
     "semantic_hash": ""
   },
   "SideKick/Views/Home/ImportDownloadViews.swift": {
-    "mtime": 1792251946.0829804,
-    "seen": 1792252018.9401226,
-    "ast_hash": "21affacf95d764e15c180a51d5afafb6",
+    "mtime": 1793381563.3561635,
+    "seen": 1793381663.9175775,
+    "ast_hash": "b233c35fe110843f7847ff869bdbca69",
     "semantic_hash": ""
   },
   "SideKick/Services/RefreshFailureReport.swift": {
@@ -4233,6 +4233,48 @@
     "mtime": 1793378607.0523489,
     "seen": 1793378618.8198888,
     "ast_hash": "e046eb0b2beb01c08f887ead53efe209",
+    "semantic_hash": ""
+  },
+  "SideKick/Services/InstallReplacementPolicy.swift": {
+    "mtime": 1793380340.180385,
+    "seen": 1793381258.1358602,
+    "ast_hash": "2ca867a824cab8db58141b31b0c3ae46",
+    "semantic_hash": ""
+  },
+  "SideKick/Services/NativeInstallReplacementReview.swift": {
+    "mtime": 1793381749.395648,
+    "seen": 1793381796.1110911,
+    "ast_hash": "661eed64bbfb295cb22dce38cac3bcd6",
+    "semantic_hash": ""
+  },
+  "SideKick/Views/Library/MatchingIPAImportReviewView.swift": {
+    "mtime": 1793381108.3650155,
+    "seen": 1793381258.1359348,
+    "ast_hash": "180456bdb218d89198a39f5058959201",
+    "semantic_hash": ""
+  },
+  "Tests/ReleaseManifest/install_review_checks.py": {
+    "mtime": 1793380998.819596,
+    "seen": 1793381258.1359756,
+    "ast_hash": "9d278d8f82d8f03886b117895cfaf5db",
+    "semantic_hash": ""
+  },
+  "Tests/ReleaseManifest/test_import_review.py": {
+    "mtime": 1793380998.8205945,
+    "seen": 1793381258.1359916,
+    "ast_hash": "fb4465783c2b3c748951f68b556f6da3",
+    "semantic_hash": ""
+  },
+  "Tests/SideKickCoreTests/InstallReplacementPolicyTests.swift": {
+    "mtime": 1793381778.3632932,
+    "seen": 1793381796.1112306,
+    "ast_hash": "dec7d4142ff5b177e8867bf98d3a189c",
+    "semantic_hash": ""
+  },
+  "scripts/integrate-install-review.py": {
+    "mtime": 1793381212.9420726,
+    "seen": 1793381258.137709,
+    "ast_hash": "9c271db6e7b18be0106ce739b42d2718",
     "semantic_hash": ""
   }
 }

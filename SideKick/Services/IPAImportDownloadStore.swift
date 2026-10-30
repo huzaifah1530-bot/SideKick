@@ -42,7 +42,9 @@ final class IPAImportDownloadStore {
     private(set) var order: [UUID] = []
     /// The job whose page is on screen; the floating button hides it.
     var visibleJobID: UUID?
+    var reviewRequestedJobID: UUID?
     @ObservationIgnored private var tasks: [UUID: Task<Void, Never>] = [:]
+    @ObservationIgnored private var choicesInFlight: Set<UUID> = []
     @ObservationIgnored private let ipaStore: IPAImportStore
 
     init(ipaStore: IPAImportStore) { self.ipaStore = ipaStore }
@@ -74,6 +76,8 @@ final class IPAImportDownloadStore {
 
     /// While downloading: stops. After: deletes the IPA. Either way the job is forgotten.
     func cancel(_ id: UUID) async {
+        guard !choicesInFlight.contains(id) else { return }
+        if reviewRequestedJobID == id { reviewRequestedJobID = nil }
         tasks[id]?.cancel()
         tasks[id] = nil
         let state = jobs[id]?.state
@@ -88,15 +92,21 @@ final class IPAImportDownloadStore {
 
     /// Clears a finished or failed job from the list without touching the saved IPA.
     func dismiss(_ id: UUID) {
-        guard tasks[id] == nil else { return }
+        guard tasks[id] == nil, !choicesInFlight.contains(id) else { return }
         jobs[id] = nil
         order.removeAll { $0 == id }
     }
 
-    func choose(_ id: UUID, target: InstalledAppSummary) async {
-        guard case .needsTarget(let ipa, _) = jobs[id]?.state else { return }
-        do { jobs[id]?.state = .ready(try await save(ipa, targetID: target.id), isUpdate: true) }
-        catch { fail(id, error) }
+    func choose(_ id: UUID, target: InstalledAppSummary?) async {
+        guard !choicesInFlight.contains(id), case .needsTarget(let ipa, let installations) = jobs[id]?.state else { return }
+        if let target, !installations.contains(where: { $0.id == target.id }) { return }
+        choicesInFlight.insert(id)
+        defer { choicesInFlight.remove(id) }
+        do { jobs[id]?.state = .ready(try await save(ipa, targetID: target?.id, asSeparateApp: target == nil), isUpdate: target != nil) }
+        catch {
+            await ipaStore.discardPreparedIPA(ipa)
+            fail(id, error)
+        }
     }
 
     func retry(_ id: UUID) {
@@ -152,10 +162,11 @@ final class IPAImportDownloadStore {
         tasks[id] = nil
     }
 
-    private func save(_ ipa: ImportedIPA, targetID: String?) async throws -> ImportedIPA {
+    private func save(_ ipa: ImportedIPA, targetID: String?, asSeparateApp: Bool = false) async throws -> ImportedIPA {
         var saved = ipa
         saved.isQueuedForUpdate = targetID != nil
         saved.queuedForInstalledAppID = targetID
+        saved.separateInstallationRequested = asSeparateApp
         try await ipaStore.saveImportedIPA(saved)
         return saved
     }

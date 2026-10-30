@@ -246,30 +246,33 @@ final class SideStoreOperationService {
                             accountIdentifier: account.accountIdentifier, teamIdentifier: account.teamIdentifier,
                             useImportedCertificate: false)
                     }
-                    return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
-                        guard !SideKickStorageCleanup.isRemovingFiles else {
-                            continuation.resume(throwing: StorageCleanupError.operationRunning)
-                            return
-                        }
-                        let observationBox = ProgressObservationBox()
-                        let group = AppManager.shared.install(.url(url), presentingViewController: presenter,
-                                                              customBundleIdentifier: customBundleIdentifier) { result in
-                            observationBox.finish()
-                            switch result {
-                            case .failure(let error): continuation.resume(throwing: error)
-                            case .success(let app):
-                                guard let context = app.managedObjectContext else {
-                                    continuation.resume(throwing: SideStoreOperationError.installedAppUnavailable)
-                                    return
-                                }
-                                context.perform { continuation.resume(returning: app.resignedBundleIdentifier) }
+                    return try await NativeInstallReplacementReview.withReview(
+                        expectedUpdateIdentifier: ipa.isUpdateQueued ? ipa.queuedForInstalledAppID : nil) {
+                        return try await withCheckedThrowingContinuation { (continuation: CheckedContinuation<String, Error>) in
+                            guard !SideKickStorageCleanup.isRemovingFiles else {
+                                continuation.resume(throwing: StorageCleanupError.operationRunning)
+                                return
                             }
+                            let observationBox = ProgressObservationBox()
+                            let group = AppManager.shared.install(.url(url), presentingViewController: presenter,
+                                                                  customBundleIdentifier: customBundleIdentifier) { result in
+                                observationBox.finish()
+                                switch result {
+                                case .failure(let error): continuation.resume(throwing: error)
+                                case .success(let app):
+                                    guard let context = app.managedObjectContext else {
+                                        continuation.resume(throwing: SideStoreOperationError.installedAppUnavailable)
+                                        return
+                                    }
+                                    context.perform { continuation.resume(returning: app.resignedBundleIdentifier) }
+                                }
+                            }
+                            let observation = group.progress.observe(\.fractionCompleted, options: [.initial, .new]) { progress, _ in
+                                let fraction = progress.fractionCompleted
+                                Task { @MainActor in progressHandler(fraction) }
+                            }
+                            observationBox.retain(observation)
                         }
-                        let observation = group.progress.observe(\.fractionCompleted, options: [.initial, .new]) { progress, _ in
-                            let fraction = progress.fractionCompleted
-                            Task { @MainActor in progressHandler(fraction) }
-                        }
-                        observationBox.retain(observation)
                     }
                 }
             }
@@ -294,6 +297,10 @@ final class SideStoreOperationService {
                 // receipt for next-launch recovery and report persistence separately.
                 debugLog("[SideKick] Installation succeeded, but its GitHub update receipt could not be saved: \(error.localizedDescription)")
             }
+        }
+        if selfBinaryMatches, ipa.separateInstallationRequested == true {
+            do { try await ipaStore.completeSeparateInstallation(ipa) }
+            catch { debugLog("[SideKick] Installed the app, but could not complete its Imports entry: \(error.localizedDescription)") }
         }
         if selfBinaryMatches, ipa.queuedForInstalledAppID != nil {
             do { try await ipaStore.delete(ipa) }
