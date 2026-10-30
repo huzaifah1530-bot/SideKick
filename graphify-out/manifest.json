@@ -4242,9 +4242,9 @@
     "semantic_hash": ""
   },
   "SideKick/Services/NativeInstallReplacementReview.swift": {
-    "mtime": 1793381749.395648,
-    "seen": 1793381796.1110911,
-    "ast_hash": "661eed64bbfb295cb22dce38cac3bcd6",
+    "mtime": 1793381980.27809,
+    "seen": 1793382012.6548085,
+    "ast_hash": "6a95427fe09324eb60463184a202bc85",
     "semantic_hash": ""
   },
   "SideKick/Views/Library/MatchingIPAImportReviewView.swift": {

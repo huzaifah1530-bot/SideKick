@@ -22,6 +22,7 @@ enum NativeInstallReplacementReview {
     /// before the native installation or installed-app tracking data changes.
     static func review(finalIdentifier: String) async throws {
         guard let request = current else { return }
+        guard !Task.isCancelled else { throw OperationError.cancelled }
         guard !finalIdentifier.isEmpty, !finalIdentifier.contains("\0") else {
             throw OperationError.invalidParameters("The signed package has an invalid bundle ID.")
         }
@@ -49,6 +50,7 @@ enum NativeInstallReplacementReview {
             alert.addAction(UIAlertAction(title: "Replace App", style: .destructive) { _ in continuation.resume(returning: true) })
             presenter.present(alert, animated: true)
         }
+        guard current?.id == request.id, !Task.isCancelled else { throw OperationError.cancelled }
         guard accepted else { throw OperationError.cancelled }
     }
 }

@@ -1,7 +1,7 @@
 # Graph Report - Sidekick  (2026-10-30)
 
 ## Corpus Check
-- 698 files · ~517,519 words
+- 698 files · ~517,536 words
 - Verdict: corpus is large enough that graph structure adds value.
 - Unclassified: 112 file(s) not represented in the graph (top: (none) 34, .patch 20, .xib 14)
 
@@ -11,7 +11,7 @@
 - Token cost: 0 input · 0 output
 
 ## Graph Freshness
-- Built from commit: `55203bc6`
+- Built from commit: `487bc34b`
 - Run `git rev-parse HEAD` and compare to check if the graph is stale.
 - Run `graphify update .` after code changes (no API cost).
 
