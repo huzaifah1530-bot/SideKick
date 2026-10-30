@@ -44,8 +44,8 @@ idevice = """    public func lookupInstalledAppName(bundleId: String) async thro
                 var count: Int = 0
                 defer {
                     if let result, count >= 0 {
-                        idevice_plist_array_free(result.assumingMemoryBound(to: plist_t?.self), count)
-                        idevice_outer_slice_free(result, count)
+                        idevice_plist_array_free(result.assumingMemoryBound(to: plist_t?.self), UInt(count))
+                        idevice_outer_slice_free(result, UInt(count))
                     }
                 }
                 try bundleId.withCString { identifier in

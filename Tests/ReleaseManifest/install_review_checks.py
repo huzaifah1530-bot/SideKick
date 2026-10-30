@@ -41,12 +41,12 @@ func installation_proxy_get_apps(_ client: Int, _ applicationType: UnsafePointer
     }
     return nil
 }
-func idevice_plist_array_free(_ pointer: UnsafeMutablePointer<plist_t?>, _ count: Int) { freedPlists += 1 }
-func idevice_outer_slice_free(_ pointer: UnsafeMutableRawPointer, _ count: Int) {
+func idevice_plist_array_free(_ pointer: UnsafeMutablePointer<plist_t?>, _ count: UInt) { freedPlists += 1 }
+func idevice_outer_slice_free(_ pointer: UnsafeMutableRawPointer, _ count: UInt) {
     freedArrays += 1
     if count > 0 {
         let array = pointer.assumingMemoryBound(to: plist_t?.self)
-        array.deinitialize(count: count)
+        array.deinitialize(count: Int(count))
         array.deallocate()
     }
 }
