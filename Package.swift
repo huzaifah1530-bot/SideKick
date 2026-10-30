@@ -34,6 +34,8 @@ let package = Package(
             "Services/AnisetteConfiguration.swift",
             "Services/DailyRefreshReminderPlan.swift",
             "Services/SigningIdentityPolicy.swift",
+            "Services/AppInstallationState.swift",
+            "Services/CertificateExportPolicy.swift",
             "Services/StorageArchiveImportance.swift",
             "Services/AppIconVariant.swift",
             "Services/RemoteAnisetteConfiguration.swift",

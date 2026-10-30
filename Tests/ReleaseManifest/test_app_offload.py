@@ -40,7 +40,10 @@ class AppOffloadTests(unittest.TestCase):
         self.assertIn('SwiftUI.Section("Offloaded")', home)
         self.assertIn('ForEach(installedApps.filter { !$0.isActive })', home)
         self.assertIn('NavigationLink { AppManagementView(installedApp: app) }', home)
-        self.assertIn('Label("Restore App"', home)
+        detail = (ROOT / 'SideKick/Views/Library/AppManagementView.swift').read_text(encoding='utf-8')
+        self.assertIn('Label("Restore App"', detail)
+        self.assertIn('Button("Remove from Saved"', detail)
+        self.assertNotIn('Button("Remove from Saved"', home)
         self.assertIn('$0.isActive && !AppOffloadService.blocksNativeOperations', runtime)
         self.assertIn('SideKick.transfer.', service)  # Retain interrupted old-transfer recovery.
         self.assertIn('importConfiguration: configuration', service)

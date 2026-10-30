@@ -20,7 +20,7 @@ enum SideKickCertificateExport {
                 let recipients = try await SigningAccountStore().liveContainerCertificateRecipients()
                 guard let presenter = UIApplication.shared.topViewController() else { return }
                 guard !recipients.isEmpty else {
-                    presentError("No installed LiveContainer app with a saved signing account was found.", in: presenter)
+                    presentError("No installed LiveContainer app with an available signing identity was found.", in: presenter)
                     return
                 }
 
@@ -86,7 +86,7 @@ enum SideKickCertificateExport {
         in presenter: UIViewController
     ) {
         let entries = recipients.enumerated().map { index, recipient in
-            "\(index + 1). \(recipient.name) — \(recipient.accountEmail), \(recipient.teamName) (\(recipient.teamIdentifier)); \(recipient.bundleIdentifier)"
+            "\(index + 1). \(recipient.name) — \(recipient.signerDescription), \(recipient.teamName) (\(recipient.teamIdentifier)); \(recipient.bundleIdentifier)"
         }.joined(separator: "\n")
         let alert = UIAlertController(
             title: "Choose LiveContainer",
@@ -110,7 +110,7 @@ enum SideKickCertificateExport {
     ) {
         let alert = UIAlertController(
             title: "Export Certificate to \(recipient.name)?",
-            message: "This shares the signing certificate for \(recipient.accountEmail), team \(recipient.teamName) (\(recipient.teamIdentifier)), with the installed app \(recipient.bundleIdentifier). Destination: \(destination.description). The recipient can use this certificate to sign apps.",
+            message: "This shares the signing certificate for \(recipient.signerDescription), team \(recipient.teamName) (\(recipient.teamIdentifier)), with the installed app \(recipient.bundleIdentifier). Destination: \(destination.description). The recipient can use this certificate to sign apps.",
             preferredStyle: .alert
         )
         alert.addAction(UIAlertAction(title: "Export", style: .destructive) { _ in

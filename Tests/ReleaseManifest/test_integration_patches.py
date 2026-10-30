@@ -105,6 +105,8 @@ class IntegrationPatchTests(unittest.TestCase):
             atomic = installation[installation.index('        let isBackupHelper ='):installation.index('        let (installedApp, isDifferentSideStore, bundleID, isSelfReinstall, isSideBackup)')]
             self.assertLess(atomic.index('try await installIPA'), atomic.index('self.fetchOrCreateApp'))
             self.assertIn('installed.isActive = true', atomic)
+            self.assertLess(atomic.index('try await installIPA'), atomic.index('AppInstallationState.recordSuccessfulInstall'))
+            self.assertLess(atomic.index('installed.isActive = true'), atomic.index('AppInstallationState.recordSuccessfulInstall'))
             stage = (checkout / "SideStore/Core/Operations/PipelineOperations/StageBackupAppOperation.swift").read_text()
             self.assertIn('updates["SideKickBackupAppGroup"] = backupGroup', stage)
             shared = (checkout / "Shared/Extensions/Bundle+AltStore.swift").read_text()

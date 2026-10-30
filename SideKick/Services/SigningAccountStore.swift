@@ -31,8 +31,11 @@ struct LiveContainerCertificateRecipient: Identifiable, Equatable, Sendable {
     let accountEmail: String
     let teamIdentifier: String
     let teamName: String
+    var signingCertificateSerial: String? = nil
+    var certificateName: String? = nil
+    var signerDescription: String { certificateName ?? accountEmail }
 
-    var id: String { "\(installationIdentifier)|\(accountIdentifier)|\(teamIdentifier)" }
+    var id: String { "\(installationIdentifier)|\(accountIdentifier)|\(teamIdentifier)|\(signingCertificateSerial ?? "")" }
 }
 
 @MainActor
@@ -615,6 +618,7 @@ final class SigningAccountStore {
             throw SigningAccountError.databaseUnavailable
         }
 
+        let importedCertificates = ImportedCertificateStore.shared.catalog.certificates
         let context = DatabaseManager.shared.viewContext
         return try await context.perform {
             let apps = try context.fetch(InstalledApp.fetchRequest())
@@ -627,6 +631,16 @@ final class SigningAccountStore {
                 : stableMatches
 
             return matches.compactMap { app in
+                if let serial = app.certificateSerialNumber,
+                   let imported = importedCertificates.first(where: {
+                       ImportedCertificateCatalog.normalizedSerial($0.serialNumber) == ImportedCertificateCatalog.normalizedSerial(serial)
+                   }), let profile = imported.profile {
+                    return LiveContainerCertificateRecipient(
+                        installationIdentifier: app.resignedBundleIdentifier, bundleIdentifier: app.bundleIdentifier,
+                        name: app.name, accountIdentifier: "", accountEmail: "",
+                        teamIdentifier: profile.teamIdentifier, teamName: profile.teamName,
+                        signingCertificateSerial: serial, certificateName: imported.name)
+                }
                 guard let team = app.team, let account = team.account else { return nil }
                 return LiveContainerCertificateRecipient(
                     installationIdentifier: app.resignedBundleIdentifier,
@@ -635,7 +649,8 @@ final class SigningAccountStore {
                     accountIdentifier: account.identifier,
                     accountEmail: account.appleID,
                     teamIdentifier: team.identifier,
-                    teamName: team.name
+                    teamName: team.name,
+                    signingCertificateSerial: app.certificateSerialNumber
                 )
             }
             .sorted {
@@ -666,40 +681,38 @@ final class SigningAccountStore {
             let apps = try context.fetch(InstalledApp.fetchRequest())
             guard let liveContainer = apps.first(where: {
                 $0.resignedBundleIdentifier == recipient.installationIdentifier
-            }),
-                  let team = liveContainer.team,
-                  let account = team.account,
-                  liveContainer.bundleIdentifier == recipient.bundleIdentifier,
-                  account.identifier == recipient.accountIdentifier,
-                  team.identifier == recipient.teamIdentifier else {
+            }), liveContainer.bundleIdentifier == recipient.bundleIdentifier,
+                liveContainer.certificateSerialNumber == recipient.signingCertificateSerial else {
                 throw SigningAccountError.savedAccountMissing
             }
-            return (account.identifier, team.identifier)
+            if recipient.certificateName == nil {
+                guard liveContainer.team?.account?.identifier == recipient.accountIdentifier,
+                      liveContainer.team?.identifier == recipient.teamIdentifier else {
+                    throw SigningAccountError.savedAccountMissing
+                }
+            }
+            return (recorded: liveContainer.certificateSerialNumber,
+                cached: CertificateManager.shared.getSigningCertificate(for: liveContainer)?.serialNumber,
+                profileSerials: liveContainer.customProvisioningProfile?.certificates.map(\.serialNumber) ?? [])
         }
 
-        let certificateData: Data
-        let password: String
-        if let imported = try ImportedCertificateStore.shared.assignedSigningCertificate(
-            accountIdentifier: target.0,
-            teamIdentifier: target.1
-        ) {
-            // LiveContainer needs the identity that actually signed it, so share the imported one.
-            let exportPassword = imported.record.serialNumber
-            certificateData = try CertificateManager.convert(imported.certificate, password: exportPassword)
-            password = exportPassword
+        let certificate: ALTCertificate
+        if let serial = target.recorded,
+           ImportedCertificateStore.shared.catalog.record(matchingSerial: serial) != nil {
+            certificate = try ImportedCertificateStore.shared.signingCertificate(serialNumber: serial).certificate
         } else {
+            guard recipient.certificateName == nil else { throw SigningAccountError.certificateUnavailable }
             let credentials = try vault.load(key: SigningSessionVault.key(
-                accountIdentifier: target.0,
-                teamIdentifier: target.1
-            ))
-            guard let savedData = credentials.certificateData,
-                  let savedPassword = credentials.certificatePassword else {
-                throw SigningAccountError.certificateUnavailable
-            }
-            certificateData = savedData
-            password = savedPassword
+                accountIdentifier: recipient.accountIdentifier, teamIdentifier: recipient.teamIdentifier))
+            guard let savedData = credentials.certificateData else { throw SigningAccountError.certificateUnavailable }
+            certificate = try CertificateManager.parse(savedData, password: credentials.certificatePassword)
         }
-        _ = try CertificateManager.parse(certificateData, password: password)
+        try CertificateExportPolicy.validate(candidate: certificate.serialNumber, recorded: target.recorded,
+            cachedSigner: target.cached, profileSerials: target.profileSerials)
+        try await OCSPValidator.validate(certificate.x509)
+        // Re-export with a known password even when the source P12 had no password.
+        let password = certificate.serialNumber
+        let certificateData = try CertificateManager.convert(certificate, password: password)
         let base64Certificate = certificateData.base64EncodedString()
         var allowed = CharacterSet.urlQueryAllowed
         allowed.remove(charactersIn: ";/?:@&=+$, ")
@@ -1239,7 +1252,7 @@ private enum SigningAccountError: LocalizedError {
         case .credentialsUnavailable:
             return "SideKick couldn’t retrieve the Apple ID details. Please try signing in again."
         case .certificateUnavailable:
-            return "SideKick has no saved signing certificate for the account used by LiveContainer. Refresh LiveContainer in SideKick, then import the certificate again."
+            return "SideKick has no matching saved signing certificate for this LiveContainer installation. Re-sign LiveContainer in SideKick, then import its certificate again."
         case .databaseUnavailable:
             return "SideKick’s local database isn’t available. Restart the app and try again before signing in."
         case .keychain(let status):

@@ -122,6 +122,7 @@ edit("SideStore/Core/Operations/PipelineOperations/InstallAppOperation.swift",
                 self.context.beginInstallationHandler?(installed)
                 return installed
             }
+            AppInstallationState.recordSuccessfulInstall(identifier: resignedAppBundle.bundleIdentifier)
             self.setProgress(100)
             return installedApp
         }

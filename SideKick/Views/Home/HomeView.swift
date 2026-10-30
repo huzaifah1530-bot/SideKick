@@ -39,7 +39,6 @@ struct HomeView: View {
     @State private var isRoutingUpdateNotification = false
     @State private var expirationClock = Date.now
     @State private var ipaPendingRemoval: ImportedIPA?
-    @State private var savedAppPendingRemoval: InstalledAppSummary?
     @State private var contextRoute: HomeContextRoute?
     /// Files picked together import one at a time, pausing whenever one needs an update choice.
     @State private var pendingFileImports: [URL] = []
@@ -226,33 +225,14 @@ struct HomeView: View {
                 if installedApps.contains(where: { !$0.isActive }) {
                     SwiftUI.Section("Offloaded") {
                         ForEach(installedApps.filter { !$0.isActive }) { app in
-                            HStack {
-                                NavigationLink { AppManagementView(installedApp: app) } label: {
-                                    SideKickLibraryAppRow(
-                                        name: app.name,
-                                        versionText: app.version,
-                                        iconData: app.iconData,
-                                        metadata: { EmptyView() },
-                                        status: { Image(systemName: "icloud.and.arrow.down").foregroundStyle(.secondary).accessibilityLabel("Offloaded") }
-                                    )
-                                }
-                                Menu {
-                                    SwiftUI.Button { contextRoute = .offload(app.id) } label: {
-                                        Label("Restore App", systemImage: "arrow.down.circle")
-                                    }
-                                    SwiftUI.Button("Remove from Saved", role: .destructive) { savedAppPendingRemoval = app }
-                                } label: {
-                                    Image(systemName: "ellipsis").frame(width: 44, height: 44)
-                                }
-                                .accessibilityLabel("Actions for \(app.name)")
+                            NavigationLink { AppManagementView(installedApp: app) } label: {
+                                SideKickLibraryAppRow(
+                                    name: app.name, versionText: app.version, iconData: app.iconData,
+                                    metadata: { EmptyView() },
+                                    status: { Image(systemName: "icloud.and.arrow.down").foregroundStyle(.secondary).accessibilityLabel("Offloaded") }
+                                )
                             }
-                            .contextMenu {
-                                SwiftUI.Button { contextRoute = .offload(app.id) } label: {
-                                    Label("Restore App", systemImage: "arrow.down.circle")
-                                }
-                                copyMenuItem("Copy Bundle ID", value: app.bundleIdentifier)
-                                SwiftUI.Button("Remove from Saved", role: .destructive) { savedAppPendingRemoval = app }
-                            }
+
                         }
                     }
                 }
@@ -319,21 +299,6 @@ struct HomeView: View {
                 }
             }
             .messageAlert("LiveContainer", message: $liveContainerError)
-            .confirmationDialog("Remove saved app?", isPresented: Binding(
-                get: { savedAppPendingRemoval != nil }, set: { if !$0 { savedAppPendingRemoval = nil } }), titleVisibility: .visible) {
-                SwiftUI.Button("Remove from Saved", role: .destructive) {
-                    guard let app = savedAppPendingRemoval else { return }
-                    savedAppPendingRemoval = nil
-                    Task {
-                        do {
-                            try await AppOffloadService(app: app, accounts: accountStore).forgetSavedApp()
-                            await environment.reloadLocalCatalogues()
-                        } catch { appRefreshErrorMessage = error.localizedDescription }
-                    }
-                }
-            } message: {
-                Text("Removes the saved entry from this list. It does not uninstall an app or delete retained app files or backups.")
-            }
             .confirmationDialog(
                 "Remove \(ipaPendingRemoval?.name ?? "IPA")?",
                 isPresented: Binding(get: { ipaPendingRemoval != nil }, set: { if !$0 { ipaPendingRemoval = nil } }),

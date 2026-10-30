@@ -62,7 +62,7 @@ struct AccountsView: View {
                 ContentUnavailableView {
                     Label("No Apple Accounts", systemImage: "person.crop.circle")
                 } description: {
-                    Text("Add an Apple Account or import a certificate below to sign apps. GitHub sign-in enables update checks.")
+                    Text("Use + to add an Apple Account or import a certificate to sign apps. GitHub sign-in enables update checks.")
                 } actions: {
                     SwiftUI.Button { isShowingSignIn = true } label: {
                         Text("Add Apple Account").font(.headline).padding(.horizontal, Spacing.m)
@@ -85,21 +85,20 @@ struct AccountsView: View {
                     Text("Apps are signed with these accounts. Passwords are stored in the iOS Keychain.")
                 }
             }
-            Section {
-                ForEach(certificates.certificates) { record in
-                    NavigationLink {
-                        ImportedCertificateDetailView(record: record, accountStore: accountStore)
-                    } label: {
-                        ImportedCertificateRow(record: record, usageCount: 0)
+            if !certificates.certificates.isEmpty {
+                Section {
+                    ForEach(certificates.certificates) { record in
+                        NavigationLink {
+                            ImportedCertificateDetailView(record: record, accountStore: accountStore)
+                        } label: {
+                            ImportedCertificateRow(record: record, usageCount: 0)
+                        }
                     }
+                } header: {
+                    Text("Certificates")
+                } footer: {
+                    Text("Sign with a .p12 certificate and its provisioning profile. An Apple Account sign-in is not required.")
                 }
-                NavigationLink { ImportedCertificatesView() } label: {
-                    Label("Import or Manage Certificates", systemImage: "checkmark.seal")
-                }
-            } header: {
-                Text("Certificates")
-            } footer: {
-                Text("Sign with a .p12 certificate and its provisioning profile. An Apple Account sign-in is not required.")
             }
             if let githubAccount {
                 Section {
@@ -132,6 +131,9 @@ struct AccountsView: View {
                         Label("Apple Account", systemImage: "apple.logo")
                     }
                     .disabled(accountStore.isWorking)
+                    NavigationLink { ImportedCertificatesView() } label: {
+                        Label("Certificate", systemImage: "checkmark.seal")
+                    }
                     SwiftUI.Button { isShowingGitHubSignIn = true } label: {
                         Label("GitHub Account", systemImage: "chevron.left.forwardslash.chevron.right")
                     }

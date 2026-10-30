@@ -65,6 +65,7 @@ struct AppManagementView: View {
 
     @State private var route: Route?
     @State private var isConfirmingImportedRemoval = false
+    @State private var isConfirmingSavedRemoval = false
 
     private var iconData: Data? { importedApp?.iconData ?? installedApp?.iconData ?? requiredQueuedIPA?.iconData }
     private var versionText: String {
@@ -189,6 +190,20 @@ struct AppManagementView: View {
                 catch { return }
                 expirationClock = .now
             }
+        }
+        .confirmationDialog("Remove saved app?", isPresented: $isConfirmingSavedRemoval, titleVisibility: .visible) {
+            SwiftUI.Button("Remove from Saved", role: .destructive) {
+                guard let installedApp else { return }
+                Task {
+                    do {
+                        try await AppOffloadService(app: installedApp, accounts: accountStore).forgetSavedApp()
+                        await environment.reloadLocalCatalogues()
+                        dismiss()
+                    } catch { errorMessage = error.localizedDescription }
+                }
+            }
+        } message: {
+            Text("Removes the saved entry. Retained app files and backups can be managed in Settings → Storage.")
         }
         .messageAlert("Couldn’t Continue", message: $errorMessage)
     }
@@ -329,11 +344,17 @@ struct AppManagementView: View {
     }
 
     private var hasMoreActions: Bool {
-        canActOnInstalledApp || importedApp != nil || pendingUpdateIPA != nil || requiredQueuedIPA != nil
+        (installedApp != nil && !isQueuedTargetUnavailable) || importedApp != nil || pendingUpdateIPA != nil || requiredQueuedIPA != nil
     }
 
     @ViewBuilder
     private var moreMenuItems: some View {
+        if let installedApp, !installedApp.isActive, !isQueuedTargetUnavailable {
+            SwiftUI.Button { route = .offload } label: {
+                Label("Restore App", systemImage: "arrow.down.circle")
+            }
+            SwiftUI.Button("Remove from Saved", role: .destructive) { isConfirmingSavedRemoval = true }
+        }
         if let installedApp, canActOnInstalledApp, !AppOffloadService.blocksNativeOperations(installedApp.id) {
             Section {
                 SwiftUI.Button { route = .refreshAccount } label: {
