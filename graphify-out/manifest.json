@@ -1,7 +1,7 @@
 {
   "Package.swift": {
-    "mtime": 1793377510.482426,
-    "seen": 1793377765.7753172,
+    "mtime": 1793378607.043838,
+    "seen": 1793378618.8196373,
     "ast_hash": "07820c9cf54e15eb35ad9d89d3ce2e73",
     "semantic_hash": ""
   },
@@ -180,8 +180,8 @@
     "semantic_hash": ""
   },
   "SideKick/Services/SideKickCertificateExport.swift": {
-    "mtime": 1793377543.285857,
-    "seen": 1793377765.775425,
+    "mtime": 1793378607.0463493,
+    "seen": 1793378618.8197374,
     "ast_hash": "59cde1fe9335f008069502ba1328a98d",
     "semantic_hash": ""
   },
@@ -216,8 +216,8 @@
     "semantic_hash": ""
   },
   "SideKick/Services/SigningAccountStore.swift": {
-    "mtime": 1793377543.2848542,
-    "seen": 1793377765.7754393,
+    "mtime": 1793378607.0473492,
+    "seen": 1793378618.8197513,
     "ast_hash": "25a0efcefab45c73891fde89c5951d72",
     "semantic_hash": ""
   },
@@ -234,8 +234,8 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Accounts/AccountsView.swift": {
-    "mtime": 1793377663.263461,
-    "seen": 1793377765.775456,
+    "mtime": 1793378607.0483491,
+    "seen": 1793378618.8197665,
     "ast_hash": "eedf5ac99f81011a9c1ec6bdec4cf56c",
     "semantic_hash": ""
   },
@@ -252,8 +252,8 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Home/HomeView.swift": {
-    "mtime": 1793377486.343457,
-    "seen": 1793377765.7754607,
+    "mtime": 1793378607.049351,
+    "seen": 1793378618.819772,
     "ast_hash": "90fc4e20a5cec627dbd6c424e6788534",
     "semantic_hash": ""
   },
@@ -264,8 +264,8 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Library/AppManagementView.swift": {
-    "mtime": 1793377486.343457,
-    "seen": 1793377765.7754648,
+    "mtime": 1793378607.0503502,
+    "seen": 1793378618.8197773,
     "ast_hash": "64366e71258cf689c09ffa4b8e7dd988",
     "semantic_hash": ""
   },
@@ -378,8 +378,8 @@
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_integration_patches.py": {
-    "mtime": 1793377663.2624612,
-    "seen": 1793377765.7755291,
+    "mtime": 1793378607.0513506,
+    "seen": 1793378618.8198428,
     "ast_hash": "7cc99c964111509c148a3ceef655e521",
     "semantic_hash": ""
   },
@@ -3666,8 +3666,8 @@
     "semantic_hash": ""
   },
   "docs/settings-functionality.md": {
-    "mtime": 1793377738.281965,
-    "seen": 1793377765.776454,
+    "mtime": 1793378607.0533495,
+    "seen": 1793378618.8208025,
     "ast_hash": "b5e9acece609a4afb7a72109e83d8d87",
     "semantic_hash": ""
   },
@@ -3864,8 +3864,8 @@
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_app_offload.py": {
-    "mtime": 1793377663.2614644,
-    "seen": 1793377765.7755177,
+    "mtime": 1793378607.0513506,
+    "seen": 1793378618.8198314,
     "ast_hash": "71a3df55b01413cbdce0335316b5050c",
     "semantic_hash": ""
   },
@@ -3900,8 +3900,8 @@
     "semantic_hash": ""
   },
   "scripts/integrate-backup-helper.py": {
-    "mtime": 1793377824.3014991,
-    "seen": 1793377852.4066162,
+    "mtime": 1793378607.0913928,
+    "seen": 1793378618.8207407,
     "ast_hash": "b402bc3446acadc83c5c4a5c29f65517",
     "semantic_hash": ""
   },
@@ -4212,26 +4212,26 @@
     "semantic_hash": ""
   },
   "SideKick/Services/AppInstallationState.swift": {
-    "mtime": 1793377510.4714262,
-    "seen": 1793377765.7753696,
+    "mtime": 1793378607.0453434,
+    "seen": 1793378618.819681,
     "ast_hash": "fde2065499e4182a9d94e7afa8d571ef",
     "semantic_hash": ""
   },
   "SideKick/Services/CertificateExportPolicy.swift": {
-    "mtime": 1793377510.4724262,
-    "seen": 1793377765.7753751,
+    "mtime": 1793378607.0453434,
+    "seen": 1793378618.8196867,
     "ast_hash": "d73e617b2560d8d482a89bfee70116af",
     "semantic_hash": ""
   },
   "Tests/ReleaseManifest/test_signer_export.py": {
-    "mtime": 1793377663.2624612,
-    "seen": 1793377765.7755375,
+    "mtime": 1793378607.0523489,
+    "seen": 1793378618.8198507,
     "ast_hash": "cd4fc27de4383223a69f4559c1065bd0",
     "semantic_hash": ""
   },
   "Tests/SideKickCoreTests/SigningRecoveryTests.swift": {
-    "mtime": 1793377510.482426,
-    "seen": 1793377765.7755795,
+    "mtime": 1793378607.0523489,
+    "seen": 1793378618.8198888,
     "ast_hash": "e046eb0b2beb01c08f887ead53efe209",
     "semantic_hash": ""
   }
