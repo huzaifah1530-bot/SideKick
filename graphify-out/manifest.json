@@ -1,8 +1,8 @@
 {
   "Package.swift": {
-    "mtime": 1793383610.718342,
-    "seen": 1793383631.3893452,
-    "ast_hash": "f8cc4ce3d141129aaa896db8b1ea4925",
+    "mtime": 1793384567.8295536,
+    "seen": 1793385110.050591,
+    "ast_hash": "a049494a75ecfa4fff1964d3288d530b",
     "semantic_hash": ""
   },
   "SideKick/App/AppEnvironment.swift": {
@@ -210,15 +210,15 @@
     "semantic_hash": ""
   },
   "SideKick/Services/SideStoreOperationService.swift": {
-    "mtime": 1793383610.7261992,
-    "seen": 1793383631.3894687,
-    "ast_hash": "857d1de10bfd396c285ab1fb4ee25ce2",
+    "mtime": 1793384902.6866589,
+    "seen": 1793385110.0507958,
+    "ast_hash": "011d1a566eeb7e709b5f1a299d851ee3",
     "semantic_hash": ""
   },
   "SideKick/Services/SigningAccountStore.swift": {
-    "mtime": 1793378607.0473492,
-    "seen": 1793378618.8197513,
-    "ast_hash": "25a0efcefab45c73891fde89c5951d72",
+    "mtime": 1793384771.7442417,
+    "seen": 1793385110.0507991,
+    "ast_hash": "28dad5f97acb2c617a619ba317e0c97c",
     "semantic_hash": ""
   },
   "SideKick/Services/SigningExpiry.swift": {
@@ -264,9 +264,9 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Library/AppManagementView.swift": {
-    "mtime": 1793378607.0503502,
-    "seen": 1793378618.8197773,
-    "ast_hash": "64366e71258cf689c09ffa4b8e7dd988",
+    "mtime": 1793384902.6881833,
+    "seen": 1793385110.0508516,
+    "ast_hash": "04428764ed76216c2e03863336600c99",
     "semantic_hash": ""
   },
   "SideKick/Views/Library/GitHubRepositoryImportView.swift": {
@@ -282,9 +282,9 @@
     "semantic_hash": ""
   },
   "SideKick/Views/Library/GitHubUpdateDetailView.swift": {
-    "mtime": 1792517399.0358267,
-    "seen": 1792517481.4626954,
-    "ast_hash": "3aa0b22978d3d8c537e18a2e362e1688",
+    "mtime": 1793384902.689707,
+    "seen": 1793385110.0508657,
+    "ast_hash": "ce5412c16cf98006063f02d738492699",
     "semantic_hash": ""
   },
   "SideKick/Views/Library/GitHubUpdateSettingsView.swift": {
@@ -4242,9 +4242,9 @@
     "semantic_hash": ""
   },
   "SideKick/Services/NativeInstallReplacementReview.swift": {
-    "mtime": 1793383610.724688,
-    "seen": 1793383631.3894475,
-    "ast_hash": "6a95427fe09324eb60463184a202bc85",
+    "mtime": 1793384771.7421575,
+    "seen": 1793385110.0507545,
+    "ast_hash": "aa4baa64ddfdbf319969a424cdfd1c12",
     "semantic_hash": ""
   },
   "SideKick/Views/Library/MatchingIPAImportReviewView.swift": {
@@ -4275,6 +4275,24 @@
     "mtime": 1793383610.7796001,
     "seen": 1793383631.3910756,
     "ast_hash": "5cc6cc15b2e0faa0bbfed52ab3db248c",
+    "semantic_hash": ""
+  },
+  "SideKick/Models/UpdateSigningIdentity.swift": {
+    "mtime": 1793384567.8263774,
+    "seen": 1793385110.0506394,
+    "ast_hash": "81ca4c5747574c012d717d5933ea3681",
+    "semantic_hash": ""
+  },
+  "SideKick/Services/UpdateSigningIdentityStore.swift": {
+    "mtime": 1793384567.8285105,
+    "seen": 1793385110.0508223,
+    "ast_hash": "60dde3b0aa22f62cabf32388f1af6ff5",
+    "semantic_hash": ""
+  },
+  "Tests/SideKickCoreTests/UpdateSigningIdentityTests.swift": {
+    "mtime": 1793384567.8290396,
+    "seen": 1793385110.051093,
+    "ast_hash": "f0426d94e82249a16d5a35a20522b2d4",
     "semantic_hash": ""
   }
 }
